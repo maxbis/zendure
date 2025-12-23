@@ -25,7 +25,6 @@ $currentHour = date('H') . '00';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Charge Schedule Manager</title>
     <link rel="stylesheet" href="assets/css/charge_schedule.css">
-    <link rel="stylesheet" href="../zendure/assets/css/zendure.css">
 </head>
 
 <body>
