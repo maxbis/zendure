@@ -98,9 +98,19 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         response.raise_for_status()
         data = response.json()
         
-        return data.get('success', False)
-    except Exception:
-        # Silent error handling - don't interrupt main loop if status API is unavailable
+        if not data.get('success', False):
+            print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")
+            return False
+        
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️  Error posting status update to API: {e}")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"⚠️  Error parsing status API response: {e}")
+        return False
+    except Exception as e:
+        print(f"⚠️  Unexpected error posting status update: {e}")
         return False
 
 
@@ -279,10 +289,10 @@ def main():
             
     except KeyboardInterrupt:
         print("\n👋 Shutting down gracefully...")
-        post_status_update(status_api_url, 'stop', current_power, None)
+        post_status_update(status_api_url, 'stop', value, None)
     except Exception as e:
         print(f"\n❌ Fatal error in main loop: {e}")
-        post_status_update(status_api_url, 'stop', current_power, None)
+        post_status_update(status_api_url, 'stop', value, None)
         raise
 
 
