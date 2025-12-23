@@ -10,6 +10,7 @@ import json
 import time
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import requests
@@ -20,14 +21,14 @@ from zero_feed_in_shot import set_power
 # CONFIGURATION PARAMETERS
 # ============================================================================
 
+# Path to config.json (local to run_schedule)
+CONFIG_FILE_PATH = Path(__file__).parent / "config" / "config.json"
+
 # Time to pause between loop iterations (seconds)
 LOOP_INTERVAL_SECONDS = 20
 
 # Time between API calls (seconds) - 5 minutes
 API_REFRESH_INTERVAL_SECONDS = 300
-
-# API endpoint URL
-API_URL = "http://localhost/Energy/schedule/api/charge_schedule_api.php"
 
 # Valid integer range for schedule values
 MIN_VALUE = -800
@@ -35,18 +36,50 @@ MAX_VALUE = 800
 
 
 # ============================================================================
+# CONFIG LOADING
+# ============================================================================
+
+def load_config(config_path: Path) -> Dict[str, Any]:
+    """
+    Load configuration from config.json.
+    
+    Expected keys:
+    - apiUrl: API endpoint URL for charge schedule
+    """
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in config file {config_path}: {e}")
+    
+    api_url = config.get("apiUrl")
+    
+    if not api_url:
+        raise ValueError("apiUrl not found in config.json")
+    
+    return {
+        "apiUrl": api_url,
+    }
+
+
+# ============================================================================
 # API CALL FUNCTION
 # ============================================================================
 
-def fetch_schedule_api() -> Optional[Dict[str, Any]]:
+def fetch_schedule_api(api_url: str) -> Optional[Dict[str, Any]]:
     """
-    Fetches the charge schedule data from the API.n automate.py, we have two possible vl
+    Fetches the charge schedule data from the API.
+    
+    Args:
+        api_url: The API endpoint URL to fetch from
     
     Returns:
         Dictionary with API response data, or None on error
     """
     try:
-        response = requests.get(API_URL, timeout=10)
+        response = requests.get(api_url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -122,10 +155,19 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
 
 def main():
     """Main execution loop."""
+    # Load configuration
+    try:
+        config = load_config(CONFIG_FILE_PATH)
+        api_url = config["apiUrl"]
+    except (FileNotFoundError, ValueError) as e:
+        print(f"❌ Configuration error: {e}")
+        print("   Please ensure config.json exists and contains 'apiUrl' field")
+        return
+    
     print("🚀 Starting charge schedule automation script")
     print(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
     print(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
-    print(f"   API URL: {API_URL}")
+    print(f"   API URL: {api_url}")
     print()
     
     last_api_call_time = 0
@@ -143,7 +185,7 @@ def main():
             if time_since_last_api >= API_REFRESH_INTERVAL_SECONDS:
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
                 
-                api_data = fetch_schedule_api()
+                api_data = fetch_schedule_api(api_url)
                 if api_data:
                     resolved_data = api_data.get('resolved')
                     current_hour = api_data.get('currentHour')
