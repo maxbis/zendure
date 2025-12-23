@@ -4,3 +4,4 @@ get_prices.py
 /config/*
 config.json
 /run_schedule/config/*.json
+/data/automation_status.json

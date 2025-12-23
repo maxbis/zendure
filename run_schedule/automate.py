@@ -45,6 +45,7 @@ def load_config(config_path: Path) -> Dict[str, Any]:
     
     Expected keys:
     - apiUrl: API endpoint URL for charge schedule
+    - statusApiUrl: API endpoint URL for automation status logging
     """
     try:
         with open(config_path, "r") as f:
@@ -55,13 +56,52 @@ def load_config(config_path: Path) -> Dict[str, Any]:
         raise ValueError(f"Invalid JSON in config file {config_path}: {e}")
     
     api_url = config.get("apiUrl")
+    status_api_url = config.get("statusApiUrl")
     
     if not api_url:
         raise ValueError("apiUrl not found in config.json")
+    if not status_api_url:
+        raise ValueError("statusApiUrl not found in config.json")
     
     return {
         "apiUrl": api_url,
+        "statusApiUrl": status_api_url,
     }
+
+
+# ============================================================================
+# STATUS UPDATE FUNCTION
+# ============================================================================
+
+def post_status_update(status_api_url: str, event_type: str, old_value: Any = None, new_value: Any = None) -> bool:
+    """
+    Posts a status update to the automation status API.
+    
+    Args:
+        status_api_url: The status API endpoint URL
+        event_type: Type of event ('start', 'stop', 'change', 'heartbeat')
+        old_value: Previous power value (for 'change' events)
+        new_value: New power value (for 'change' events)
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        payload = {
+            'type': event_type,
+            'timestamp': int(time.time()),
+            'oldValue': old_value,
+            'newValue': new_value
+        }
+        
+        response = requests.post(status_api_url, json=payload, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        return data.get('success', False)
+    except Exception:
+        # Silent error handling - don't interrupt main loop if status API is unavailable
+        return False
 
 
 # ============================================================================
@@ -150,6 +190,36 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
 
 
 # ============================================================================
+# REFRESH SCHEDULE FUNCTION, read from AP
+# ============================================================================
+def refresh_schedule(api_url, last_api_call_time, current_time):
+    """
+    Fetch and process the schedule API.
+    Returns: (resolved_data, current_hour, last_api_call_time)
+    """
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
+    
+    api_data = fetch_schedule_api(api_url)
+    if api_data:
+        resolved_data = api_data.get('resolved')
+        current_hour = api_data.get('currentHour')
+        
+        if resolved_data is None:
+            print("⚠️  API response missing 'resolved' field")
+        elif current_hour is None:
+            print("⚠️  API response missing 'currentHour' field")
+        else:
+            print(f"✅ API data refreshed. Current hour: {current_hour}, Resolved entries: {len(resolved_data)}")
+        
+        last_api_call_time = current_time
+        return resolved_data, current_hour, last_api_call_time
+    else:
+        print("⚠️  Failed to fetch API data, set power to 0")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(0)}")
+        return None, None, last_api_call_time
+
+
+# ============================================================================
 # MAIN LOOP
 # ============================================================================
 
@@ -159,10 +229,14 @@ def main():
     try:
         config = load_config(CONFIG_FILE_PATH)
         api_url = config["apiUrl"]
+        status_api_url = config["statusApiUrl"]
     except (FileNotFoundError, ValueError) as e:
         print(f"❌ Configuration error: {e}")
-        print("   Please ensure config.json exists and contains 'apiUrl' field")
+        print("   Please ensure config.json exists and contains 'apiUrl' and 'statusApiUrl' fields")
         return
+    
+    # Log startup
+    post_status_update(status_api_url, 'start')
     
     print("🚀 Starting charge schedule automation script")
     print(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
@@ -173,8 +247,8 @@ def main():
     last_api_call_time = 0
     resolved_data = None
     current_hour = None
-    value = 0
-    old_value = 0
+    old_value = None
+    value = None
     
     try:
         while True:
@@ -183,26 +257,9 @@ def main():
             # Check if we need to refresh API data (at startup or every 5 minutes)
             time_since_last_api = current_time - last_api_call_time
             if time_since_last_api >= API_REFRESH_INTERVAL_SECONDS:
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
-                
-                api_data = fetch_schedule_api(api_url)
-                if api_data:
-                    resolved_data = api_data.get('resolved')
-                    current_hour = api_data.get('currentHour')
-                    
-                    if resolved_data is None:
-                        print("⚠️  API response missing 'resolved' field")
-                    elif current_hour is None:
-                        print("⚠️  API response missing 'currentHour' field")
-                    else:
-                        print(f"✅ API data refreshed. Current hour: {current_hour}, Resolved entries: {len(resolved_data)}")
-                    
-                    last_api_call_time = current_time
-                else:
-                    print("⚠️  Failed to fetch API data, set power to 0")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(0)}")
+                resolved_data, current_hour, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)
             
-            # Find and print current schedule value if we have valid data
+            # Find current schedule value if we have valid data
             if resolved_data and current_hour:
                 old_value = value
                 value = find_current_schedule_value(resolved_data, current_hour)
@@ -215,13 +272,17 @@ def main():
             else:
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
             
+            post_status_update(status_api_url, 'change', old_value, value)
+
             # Sleep for the loop interval
             time.sleep(LOOP_INTERVAL_SECONDS)
             
     except KeyboardInterrupt:
         print("\n👋 Shutting down gracefully...")
+        post_status_update(status_api_url, 'stop', current_power, None)
     except Exception as e:
         print(f"\n❌ Fatal error in main loop: {e}")
+        post_status_update(status_api_url, 'stop', current_power, None)
         raise
 
 
