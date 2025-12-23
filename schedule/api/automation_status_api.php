@@ -1,5 +1,6 @@
 <?php
 // schedule/api/automation_status_api.php
+date_default_timezone_set('Europe/Amsterdam');
 
 header('Content-Type: application/json');
 
@@ -147,7 +148,7 @@ try {
             $timeA = isset($a['timestamp']) ? (int)$a['timestamp'] : 0;
             $timeB = isset($b['timestamp']) ? (int)$b['timestamp'] : 0;
             return $timeB - $timeA;
-        });
+        });A
         
         // Get last N entries
         $lastEntries = array_slice($filteredEntries, 0, $limit);
