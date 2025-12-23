@@ -95,9 +95,43 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
             'newValue': new_value
         }
         
-        response = requests.post(status_api_url, json=payload, timeout=5)
+        # Explicitly set headers to ensure POST is sent correctly
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        
+        response = requests.post(
+            status_api_url, 
+            json=payload, 
+            headers=headers,
+            timeout=5, 
+            allow_redirects=False
+        )
+        
+        # Check for redirects
+        if response.status_code in [301, 302, 303, 307, 308]:
+            print(f"⚠️  API redirected (status {response.status_code}): {response.headers.get('Location', 'unknown')}")
+            # Follow redirect manually to see what happens
+            redirect_url = response.headers.get('Location')
+            if redirect_url:
+                if not redirect_url.startswith('http'):
+                    # Relative URL
+                    from urllib.parse import urljoin
+                    redirect_url = urljoin(status_api_url, redirect_url)
+                print(f"   Following redirect to: {redirect_url}")
+                response = requests.post(redirect_url, json=payload, headers=headers, timeout=5)
+        
         response.raise_for_status()
         data = response.json()
+        
+        # Log request details for debugging
+        if event_type == 'change':
+            print(f"   Request URL: {status_api_url}")
+            print(f"   Request method sent: POST")
+            print(f"   Response status: {response.status_code}")
+            if 'debug' in data:
+                print(f"   Server debug info: {json.dumps(data.get('debug', {}), indent=4)}")
         
         if not data.get('success', False):
             print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")

@@ -113,6 +113,14 @@ function calculateRunningTime($entries) {
 $method = $_SERVER['REQUEST_METHOD'];
 $response = ['success' => false, 'detectedMethod' => $method];
 
+// Debug: Log what we're actually receiving
+$debugInfo = [
+    'REQUEST_METHOD' => $method,
+    'HTTP_METHOD' => isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE']) ? $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] : 'not set',
+    'CONTENT_TYPE' => isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : 'not set',
+    'REQUEST_URI' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'
+];
+
 try {
     if ($method === 'GET') {
         // Get limit parameter (default 1, max 1000)
@@ -159,7 +167,8 @@ try {
             'lastAlive' => $lastAlive,
             'runningTime' => $runningTime,
             'entryCount' => count($entries),
-            'lastUpdate' => $data['lastUpdate']
+            'lastUpdate' => $data['lastUpdate'],
+            'debug' => $debugInfo
         ];
     } elseif ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -199,13 +208,13 @@ try {
                 'entryCount' => count($data['entries']),
                 'filePath' => $dataFile,
                 'lastEntryType' => $entry['type'],
-                'debug' => [
+                'debug' => array_merge($debugInfo, [
                     'entriesBefore' => $entriesBefore,
                     'entriesAfterAdd' => $entriesAfterAdd,
                     'entriesAfterCleanup' => $entriesAfterCleanup,
                     'entryTimestamp' => $entry['timestamp'],
                     'currentTime' => time()
-                ]
+                ])
             ];
         } else {
             $errorDetails = "Failed to write status file: $dataFile";
