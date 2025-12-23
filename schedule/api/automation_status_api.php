@@ -111,15 +111,7 @@ function calculateRunningTime($entries) {
 // --- Request Handling ---
 
 $method = $_SERVER['REQUEST_METHOD'];
-$response = ['success' => false, 'detectedMethod' => $method];
-
-// Debug: Log what we're actually receiving
-$debugInfo = [
-    'REQUEST_METHOD' => $method,
-    'HTTP_METHOD' => isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE']) ? $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] : 'not set',
-    'CONTENT_TYPE' => isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : 'not set',
-    'REQUEST_URI' => isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'
-];
+$response = ['success' => false];
 
 try {
     if ($method === 'GET') {
@@ -167,8 +159,7 @@ try {
             'lastAlive' => $lastAlive,
             'runningTime' => $runningTime,
             'entryCount' => count($entries),
-            'lastUpdate' => $data['lastUpdate'],
-            'debug' => $debugInfo
+            'lastUpdate' => $data['lastUpdate']
         ];
     } elseif ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -190,13 +181,10 @@ try {
         ];
         
         $data = loadStatusData($dataFile);
-        $entriesBefore = count($data['entries']);
         $data['entries'][] = $entry;
-        $entriesAfterAdd = count($data['entries']);
         
         // Cleanup old entries (keep last 3 days)
         $data['entries'] = array_values(cleanupOldEntries($data['entries'], $retentionSeconds));
-        $entriesAfterCleanup = count($data['entries']);
         
         // Update last update timestamp
         $data['lastUpdate'] = time();
@@ -205,16 +193,7 @@ try {
             $response = [
                 'success' => true,
                 'method' => 'POST',
-                'entryCount' => count($data['entries']),
-                'filePath' => $dataFile,
-                'lastEntryType' => $entry['type'],
-                'debug' => array_merge($debugInfo, [
-                    'entriesBefore' => $entriesBefore,
-                    'entriesAfterAdd' => $entriesAfterAdd,
-                    'entriesAfterCleanup' => $entriesAfterCleanup,
-                    'entryTimestamp' => $entry['timestamp'],
-                    'currentTime' => time()
-                ])
+                'entryCount' => count($data['entries'])
             ];
         } else {
             $errorDetails = "Failed to write status file: $dataFile";
