@@ -3,9 +3,43 @@ import json
 import os
 from datetime import datetime, timedelta
 
-# API URLs
-URL_TODAY = "https://enever.nl/apiv3/stroomprijs_vandaag.php?token=9746105a73dccdd78e33d198a8fce77f"
-URL_TOMORROW = "https://enever.nl/apiv3/stroomprijs_morgen.php?token=9746105a73dccdd78e33d198a8fce77f"
+# API URLs - loaded from config file
+CONFIG_FILE = os.path.join("config", "price_urls.txt")
+
+def load_urls_from_config():
+    """
+    Loads API URLs from config file (lines 7 and 8).
+    
+    Returns:
+        Tuple of (URL_TODAY, URL_TOMORROW) or (None, None) on error
+    """
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            
+        if len(lines) < 8:
+            print(f"ERROR: Config file {CONFIG_FILE} must have at least 8 lines")
+            return None, None
+        
+        # Lines are 1-indexed, so line 7 is index 6, line 8 is index 7
+        url_today = lines[6].strip()
+        url_tomorrow = lines[7].strip()
+        
+        if not url_today or not url_tomorrow:
+            print(f"ERROR: URLs in config file {CONFIG_FILE} cannot be empty")
+            return None, None
+        
+        return url_today, url_tomorrow
+    except FileNotFoundError:
+        print(f"ERROR: Config file {CONFIG_FILE} not found")
+        return None, None
+    except IOError as e:
+        print(f"ERROR: Error reading config file {CONFIG_FILE}: {e}")
+        return None, None
+
+URL_TODAY, URL_TOMORROW = load_urls_from_config()
+if not URL_TODAY or not URL_TOMORROW:
+    raise RuntimeError(f"Failed to load URLs from {CONFIG_FILE}")
 
 # Data directory
 DATA_DIR = "data"

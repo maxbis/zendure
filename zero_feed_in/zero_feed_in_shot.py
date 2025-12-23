@@ -523,7 +523,7 @@ def set_power(
         return power
 
     # Handle dynamic zero feed-in ('netzero' or None)
-    elif power == 'netzero' or power is None:
+    elif power == 'netzero' or power == 'netzero+' or power is None:
         result = calculate_zero_feed_in(
             config_path=config_path,
             apply=not test,
@@ -536,7 +536,10 @@ def set_power(
         # Calculate effective power in CLI convention (positive=charge, negative=discharge)
         if result.new_output and result.new_output > 0:
             # Discharging: return negative value
-            return -result.new_output
+            if power == 'netzero+': # netzero+ means don't discharge, only charge
+                return 0
+            else:
+                return -result.new_output
         elif result.new_input and result.new_input > 0:
             # Charging: return positive value
             return result.new_input

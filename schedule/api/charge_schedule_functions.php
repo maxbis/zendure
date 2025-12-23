@@ -85,8 +85,8 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
     // Schedule times
     foreach ($schedule as $key => $value) {
         // Validation of value happens loosely here, or we filter?
-        // Spec: Integers, "netzero"
-        if ($value !== 'netzero' && !is_numeric($value))
+        // Spec: Integers, "netzero", "netzero+"
+        if ($value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value))
             continue;
 
         $t = extractTimeFromKey((string) $key);
@@ -99,7 +99,7 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
     // Prepare entries list for easier processing
     $entries = [];
     foreach ($schedule as $k => $v) {
-        if ($v !== 'netzero' && !is_numeric($v))
+        if ($v !== 'netzero' && $v !== 'netzero+' && !is_numeric($v))
             continue;
         $entries[] = [
             'key' => (string) $k,

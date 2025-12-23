@@ -49,7 +49,7 @@ try {
 
         if (strlen($key) !== 12)
             throw new Exception("Key must be 12 characters");
-        if ($val !== 'netzero' && !is_numeric($val))
+        if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val))
             throw new Exception("Invalid value");
         if (is_numeric($val))
             $val = (int) $val;
@@ -71,7 +71,7 @@ try {
 
         if (strlen($key) !== 12)
             throw new Exception("Key must be 12 characters");
-        if ($val !== 'netzero' && !is_numeric($val))
+        if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val))
             throw new Exception("Invalid value");
         if (is_numeric($val))
             $val = (int) $val;
