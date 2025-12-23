@@ -111,7 +111,7 @@ function calculateRunningTime($entries) {
 // --- Request Handling ---
 
 $method = $_SERVER['REQUEST_METHOD'];
-$response = ['success' => false];
+$response = ['success' => false, 'detectedMethod' => $method];
 
 try {
     if ($method === 'GET') {
@@ -154,6 +154,7 @@ try {
         
         $response = [
             'success' => true,
+            'method' => 'GET',
             'lastChanges' => array_values($lastChanges),
             'lastAlive' => $lastAlive,
             'runningTime' => $runningTime,
@@ -194,6 +195,7 @@ try {
         if (writeStatusData($dataFile, $data)) {
             $response = [
                 'success' => true,
+                'method' => 'POST',
                 'entryCount' => count($data['entries']),
                 'filePath' => $dataFile,
                 'lastEntryType' => $entry['type'],

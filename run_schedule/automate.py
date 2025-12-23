@@ -107,10 +107,13 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         entry_count = data.get('entryCount', 'unknown')
         file_path = data.get('filePath', 'unknown')
         last_entry_type = data.get('lastEntryType', 'unknown')
+        detected_method = data.get('method', data.get('detectedMethod', 'unknown'))
         
         # Show full response for debugging (only for change events to reduce noise)
         if event_type == 'change':
-            print(f"✅ Status update saved (entryCount: {entry_count}, filePath: {file_path}, lastEntryType: {last_entry_type})")
+            print(f"✅ Status update saved (method: {detected_method}, entryCount: {entry_count}, filePath: {file_path}, lastEntryType: {last_entry_type})")
+            if detected_method != 'POST':
+                print(f"⚠️  WARNING: Server responded with method '{detected_method}' instead of 'POST' - server PHP file may need updating!")
             print(f"   Full API response: {json.dumps(data, indent=2)}")
         
         return True
