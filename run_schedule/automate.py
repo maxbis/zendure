@@ -106,8 +106,12 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         # Log successful writes for debugging
         entry_count = data.get('entryCount', 'unknown')
         file_path = data.get('filePath', 'unknown')
+        last_entry_type = data.get('lastEntryType', 'unknown')
+        
+        # Show full response for debugging (only for change events to reduce noise)
         if event_type == 'change':
-            print(f"✅ Status update saved (entryCount: {entry_count}, filePath: {file_path})")
+            print(f"✅ Status update saved (entryCount: {entry_count}, filePath: {file_path}, lastEntryType: {last_entry_type})")
+            print(f"   Full API response: {json.dumps(data, indent=2)}")
         
         return True
     except requests.exceptions.RequestException as e:

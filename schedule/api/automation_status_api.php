@@ -180,10 +180,13 @@ try {
         ];
         
         $data = loadStatusData($dataFile);
+        $entriesBefore = count($data['entries']);
         $data['entries'][] = $entry;
+        $entriesAfterAdd = count($data['entries']);
         
         // Cleanup old entries (keep last 3 days)
         $data['entries'] = array_values(cleanupOldEntries($data['entries'], $retentionSeconds));
+        $entriesAfterCleanup = count($data['entries']);
         
         // Update last update timestamp
         $data['lastUpdate'] = time();
@@ -193,7 +196,14 @@ try {
                 'success' => true,
                 'entryCount' => count($data['entries']),
                 'filePath' => $dataFile,
-                'lastEntryType' => $entry['type']
+                'lastEntryType' => $entry['type'],
+                'debug' => [
+                    'entriesBefore' => $entriesBefore,
+                    'entriesAfterAdd' => $entriesAfterAdd,
+                    'entriesAfterCleanup' => $entriesAfterCleanup,
+                    'entryTimestamp' => $entry['timestamp'],
+                    'currentTime' => time()
+                ]
             ];
         } else {
             $errorDetails = "Failed to write status file: $dataFile";
