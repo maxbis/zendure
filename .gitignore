@@ -3,3 +3,4 @@
 get_prices.py
 /config/*
 config.json
+/run_schedule/config/*.json
