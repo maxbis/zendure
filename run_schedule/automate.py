@@ -290,15 +290,21 @@ def main():
                 old_value = value
                 value = find_current_schedule_value(resolved_data, current_hour)
                 if value is None:
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to {set_power(0)}")
-                elif old_value != value or value == 'netzero':
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(value)}")
+                    resulting_power = set_power(0)
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
+                    post_status_update(status_api_url, 'No Value', old_value, resulting_power)
+                elif old_value != value or value == 'netzero' or value == 'netzero+':
+                    resulting_power = set_power(value)
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(resulting_power)}")
+                    post_status_update(status_api_url, value, old_value, resulting_power)
                 else:
+                    resulting_power = set_power(0)
                     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
+                    post_status_update(status_api_url, 'change', old_value, resulting_power)
             else:
+                resulting_power = set_power(0)
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
-            
-            post_status_update(status_api_url, 'change', old_value, value)
+                post_status_update(status_api_url, 'No Data', old_value, resulting_power)
 
             # Sleep for the loop interval
             time.sleep(LOOP_INTERVAL_SECONDS)

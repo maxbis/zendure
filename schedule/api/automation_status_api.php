@@ -178,10 +178,7 @@ try {
             throw new Exception("Missing 'type' field");
         }
         
-        $validTypes = ['start', 'stop', 'change', 'heartbeat'];
-        if (!in_array($input['type'], $validTypes)) {
-            throw new Exception("Invalid type. Must be one of: " . implode(', ', $validTypes));
-        }
+        // Type validation removed - accept any string value
         
         $entry = [
             'timestamp' => isset($input['timestamp']) ? (int)$input['timestamp'] : time(),
