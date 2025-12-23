@@ -90,3 +90,101 @@ function getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $so
     return $status;
 }
 
+/**
+ * Get badge class for automation entry type
+ * @param string $type Entry type: 'start', 'stop', 'change', 'heartbeat'
+ * @return string CSS class name
+ */
+function getAutomationEntryTypeClass($type) {
+    switch ($type) {
+        case 'start': return 'automation-badge-start';
+        case 'stop': return 'automation-badge-stop';
+        case 'change': return 'automation-badge-change';
+        case 'heartbeat': return 'automation-badge-heartbeat';
+        default: return 'automation-badge-unknown';
+    }
+}
+
+/**
+ * Get label text for automation entry type
+ * @param string $type Entry type: 'start', 'stop', 'change', 'heartbeat'
+ * @return string Label text
+ */
+function getAutomationEntryTypeLabel($type) {
+    switch ($type) {
+        case 'start': return 'Start';
+        case 'stop': return 'Stop';
+        case 'change': return 'Change';
+        case 'heartbeat': return 'Heartbeat';
+        default: return 'Unknown';
+    }
+}
+
+/**
+ * Format relative time (e.g., "2 minutes ago", "1 hour ago")
+ * @param int $timestamp Unix timestamp
+ * @return string Formatted relative time or absolute time if > 24 hours
+ */
+function formatRelativeTime($timestamp) {
+    if (!$timestamp) {
+        return 'Unknown';
+    }
+    
+    $now = time();
+    $diff = $now - $timestamp;
+    
+    if ($diff < 60) {
+        return 'Just now';
+    } elseif ($diff < 3600) {
+        $minutes = floor($diff / 60);
+        return $minutes . ' minute' . ($minutes > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 86400) {
+        $hours = floor($diff / 3600);
+        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+    } else {
+        // For times > 24 hours, show absolute time
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+}
+
+/**
+ * Format value for display (handles null, numeric, and special values)
+ * @param mixed $value Value to format
+ * @return string Formatted value
+ */
+function formatAutomationValue($value) {
+    if ($value === null) {
+        return '—';
+    }
+    if (is_numeric($value)) {
+        return $value . ' W';
+    }
+    return (string)$value;
+}
+
+/**
+ * Format automation entry details based on type
+ * @param array $entry Entry array with type, oldValue, newValue
+ * @return string Formatted details text
+ */
+function formatAutomationEntryDetails($entry) {
+    $type = $entry['type'] ?? 'unknown';
+    $oldValue = $entry['oldValue'] ?? null;
+    $newValue = $entry['newValue'] ?? null;
+    
+    switch ($type) {
+        case 'change':
+            $oldFormatted = formatAutomationValue($oldValue);
+            $newFormatted = formatAutomationValue($newValue);
+            return $oldFormatted . ' → ' . $newFormatted;
+        case 'start':
+            return 'Automation started';
+        case 'stop':
+            return 'Automation stopped';
+        case 'heartbeat':
+            return 'Heartbeat';
+        default:
+            return 'Unknown event';
+    }
+}
+

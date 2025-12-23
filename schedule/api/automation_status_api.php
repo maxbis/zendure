@@ -115,32 +115,42 @@ $response = ['success' => false];
 
 try {
     if ($method === 'GET') {
-        // Get limit parameter (default 1, max 1000)
-        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1;
+        // Get type parameter (default 'change', or 'all' for all entry types)
+        $typeFilter = isset($_GET['type']) ? $_GET['type'] : 'change';
+        
+        // Get limit parameter (default 10 for 'all', 1 for 'change', max 50)
+        $defaultLimit = ($typeFilter === 'all') ? 10 : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : $defaultLimit;
         if ($limit < 1) {
             $limit = 1;
         }
-        if ($limit > 1000) {
-            $limit = 1000;
+        if ($limit > 50) {
+            $limit = 50;
         }
         
         $data = loadStatusData($dataFile);
         $entries = $data['entries'];
         
-        // Filter to only 'change' events and get last N
-        $changeEvents = array_filter($entries, function($entry) {
-            return isset($entry['type']) && $entry['type'] === 'change';
-        });
+        // Filter entries based on type parameter
+        if ($typeFilter === 'all') {
+            // Return all entry types
+            $filteredEntries = $entries;
+        } else {
+            // Filter to only 'change' events (default behavior)
+            $filteredEntries = array_filter($entries, function($entry) {
+                return isset($entry['type']) && $entry['type'] === 'change';
+            });
+        }
         
         // Sort by timestamp descending (most recent first)
-        usort($changeEvents, function($a, $b) {
+        usort($filteredEntries, function($a, $b) {
             $timeA = isset($a['timestamp']) ? (int)$a['timestamp'] : 0;
             $timeB = isset($b['timestamp']) ? (int)$b['timestamp'] : 0;
             return $timeB - $timeA;
         });
         
-        // Get last N changes
-        $lastChanges = array_slice($changeEvents, 0, $limit);
+        // Get last N entries
+        $lastEntries = array_slice($filteredEntries, 0, $limit);
         
         // Get last alive timestamp (most recent entry of any type)
         $lastAlive = null;
@@ -155,7 +165,7 @@ try {
         $response = [
             'success' => true,
             'method' => 'GET',
-            'lastChanges' => array_values($lastChanges),
+            'lastChanges' => array_values($lastEntries),
             'lastAlive' => $lastAlive,
             'runningTime' => $runningTime,
             'entryCount' => count($entries),
