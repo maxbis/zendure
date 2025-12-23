@@ -1,0 +1,15 @@
+{
+  "dataDir": "./data/",
+  "dataFile": null,
+  "deviceIp": "192.168.2.93",
+  "deviceSn": "HOA1NAN9N385989",
+  "p1MeterIp": "192.168.2.94",
+  "p1DeviceId": "ZEE1NBN9N420947",
+  "mqtt": {
+    "broker": "mqtt-eu.zen-iot.com",
+    "port": 1883,
+    "appKey": "aHR0cHM6Ly9hcHAuemVuZHVyZS50ZWNoL2V1LjYydWgwQzIwdg",
+    "appSecret": "ZEE1NBN9N420947"
+  }
+}
+
