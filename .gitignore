@@ -2,3 +2,4 @@
 /zendure/config/*.json
 get_prices.py
 /config/*
+config.json
