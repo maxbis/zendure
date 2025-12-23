@@ -38,6 +38,8 @@ POWER_FEED_MIN_THRESHOLD = 20  # Minimum change (W) to actually adjust limits
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 90          # Maximum battery level (%) - stop charging above this
 
+TEST_MODE = True
+
 
 # ============================================================================
 # DATA STRUCTURES
@@ -235,6 +237,10 @@ def send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bo
         }
 
     payload = {"sn": device_sn, "properties": properties}
+
+    if TEST_MODE:
+        print(f"TEST MODE: Would set power feed to {power_feed} W")
+        return (True, None)
 
     try:
         response = requests.post(
@@ -476,7 +482,7 @@ def set_power(
     power: Union[int, str, None] = 'netzero',
     config_path: Optional[Path] = None,
     test: bool = False,
-) -> int:
+    ) -> int:
     """
     Unified function to set power feed or use dynamic zero feed-in calculation.
 

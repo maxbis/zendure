@@ -3,7 +3,7 @@
  * Main application logic for rendering and managing schedule data
  */
 
-const API_URL = 'http://localhost/Energy/schedule/api/charge_schedule_api.php';
+const API_URL = 'api/charge_schedule_api.php';
 
 // Helper function to get label from radio button by value
 function getValueLabel(value) {
