@@ -93,7 +93,6 @@ function renderEntries(entries) {
             <td style="font-family:monospace;">${keyStr}</td>
             <td class="${valClass}" style="font-weight:500;">${displayVal}</td>
             <td><span class="badge ${isWild ? 'badge-wildcard' : 'badge-exact'}">${isWild ? 'Wildcard' : 'Exact'}</span></td>
-            <td><button class="btn-icon btn-edit">✏️</button></td>
         `;
         tbody.appendChild(tr);
     });

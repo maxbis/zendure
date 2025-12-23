@@ -112,7 +112,6 @@ $currentHour = date('H') . '00';
                                 <th>Key</th>
                                 <th>Value</th>
                                 <th>Type</th>
-                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -136,7 +135,6 @@ $currentHour = date('H') . '00';
                                     <td><span
                                             class="badge <?php echo $isWild ? 'badge-wildcard' : 'badge-exact'; ?>"><?php echo $isWild ? 'Wildcard' : 'Exact'; ?></span>
                                     </td>
-                                    <td><button class="btn-icon btn-edit">✏️</button></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

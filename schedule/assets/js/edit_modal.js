@@ -27,10 +27,10 @@ class EditModal {
             r.onclick = () => this.handleModeChange(r.value);
         });
 
-        // Edit button delegation
+        // Row click to edit
         document.querySelector('#schedule-table tbody').addEventListener('click', (e) => {
-            if (e.target.closest('.btn-edit')) {
-                const tr = e.target.closest('tr');
+            const tr = e.target.closest('tr');
+            if (tr && tr.dataset.key) {
                 this.open(tr.dataset.key, tr.dataset.value);
             }
         });
