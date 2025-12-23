@@ -103,6 +103,12 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
             print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")
             return False
         
+        # Log successful writes for debugging
+        entry_count = data.get('entryCount', 'unknown')
+        file_path = data.get('filePath', 'unknown')
+        if event_type == 'change':
+            print(f"✅ Status update saved (entryCount: {entry_count}, filePath: {file_path})")
+        
         return True
     except requests.exceptions.RequestException as e:
         print(f"⚠️  Error posting status update to API: {e}")

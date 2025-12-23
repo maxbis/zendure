@@ -191,7 +191,9 @@ try {
         if (writeStatusData($dataFile, $data)) {
             $response = [
                 'success' => true,
-                'entryCount' => count($data['entries'])
+                'entryCount' => count($data['entries']),
+                'filePath' => $dataFile,
+                'lastEntryType' => $entry['type']
             ];
         } else {
             $errorDetails = "Failed to write status file: $dataFile";
