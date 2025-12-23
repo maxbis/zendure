@@ -21,9 +21,9 @@
         $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        // Get base path: remove /zendure/zendure.php to get /Energy or root
-        $basePath = dirname(dirname($scriptName));
-        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/schedule/api/automation_status_api.php?type=all&limit=10';
+        // Get base path: remove /schedule/charge_schedule.php to get /Energy or root
+        $basePath = dirname($scriptName);
+        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=10';
         
         try {
             $context = stream_context_create([
@@ -31,7 +31,7 @@
                     'timeout' => 5,
                     'ignore_errors' => true,
                     'method' => 'GET',
-                    'header' => 'User-Agent: Zendure-Status-Page'
+                    'header' => 'User-Agent: Charge-Schedule-Page'
                 ]
             ]);
             
@@ -39,7 +39,7 @@
             
             if ($jsonData === false || empty($jsonData)) {
                 // Try alternative: direct file path (for local file access)
-                $apiFilePath = __DIR__ . '/../../schedule/api/automation_status_api.php';
+                $apiFilePath = __DIR__ . '/../api/automation_status_api.php';
                 if (file_exists($apiFilePath)) {
                     // Temporarily set GET parameters and capture output
                     $originalGet = $_GET;

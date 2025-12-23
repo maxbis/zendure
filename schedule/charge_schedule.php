@@ -5,6 +5,8 @@
  */
 
 require_once __DIR__ . '/api/charge_schedule_functions.php';
+// Include zendure helpers for automation status functions
+require_once __DIR__ . '/../zendure/includes/helpers.php';
 
 $dataFile = __DIR__ . '/../data/charge_schedule.json';
 
@@ -23,6 +25,7 @@ $currentHour = date('H') . '00';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Charge Schedule Manager</title>
     <link rel="stylesheet" href="assets/css/charge_schedule.css">
+    <link rel="stylesheet" href="../zendure/assets/css/zendure.css">
 </head>
 
 <body>
@@ -142,12 +145,19 @@ $currentHour = date('H') . '00';
                 </div>
             </div>
         </div>
+        <?php include __DIR__ . '/partials/edit_modal.php'; ?>
+
+        <!-- Automation Status Section - Full Width -->
+        <div class="automation-status-wrapper" style="margin-top: 20px;">
+            <?php include __DIR__ . '/partials/automation_status.php'; ?>
+        </div>
+
+        <script src="assets/js/edit_modal.js"></script>
+        <script src="assets/js/charge_schedule.js"></script>
+        <script src="../zendure/assets/js/zendure.js"></script>
+        
     </div>
 
-    <?php include __DIR__ . '/partials/edit_modal.php'; ?>
-
-    <script src="assets/js/edit_modal.js"></script>
-    <script src="assets/js/charge_schedule.js"></script>
 </body>
 
 </html>

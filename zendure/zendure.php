@@ -482,9 +482,6 @@ $systemStatus = getSystemStatusInfo(
                     </div>
                 </div>
             </div>
-
-            <!-- Automation Status Section -->
-            <?php include __DIR__ . '/partials/automation_status.php'; ?>
         <?php endif; ?>
     </div>
 
