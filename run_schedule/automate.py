@@ -86,6 +86,7 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
     Returns:
         True if successful, False otherwise
     """
+    print(f"Posting status update to {status_api_url} with event type {event_type}, old value {old_value}, new value {new_value}")
     try:
         payload = {
             'type': event_type,
@@ -98,10 +99,9 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         response.raise_for_status()
         data = response.json()
         
-        if data.get['success'] == False:
+        if not data.get('success', False):
             print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")
             return False
-
         
         return True
     except requests.exceptions.RequestException as e:

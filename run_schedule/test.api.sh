@@ -1,0 +1,2 @@
+curl -X POST https://www.wijs.ovh/zendure/schedule/api/automation_status_api.php -H "Content-Type: application/json" -d "{\"type\":\"start\"}"
+curl -X POST https://www.wijs.ovh/zendure/schedule/api/automation_status_api.php -H "Content-Type: application/json" -d "{\"type\":\"change\",\"oldValue\":100,\"newValue\":200}"ZZ

@@ -194,7 +194,7 @@ try {
                 'entryCount' => count($data['entries'])
             ];
         } else {
-            $errorDetails = "Failed to write status file: $dataFile !";
+            $errorDetails = "Failed to write status file: $dataFile";
             if (!is_dir(dirname($dataFile))) {
                 $errorDetails .= " (Directory does not exist)";
             } elseif (!is_writable(dirname($dataFile))) {
