@@ -23,12 +23,42 @@ function loadStatusData($dataFile) {
 }
 
 function writeStatusData($dataFile, $data) {
-    $tempFile = $dataFile . '.tmp';
-    $json = json_encode($data, JSON_PRETTY_PRINT);
-    if (file_put_contents($tempFile, $json) === false) {
+    // Ensure the directory exists
+    $dir = dirname($dataFile);
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0755, true)) {
+            error_log("Failed to create directory: $dir");
+            return false;
+        }
+    }
+    
+    // Check if directory is writable
+    if (!is_writable($dir)) {
+        error_log("Directory is not writable: $dir");
         return false;
     }
-    return rename($tempFile, $dataFile);
+    
+    $tempFile = $dataFile . '.tmp';
+    $json = json_encode($data, JSON_PRETTY_PRINT);
+    
+    if ($json === false) {
+        error_log("Failed to encode JSON data");
+        return false;
+    }
+    
+    if (file_put_contents($tempFile, $json) === false) {
+        error_log("Failed to write temp file: $tempFile");
+        return false;
+    }
+    
+    if (!rename($tempFile, $dataFile)) {
+        error_log("Failed to rename temp file to: $dataFile");
+        // Clean up temp file if rename failed
+        @unlink($tempFile);
+        return false;
+    }
+    
+    return true;
 }
 
 function cleanupOldEntries($entries, $retentionSeconds) {
@@ -164,7 +194,16 @@ try {
                 'entryCount' => count($data['entries'])
             ];
         } else {
-            throw new Exception("Failed to write status file");
+            $errorDetails = "Failed to write status file: $dataFile !";
+            if (!is_dir(dirname($dataFile))) {
+                $errorDetails .= " (Directory does not exist)";
+            } elseif (!is_writable(dirname($dataFile))) {
+                $errorDetails .= " (Directory is not writable)";
+            } elseif (file_exists($dataFile) && !is_writable($dataFile)) {
+                $errorDetails .= " (File exists but is not writable)";
+            }
+            error_log($errorDetails);
+            throw new Exception($errorDetails);
         }
     } else {
         throw new Exception("Method not allowed. Use GET or POST");

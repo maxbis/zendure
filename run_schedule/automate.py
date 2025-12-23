@@ -98,9 +98,10 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         response.raise_for_status()
         data = response.json()
         
-        if not data.get('success', False):
+        if data.get['success'] == False:
             print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")
             return False
+
         
         return True
     except requests.exceptions.RequestException as e:
