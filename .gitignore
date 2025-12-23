@@ -1,2 +1,3 @@
-/data/*
-/zendure/config/*
+/data/*.json
+/zendure/config/*.json
+get_prices.py

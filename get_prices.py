@@ -4,8 +4,8 @@ import os
 from datetime import datetime, timedelta
 
 # API URLs
-URL_TODAY = "https://enever.nl/apiv3/stroomprijs_vandaag.php?token=9746105a73dccdd78e33d198a8fce77e"
-URL_TOMORROW = "https://enever.nl/apiv3/stroomprijs_morgen.php?token=9746105a73dccdd78e33d198a8fce77e"
+URL_TODAY = "https://enever.nl/apiv3/stroomprijs_vandaag.php?token=9746105a73dccdd78e33d198a8fce77f"
+URL_TOMORROW = "https://enever.nl/apiv3/stroomprijs_morgen.php?token=9746105a73dccdd78e33d198a8fce77f"
 
 # Data directory
 DATA_DIR = "data"
