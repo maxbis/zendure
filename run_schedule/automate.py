@@ -34,8 +34,34 @@ TIMEZONE = 'Europe/Amsterdam'
 # CONFIGURATION PARAMETERS
 # ============================================================================
 
-# Path to config.json (local to run_schedule)
-CONFIG_FILE_PATH = Path(__file__).parent / "config" / "config.json"
+def find_config_file() -> Path:
+    """
+    Find config.json file with fallback logic.
+    Checks project root config first, then local config.
+    
+    Returns:
+        Path to the config file that exists
+        
+    Raises:
+        FileNotFoundError: If neither config file exists
+    """
+    script_dir = Path(__file__).parent
+    root_config = script_dir.parent.parent / "config" / "config.json"
+    local_config = script_dir / "config" / "config.json"
+    
+    if root_config.exists():
+        return root_config
+    elif local_config.exists():
+        return local_config
+    else:
+        raise FileNotFoundError(
+            f"Config file not found in either location:\n"
+            f"  1. {root_config}\n"
+            f"  2. {local_config}"
+        )
+
+# Path to config.json (with fallback to project root config)
+CONFIG_FILE_PATH = find_config_file()
 
 # Time to pause between loop iterations (seconds)
 LOOP_INTERVAL_SECONDS = 20
@@ -296,9 +322,13 @@ def main():
         config = load_config(CONFIG_FILE_PATH)
         api_url = config["apiUrl"]
         status_api_url = config["statusApiUrl"]
-    except (FileNotFoundError, ValueError) as e:
+    except FileNotFoundError as e:
         print(f"❌ Configuration error: {e}")
-        print("   Please ensure config.json exists and contains 'apiUrl' and 'statusApiUrl' fields")
+        print("   Please ensure config.json exists in one of the checked locations")
+        return
+    except ValueError as e:
+        print(f"❌ Configuration error: {e}")
+        print("   Please ensure config.json contains 'apiUrl' and 'statusApiUrl' fields")
         return
     
     # Log startup
