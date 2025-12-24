@@ -4,6 +4,9 @@
  * View, edit, and visualize charge/discharge schedule.
  */
 
+// Ensure server timezone matches local expectation
+date_default_timezone_set('Europe/Amsterdam');
+
 require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include zendure helpers for automation status functions
 require_once __DIR__ . '/../zendure/includes/helpers.php';
