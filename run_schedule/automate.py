@@ -9,13 +9,26 @@ and finding the current schedule value based on the resolved time entries.
 import json
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Fallback for Python < 3.9
+    from backports.zoneinfo import ZoneInfo
 
 import requests
 
 from zero_feed_in_shot import set_power
+
+# ============================================================================
+# TIMEZONE CONFIGURATION
+# ============================================================================
+
+# Configurable timezone (default: Europe/Amsterdam)
+TIMEZONE = 'Europe/Amsterdam'
 
 # ============================================================================
 # CONFIGURATION PARAMETERS
@@ -33,6 +46,29 @@ API_REFRESH_INTERVAL_SECONDS = 300
 # Valid integer range for schedule values
 MIN_VALUE = -800
 MAX_VALUE = 800
+
+
+# ============================================================================
+# TIMESTAMP FUNCTION
+# ============================================================================
+
+def get_my_datetime() -> datetime:
+    """
+    Get the current datetime object using the configured timezone.
+    
+    Returns:
+        datetime object with the configured timezone
+    """
+    return datetime.now(ZoneInfo(TIMEZONE))
+
+def get_my_timestamp() -> int:
+    """
+    Get the current Unix timestamp (as integer) using the configured timezone.
+    
+    Returns:
+        Unix timestamp as integer (seconds since epoch)
+    """
+    return int(get_my_datetime().timestamp())
 
 
 # ============================================================================
@@ -87,9 +123,11 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         True if successful, False otherwise
     """
     try:
+        timestamp = get_my_timestamp()
+        
         payload = {
             'type': event_type,
-            'timestamp': int(time.time()),
+            'timestamp': timestamp,
             'oldValue': old_value,
             'newValue': new_value
         }
@@ -223,7 +261,8 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
     Fetch and process the schedule API.
     Returns: (resolved_data, current_hour, last_api_call_time)
     """
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
+    now_amsterdam = get_my_datetime()
+    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
     
     api_data = fetch_schedule_api(api_url)
     if api_data:
@@ -241,7 +280,7 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
         return resolved_data, current_hour, last_api_call_time
     else:
         print("⚠️  Failed to fetch API data, set power to 0")
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(0)}")
+        print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(0)}")
         return None, None, last_api_call_time
 
 
@@ -278,7 +317,8 @@ def main():
     
     try:
         while True:
-            current_time = time.time()
+            current_time = get_my_timestamp()
+            now_amsterdam = get_my_datetime()
             
             # Check if we need to refresh API data (at startup or every 5 minutes)
             time_since_last_api = current_time - last_api_call_time
@@ -291,19 +331,19 @@ def main():
                 value = find_current_schedule_value(resolved_data, current_hour)
                 if value is None:
                     resulting_power = set_power(0)
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
+                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
                     post_status_update(status_api_url, 'No Value', old_value, resulting_power)
                 elif old_value != value or value == 'netzero' or value == 'netzero+':
                     resulting_power = set_power(value)
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(resulting_power)}")
+                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {resulting_power}")
                     post_status_update(status_api_url, value, old_value, resulting_power)
                 else:
                     resulting_power = set_power(0)
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
+                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
                     post_status_update(status_api_url, 'change', old_value, resulting_power)
             else:
                 resulting_power = set_power(0)
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
+                print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
                 post_status_update(status_api_url, 'No Data', old_value, resulting_power)
 
             # Sleep for the loop interval
