@@ -8,6 +8,8 @@ class EditModal {
         this.onSaveCallback = onSaveCallback;
         this.currentOriginalKey = null;
         this.modal = document.getElementById('edit-modal');
+        this.confirmDialog = document.getElementById('confirm-dialog');
+        this.confirmResolve = null;
         
         this.init();
     }
@@ -38,8 +40,51 @@ class EditModal {
         // Delete handler
         document.getElementById('btn-delete').onclick = () => this.handleDelete();
 
+        // Confirmation dialog handlers
+        document.getElementById('confirm-cancel').onclick = () => this.closeConfirmDialog(false);
+        document.getElementById('confirm-delete').onclick = () => this.closeConfirmDialog(true);
+        this.confirmDialog.onclick = (e) => {
+            if (e.target === this.confirmDialog) this.closeConfirmDialog(false);
+        };
+
+        // Close confirmation dialog on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.confirmDialog.classList.contains('active')) {
+                this.closeConfirmDialog(false);
+            }
+        });
+
         // Save handler
         document.getElementById('btn-save').onclick = () => this.handleSave();
+
+        // Wildcard expansion handlers
+        const dateInput = document.getElementById('inp-date');
+        const timeInput = document.getElementById('inp-time');
+        
+        dateInput.addEventListener('input', (e) => this.handleWildcardExpansion(e, 8));
+        timeInput.addEventListener('input', (e) => this.handleWildcardExpansion(e, 4));
+    }
+
+    handleWildcardExpansion(event, maxLength) {
+        const input = event.target;
+        const value = input.value;
+        const cursorPos = input.selectionStart;
+        
+        // Check if the current input contains a *
+        const asteriskIndex = value.indexOf('*');
+        
+        if (asteriskIndex !== -1) {
+            // Found a *, fill the rest with *s
+            const beforeAsterisk = value.substring(0, asteriskIndex);
+            const remaining = maxLength - beforeAsterisk.length;
+            const newValue = beforeAsterisk + '*'.repeat(remaining);
+            
+            input.value = newValue;
+            
+            // Restore cursor position (adjust if it was after the asterisk)
+            const newCursorPos = Math.min(cursorPos, asteriskIndex + 1);
+            input.setSelectionRange(newCursorPos, newCursorPos);
+        }
     }
 
     open(key = null, value = null) {
@@ -106,11 +151,34 @@ class EditModal {
             wattsInput.setAttribute('value', '');
         } else {
             wattsInput.disabled = false;
+            if (wattsInput.value === '') {
+                wattsInput.value = '0';
+            }
+        }
+    }
+
+    showConfirmDialog(message) {
+        return new Promise((resolve) => {
+            this.confirmResolve = resolve;
+            document.getElementById('confirm-message').innerText = message;
+            this.confirmDialog.classList.add('active');
+        });
+    }
+
+    closeConfirmDialog(confirmed) {
+        this.confirmDialog.classList.remove('active');
+        if (this.confirmResolve) {
+            this.confirmResolve(confirmed);
+            this.confirmResolve = null;
         }
     }
 
     async handleDelete() {
-        if (!this.currentOriginalKey || !confirm('Delete this entry?')) return;
+        if (!this.currentOriginalKey) return;
+        
+        const confirmed = await this.showConfirmDialog('Are you sure you want to delete this entry?');
+        if (!confirmed) return;
+
         try {
             const res = await fetch(this.apiUrl, {
                 method: 'DELETE',

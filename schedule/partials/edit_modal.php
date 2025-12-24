@@ -41,3 +41,21 @@
     </div>
 </div>
 
+<!-- Confirmation Dialog -->
+<div class="modal-backdrop" id="confirm-dialog">
+    <div class="modal-dialog confirm-dialog">
+        <div class="modal-header">
+            <div class="modal-title">Confirm Delete</div>
+        </div>
+        <div class="modal-body">
+            <p id="confirm-message">Are you sure you want to delete this entry?</p>
+        </div>
+        <div class="modal-footer">
+            <div style="margin-left:auto; display:flex; gap:10px;">
+                <button class="btn btn-outline" id="confirm-cancel">Cancel</button>
+                <button class="btn btn-danger" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+

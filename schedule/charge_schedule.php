@@ -8,8 +8,8 @@
 date_default_timezone_set('Europe/Amsterdam');
 
 require_once __DIR__ . '/api/charge_schedule_functions.php';
-// Include zendure helpers for automation status functions
-require_once __DIR__ . '/../zendure/includes/helpers.php';
+// Include local helpers for automation status functions
+require_once __DIR__ . '/includes/status.php';
 
 $dataFile = __DIR__ . '/../data/charge_schedule.json';
 
@@ -171,7 +171,6 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
-        <script src="../zendure/assets/js/zendure.js"></script>
         
     </div>
 

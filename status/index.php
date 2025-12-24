@@ -10,27 +10,20 @@ require_once __DIR__ . '/includes/helpers.php';
 // Load configuration
 $config = require __DIR__ . '/includes/config_loader.php';
 
-// Handle update request
-if (isset($_GET['update']) && $_GET['update'] == '1') {
-    // Require the read_zendure class
-    require_once __DIR__ . '/classes/read_zendure.php';
-    
-    // Fetch fresh data from device
-    $solarflow = new SolarFlow2400($config['deviceIp']);
-    $solarflow->getStatus(false); // Non-verbose, just saves data
-    
-    // Require the read_zendure_p1 class
-    require_once __DIR__ . '/classes/read_zendure_p1.php';
-    
-    // Fetch fresh P1 meter data
-    $p1Meter = new ZendureP1Meter($config['p1MeterIp']);
-    $p1Meter->update(false); // Non-verbose, just saves data
-    
-    // Redirect to same page without update parameter
-    $scriptName = basename($_SERVER['PHP_SELF']);
-    header('Location: ' . $scriptName);
-    exit();
-}
+// Auto-update: Fetch fresh data from devices on every page load
+// Require the read_zendure class
+require_once __DIR__ . '/classes/read_zendure.php';
+
+// Fetch fresh data from device
+$solarflow = new SolarFlow2400($config['deviceIp']);
+$solarflow->getStatus(false); // Non-verbose, just saves data
+
+// Require the read_zendure_p1 class
+require_once __DIR__ . '/classes/read_zendure_p1.php';
+
+// Fetch fresh P1 meter data
+$p1Meter = new ZendureP1Meter($config['p1MeterIp']);
+$p1Meter->update(false); // Non-verbose, just saves data
 
 $dataFile = $config['dataFile'];
 

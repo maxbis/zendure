@@ -84,7 +84,75 @@ foreach ($dates as $dateIndex => $date) {
 
 // Get current date and hour
 $currentDate = date('Ymd');
-$currentHour = date('H');
+$currentHour = (int)date('H');
+
+// Check if update is needed (on second day at 15:00 or later)
+$updateAttempted = false;
+$updateResult = null;
+if (count($dates) >= 2) {
+    // Check if current date is the second day (newest day)
+    $secondDayDate = $dates[count($dates) - 1]; // Last element is the newest day
+    if ($currentDate == $secondDayDate && $currentHour >= 15) {
+        // Include get_prices.php and call fetchPricesMain()
+        $getPricesPath = __DIR__ . '/get_prices.php';
+        if (file_exists($getPricesPath)) {
+            require_once $getPricesPath;
+            $updateAttempted = true;
+            $updateResult = fetchPricesMain();
+            
+            // Reload price files after update
+            $priceFiles = [];
+            $files = glob($dataDir . $filePattern);
+            
+            foreach ($files as $file) {
+                $filename = basename($file);
+                $date = extractDateFromFilename($filename);
+                if ($date) {
+                    $priceFiles[$date] = $file;
+                }
+            }
+            
+            // Sort by date descending and get last two days
+            krsort($priceFiles);
+            $selectedFiles = array_slice($priceFiles, 0, 2, true);
+            
+            // Reload and parse price data
+            $priceData = [];
+            $dates = [];
+            
+            foreach ($selectedFiles as $date => $file) {
+                $jsonContent = file_get_contents($file);
+                $data = json_decode($jsonContent, true);
+                
+                if ($data && is_array($data)) {
+                    // Sort by hour (00-23)
+                    ksort($data);
+                    $priceData[$date] = $data;
+                    $dates[] = $date;
+                }
+            }
+            
+            // Reverse dates so oldest is first (left side), newest is last (right side)
+            $dates = array_reverse($dates);
+            
+            // Rebuild data arrays for chart
+            $allLabels = [];
+            $allPrices = [];
+            $dayLabels = [];
+            
+            // Combine both days sequentially
+            foreach ($dates as $dateIndex => $date) {
+                $dayLabel = formatDateDisplay($date);
+                foreach ($hours as $hour) {
+                    $price = isset($priceData[$date][$hour]) ? floatval($priceData[$date][$hour]) : null;
+                    $allPrices[] = $price;
+                    $allLabels[] = $hour;
+                    $dayLabels[] = $dayLabel;
+                }
+            }
+        }
+    }
+}
 
 // Find current price and index
 $currentPrice = null;
@@ -216,6 +284,36 @@ $datasets = [[
             text-align: center;
         }
 
+        .update-status-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .update-status-box.success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        .update-status-box.error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .update-status-box h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .update-status-box p {
+            color: #666;
+            line-height: 1.5;
+            margin: 4px 0;
+        }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -296,6 +394,50 @@ $datasets = [[
             <h1>⚡ Electricity Price Graph</h1>
             <p>Last Two Days of Pricing Data</p>
         </div>
+
+        <?php if ($updateAttempted): ?>
+            <div class="card">
+                <?php
+                $statusClass = 'update-status-box';
+                $statusMessage = '';
+                $success = false;
+                
+                if ($updateResult) {
+                    $todaySuccess = isset($updateResult['today']) && $updateResult['today'];
+                    $tomorrowSuccess = isset($updateResult['tomorrow']) && $updateResult['tomorrow'];
+                    
+                    if ($todaySuccess && $tomorrowSuccess) {
+                        $statusClass .= ' success';
+                        $statusMessage = '✅ Price data updated successfully. Both today\'s and tomorrow\'s prices were fetched.';
+                        $success = true;
+                    } elseif ($todaySuccess || $tomorrowSuccess) {
+                        $statusClass .= ' success';
+                        $statusMessage = '⚠️ Price data partially updated. ';
+                        if ($todaySuccess) {
+                            $statusMessage .= 'Today\'s prices were fetched. ';
+                        }
+                        if ($tomorrowSuccess) {
+                            $statusMessage .= 'Tomorrow\'s prices were fetched.';
+                        }
+                        $success = true;
+                    } else {
+                        $statusClass .= ' error';
+                        $statusMessage = '❌ Failed to update price data. Please check the error logs or try running get_prices.php manually.';
+                    }
+                } else {
+                    $statusClass .= ' error';
+                    $statusMessage = '❌ Update function returned no result. Please check the error logs.';
+                }
+                ?>
+                <div class="<?php echo $statusClass; ?>">
+                    <h3>🔄 Auto-Update Status</h3>
+                    <p><?php echo htmlspecialchars($statusMessage); ?></p>
+                    <?php if ($success): ?>
+                        <p style="font-size: 0.9rem; margin-top: 8px; color: #555;">The chart below has been refreshed with the latest data.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <?php if (count($priceData) == 0): ?>
             <div class="card">

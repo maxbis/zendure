@@ -25,12 +25,12 @@ CONFIG_FILE_PATH = Path(__file__).parent / "config" / "config.json"
 
 # Power limits (W)
 POWER_FEED_MIN = -800  # Minimum effective power feed (discharge)
-POWER_FEED_MAX = 800   # Maximum effective power feed (charge)
+POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
 
 # Thresholds and battery limits
-POWER_FEED_MIN_THRESHOLD = 20  # Minimum change (W) to actually adjust limits
-MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
-MAX_CHARGE_LEVEL = 90          # Maximum battery level (%) - stop charging above this
+POWER_FEED_MIN_THRESHOLD = 50  # Minimum change (W) to actually adjust limits
+MIN_CHARGE_LEVEL = 100          # Minimum battery level (%) - stop discharging below this
+MAX_CHARGE_LEVEL = 100          # Maximum battery level (%) - stop charging above this
 
 TEST_MODE = True
 
