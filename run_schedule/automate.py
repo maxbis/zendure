@@ -313,7 +313,7 @@ def main():
     resolved_data = None
     current_hour = None
     old_value = None
-    value = None
+    value = 'init'
     
     try:
         while True:
