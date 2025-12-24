@@ -108,7 +108,7 @@
                             $entryTimestamp = $entry['timestamp'] ?? 0;
                             $entryDetails = formatAutomationEntryDetails($entry);
                             $badgeClass = getAutomationEntryTypeClass($entryType);
-                            $badgeLabel = getAutomationEntryTypeLabel($entryType);
+                            $badgeLabel = getAutomationEntryTypeLabel($entryType); # in zendure/includes/status.php
                             $isFirst = $index === 0;
                             $entryClass = 'automation-entry' . ($isFirst ? '' : ' automation-entry-collapsed');
                         ?>

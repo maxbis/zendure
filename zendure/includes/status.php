@@ -111,13 +111,7 @@ function getAutomationEntryTypeClass($type) {
  * @return string Label text
  */
 function getAutomationEntryTypeLabel($type) {
-    switch ($type) {
-        case 'start': return 'Start';
-        case 'stop': return 'Stop';
-        case 'change': return 'Change';
-        case 'heartbeat': return 'Heartbeat';
-        default: return 'Unknown';
-    }
+    return ucfirst($type);
 }
 
 /**
