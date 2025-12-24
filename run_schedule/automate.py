@@ -265,10 +265,11 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
     
     api_data = fetch_schedule_api(api_url)
+    
     if api_data:
         resolved_data = api_data.get('resolved')
         current_hour = api_data.get('currentHour')
-        
+
         if resolved_data is None:
             print("⚠️  API response missing 'resolved' field")
         elif current_hour is None:
