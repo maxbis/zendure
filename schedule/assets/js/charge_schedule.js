@@ -155,29 +155,11 @@ async function refreshData() {
 // Initialize application
 let editModal;
 
-function updateCurrentTime() {
-    const now = new Date();
-    const timeString = now.getFullYear() + '-' + 
-        String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(now.getDate()).padStart(2, '0') + ' ' + 
-        String(now.getHours()).padStart(2, '0') + ':' + 
-        String(now.getMinutes()).padStart(2, '0') + ':' + 
-        String(now.getSeconds()).padStart(2, '0');
-    const timeElement = document.getElementById('current-time');
-    if (timeElement) {
-        timeElement.textContent = timeString;
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize edit modal with callback to refresh data after save/delete
     editModal = new EditModal(API_URL, refreshData);
     
     // Initial data load
     refreshData();
-    
-    // Update current time every second
-    updateCurrentTime();
-    setInterval(updateCurrentTime, 1000);
 });
 
