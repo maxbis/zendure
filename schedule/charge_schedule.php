@@ -15,6 +15,7 @@ $schedule = loadSchedule($dataFile);
 $today = isset($_GET['initial_date']) ? $_GET['initial_date'] : date('Ymd');
 $resolvedToday = resolveScheduleForDate($schedule, $today);
 $currentHour = date('H') . '00';
+$currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
 ?>
 <!DOCTYPE html>
@@ -57,6 +58,36 @@ $currentHour = date('H') . '00';
                         return $val . ' W';
                     }
                     $prevVal = null;
+                    // First pass: collect displayed slots to find the active one
+                    $displayedSlots = [];
+                    foreach ($resolvedToday as $slot) {
+                        $val = $slot['value'];
+                        // Filter logic: Only show changes or first item
+                        if (
+                            $prevVal !== null &&
+                            (($val === $prevVal) || 
+                             ($val === 'netzero' && $prevVal === 'netzero') ||
+                             ($val === 'netzero+' && $prevVal === 'netzero+'))
+                        ) {
+                            continue;
+                        }
+                        $prevVal = $val;
+                        $displayedSlots[] = $slot;
+                    }
+                    
+                    // Find the current active entry from displayed slots (closest to current time but not larger)
+                    $currentActiveTime = null;
+                    foreach ($displayedSlots as $slot) {
+                        $time = $slot['time'];
+                        if ($time <= $currentTime) {
+                            if ($currentActiveTime === null || $time > $currentActiveTime) {
+                                $currentActiveTime = $time;
+                            }
+                        }
+                    }
+                    
+                    // Second pass: render the displayed slots
+                    $prevVal = null;
                     foreach ($resolvedToday as $slot):
                         $val = $slot['value'];
                         // Filter logic: Only show changes or first item
@@ -72,7 +103,7 @@ $currentHour = date('H') . '00';
 
                         $time = $slot['time'];
                         $h = intval(substr($time, 0, 2));
-                        $isCurrent = ($time === $currentHour);
+                        $isCurrent = ($time === $currentActiveTime);
                         $bgClass = getTimeClass($h);
 
                         $valDisplay = getValueLabel($val);

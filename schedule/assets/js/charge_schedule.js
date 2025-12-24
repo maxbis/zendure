@@ -25,12 +25,40 @@ function getValueLabel(value) {
 
 // --- UI Rendering ---
 
-function renderToday(resolved, currentHour) {
+function renderToday(resolved, currentHour, currentTime) {
     const container = document.getElementById('today-schedule-grid');
     container.innerHTML = '';
 
     let prevVal = null;
+    
+    // First pass: collect displayed slots to find the active one
+    const displayedSlots = [];
+    resolved.forEach(slot => {
+        const val = slot.value;
+        // Filter logic: Only show changes or first item
+        if (prevVal !== null &&
+            ((val === prevVal) || 
+             (val === 'netzero' && prevVal === 'netzero') ||
+             (val === 'netzero+' && prevVal === 'netzero+'))) {
+            return;
+        }
+        prevVal = val;
+        displayedSlots.push(slot);
+    });
+    
+    // Find the current active entry from displayed slots (closest to current time but not larger)
+    let currentActiveTime = null;
+    displayedSlots.forEach(slot => {
+        const time = String(slot.time);
+        if (time <= currentTime) {
+            if (currentActiveTime === null || time > currentActiveTime) {
+                currentActiveTime = time;
+            }
+        }
+    });
 
+    // Second pass: render the displayed slots
+    prevVal = null;
     resolved.forEach(slot => {
         const val = slot.value;
         // Filter logic: Only show changes or first item
@@ -44,7 +72,7 @@ function renderToday(resolved, currentHour) {
 
         const time = String(slot.time);
         const h = parseInt(time.substring(0, 2));
-        const isCurrent = (time === currentHour);
+        const isCurrent = (time === currentActiveTime);
 
         let bgClass = 'time-evening';
         if (h >= 22 || h < 6) bgClass = 'time-night';
@@ -115,7 +143,7 @@ async function refreshData() {
         const data = await res.json();
         if (data.success) {
             renderEntries(data.entries);
-            renderToday(data.resolved, data.currentHour);
+            renderToday(data.resolved, data.currentHour, data.currentTime || data.currentHour);
             document.getElementById('status-bar').innerHTML = `<span>${data.entries.length} entries loaded.</span>`;
         }
     } catch (e) {

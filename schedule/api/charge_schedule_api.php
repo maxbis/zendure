@@ -37,7 +37,8 @@ try {
             'entries' => $uiEntries,
             'resolved' => $resolved,
             'date' => $date,
-            'currentHour' => date('H') . '00'
+            'currentHour' => date('H') . '00',
+            'currentTime' => date('Hi') // Current time in HHmm format (e.g., "0930")
         ];
     } elseif ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
