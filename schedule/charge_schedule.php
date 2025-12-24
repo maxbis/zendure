@@ -32,7 +32,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <div class="container">
         <div class="header">
             <h1>⚡ Charge Schedule Manager</h1>
-            <p>Manage charge and discharge targets with wildcard pattern matching.</p>
+            <p id="current-time"><?php echo date('Y-m-d H:i:s'); ?></p>
         </div>
 
         <div class="layout">
