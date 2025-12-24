@@ -312,8 +312,8 @@ def main():
     last_api_call_time = 0
     resolved_data = None
     current_hour = None
-    old_value = None
-    value = 'init'
+    old_value = 0
+    value = 0
     
     try:
         while True:
@@ -336,7 +336,7 @@ def main():
                 elif old_value != value or value == 'netzero' or value == 'netzero+':
                     resulting_power = set_power(value)
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {resulting_power}")
-                    post_status_update(status_api_url, value, old_value, resulting_power)
+                    post_status_update(status_api_url, 'Change', old_value, resulting_power)
                 else:
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
             else:
