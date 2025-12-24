@@ -8,19 +8,11 @@ and finding the current schedule value based on the resolved time entries.
 
 import json
 import time
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:
-    # Fallback for Python < 3.9
-    from backports.zoneinfo import ZoneInfo
-
+from zoneinfo import ZoneInfo
 import requests
-
 from zero_feed_in_shot import set_power
 
 # ============================================================================
@@ -69,9 +61,6 @@ LOOP_INTERVAL_SECONDS = 20
 # Time between API calls (seconds) - 5 minutes
 API_REFRESH_INTERVAL_SECONDS = 300
 
-# Valid integer range for schedule values
-MIN_VALUE = -800
-MAX_VALUE = 800
 
 
 # ============================================================================
