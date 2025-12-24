@@ -67,12 +67,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                     foreach ($resolvedToday as $slot) {
                         $val = $slot['value'];
                         // Filter logic: Only show changes or first item
-                        if (
-                            $prevVal !== null &&
-                            (($val === $prevVal) || 
-                             ($val === 'netzero' && $prevVal === 'netzero') ||
-                             ($val === 'netzero+' && $prevVal === 'netzero+'))
-                        ) {
+                        if ($prevVal !== null && $val === $prevVal) {
                             continue;
                         }
                         $prevVal = $val;
@@ -91,20 +86,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                     }
                     
                     // Second pass: render the displayed slots
-                    $prevVal = null;
-                    foreach ($resolvedToday as $slot):
+                    foreach ($displayedSlots as $slot):
                         $val = $slot['value'];
-                        // Filter logic: Only show changes or first item
-                        if (
-                            $prevVal !== null &&
-                            (($val === $prevVal) || 
-                             ($val === 'netzero' && $prevVal === 'netzero') ||
-                             ($val === 'netzero+' && $prevVal === 'netzero+'))
-                        ) {
-                            continue;
-                        }
-                        $prevVal = $val;
-
                         $time = $slot['time'];
                         $h = intval(substr($time, 0, 2));
                         $isCurrent = ($time === $currentActiveTime);
