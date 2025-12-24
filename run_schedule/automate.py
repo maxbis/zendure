@@ -312,7 +312,7 @@ def main():
     last_api_call_time = 0
     resolved_data = None
     current_hour = None
-    old_value = 0
+    old_value = None
     value = 0
     
     try:
