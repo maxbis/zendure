@@ -338,9 +338,7 @@ def main():
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {resulting_power}")
                     post_status_update(status_api_url, value, old_value, resulting_power)
                 else:
-                    resulting_power = set_power(0)
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
-                    post_status_update(status_api_url, 'change', old_value, resulting_power)
             else:
                 resulting_power = set_power(0)
                 print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
