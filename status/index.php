@@ -113,20 +113,14 @@ $systemStatus = getSystemStatusInfo(
                     
                     // Extract values for easier access in template
                     $chargePowerValue = $metrics['chargePower']['value'];
-                    $chargeBarData = $metrics['chargePower']['barData'];
                     $dischargePowerValue = $metrics['dischargePower']['value'];
-                    $dischargeBarData = $metrics['dischargePower']['barData'];
                     $totalPowerValue = $metrics['totalPower']['value'];
-                    $totalPowerBarData = $metrics['totalPower']['barData'];
                     $totalPowerColor = $metrics['totalPower']['color'];
-                    $gridBarData = $metrics['gridStatus']['barData'];
+                    $gridBarData = $metrics['gridStatus']['barData'];  // Still needed for bidirectional bar
                     $gridStatusColor = $metrics['gridStatus']['color'];
-                    $tempBarData = $metrics['temperature']['barData'];
                     $tempColor = $metrics['temperature']['color'];
-                    $rssiBarData = $metrics['rssi']['barData'];
                     $rssiColor = $metrics['rssi']['color'];
                     $batteryLevelValue = $metrics['batteryLevel']['value'];
-                    $batteryLevelBarData = $metrics['batteryLevel']['barData'];
                     $batteryLevelColor = $metrics['batteryLevel']['color'];
                     $packCount = is_array($packData) ? count($packData) : 0;
                     $totalCapacityKwh = $packCount * 2.88;
@@ -160,22 +154,26 @@ $systemStatus = getSystemStatusInfo(
                     <div class="metrics-grid">
                         <!-- 1. Total Power (swapped with Charging/Discharging) -->
                         <?php
-                        $totalPowerExtraContent = $totalPowerBarData['exceedsMax'] 
+                        // Calculate exceedsMax separately for custom label/content
+                        $totalPowerBarDataForCheck = calculateBarWidthNonLinear(abs($totalPowerValue), 0, 2000, 'power', 0.7);
+                        $totalPowerExtraContent = $totalPowerBarDataForCheck['exceedsMax'] 
                             ? '<span style="color: #ff9800; font-size: 0.85em;" title="Value exceeds maximum range">⚠️</span>' 
                             : null;
-                        $totalPowerRightLabel = $totalPowerBarData['exceedsMax'] ? '2000+ W' : '2000 W';
+                        $totalPowerRightLabel = $totalPowerBarDataForCheck['exceedsMax'] ? '2000+ W' : '2000 W';
                         renderMetricBar(
                             '1. Total Power',
                             $totalPowerValue,
-                            $totalPowerBarData,
                             $totalPowerColor,
                             0,
                             2000,
+                            'power',
+                            0.7,
+                            abs($totalPowerValue),  // Calculate with abs, but display signed
                             null,
                             'W',
                             '0',
                             $totalPowerRightLabel,
-                            'Total Power' . ($totalPowerBarData['exceedsMax'] ? ' (exceeds maximum)' : ''),
+                            'Total Power' . ($totalPowerBarDataForCheck['exceedsMax'] ? ' (exceeds maximum)' : ''),
                             false,
                             $totalPowerExtraContent
                         );
@@ -231,10 +229,12 @@ $systemStatus = getSystemStatusInfo(
                         renderMetricBar(
                             '3. Battery Level',
                             $batteryLevelValue,
-                            $batteryLevelBarData,
                             $batteryLevelColor,
                             0,
                             100,
+                            'linear',
+                            0.7,
+                            null,
                             "#000000",
                             '%',
                             '0%',
@@ -269,76 +269,38 @@ $systemStatus = getSystemStatusInfo(
 
                         <!-- 5. Unit Temperature (hyperTmp) -->
                         <?php
+                        $heatState = $properties['heatState'] ?? 0;
+                        $heatValue = $heatState == 1 ? '🔥 Heating ON' : '❄️ No Heating';
+ 
                         renderMetricBar(
-                            '5. Unit Temperature',
+                            '5. Unit Temperature ('.$heatValue.')',
                             $hyperTmpCelsius,
-                            $tempBarData,
                             $tempColor,
                             -10,
                             40,
-                            null,
-                            '°C',
+                            'linear',
+                            0.7,  // Exponent (not used for linear, but keeping for consistency)
+                            null, // valueForCalculation
+                            null, // valueColor
+                            '°C ',
                             '-10°C',
                             '+40°C',
-                            'Unit Temperature: ' . number_format($hyperTmpCelsius, 1) . ' degrees Celsius'
-                        );
-                        ?>
-
-                        <!-- 6. Battery Heating (swapped with Battery Level) -->
-                        <?php
-                        $heatState = $properties['heatState'] ?? 0;
-                        $heatValue = $heatState == 1 ? '🔥 <strong>Heating ON</strong>' : '❄️ No Heating';
-                        renderMetricSimple('6. Battery Heating', $heatValue, null, 'Battery Heating Status');
-                        ?>
-                    </div>
-
-                    <!-- Second Row: Grid Status, Unit Temperature, WiFi Strength -->
-                    <div class="metrics-grid">
-                        <!-- 7. Charging Power (outputPackPower) -->
-                        <?php
-                        renderMetricBar(
-                            '7. Charging',
-                            $chargePowerValue,
-                            $chargeBarData,
-                            COLOR_CHARGING,
-                            0,
-                            1200,
-                            null,
-                            'W',
-                            '0 W',
-                            '1200 W',
-                            'Charging Power',
-                            true
-                        );
-                        ?>
-
-                        <!-- 8. Discharging Power (outputHomePower) -->
-                        <?php
-                        renderMetricBar(
-                            '8. Discharging',
-                            $dischargePowerValue,
-                            $dischargeBarData,
-                            COLOR_DISCHARGING,
-                            0,
-                            1200,
-                            null,
-                            'W',
-                            '0 W',
-                            '1200 W',
-                            'Discharging Power',
-                            true
+                            'Unit Temperature: ' . number_format($hyperTmpCelsius, 1) . ' degrees Celsius',
+                            false  // showValueInBar
                         );
                         ?>
 
                         <!-- 9. WiFi Signal Strength (rssi) -->
                         <?php
                         renderMetricBar(
-                            '9. WiFi Signal (RSSI)',
+                            '6. WiFi Signal (RSSI)',
                             $rssiScale,
-                            $rssiBarData,
                             $rssiColor,
                             0,
                             10,
+                            'linear',
+                            0.7,
+                            null,
                             $rssiColor,
                             '/10',
                             '0',
@@ -347,6 +309,56 @@ $systemStatus = getSystemStatusInfo(
                             true
                         );
                         ?>
+                    </div>
+
+                    <!-- Second Row: Grid Status, Unit Temperature, WiFi Strength -->
+                    <div class="metrics-grid">
+                        <!-- 7. Charging Power (outputPackPower) -->
+                        <!-- <?php
+                        renderMetricBar(
+                            '7. Charging',
+                            $chargePowerValue,
+                            COLOR_CHARGING,
+                            0,
+                            1200,
+                            'power',
+                            0.7,
+                            null,
+                            null,
+                            'W',
+                            '0 W',
+                            '1200 W',
+                            'Charging Power',
+                            true
+                        );
+                        ?> -->
+
+                        <!-- 8. Discharging Power (outputHomePower) -->
+                        <!-- <?php
+                        renderMetricBar(
+                            '8. Discharging',
+                            $dischargePowerValue,
+                            COLOR_DISCHARGING,
+                            0,
+                            1200,
+                            'power',
+                            0.7,
+                            null,
+                            null,
+                            'W',
+                            '0 W',
+                            '1200 W',
+                            'Discharging Power',
+                            true
+                        );
+                        ?> -->
+
+                        <!-- 6. Battery Heating (swapped with Battery Level) -->
+                        <!-- <?php
+                        $heatState = $properties['heatState'] ?? 0;
+                        $heatValue = $heatState == 1 ? '🔥 <strong>Heating ON</strong>' : '❄️ No Heating';
+                        renderMetricSimple('9. Battery Heating', $heatValue, null, 'Battery Heating Status');
+                        ?> -->
                     </div>
 
                     <!-- AC Status -->
@@ -380,6 +392,9 @@ $systemStatus = getSystemStatusInfo(
                 </div>
             </div>
 
+            <!-- Power control section -->
+             
+
             <!-- Battery Packs Section -->
             <div class="card">
                 <div class="metric-section">
@@ -390,7 +405,6 @@ $systemStatus = getSystemStatusInfo(
                             // Calculate battery temperature (using same conversion as Unit Temperature)
                             $batteryMaxTemp = $pack['maxTemp'] ?? 0;
                             $batteryTempCelsius = convertHyperTmp($batteryMaxTemp);
-                            $batteryTempBarData = calculateBarWidth($batteryTempCelsius, -10, 40);
                             $batteryTempColor = getTempColor($batteryTempCelsius);
                             ?>
                             <div class="battery-card">
@@ -409,15 +423,16 @@ $systemStatus = getSystemStatusInfo(
                                     <?php
                                     $socPercent = $pack['socLevel'] ?? 0;
                                     $socColor = getBatteryLevelColor($socPercent);
-                                    $socBarData = calculateBarWidth($socPercent, 0, 100);
                                     // Use generic component with single centered label style and no wrapper
                                     renderMetricBar(
                                         'Charge Level',
                                         $socPercent,
-                                        $socBarData,
                                         $socColor,
                                         0,
                                         100,
+                                        'linear',
+                                        0.7,
+                                        null,
                                         $socColor,
                                         '%',
                                         '0%',  // Single centered label (dash indicates single label mode)
@@ -436,10 +451,12 @@ $systemStatus = getSystemStatusInfo(
                                     renderMetricBar(
                                         'Temperature (maxTemp)',
                                         $batteryTempCelsius,
-                                        $batteryTempBarData,
                                         $batteryTempColor,
                                         -10,
                                         40,
+                                        'linear',
+                                        0.7,
+                                        null,
                                         $batteryTempColor,
                                         '°C',
                                         '-10°C',

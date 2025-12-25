@@ -21,13 +21,16 @@ function renderMetricSimple($label, $value, $valueColor = null, $ariaLabel = nul
 
 /**
  * Render a unidirectional bar metric item
+ * Calculates bar width internally from the value parameter
  * 
  * @param string $label The metric label
- * @param string|int|float $value The metric value
- * @param array $barData Bar data from calculateBarWidth() or calculateBarWidthNonLinear()
+ * @param string|int|float $value The metric value to display
  * @param string $barColor Color for the bar fill
- * @param int|float $min Minimum value (default: 0)
+ * @param int|float $min Minimum value
  * @param int|float $max Maximum value
+ * @param string $scaleType Scaling type: 'linear', 'power', 'sqrt', or 'log' (default: 'linear')
+ * @param float $exponent Exponent for power scaling (default: 0.7)
+ * @param float|null $valueForCalculation Optional override for calculation value (e.g., abs($value))
  * @param string|null $valueColor Optional color for the value text
  * @param string|null $valueSuffix Optional suffix (e.g., 'W', '%', '°C')
  * @param string|null $leftLabel Optional left label
@@ -37,7 +40,20 @@ function renderMetricSimple($label, $value, $valueColor = null, $ariaLabel = nul
  * @param string|array|null $extraValueContent Optional extra content after value
  * @param bool $noWrapper If true, don't wrap in metric-item div
  */
-function renderMetricBar($label, $value, $barData, $barColor, $min = 0, $max = 100, $valueColor = null, $valueSuffix = '', $leftLabel = null, $rightLabel = null, $ariaLabel = null, $showValueInBar = false, $extraValueContent = null, $noWrapper = false) {
+function renderMetricBar($label, $value, $barColor, $min, $max, $scaleType = 'linear', $exponent = 0.7, $valueForCalculation = null, $valueColor = null, $valueSuffix = '', $leftLabel = null, $rightLabel = null, $ariaLabel = null, $showValueInBar = false, $extraValueContent = null, $noWrapper = false) {
+    // Calculate the value to use for bar calculation
+    $calcValue = $valueForCalculation !== null ? $valueForCalculation : $value;
+    
+    // Calculate bar data based on scale type
+    if ($scaleType === 'linear') {
+        $barData = calculateBarWidth($calcValue, $min, $max);
+    } else {
+        $barData = calculateBarWidthNonLinear($calcValue, $min, $max, $scaleType, $exponent);
+    }
+    
+    // For non-linear scaling, use a lower threshold (5% instead of 10%) since values are compressed
+    // $valueDisplayThreshold = ($scaleType === 'linear') ? 10 : 5;
+    
     $partialPath = __DIR__ . '/../partials/metric_bar.php';
     if (file_exists($partialPath)) {
         include $partialPath;

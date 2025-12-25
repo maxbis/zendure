@@ -6,7 +6,8 @@
 
 /**
  * Prepare all metric data for display
- * Calculates bar widths, colors, and values for all system metrics
+ * Calculates colors and values for all system metrics
+ * Note: Bar widths are now calculated in renderMetricBar() from the value parameter
  * 
  * @param array $properties Zendure device properties
  * @param float $p1TotalPower P1 meter total power value
@@ -17,35 +18,29 @@
 function prepareMetricData($properties, $p1TotalPower, $hyperTmpCelsius, $rssiScale) {
     // Charging Power
     $chargePowerValue = $properties['outputPackPower'] ?? 0;
-    $chargeBarData = calculateBarWidthNonLinear($chargePowerValue, 0, 2000, 'power', 0.7);
     
     // Discharging Power
     $dischargePowerValue = $properties['outputHomePower'] ?? 0;
-    $dischargeBarData = calculateBarWidthNonLinear($dischargePowerValue, 0, 2000, 'power', 0.7);
     
-    // Total Power (store signed value for display, use abs for bar calculation)
+    // Total Power (store signed value for display)
     $totalPowerValue = $p1TotalPower; // Keep signed value for display
-    $totalPowerBarData = calculateBarWidthNonLinear(abs($p1TotalPower), 0, 2000, 'power', 0.7);
     $totalPowerColor = ($p1TotalPower < 0) ? COLOR_EXPORTING : COLOR_IMPORTING;
     
-    // Grid Status (bidirectional)
+    // Grid Status (bidirectional) - bar data still calculated here for bidirectional bars
     $gridBarData = getBidirectionalBarDataNonLinear($p1TotalPower, -2000, 2000, 'power', 0.7);
     $gridStatusColor = ($p1TotalPower < 0) ? COLOR_EXPORTING : COLOR_IMPORTING;
     
     // Unit Temperature
-    $tempBarData = calculateBarWidth($hyperTmpCelsius, -10, 40);
     $tempColor = getTempColor($hyperTmpCelsius);
     
     // WiFi Signal Strength
-    $rssiBarData = calculateBarWidth($rssiScale, 0, 10);
     $rssiColor = getRssiColor($rssiScale);
     
     // Battery Level
     $batteryLevelValue = $properties['electricLevel'] ?? 0;
-    $batteryLevelBarData = calculateBarWidth($batteryLevelValue, 0, 100);
     $batteryLevelColor = getBatteryLevelColor($batteryLevelValue);
     
-    // Charging/Discharging (bidirectional)
+    // Charging/Discharging (bidirectional) - bar data still calculated here for bidirectional bars
     // Positive = charging, Negative = discharging
     $chargeDischargeValue = ($chargePowerValue > 0) ? $chargePowerValue : (($dischargePowerValue > 0) ? -$dischargePowerValue : 0);
     $chargeDischargeBarData = getBidirectionalBarDataNonLinear($chargeDischargeValue, -1200, 1200, 'power', 0.7);
@@ -63,15 +58,12 @@ function prepareMetricData($properties, $p1TotalPower, $hyperTmpCelsius, $rssiSc
     return [
         'chargePower' => [
             'value' => $chargePowerValue,
-            'barData' => $chargeBarData,
         ],
         'dischargePower' => [
             'value' => $dischargePowerValue,
-            'barData' => $dischargeBarData,
         ],
         'totalPower' => [
             'value' => $totalPowerValue,
-            'barData' => $totalPowerBarData,
             'color' => $totalPowerColor,
         ],
         'gridStatus' => [
@@ -79,16 +71,13 @@ function prepareMetricData($properties, $p1TotalPower, $hyperTmpCelsius, $rssiSc
             'color' => $gridStatusColor,
         ],
         'temperature' => [
-            'barData' => $tempBarData,
             'color' => $tempColor,
         ],
         'rssi' => [
-            'barData' => $rssiBarData,
             'color' => $rssiColor,
         ],
         'batteryLevel' => [
             'value' => $batteryLevelValue,
-            'barData' => $batteryLevelBarData,
             'color' => $batteryLevelColor,
         ],
         'chargeDischarge' => [
