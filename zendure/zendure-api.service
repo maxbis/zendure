@@ -1,0 +1,16 @@
+[Unit]
+Description=Zendure API Flask Application
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/zendure
+Environment="PATH=/home/pi/zendure/venv/bin"
+ExecStart=/home/pi/zendure/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000 app:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
