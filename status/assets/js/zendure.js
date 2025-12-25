@@ -1,16 +1,27 @@
 (function() {
     const buttons = document.querySelectorAll('.power-control-button');
     const countdownDisplay = document.getElementById('countdown-display');
+    const slider = document.getElementById('power-control-slider');
+    const sliderValueDisplay = document.getElementById('power-control-slider-value');
+    const countdownDisplaySlider = document.getElementById('countdown-display-slider');
     const zendureConfig = window.zendureConfig || {};
     let countdownInterval = null;
     let countdownSeconds = 0;
+    let sliderCountdownInterval = null;
+    let sliderCountdownSeconds = 0;
 
     function disableButtons() {
         buttons.forEach(btn => btn.disabled = true);
+        if (slider) {
+            slider.disabled = true;
+        }
     }
 
     function enableButtons() {
         buttons.forEach(btn => btn.disabled = false);
+        if (slider) {
+            slider.disabled = false;
+        }
     }
 
     function clearCountdown() {
@@ -20,6 +31,17 @@
         }
         countdownDisplay.textContent = '';
         countdownDisplay.classList.remove('active');
+    }
+
+    function clearSliderCountdown() {
+        if (sliderCountdownInterval) {
+            clearInterval(sliderCountdownInterval);
+            sliderCountdownInterval = null;
+        }
+        if (countdownDisplaySlider) {
+            countdownDisplaySlider.textContent = '';
+            countdownDisplaySlider.classList.remove('active');
+        }
     }
 
     function startCountdown() {
@@ -39,8 +61,126 @@
         }, 1000);
     }
 
+    function startSliderCountdown() {
+        sliderCountdownSeconds = 8;
+        if (countdownDisplaySlider) {
+            countdownDisplaySlider.classList.add('active');
+            updateSliderCountdown();
+        }
+
+        sliderCountdownInterval = setInterval(() => {
+            sliderCountdownSeconds--;
+            if (sliderCountdownSeconds <= 0) {
+                clearSliderCountdown();
+                // Trigger update data
+                window.location.href = '?update=1';
+            } else {
+                updateSliderCountdown();
+            }
+        }, 1000);
+    }
+
     function updateCountdown() {
         countdownDisplay.textContent = `Updating data in ${countdownSeconds} seconds...`;
+    }
+
+    function updateSliderCountdown() {
+        if (countdownDisplaySlider) {
+            countdownDisplaySlider.textContent = `Updating data in ${sliderCountdownSeconds} seconds...`;
+        }
+    }
+
+    function updateSliderValueDisplay(value) {
+        if (sliderValueDisplay) {
+            const watts = parseInt(value);
+            sliderValueDisplay.textContent = watts + 'W';
+            // Update color based on value
+            if (watts > 0) {
+                sliderValueDisplay.style.color = '#66bb6a'; // Green for charge
+            } else if (watts < 0) {
+                sliderValueDisplay.style.color = '#ef5350'; // Red for discharge
+            } else {
+                sliderValueDisplay.style.color = '#9e9e9e'; // Gray for zero
+            }
+        }
+    }
+
+    function sendPowerCommand(watts, displayElement, countdownFunction, clearCountdownFunction) {
+        // Disable all controls
+        disableButtons();
+        clearCountdownFunction();
+        if (displayElement) {
+            displayElement.textContent = 'Sending command...';
+        }
+
+        // Make AJAX request
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'api/set_zendure.php?watts=' + watts, true);
+        
+        xhr.onload = function() {
+            try {
+                const response = JSON.parse(xhr.responseText);
+                
+                // Log to console
+                console.log('Power Control Response:', response);
+                
+                if (response.success) {
+                    console.log('✅ Success: Set power to ' + watts + 'W');
+                    console.log('Device Response:', response.response);
+                    
+                    // Start countdown
+                    countdownFunction();
+                } else {
+                    console.error('❌ Failed:', response.error || 'Unknown error');
+                    if (displayElement) {
+                        displayElement.textContent = 'Error: ' + (response.error || 'Failed to send command');
+                        displayElement.style.color = '#ef5350';
+                    }
+                    enableButtons();
+                    
+                    // Clear error message after 3 seconds
+                    setTimeout(() => {
+                        if (displayElement) {
+                            displayElement.textContent = '';
+                            displayElement.style.color = '';
+                        }
+                    }, 3000);
+                }
+            } catch (e) {
+                console.error('❌ Error parsing response:', e);
+                console.error('Response text:', xhr.responseText);
+                if (displayElement) {
+                    displayElement.textContent = 'Error: Invalid response from server';
+                    displayElement.style.color = '#ef5350';
+                }
+                enableButtons();
+                
+                setTimeout(() => {
+                    if (displayElement) {
+                        displayElement.textContent = '';
+                        displayElement.style.color = '';
+                    }
+                }, 3000);
+            }
+        };
+        
+        xhr.onerror = function() {
+            console.error('❌ Network error: Failed to connect to server');
+            if (displayElement) {
+                displayElement.textContent = 'Error: Network error';
+                displayElement.style.color = '#ef5350';
+            }
+            enableButtons();
+            
+            setTimeout(() => {
+                if (displayElement) {
+                    displayElement.textContent = '';
+                    displayElement.style.color = '';
+                }
+            }, 3000);
+        };
+        
+        xhr.send();
     }
 
     // Automation entries toggle functionality (global function for onclick)
@@ -139,69 +279,26 @@
 
         button.addEventListener('click', function() {
             const watts = parseInt(this.getAttribute('data-watts'));
-            
-            // Disable all buttons
-            disableButtons();
-            clearCountdown();
-            countdownDisplay.textContent = 'Sending command...';
-
-            // Make AJAX request
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'api/set_zendure.php?watts=' + watts, true);
-            
-            xhr.onload = function() {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    
-                    // Log to console
-                    console.log('Power Control Response:', response);
-                    
-                    if (response.success) {
-                        console.log('✅ Success: Set power to ' + watts + 'W');
-                        console.log('Device Response:', response.response);
-                        
-                        // Start countdown
-                        startCountdown();
-                    } else {
-                        console.error('❌ Failed:', response.error || 'Unknown error');
-                        countdownDisplay.textContent = 'Error: ' + (response.error || 'Failed to send command');
-                        countdownDisplay.style.color = '#ef5350';
-                        enableButtons();
-                        
-                        // Clear error message after 3 seconds
-                        setTimeout(() => {
-                            countdownDisplay.textContent = '';
-                            countdownDisplay.style.color = '';
-                        }, 3000);
-                    }
-                } catch (e) {
-                    console.error('❌ Error parsing response:', e);
-                    console.error('Response text:', xhr.responseText);
-                    countdownDisplay.textContent = 'Error: Invalid response from server';
-                    countdownDisplay.style.color = '#ef5350';
-                    enableButtons();
-                    
-                    setTimeout(() => {
-                        countdownDisplay.textContent = '';
-                        countdownDisplay.style.color = '';
-                    }, 3000);
-                }
-            };
-            
-            xhr.onerror = function() {
-                console.error('❌ Network error: Failed to connect to server');
-                countdownDisplay.textContent = 'Error: Network error';
-                countdownDisplay.style.color = '#ef5350';
-                enableButtons();
-                
-                setTimeout(() => {
-                    countdownDisplay.textContent = '';
-                    countdownDisplay.style.color = '';
-                }, 3000);
-            };
-            
-            xhr.send();
+            sendPowerCommand(watts, countdownDisplay, startCountdown, clearCountdown);
         });
     });
+
+    // Slider functionality
+    if (slider && sliderValueDisplay) {
+        // Update display on input (real-time)
+        slider.addEventListener('input', function() {
+            const value = parseInt(this.value);
+            updateSliderValueDisplay(value);
+        });
+
+        // Send command on change (when user releases slider)
+        slider.addEventListener('change', function() {
+            const watts = parseInt(this.value);
+            sendPowerCommand(watts, countdownDisplaySlider, startSliderCountdown, clearSliderCountdown);
+        });
+
+        // Initialize display
+        updateSliderValueDisplay(slider.value);
+    }
 })();
 

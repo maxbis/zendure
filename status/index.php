@@ -393,7 +393,28 @@ $systemStatus = getSystemStatusInfo(
             </div>
 
             <!-- Power control section -->
-             
+            <div class="card">
+                <div class="power-control-section">
+                    <h3>⚡ Manual Power Control (Slider)</h3>
+                    <div class="power-control-slider-container">
+                        <div class="power-control-slider-labels">
+                            <span class="power-control-label-left">Discharge</span>
+                            <span class="power-control-label-right">Charge</span>
+                        </div>
+                        <div class="power-control-slider-wrapper">
+                            <input type="range" 
+                                   id="power-control-slider" 
+                                   class="power-control-slider" 
+                                   min="-800" 
+                                   max="1200" 
+                                   step="100" 
+                                   value="0">
+                            <div class="power-control-slider-value" id="power-control-slider-value">0W</div>
+                        </div>
+                        <div class="countdown-display" id="countdown-display-slider"></div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Battery Packs Section -->
             <div class="card">
