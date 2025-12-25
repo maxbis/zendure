@@ -369,104 +369,6 @@ body {
     font-size: 1.5rem;
 }
 
-.power-control-section {
-    margin-bottom: 20px;
-}
-
-.power-control-buttons {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-top: 15px;
-    margin-bottom: 10px;
-}
-
-.power-control-label-left {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #ef5350;
-    margin-right: 12px;
-}
-
-.power-control-label-right {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #66bb6a;
-    margin-left: 12px;
-}
-
-.power-control-button {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    width: 80px;
-}
-
-.power-control-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.power-control-button:active:not(:disabled) {
-    transform: translateY(0);
-}
-
-.power-control-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.power-control-button.charge {
-    background: #66bb6a;
-    color: #fff;
-}
-
-.power-control-button.charge:hover:not(:disabled) {
-    background: #4caf50;
-}
-
-.power-control-button.stop {
-    background: #9e9e9e;
-    color: #fff;
-}
-
-.power-control-button.stop:hover:not(:disabled) {
-    background: #757575;
-}
-
-.power-control-button.discharge {
-    background: #ef5350;
-    color: #fff;
-}
-
-.power-control-button.discharge:hover:not(:disabled) {
-    background: #e53935;
-}
-
-.countdown-display {
-    text-align: center;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #64b5f6;
-    margin-top: 5px;
-    min-height: 20px;
-}
-
-.countdown-display.active {
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
 
 @media (max-width: 768px) {
     .header {
@@ -495,29 +397,6 @@ body {
 
     .battery-grid {
         grid-template-columns: 1fr;
-    }
-
-    .power-control-buttons {
-        flex-direction: column;
-    }
-
-    .power-control-button {
-        width: 100%;
-    }
-
-    .power-control-label-left,
-    .power-control-label-right {
-        margin: 0;
-        width: 100%;
-        text-align: center;
-    }
-
-    .power-control-label-left {
-        margin-bottom: 8px;
-    }
-
-    .power-control-label-right {
-        margin-top: 8px;
     }
 }
 
