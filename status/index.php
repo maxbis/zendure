@@ -363,7 +363,62 @@ $systemStatus = getSystemStatusInfo(
 
                     <!-- AC Status -->
                     <?php
-                    $acStatusValue = '<span class="icon-large">' . getAcStatusIcon($properties['acStatus'] ?? 0) . '</span><strong>' . getAcStatusText($properties['acStatus'] ?? 0) . '</strong>';
+                    // Calculate time projection for battery full/empty
+                    $acStatusProjection = null;
+                    $acStatus = $properties['acStatus'] ?? 0;
+                    $packState = $properties['packState'] ?? 0;
+                    $outputPackPower = $properties['outputPackPower'] ?? 0;
+                    $outputHomePower = $properties['outputHomePower'] ?? 0;
+                    
+                    // Determine if charging or discharging
+                    $isCharging = ($acStatus == 2 || $packState == 1 || $outputPackPower > 0);
+                    $isDischarging = ($packState == 2 || $outputHomePower > 0);
+                    
+                    if ($isCharging || $isDischarging) {
+                        // Use the charge/discharge power value for calculation
+                        $powerW = $isCharging ? $outputPackPower : -$outputHomePower;
+                        $powerAbsW = abs($powerW);
+                        
+                        if ($powerAbsW > 0) {
+                            $hours = 0;
+                            if ($isCharging && $batteryLevelValue < $socSetPercent) {
+                                // Charging: time to reach socSet (full)
+                                $energyToTargetKwh = $totalCapacityKwh * max(0, ($socSetPercent - $batteryLevelValue) / 100);
+                                if ($energyToTargetKwh > 0) {
+                                    $hours = $energyToTargetKwh * 1000 / $powerAbsW;
+                                }
+                            } elseif ($isDischarging && $batteryRemainingAboveMinKwh > 0) {
+                                // Discharging: time to reach minSoc (empty)
+                                $energyToTargetKwh = $batteryRemainingAboveMinKwh;
+                                $hours = $energyToTargetKwh * 1000 / $powerAbsW;
+                            }
+                            
+                            if ($hours > 0 && $timestamp) {
+                                try {
+                                    $currentTime = new DateTime($timestamp);
+                                    $currentTime->modify('+' . round($hours * 3600) . ' seconds');
+                                    $timeStr = $currentTime->format('H:i');
+                                    $isTomorrow = ($currentTime->format('Y-m-d') != (new DateTime($timestamp))->format('Y-m-d'));
+                                    if ($isTomorrow) {
+                                        $timeStr .= ' (tomorrow)';
+                                    }
+                                    $acStatusProjection = ($isCharging ? 'Full at ' : 'Empty at ') . $timeStr;
+                                } catch (Exception $e) {
+                                    // Fallback to duration if timestamp parsing fails
+                                    $totalMinutes = (int)round($hours * 60);
+                                    $h = intdiv($totalMinutes, 60);
+                                    $m = $totalMinutes % 60;
+                                    $timeStr = sprintf('%d:%02d', $h, $m);
+                                    $acStatusProjection = ($isCharging ? 'Full in ' : 'Empty in ') . $timeStr . ' h';
+                                }
+                            }
+                        }
+                    }
+                    
+                    $acStatusValue = '<span class="icon-large">' . getAcStatusIcon($acStatus) . '</span><strong>' . getAcStatusText($acStatus) . '</strong>';
+                    if ($acStatusProjection) {
+                        $acStatusValue .= ' <span style="font-size: 0.85em; color: #666; font-weight: normal;">(' . htmlspecialchars($acStatusProjection) . ')</span>';
+                    }
                     renderMetricSimple('AC Status', $acStatusValue, null, 'AC Status');
                     ?>
                 </div>
