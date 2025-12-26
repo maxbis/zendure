@@ -379,17 +379,17 @@ def main():
                 if value is None:
                     resulting_power = set_power(0)
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
-                    post_status_update(status_api_url, 'No Value', old_value, resulting_power)
+                    post_status_update(status_api_url, 'change', old_value, resulting_power)
                 elif old_value != value or value == 'netzero' or value == 'netzero+':
                     resulting_power = set_power(value)
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {resulting_power}")
-                    post_status_update(status_api_url, 'Change', old_value, resulting_power)
+                    post_status_update(status_api_url, 'change', old_value, resulting_power)
                 else:
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
             else:
                 resulting_power = set_power(0)
                 print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
-                post_status_update(status_api_url, 'No Data', old_value, resulting_power)
+                post_status_update(status_api_url, 'change', old_value, resulting_power)
 
             # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
             sleep_remaining = LOOP_INTERVAL_SECONDS

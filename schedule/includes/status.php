@@ -96,7 +96,9 @@ function getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $so
  * @return string CSS class name
  */
 function getAutomationEntryTypeClass($type) {
-    switch ($type) {
+    // Normalize to lowercase for comparison
+    $typeLower = strtolower($type);
+    switch ($typeLower) {
         case 'start': return 'automation-badge-start';
         case 'stop': return 'automation-badge-stop';
         case 'change': return 'automation-badge-change';
@@ -157,7 +159,7 @@ function formatAutomationValue($value) {
 }
 
 /**
- * Format automation entry details based on type
+ * Format automation entry details - no validation, just display what's there
  * @param array $entry Entry array with type, oldValue, newValue
  * @return string Formatted details text
  */
@@ -166,19 +168,20 @@ function formatAutomationEntryDetails($entry) {
     $oldValue = $entry['oldValue'] ?? null;
     $newValue = $entry['newValue'] ?? null;
     
-    switch ($type) {
-        case 'change':
-            $oldFormatted = formatAutomationValue($oldValue);
-            $newFormatted = formatAutomationValue($newValue);
-            return $oldFormatted . ' → ' . $newFormatted;
-        case 'start':
-            return 'Automation started';
-        case 'stop':
-            return 'Automation stopped';
-        case 'heartbeat':
-            return 'Heartbeat';
-        default:
-            return 'Unknown event';
+    // Just display the type and any values
+    $parts = [];
+    if ($oldValue !== null || $newValue !== null) {
+        if ($oldValue !== null) {
+            $parts[] = formatAutomationValue($oldValue);
+        }
+        if ($newValue !== null) {
+            if (count($parts) > 0) {
+                $parts[] = '→';
+            }
+            $parts[] = formatAutomationValue($newValue);
+        }
     }
+    $details = implode(' ', $parts);
+    return ucfirst($type) . ($details ? ' (' . $details . ')' : '');
 }
 

@@ -474,6 +474,7 @@ $datasets = [[
             $minPrice = min($allPrices);
             $maxPrice = max($allPrices);
             $avgPrice = array_sum($allPrices) / count($allPrices);
+            $priceDelta = $maxPrice - $minPrice;
             
             // Calculate current price percentile
             $currentPercentile = null;
@@ -489,10 +490,16 @@ $datasets = [[
                 <div class="stat-card">
                     <h4>Minimum Price</h4>
                     <div class="value">€<?php echo number_format($minPrice, 4); ?></div>
+                    <div style="font-size: 1.2rem; margin-top: 8px; font-weight: 600; color: #666;">
+                        Delta €<?php echo number_format($priceDelta, 4); ?>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>Maximum Price</h4>
                     <div class="value">€<?php echo number_format($maxPrice, 4); ?></div>
+                    <div style="font-size: 1.2rem; margin-top: 8px; font-weight: 600; color: #666;">
+                        Delta €<?php echo number_format($priceDelta, 4); ?>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>Average Price</h4>
