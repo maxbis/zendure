@@ -13,28 +13,9 @@ $config = require __DIR__ . '/includes/config_loader.php';
 // Check if update parameter is set
 $useApiUpdate = isset($_GET['update']) && $_GET['update'] == '1';
 
-if ($useApiUpdate && isset($config['zendureFetchApiUrl'])) {
-    // Use API to fetch fresh Zendure data when update button is pressed
-    $apiUrl = $config['zendureFetchApiUrl'];
-    
-    // Make HTTP request to fetch Zendure data via API
-    $ch = curl_init($apiUrl);
-    if ($ch !== false) {
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_FOLLOWLOCATION => true
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        // Note: API response is not checked here, as data is saved by the API itself
-        // If API fails, the existing data file will remain unchanged
-    }
-} else {
+// If update parameter is set, API call will be made client-side via JavaScript
+// Otherwise, use default class-based update
+if (!$useApiUpdate) {
     // Auto-update: Fetch fresh data from devices on every page load (default behavior)
     // Require the read_zendure class
     require_once __DIR__ . '/classes/read_zendure.php';
@@ -76,6 +57,13 @@ $p1Status = ($p1TotalPower < 0) ? "EXPORTING ☀️" : "IMPORTING ⚡";
 $properties = $zendureData['properties'] ?? [];
 $packData = $zendureData['packData'] ?? [];
 $timestamp = $zendureData['timestamp'] ?? '';
+
+// Initialize variables for JavaScript config (defaults in case zendureData is not available)
+$totalCapacityKwh = 0;
+$batteryLevelValue = 0;
+$socSetPercent = 90;
+$minSocPercent = 20;
+$batteryRemainingAboveMinKwh = 0;
 
 // Calculate values
 $hyperTmpCelsius = isset($properties['hyperTmp']) ? convertHyperTmp($properties['hyperTmp']) : 0;
@@ -605,8 +593,44 @@ $systemStatus = getSystemStatusInfo(
             batteryLevelPercent: <?php echo $batteryLevelValue; ?>,
             socSetPercent: <?php echo $socSetPercent; ?>,
             minSocPercent: <?php echo $minSocPercent; ?>,
-            batteryRemainingAboveMinKwh: <?php echo $batteryRemainingAboveMinKwh; ?>
+            batteryRemainingAboveMinKwh: <?php echo $batteryRemainingAboveMinKwh; ?>,
+            zendureFetchApiUrl: <?php echo isset($config['zendureFetchApiUrl']) ? json_encode($config['zendureFetchApiUrl']) : 'null'; ?>,
+            updateRequested: <?php echo $useApiUpdate ? 'true' : 'false'; ?>
         };
+
+        // If update=1 is in URL, make API call and log result to console
+        if (window.zendureConfig.updateRequested && window.zendureConfig.zendureFetchApiUrl) {
+            console.log('🔄 Update requested - Calling Zendure Fetch API...');
+            console.log('API URL:', window.zendureConfig.zendureFetchApiUrl);
+            
+            fetch(window.zendureConfig.zendureFetchApiUrl)
+                .then(response => {
+                    console.log('API Response Status:', response.status, response.statusText);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('✅ Zendure Fetch API Response:', data);
+                    if (data.success) {
+                        console.log('✓ Data fetched and saved successfully');
+                        console.log('Device IP:', data.deviceIp);
+                        console.log('File:', data.file);
+                        console.log('Timestamp:', data.timestampIso);
+                    } else {
+                        console.error('✗ API Error:', data.error || 'Unknown error');
+                    }
+                    // Reload page after a short delay to show updated data
+                    setTimeout(() => {
+                        window.location.href = window.location.pathname;
+                    }, 1000);
+                })
+                .catch(error => {
+                    console.error('❌ Error calling Zendure Fetch API:', error);
+                    // Reload page anyway to show current data
+                    setTimeout(() => {
+                        window.location.href = window.location.pathname;
+                    }, 1000);
+                });
+        }
     </script>
     <script src="assets/js/zendure.js"></script>
 </body>
