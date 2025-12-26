@@ -13,6 +13,19 @@ require_once __DIR__ . '/includes/status.php';
 
 $dataFile = __DIR__ . '/../data/charge_schedule.json';
 
+// Load API URL from config file
+$apiUrl = 'api/charge_schedule_api.php'; // Default fallback
+$configPath = __DIR__ . '/../run_schedule/config/config.json';
+if (file_exists($configPath)) {
+    $configJson = file_get_contents($configPath);
+    if ($configJson !== false) {
+        $config = json_decode($configJson, true);
+        if ($config !== null && isset($config['apiUrl'])) {
+            $apiUrl = $config['apiUrl'];
+        }
+    }
+}
+
 // Initial Server-Side Render Data
 $schedule = loadSchedule($dataFile);
 $today = isset($_GET['initial_date']) ? $_GET['initial_date'] : date('Ymd');
@@ -169,6 +182,10 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
 
+        <script>
+            // Inject API URL from PHP config
+            const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
+        </script>
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
         

@@ -1,9 +1,15 @@
 /**
  * Charge Schedule Manager
  * Main application logic for rendering and managing schedule data
+ * 
+ * API_URL is injected from PHP (charge_schedule.php) which reads it from config.json
+ * If not defined, fallback to old endpoint
  */
 
-const API_URL = 'api/charge_schedule_api.php';
+// API_URL is injected from PHP, but provide fallback if not available
+if (typeof API_URL === 'undefined') {
+    var API_URL = 'api/charge_schedule_api.php';
+}
 
 // Helper function to get label from radio button by value
 function getValueLabel(value) {

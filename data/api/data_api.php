@@ -103,12 +103,59 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                $response = [
-                    'success' => true,
-                    'data' => $data,
-                    'file' => basename($filePath),
-                    'timestamp' => file_exists($filePath) ? filemtime($filePath) : null
-                ];
+                // Check if resolved format is requested for schedule type
+                if ($type === 'schedule' && (isset($_GET['resolved']) || isset($_GET['format']) && $_GET['format'] === 'resolved')) {
+                    // Require schedule resolution functions
+                    $scheduleFunctionsPath = __DIR__ . '/../../schedule/api/charge_schedule_functions.php';
+                    if (!file_exists($scheduleFunctionsPath)) {
+                        throw new Exception("Schedule functions file not found: $scheduleFunctionsPath");
+                    }
+                    require_once $scheduleFunctionsPath;
+                    
+                    // Normalize schedule data (like loadSchedule does)
+                    $schedule = [];
+                    if (is_array($data)) {
+                        foreach ($data as $k => $v) {
+                            $schedule[(string) $k] = $v;
+                        }
+                    }
+                    
+                    // Get date parameter (default: today)
+                    $date = isset($_GET['date']) ? $_GET['date'] : date('Ymd');
+                    if (!preg_match('/^\d{8}$/', $date)) {
+                        $date = date('Ymd');
+                    }
+                    
+                    // Resolve schedule for the date
+                    $resolved = resolveScheduleForDate($schedule, $date);
+                    
+                    // Format UI entries (sorted key-value pairs)
+                    $uiEntries = [];
+                    foreach ($schedule as $k => $v) {
+                        $uiEntries[] = ['key' => (string) $k, 'value' => $v];
+                    }
+                    usort($uiEntries, function ($a, $b) {
+                        return strcmp($a['key'], $b['key']);
+                    });
+                    
+                    // Return response in old endpoint format
+                    $response = [
+                        'success' => true,
+                        'resolved' => $resolved,
+                        'currentHour' => date('H') . '00',
+                        'currentTime' => date('Hi'),
+                        'entries' => $uiEntries,
+                        'date' => $date
+                    ];
+                } else {
+                    // Standard response format
+                    $response = [
+                        'success' => true,
+                        'data' => $data,
+                        'file' => basename($filePath),
+                        'timestamp' => file_exists($filePath) ? filemtime($filePath) : null
+                    ];
+                }
             }
         }
     }
