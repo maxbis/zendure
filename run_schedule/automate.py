@@ -7,6 +7,7 @@ and finding the current schedule value based on the resolved time entries.
 """
 
 import json
+import signal
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,21 @@ LOOP_INTERVAL_SECONDS = 20
 # Time between API calls (seconds) - 5 minutes
 API_REFRESH_INTERVAL_SECONDS = 300
 
+# ============================================================================
+# SIGNAL HANDLING
+# ============================================================================
 
+# Shutdown flag (using list for mutable reference in signal handler)
+shutdown_flag = [False]
+
+def signal_handler(signum, frame):
+    """
+    Signal handler for graceful shutdown.
+    Sets the shutdown flag when SIGTERM or SIGINT is received.
+    """
+    signal_name = signal.Signals(signum).name
+    print(f"\n⚠️  Received {signal_name} signal, initiating graceful shutdown...")
+    shutdown_flag[0] = True
 
 # ============================================================================
 # TIMESTAMP FUNCTION
@@ -329,6 +344,10 @@ def main():
     print(f"   API URL: {api_url}")
     print()
     
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
     last_api_call_time = 0
     resolved_data = None
     current_hour = None
@@ -337,6 +356,10 @@ def main():
     
     try:
         while True:
+            # Check for shutdown request
+            if shutdown_flag[0]:
+                break
+            
             current_time = get_my_timestamp()
             now_amsterdam = get_my_datetime()
             
@@ -344,6 +367,10 @@ def main():
             time_since_last_api = current_time - last_api_call_time
             if time_since_last_api >= API_REFRESH_INTERVAL_SECONDS:
                 resolved_data, current_hour, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)
+            
+            # Check for shutdown request again after potentially long-running operations
+            if shutdown_flag[0]:
+                break
             
             # Find current schedule value if we have valid data
             if resolved_data and current_hour:
@@ -364,8 +391,15 @@ def main():
                 print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
                 post_status_update(status_api_url, 'No Data', old_value, resulting_power)
 
-            # Sleep for the loop interval
-            time.sleep(LOOP_INTERVAL_SECONDS)
+            # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
+            sleep_remaining = LOOP_INTERVAL_SECONDS
+            while sleep_remaining > 0 and not shutdown_flag[0]:
+                time.sleep(min(1, sleep_remaining))
+                sleep_remaining -= 1
+            
+            # If shutdown was requested during sleep, break immediately
+            if shutdown_flag[0]:
+                break
             
     except KeyboardInterrupt:
         print("\n👋 Shutting down gracefully...")
@@ -374,6 +408,11 @@ def main():
         print(f"\n❌ Fatal error in main loop: {e}")
         post_status_update(status_api_url, 'stop', value, None)
         raise
+    
+    # Handle graceful shutdown from signal
+    if shutdown_flag[0]:
+        print("\n👋 Shutting down gracefully...")
+        post_status_update(status_api_url, 'stop', value, None)
 
 
 if __name__ == "__main__":
