@@ -1,4 +1,4 @@
 <?php
 #redirect to ../status/index.php
-header('Location: ../status/index.php');
-exit();
+// header('Location: ../status/index.php');
+// exit();
