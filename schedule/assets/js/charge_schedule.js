@@ -6,9 +6,11 @@
  * If not defined, fallback to old endpoint
  */
 
-// API_URL is injected from PHP, but provide fallback if not available
+// API_URL is injected from PHP via inline script tag
+// If not injected, use fallback (but PHP should always inject it)
 if (typeof API_URL === 'undefined') {
-    var API_URL = 'api/charge_schedule_api.php';
+    // Assign to window to avoid const redeclaration error
+    window.API_URL = 'api/charge_schedule_api.php';
 }
 
 // Helper function to get label from radio button by value
