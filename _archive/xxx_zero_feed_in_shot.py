@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Single-shot P1 Meter Zero Feed-In Controller (standalone copy for run_schedule)
+P1 Meter Zero Feed-In Controller (standalone copy for run_schedule)
 
 This file is adapted to be fully local to the run_schedule directory:
 - Config and data are read from ./config/config.json and ./data/zendure_data.json
@@ -679,7 +679,7 @@ def main(argv: Optional[list] = None) -> int:
     CLI entry point.
     """
     parser = argparse.ArgumentParser(
-        description="Single-shot P1 Meter Zero Feed-In Controller",
+        description="P1 Meter Zero Feed-In Controller",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

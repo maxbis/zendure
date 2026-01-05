@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 import requests
-from zero_feed_in_shot import set_power
+from zero_feed_in_controller import set_power
 from logger import log_info, log_debug, log_warning, log_error, log_success
 
 # ============================================================================
