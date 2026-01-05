@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, Union, Literal
 
 import requests
+from logger import log_info, log_debug, log_warning, log_error, log_success
 
 # ============================================================================
 # CONFIGURATION PARAMETERS
@@ -28,9 +29,10 @@ POWER_FEED_MIN = -800  # Minimum effective power feed (discharge)
 POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
 
 # Thresholds and battery limits
-POWER_FEED_MIN_THRESHOLD = 50  # Minimum change (W) to actually adjust limits
+POWER_FEED_MIN_THRESHOLD = 30  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
+POWER_FEED_MIN_DELTA = 50      # Minimum change (W) to actually adjust limits - if |delta| < threshold, keep current
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
-MAX_CHARGE_LEVEL = 100          # Maximum battery level (%) - stop charging above this
+MAX_CHARGE_LEVEL = 100         # Maximum battery level (%) - stop charging above this
 
 TEST_MODE = False
 
@@ -69,10 +71,10 @@ class ZeroFeedInResult:
 
 
 # ============================================================================
-# HELPERS
+# PRIVATE HELPERS
 # ============================================================================
 
-def load_config(config_path: Path) -> Dict[str, str]:
+def _load_config(config_path: Path) -> Dict[str, str]:
     """
     Load configuration from config.json.
 
@@ -107,7 +109,7 @@ def load_config(config_path: Path) -> Dict[str, str]:
     }
 
 
-def read_p1_meter(ip_address: str) -> Optional[int]:
+def _read_p1_meter(ip_address: str) -> Optional[int]:
     """
     Fetch total_power from Zendure P1 Meter API endpoint.
 
@@ -126,10 +128,10 @@ def read_p1_meter(ip_address: str) -> Optional[int]:
         total_power = data.get("total_power")
         return total_power
     except requests.exceptions.RequestException as e:
-        print(f"Error connecting to Zendure P1 at {ip_address}: {e}")
+        log_error(f"Error connecting to Zendure P1 at {ip_address}: {e}")
         return None
     except (json.JSONDecodeError, KeyError) as e:
-        print(f"Error parsing P1 response: {e}")
+        log_error(f"Error parsing P1 response: {e}")
         return None
 
 
@@ -144,50 +146,137 @@ def _read_zendure_data() -> Optional[dict]:
         with open(data_path, "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"Warning: zendure_data.json not found at {data_path}")
+        log_warning(f"zendure_data.json not found at {data_path}")
         return None
     except json.JSONDecodeError as e:
-        print(f"Warning: Invalid JSON in zendure_data.json: {e}")
+        log_warning(f"Invalid JSON in zendure_data.json: {e}")
         return None
 
 
-def read_zendure_current_settings() -> Tuple[Optional[int], Optional[int]]:
+def _read_zendure_state(
+    config_path: Optional[Path] = None,
+    device_ip: Optional[str] = None,
+    update: bool = True,
+) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """
-    Read current inputLimit (charge) and outputLimit (discharge) from zendure_data.json.
+    Read current Zendure device state: inputLimit, outputLimit, and electricLevel.
+    
+    Args:
+        config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
+        device_ip: Override Zendure device IP (else from config)
+        update: If True, fetch fresh data from device; if False, read from file only
+    
+    Returns:
+        tuple: (inputLimit, outputLimit, electricLevel) or (None, None, None) on error
+    """
+    if update:
+        data = _update_zendure_data(config_path, device_ip)
+    else:
+        data = _read_zendure_data()
+    
+    if not data:
+        return (None, None, None)
+    
+    try:
+        props = data.get("properties", {})
+        input_limit = props.get("inputLimit")
+        output_limit = props.get("outputLimit")
+        electric_level = props.get("electricLevel")
+        return (input_limit, output_limit, electric_level)
+    except Exception as e:
+        log_warning(f"Error reading Zendure state: {e}")
+        return (None, None, None)
+
+
+def _update_zendure_data(
+    config_path: Optional[Path] = None,
+    device_ip: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Fetch Zendure device data and save it to zendure_data.json.
+
+    Args:
+        config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
+        device_ip: Override Zendure device IP (else from config)
 
     Returns:
-        tuple: (inputLimit, outputLimit) in watts, or (None, None) if error.
+        dict: Device data with timestamp, properties, and packData, or None on error.
     """
-    data = _read_zendure_data()
-    if not data:
-        return (None, None)
-
-
-    props = data.get("properties", {})
-    input_limit = props.get("inputLimit")
-    output_limit = props.get("outputLimit")
-    return (input_limit, output_limit)
-
-
-def read_electric_level() -> Optional[int]:
-    """
-    Read electricLevel (battery percentage) from zendure_data.json.
-
-    Returns:
-        int: Battery level percentage (0-100), or None if error.
-    """
-    data = _read_zendure_data()
-    if not data:
-        return None
+    # Resolve configuration
+    if config_path is None:
+        config_path = CONFIG_FILE_PATH
 
     try:
-        return data.get("properties", {}).get("electricLevel")
+        config = _load_config(Path(config_path))
     except Exception as e:
-        print(f"Warning: Error reading electricLevel from zendure_data.json: {e}")
+        log_error(f"Error loading config: {e}")
+        return None
+
+    # Get device IP from parameter or config
+    dev_ip = device_ip or config["deviceIp"]
+
+    # Fetch data from Zendure device
+    url = f"http://{dev_ip}/properties/report"
+
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+
+        # Extract properties and pack data
+        props = data.get("properties", {})
+        packs = data.get("packData", [])
+
+        # Prepare reading data with timestamp
+        reading_data = {
+            "timestamp": datetime.now().isoformat(),
+            "properties": props,
+            "packData": packs,
+        }
+
+        # Save to JSON file atomically
+        script_dir = Path(__file__).parent.absolute()
+        data_dir = script_dir / "data"
+        data_path = data_dir / "zendure_data.json"
+        temp_path = data_path.with_suffix(".json.tmp")
+
+        # Ensure data directory exists
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write to temporary file first
+        try:
+            with open(temp_path, "w") as f:
+                json.dump(reading_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            log_error(f"Error writing temporary file: {e}")
+            return None
+
+        # Atomically replace the target file with the temp file
+        try:
+            temp_path.replace(data_path)
+        except Exception as e:
+            log_error(f"Error renaming temporary file: {e}")
+            # Clean up temp file if rename failed
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+            return None
+
+        return reading_data
+
+    except requests.exceptions.RequestException as e:
+        log_error(f"Error connecting to Zendure device at {dev_ip}: {e}")
+        return None
+    except (json.JSONDecodeError, KeyError) as e:
+        log_error(f"Error parsing Zendure response: {e}")
+        return None
+    except Exception as e:
+        log_error(f"Unexpected error updating Zendure data: {e}")
         return None
 
 
-def send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bool, Optional[str]]:
+def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bool, Optional[str]]:
     """
     Send power_feed value to Zendure device via /properties/write endpoint.
 
@@ -234,7 +323,7 @@ def send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bo
     payload = {"sn": device_sn, "properties": properties}
 
     if TEST_MODE:
-        print(f"TEST MODE: Would set power feed to {power_feed} W")
+        log_info(f"TEST MODE: Would set power feed to {power_feed} W")
         return (True, None)
 
     try:
@@ -252,7 +341,10 @@ def send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bo
         except json.JSONDecodeError:
             pass
 
+        log_info(f"Actually set power feed to {power_feed} W")
+
         return (True, None)
+
     except requests.exceptions.RequestException as e:
         return (False, str(e))
     except Exception as e:
@@ -260,10 +352,10 @@ def send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[bo
 
 
 # ============================================================================
-# CORE CALCULATION
+# PRIVATE CORE CALCULATION
 # ============================================================================
 
-def calculate_new_settings(
+def _calculate_new_settings(
     p1_power: int,
     current_input: int,
     current_output: int,
@@ -296,6 +388,9 @@ def calculate_new_settings(
     - Clamp to power limits (POWER_FEED_MIN / POWER_FEED_MAX)
     - Apply minimum absolute threshold on |F_desired| (POWER_FEED_MIN_THRESHOLD):
       if |F_desired| < threshold, then F_desired = 0.
+    - Apply minimum delta threshold on |F_desired - F_current| (POWER_FEED_MIN_DELTA):
+      if |delta| < threshold, keep current settings (F_desired = F_current).
+      This prevents small adjustments that are below the threshold.
     """
     if current_input is None:
         current_input = 0
@@ -311,11 +406,11 @@ def calculate_new_settings(
         # Too full to charge
         if electric_level > MAX_CHARGE_LEVEL and effective_desired < 0:
             effective_desired = 0
-            print(f"Charge level above {MAX_CHARGE_LEVEL}, preventing charge")
+            log_warning(f"Charge level above {MAX_CHARGE_LEVEL}, preventing charge")
         # Too empty to discharge
         if electric_level < MIN_CHARGE_LEVEL and effective_desired > 0:
             effective_desired = 0
-            print(f"Charge level below {MIN_CHARGE_LEVEL}, preventing discharge")
+            log_warning(f"Charge level below {MIN_CHARGE_LEVEL}, preventing discharge")
 
     # Clamp effective desired feed
     effective_desired = max(POWER_FEED_MIN, min(POWER_FEED_MAX, effective_desired))
@@ -324,6 +419,12 @@ def calculate_new_settings(
     # if the resulting discharge/charge is very small, turn it off.
     if abs(effective_desired) < POWER_FEED_MIN_THRESHOLD:
         effective_desired = 0
+
+    # Apply minimum delta threshold on the CHANGE:
+    # if the change is too small, keep current settings to avoid unnecessary adjustments
+    effective_delta = effective_desired - effective_current
+    if abs(effective_delta) < POWER_FEED_MIN_DELTA:
+        effective_desired = effective_current
 
     # Reconstruct input/output from clamped effective power:
     # - Positive => discharge (output), negative => charge (input)
@@ -344,7 +445,7 @@ def calculate_new_settings(
 # PUBLIC LIBRARY FUNCTION
 # ============================================================================
 
-def calculate_zero_feed_in(
+def execute_zero_feed_in(
     config_path: Optional[Path] = None,
     p1_meter_ip: Optional[str] = None,
     device_ip: Optional[str] = None,
@@ -352,7 +453,7 @@ def calculate_zero_feed_in(
     apply: bool = True,
     ) -> ZeroFeedInResult:
     """
-    Perform a single-shot zero feed-in calculation.
+    Execute a single-shot zero feed-in operation (read, calculate, and optionally apply).
 
     Args:
         config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
@@ -369,7 +470,7 @@ def calculate_zero_feed_in(
         config_path = CONFIG_FILE_PATH
 
     try:
-        config = load_config(Path(config_path))
+        config = _load_config(Path(config_path))
     except Exception as e:
         return ZeroFeedInResult(
             p1_power=None,
@@ -387,7 +488,8 @@ def calculate_zero_feed_in(
     dev_sn = device_sn or config["deviceSn"]
 
     # Read inputs
-    p1_power = read_p1_meter(p1_ip)
+    p1_power = _read_p1_meter(p1_ip)
+    log_debug(f"P1 power (grid-status): {p1_power}")
     if p1_power is None:
         return ZeroFeedInResult(
             p1_power=None,
@@ -400,9 +502,12 @@ def calculate_zero_feed_in(
             error="Failed to read P1 meter",
         )
 
-    current_input, current_output = read_zendure_current_settings()
-    print(f"function calculate_zero_feed_in()\n  current_input: {current_input}, current_output: {current_output}")
-    electric_level = read_electric_level()
+    current_input, current_output, electric_level = _read_zendure_state(
+        config_path=config_path,
+        device_ip=dev_ip,
+        update=True,
+    )
+    # print(f"function execute_zero_feed_in()\n  current_input: {current_input}, current_output: {current_output}")
 
     # If we cannot read current settings, still report but don't apply
     if current_input is None or current_output is None:
@@ -418,7 +523,7 @@ def calculate_zero_feed_in(
         )
 
     # Calculate new settings
-    new_input, new_output = calculate_new_settings(
+    new_input, new_output = _calculate_new_settings(
         p1_power=p1_power,
         current_input=current_input,
         current_output=current_output,
@@ -427,7 +532,6 @@ def calculate_zero_feed_in(
 
     # If nothing changes, no need to apply
     if new_input == current_input and new_output == current_output:
-        print(f"No change needed")
         return ZeroFeedInResult(
             p1_power=p1_power,
             current_input=current_input,
@@ -463,8 +567,8 @@ def calculate_zero_feed_in(
         # Both zero or mixed (fallback: stop all)
         power_feed = 0
 
-    print(f"send_power_feed(power_feed={power_feed})")
-    success, error_msg = send_power_feed(dev_ip, dev_sn, power_feed)
+    # print(f"send_power_feed(power_feed={power_feed})")
+    success, error_msg = _send_power_feed(dev_ip, dev_sn, power_feed)
 
     return ZeroFeedInResult(
         p1_power=p1_power,
@@ -504,7 +608,7 @@ def set_power(
         Exception: On device communication errors or P1 meter read failure
     """
 
-    print(f"function set_power(power={power})")
+    # print(f"function set_power(power={power})")
 
     # Resolve config path
     if config_path is None:
@@ -513,7 +617,7 @@ def set_power(
     # Handle specific power feed (int)
     if isinstance(power, int): 
         # Load config
-        config = load_config(Path(config_path))
+        config = _load_config(Path(config_path))
         device_ip = config["deviceIp"]
         device_sn = config["deviceSn"]
 
@@ -523,11 +627,11 @@ def set_power(
 
         # Test mode: don't apply, but return what would be set
         if test:
-            print(f"TEST MODE: Would set power feed to {power} W")
+            log_info(f"TEST MODE: Would set power feed to {power} W")
             return power
 
         # Send power feed
-        success, error_msg = send_power_feed(device_ip, device_sn, internal_power_feed)
+        success, error_msg = _send_power_feed(device_ip, device_sn, internal_power_feed)
         if not success:
             raise Exception(f"Failed to set power feed: {error_msg}")
 
@@ -535,12 +639,12 @@ def set_power(
 
     # Handle dynamic zero feed-in ('netzero' or None)
     elif power == 'netzero' or power == 'netzero+' or power is None:
-        result = calculate_zero_feed_in(
+        result = execute_zero_feed_in(
             config_path=config_path,
             apply=not test,
         )
 
-        print(f"function set_power({power})\n  result: {result}")
+        # print(f"function set_power({power})\n  result: {result}")
         # if test:
         #     return power
 
@@ -609,11 +713,11 @@ def main(argv: Optional[list] = None) -> int:
     if args.power_feed is not None:
         # Load config to get device_ip and device_sn
         try:
-            config = load_config(config_path)
+            config = _load_config(config_path)
             device_ip = config["deviceIp"]
             device_sn = config["deviceSn"]
         except Exception as e:
-            print(f"Error loading config: {e}")
+            log_error(f"Error loading config: {e}")
             return 1
 
         # Convert user convention to internal convention
@@ -622,10 +726,8 @@ def main(argv: Optional[list] = None) -> int:
         internal_power_feed = -args.power_feed
 
         # Output
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if args.test:
-            print("[TEST MODE - No changes will be applied]")
-        print(f"\nTime: {timestamp}")
+            log_info("[TEST MODE - No changes will be applied]")
 
         # Determine mode description
         if args.power_feed > 0:
@@ -635,58 +737,56 @@ def main(argv: Optional[list] = None) -> int:
         else:
             mode_desc = "Stop (0 W)"
 
-        print(f"Power Feed: {mode_desc}")
+        log_info(f"Power Feed: {mode_desc}")
 
         # Apply or simulate
         if args.test:
-            print("Status: Simulated (test mode)")
+            log_info("Status: Simulated (test mode)")
             return 0
         else:
-            success, error_msg = send_power_feed(device_ip, device_sn, internal_power_feed)
+            success, error_msg = _send_power_feed(device_ip, device_sn, internal_power_feed)
             if success:
-                print("Status: Applied")
+                log_success("Status: Applied")
                 return 0
             else:
-                print(f"Status: Failed to apply - {error_msg}")
+                log_error(f"Status: Failed to apply - {error_msg}")
                 return 1
 
     # Normal zero feed-in calculation flow
-    result = calculate_zero_feed_in(
+    result = execute_zero_feed_in(
         config_path=config_path,
         apply=apply_changes,
     )
 
     # Output
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if args.test:
-        print("[TEST MODE - No changes will be applied]")
-    print(f"\nTime: {timestamp}")
+        log_info("[TEST MODE - No changes will be applied]")
 
     if result.error:
-        print(f"Status: Error - {result.error}")
+        log_error(f"Status: Error - {result.error}")
         # Still print whatever data we have
 
-    print(f"P1 Meter Power: {result.p1_power if result.p1_power is not None else 'N/A'} W")
-    print("\nCurrent Settings:")
-    print(
+    log_info(f"P1 Meter Power: {result.p1_power if result.p1_power is not None else 'N/A'} W")
+    log_info("\nCurrent Settings:")
+    log_info(
         f"  Input (Charge): "
         f"{result.current_input if result.current_input is not None else 'N/A'} W"
     )
-    print(
+    log_info(
         f"  Output (Discharge): "
         f"{result.current_output if result.current_output is not None else 'N/A'} W"
     )
     if result.electric_level is not None:
-        print(f"\nBattery Level: {result.electric_level}%")
+        log_info(f"\nBattery Level: {result.electric_level}%")
     else:
-        print("\nBattery Level: N/A")
+        log_info("\nBattery Level: N/A")
 
-    print("\nCalculated New Settings:")
-    print(
+    log_info("\nCalculated New Settings:")
+    log_info(
         f"  Input (Charge): "
         f"{result.new_input if result.new_input is not None else 'N/A'} W"
     )
-    print(
+    log_info(
         f"  Output (Discharge): "
         f"{result.new_output if result.new_output is not None else 'N/A'} W"
     )
@@ -694,17 +794,22 @@ def main(argv: Optional[list] = None) -> int:
     # Status line
     if result.error:
         status = f"Error: {result.error}"
+        log_error(f"\nStatus: {status}")
     elif (
         result.new_input == result.current_input
         and result.new_output == result.current_output
     ):
         status = "No change needed"
+        log_info(f"\nStatus: {status}")
     elif args.test:
         status = "Simulated (test mode)"
+        log_info(f"\nStatus: {status}")
     else:
         status = "Applied" if result.applied else "Failed to apply"
-
-    print(f"\nStatus: {status}")
+        if result.applied:
+            log_success(f"\nStatus: {status}")
+        else:
+            log_error(f"\nStatus: {status}")
 
     # Exit code: non-zero on error
     return 0 if not result.error else 1

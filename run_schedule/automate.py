@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 import requests
 from zero_feed_in_shot import set_power
+from logger import log_info, log_debug, log_warning, log_error, log_success
 
 # ============================================================================
 # TIMEZONE CONFIGURATION
@@ -75,7 +76,7 @@ def signal_handler(signum, frame):
     Sets the shutdown flag when SIGTERM or SIGINT is received.
     """
     signal_name = signal.Signals(signum).name
-    print(f"\n⚠️  Received {signal_name} signal, initiating graceful shutdown...")
+    log_warning(f"Received {signal_name} signal, initiating graceful shutdown...")
     shutdown_flag[0] = True
 
 # ============================================================================
@@ -178,23 +179,23 @@ def post_status_update(status_api_url: str, event_type: str, old_value: Any = No
         data = response.json()
         
         if not data.get('success', False):
-            print(f"⚠️  Status API returned success=false: {data.get('error', 'Unknown error')}")
+            log_warning(f"Status API returned success=false: {data.get('error', 'Unknown error')}")
             return False
         
         # Only warn if method is not POST (indicates a problem)
         detected_method = data.get('method', 'unknown')
         if detected_method != 'POST' and event_type in ['start', 'stop', 'change']:
-            print(f"⚠️  WARNING: Server responded with method '{detected_method}' instead of 'POST' - server PHP file may need updating!")
+            log_warning(f"Server responded with method '{detected_method}' instead of 'POST' - server PHP file may need updating!")
         
         return True
     except requests.exceptions.RequestException as e:
-        print(f"⚠️  Error posting status update to API: {e}")
+        log_warning(f"Error posting status update to API: {e}")
         return False
     except json.JSONDecodeError as e:
-        print(f"⚠️  Error parsing status API response: {e}")
+        log_warning(f"Error parsing status API response: {e}")
         return False
     except Exception as e:
-        print(f"⚠️  Unexpected error posting status update: {e}")
+        log_warning(f"Unexpected error posting status update: {e}")
         return False
 
 
@@ -218,18 +219,18 @@ def fetch_schedule_api(api_url: str) -> Optional[Dict[str, Any]]:
         data = response.json()
         
         if not data.get("success"):
-            print(f"❌ API returned success=false: {data.get('error', 'Unknown error')}")
+            log_error(f"API returned success=false: {data.get('error', 'Unknown error')}")
             return None
             
         return data
     except requests.exceptions.RequestException as e:
-        print(f"❌ Error fetching schedule API: {e}")
+        log_error(f"Error fetching schedule API: {e}")
         return None
     except json.JSONDecodeError as e:
-        print(f"❌ Error parsing JSON response: {e}")
+        log_error(f"Error parsing JSON response: {e}")
         return None
     except Exception as e:
-        print(f"❌ Unexpected error calling API: {e}")
+        log_error(f"Unexpected error calling API: {e}")
         return None
 
 
@@ -270,7 +271,7 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
                 continue
         
         if not valid_entries_with_int_time:
-            print(f"⚠️  No valid entries found for current hour {current_hour}")
+            log_warning(f"No valid entries found for current hour {current_hour}")
             return None
         
         # Find the entry with the maximum time (closest but not exceeding)
@@ -279,7 +280,7 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
         return matching_entry.get('value')
         
     except Exception as e:
-        print(f"❌ Error finding current schedule value: {e}")
+        log_error(f"Error finding current schedule value: {e}")
         return None
 
 
@@ -291,8 +292,7 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
     Fetch and process the schedule API.
     Returns: (resolved_data, current_hour, last_api_call_time)
     """
-    now_amsterdam = get_my_datetime()
-    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Fetching schedule from API...")
+    log_info("Fetching schedule from API...")
     
     api_data = fetch_schedule_api(api_url)
     
@@ -301,17 +301,18 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
         current_hour = api_data.get('currentHour')
 
         if resolved_data is None:
-            print("⚠️  API response missing 'resolved' field")
+            log_warning("API response missing 'resolved' field")
         elif current_hour is None:
-            print("⚠️  API response missing 'currentHour' field")
+            log_warning("API response missing 'currentHour' field")
         else:
-            print(f"✅ API data refreshed. Current hour: {current_hour}, Resolved entries: {len(resolved_data)}")
+            log_success(f"API data refreshed. Current hour: {current_hour}, Resolved entries: {len(resolved_data)}")
         
         last_api_call_time = current_time
         return resolved_data, current_hour, last_api_call_time
     else:
-        print("⚠️  Failed to fetch API data, set power to 0")
-        print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {set_power(0)}")
+        log_warning("Failed to fetch API data, set power to 0")
+        resulting_power = set_power(0)
+        log_info(f"Value set at: {resulting_power}")
         return None, None, last_api_call_time
 
 
@@ -327,22 +328,22 @@ def main():
         api_url = config["apiUrl"]
         status_api_url = config["statusApiUrl"]
     except FileNotFoundError as e:
-        print(f"❌ Configuration error: {e}")
-        print("   Please ensure config.json exists in one of the checked locations")
+        log_error(f"Configuration error: {e}")
+        log_info("   Please ensure config.json exists in one of the checked locations")
         return
     except ValueError as e:
-        print(f"❌ Configuration error: {e}")
-        print("   Please ensure config.json contains 'apiUrl' and 'statusApiUrl' fields")
+        log_error(f"Configuration error: {e}")
+        log_info("   Please ensure config.json contains 'apiUrl' and 'statusApiUrl' fields")
         return
     
     # Log startup
     post_status_update(status_api_url, 'start')
     
-    print("🚀 Starting charge schedule automation script")
-    print(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
-    print(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
-    print(f"   API URL: {api_url}")
-    print()
+    log_info("🚀 Starting charge schedule automation script")
+    log_info(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
+    log_info(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
+    log_info(f"   API URL: {api_url}")
+    print()  # Empty line for readability
     
     # Register signal handlers for graceful shutdown
     signal.signal(signal.SIGTERM, signal_handler)
@@ -376,20 +377,20 @@ def main():
             if resolved_data and current_hour:
                 old_value = value
                 value = find_current_schedule_value(resolved_data, current_hour)
-                print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Current schedule value: {value}")
+                log_info(f"Current schedule value: {value}")
                 if value is None:
                     resulting_power = set_power(0)
-                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
+                    log_info(f"No value found, set power to 0")
                     post_status_update(status_api_url, 'change', old_value, resulting_power)
                 elif old_value != value or value == 'netzero' or value == 'netzero+':
                     resulting_power = set_power(value)
-                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Value set at: {resulting_power}")
+                    log_info(f"Value at: {resulting_power}")
                     post_status_update(status_api_url, 'change', old_value, resulting_power)
                 else:
-                    print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No new value to set")
+                    log_info(f"No new value to set")
             else:
                 resulting_power = set_power(0)
-                print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No data found, set power to {set_power(0)}")
+                log_info(f"No data found, set power to {resulting_power}")
                 post_status_update(status_api_url, 'change', old_value, resulting_power)
 
             # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
@@ -403,17 +404,17 @@ def main():
                 break
             
     except KeyboardInterrupt:
-        print("\n👋 Shutting down gracefully...")
+        log_info("👋 Shutting down gracefully...")
         shutdown_flag[0] = True
     except Exception as e:
-        print(f"\n❌ Fatal error in main loop: {e}")
+        log_error(f"Fatal error in main loop: {e}")
         post_status_update(status_api_url, 'stop', value, None)
         raise
     
     # Handle graceful shutdown from signal
     if shutdown_flag[0]:
-        print("\n👋 Shutting down gracefully...")
-        print("   Setting power to 0 before shutdown...")
+        log_info("👋 Shutting down gracefully...")
+        log_info("   Setting power to 0 before shutdown...")
         set_power(0)
         post_status_update(status_api_url, 'stop', value, None)
 
