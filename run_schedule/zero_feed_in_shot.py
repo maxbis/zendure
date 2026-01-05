@@ -32,7 +32,7 @@ POWER_FEED_MIN_THRESHOLD = 50  # Minimum change (W) to actually adjust limits
 MIN_CHARGE_LEVEL = 100          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 100          # Maximum battery level (%) - stop charging above this
 
-TEST_MODE = True
+TEST_MODE = False
 
 
 # ============================================================================
