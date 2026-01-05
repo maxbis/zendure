@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, Union
+from typing import Optional, Tuple, Dict, Any, Union, Literal
 
 import requests
 
@@ -29,7 +29,7 @@ POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
 
 # Thresholds and battery limits
 POWER_FEED_MIN_THRESHOLD = 50  # Minimum change (W) to actually adjust limits
-MIN_CHARGE_LEVEL = 100          # Minimum battery level (%) - stop discharging below this
+MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 100          # Maximum battery level (%) - stop charging above this
 
 TEST_MODE = False
@@ -161,6 +161,7 @@ def read_zendure_current_settings() -> Tuple[Optional[int], Optional[int]]:
     data = _read_zendure_data()
     if not data:
         return (None, None)
+
 
     props = data.get("properties", {})
     input_limit = props.get("inputLimit")
@@ -310,9 +311,11 @@ def calculate_new_settings(
         # Too full to charge
         if electric_level > MAX_CHARGE_LEVEL and effective_desired < 0:
             effective_desired = 0
+            print(f"Charge level above {MAX_CHARGE_LEVEL}, preventing charge")
         # Too empty to discharge
         if electric_level < MIN_CHARGE_LEVEL and effective_desired > 0:
             effective_desired = 0
+            print(f"Charge level below {MIN_CHARGE_LEVEL}, preventing discharge")
 
     # Clamp effective desired feed
     effective_desired = max(POWER_FEED_MIN, min(POWER_FEED_MAX, effective_desired))
@@ -398,6 +401,7 @@ def calculate_zero_feed_in(
         )
 
     current_input, current_output = read_zendure_current_settings()
+    print(f"function calculate_zero_feed_in()\n  current_input: {current_input}, current_output: {current_output}")
     electric_level = read_electric_level()
 
     # If we cannot read current settings, still report but don't apply
@@ -423,6 +427,7 @@ def calculate_zero_feed_in(
 
     # If nothing changes, no need to apply
     if new_input == current_input and new_output == current_output:
+        print(f"No change needed")
         return ZeroFeedInResult(
             p1_power=p1_power,
             current_input=current_input,
@@ -458,6 +463,7 @@ def calculate_zero_feed_in(
         # Both zero or mixed (fallback: stop all)
         power_feed = 0
 
+    print(f"send_power_feed(power_feed={power_feed})")
     success, error_msg = send_power_feed(dev_ip, dev_sn, power_feed)
 
     return ZeroFeedInResult(
@@ -473,7 +479,7 @@ def calculate_zero_feed_in(
 
 
 def set_power(
-    power: Union[int, str, None] = 'netzero',
+    power: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
     config_path: Optional[Path] = None,
     test: bool = False,
     ) -> int:
@@ -484,6 +490,7 @@ def set_power(
         power: Power setting:
             - int: Specific power feed in watts (positive=charge, negative=discharge, 0=stop)
             - 'netzero' or None: Use dynamic zero feed-in calculation (default)
+            - 'netzero+': Use dynamic zero feed-in calculation, but only charge (no discharge)
         config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
         test: If True, calculates but doesn't apply (dry-run mode)
 
@@ -496,12 +503,15 @@ def set_power(
         ValueError: If config is invalid
         Exception: On device communication errors or P1 meter read failure
     """
+
+    print(f"function set_power(power={power})")
+
     # Resolve config path
     if config_path is None:
         config_path = CONFIG_FILE_PATH
 
     # Handle specific power feed (int)
-    if isinstance(power, int):
+    if isinstance(power, int): 
         # Load config
         config = load_config(Path(config_path))
         device_ip = config["deviceIp"]
@@ -513,6 +523,7 @@ def set_power(
 
         # Test mode: don't apply, but return what would be set
         if test:
+            print(f"TEST MODE: Would set power feed to {power} W")
             return power
 
         # Send power feed
@@ -528,6 +539,10 @@ def set_power(
             config_path=config_path,
             apply=not test,
         )
+
+        print(f"function set_power({power})\n  result: {result}")
+        # if test:
+        #     return power
 
         # Raise exception if there's an error
         if result.error:
@@ -548,7 +563,7 @@ def set_power(
             return 0
 
     else:
-        raise ValueError(f"Invalid power value: {power}. Must be int, 'netzero', or None")
+        raise ValueError(f"Invalid power value: {power}. Must be int, 'netzero', 'netzero+', or None")
 
 
 # ============================================================================

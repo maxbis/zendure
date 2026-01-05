@@ -248,6 +248,82 @@ try {
             }
         }
     }
+    // Handle PUT requests
+    elseif ($method === 'PUT') {
+        if ($type === 'schedule') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if ($input === null && json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception("Invalid JSON in request body: " . json_last_error_msg());
+            }
+            
+            if (!isset($input['originalKey']) || !isset($input['key']) || !isset($input['value'])) {
+                throw new Exception("Missing parameters. Required: originalKey, key, value");
+            }
+            
+            $orig = (string) $input['originalKey'];
+            $key = (string) $input['key'];
+            $val = $input['value'];
+            
+            // Validate key length
+            if (strlen($key) !== 12) {
+                throw new Exception("Key must be 12 characters");
+            }
+            
+            // Validate value
+            if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
+                throw new Exception("Invalid value. Must be 'netzero', 'netzero+', or a number");
+            }
+            
+            // Convert numeric value to int
+            if (is_numeric($val)) {
+                $val = (int) $val;
+            }
+            
+            // Get file path
+            $params = [];
+            $filePath = getDataFilePath('schedule', $params);
+            
+            if ($filePath === null) {
+                throw new Exception("Invalid type: schedule");
+            }
+            
+            // Read current schedule
+            $schedule = readDataFile($filePath);
+            if ($schedule === null) {
+                // File doesn't exist, create empty schedule
+                $schedule = [];
+            }
+            
+            // Normalize schedule keys to strings (like loadSchedule does)
+            $normalizedSchedule = [];
+            foreach ($schedule as $k => $v) {
+                $normalizedSchedule[(string) $k] = $v;
+            }
+            $schedule = $normalizedSchedule;
+            
+            // Update schedule: remove original key if different from new key
+            if ($orig !== $key) {
+                unset($schedule[$orig]);
+            }
+            
+            // Set new value
+            $schedule[$key] = $val;
+            
+            // Write updated schedule
+            if (writeDataFileAtomic($filePath, $schedule)) {
+                $response = [
+                    'success' => true,
+                    'message' => 'Schedule entry updated successfully',
+                    'file' => basename($filePath)
+                ];
+            } else {
+                throw new Exception("Failed to write file: " . basename($filePath));
+            }
+        } else {
+            throw new Exception("PUT method only supported for schedule type");
+        }
+    }
     // Handle DELETE requests
     elseif ($method === 'DELETE') {
         if ($type === 'price') {
@@ -277,12 +353,71 @@ try {
             } else {
                 throw new Exception("Failed to delete file: " . basename($filePath));
             }
+        } elseif ($type === 'schedule') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if ($input === null && json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception("Invalid JSON in request body: " . json_last_error_msg());
+            }
+            
+            if (!isset($input['key'])) {
+                throw new Exception("Missing parameters. Required: key");
+            }
+            
+            $key = (string) $input['key'];
+            
+            // Get file path
+            $params = [];
+            $filePath = getDataFilePath('schedule', $params);
+            
+            if ($filePath === null) {
+                throw new Exception("Invalid type: schedule");
+            }
+            
+            // Read current schedule
+            $schedule = readDataFile($filePath);
+            if ($schedule === null) {
+                // File doesn't exist, return error
+                $response = [
+                    'success' => false,
+                    'error' => 'Schedule file not found'
+                ];
+            } else {
+                // Normalize schedule keys to strings (like PUT handler does)
+                $normalizedSchedule = [];
+                foreach ($schedule as $k => $v) {
+                    $normalizedSchedule[(string) $k] = $v;
+                }
+                $schedule = $normalizedSchedule;
+                
+                // Check if key exists
+                if (!isset($schedule[$key])) {
+                    $response = [
+                        'success' => false,
+                        'error' => 'Schedule entry not found'
+                    ];
+                } else {
+                    // Remove the entry
+                    unset($schedule[$key]);
+                    
+                    // Write updated schedule
+                    if (writeDataFileAtomic($filePath, $schedule)) {
+                        $response = [
+                            'success' => true,
+                            'message' => 'Schedule entry deleted successfully',
+                            'file' => basename($filePath)
+                        ];
+                    } else {
+                        throw new Exception("Failed to write file: " . basename($filePath));
+                    }
+                }
+            }
         } else {
-            throw new Exception("DELETE method only supported for price type");
+            throw new Exception("DELETE method only supported for price and schedule types");
         }
     }
     else {
-        throw new Exception("Method not allowed. Use GET, POST, or DELETE");
+        throw new Exception("Method not allowed. Use GET, POST, PUT, or DELETE");
     }
 } catch (Exception $e) {
     error_log("Data API Error: " . $e->getMessage());

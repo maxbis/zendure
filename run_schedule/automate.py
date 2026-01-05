@@ -376,6 +376,7 @@ def main():
             if resolved_data and current_hour:
                 old_value = value
                 value = find_current_schedule_value(resolved_data, current_hour)
+                print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] Current schedule value: {value}")
                 if value is None:
                     resulting_power = set_power(0)
                     print(f"[{now_amsterdam.strftime('%Y-%m-%d %H:%M:%S')}] No value found, set power to 0")
@@ -403,7 +404,7 @@ def main():
             
     except KeyboardInterrupt:
         print("\n👋 Shutting down gracefully...")
-        post_status_update(status_api_url, 'stop', value, None)
+        shutdown_flag[0] = True
     except Exception as e:
         print(f"\n❌ Fatal error in main loop: {e}")
         post_status_update(status_api_url, 'stop', value, None)
@@ -412,6 +413,8 @@ def main():
     # Handle graceful shutdown from signal
     if shutdown_flag[0]:
         print("\n👋 Shutting down gracefully...")
+        print("   Setting power to 0 before shutdown...")
+        set_power(0)
         post_status_update(status_api_url, 'stop', value, None)
 
 
