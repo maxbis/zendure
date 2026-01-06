@@ -22,6 +22,7 @@ try {
 // Auto-detect: Try to read from device (local network) or use existing JSON (remote server)
 $updateAttempted = false;
 $updateSuccess = false;
+$zendureData = null; // Initialize to track if we got data from local read
 
 // Include the read function
 require_once __DIR__ . '/includes/read_zendure.php';
@@ -101,26 +102,82 @@ if (!headers_sent()) {
 // Determine update source for display
 $updateSource = $updateSuccess ? 'local' : 'remote';
 
-// Get data file path from config, with fallback
-$dataFile = $config['dataFile'] ?? null;
+// Load Zendure data: try API GET if local read failed, otherwise fall back to direct file read
+$errorMessage = null;
 
-// If dataFile is not set, try to construct it from dataDir
-if (($dataFile === null || $dataFile === '') && isset($config['dataDir'])) {
-    $dataDir = $config['dataDir'];
-    $dataFile = rtrim($dataDir, '/') . '/zendure_data.json';
+// If local read didn't succeed, try fetching via API GET
+if ($zendureData === null || $zendureData === false) {
+    try {
+        // Construct API URL for GET request
+        $dataApiUrl = $config['dataApiUrl'] ?? null;
+        
+        // Construct API URL if not in config
+        if (empty($dataApiUrl)) {
+            // Default to relative path from status directory
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+            $dataApiUrl = $protocol . '://' . $host . $scriptPath . '/../data/api/data_api.php';
+        }
+        
+        // Remove query string if present (we'll add our own)
+        $dataApiUrl = strtok($dataApiUrl, '?');
+        $dataApiUrl = $dataApiUrl . '?type=zendure';
+        
+        // Make GET request to fetch data
+        $ch = curl_init($dataApiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_CONNECTTIMEOUT => 5
+        ]);
+        
+        $apiResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($apiResponse !== false && $httpCode === 200) {
+            $apiData = json_decode($apiResponse, true);
+            if ($apiData && isset($apiData['success']) && $apiData['success'] === true && isset($apiData['data'])) {
+                $zendureData = $apiData['data'];
+                $updateSource = 'remote-api'; // Data loaded from API (which reads JSON)
+            }
+        }
+    } catch (Exception $e) {
+        // API GET failed - will fall back to direct file read below
+    } catch (Throwable $e) {
+        // Catch any other errors - will fall back to direct file read below
+    }
 }
 
-// Final fallback: construct from default path if still not set
-if ($dataFile === null || $dataFile === '') {
-    // Default to data directory relative to Energy root
-    $defaultDataDir = dirname(__DIR__) . '/data/';
-    $dataFile = $defaultDataDir . 'zendure_data.json';
+// If we still don't have data, fall back to direct file read
+if ($zendureData === null) {
+    // Get data file path from config, with fallback
+    $dataFile = $config['dataFile'] ?? null;
+    
+    // If dataFile is not set, try to construct it from dataDir
+    if (($dataFile === null || $dataFile === '') && isset($config['dataDir'])) {
+        $dataDir = $config['dataDir'];
+        $dataFile = rtrim($dataDir, '/') . '/zendure_data.json';
+    }
+    
+    // Final fallback: construct from default path if still not set
+    if ($dataFile === null || $dataFile === '') {
+        // Default to data directory relative to Energy root
+        $defaultDataDir = dirname(__DIR__) . '/data/';
+        $dataFile = $defaultDataDir . 'zendure_data.json';
+    }
+    
+    // Load Zendure data from file
+    $dataResult = loadZendureData($dataFile);
+    $zendureData = $dataResult['data'];
+    $errorMessage = $dataResult['error'] ? $dataResult['message'] : null;
+    
+    // If we successfully loaded from file and didn't get data from local/API, mark as remote-file
+    if ($zendureData !== null && $updateSource !== 'local') {
+        $updateSource = 'remote-file';
+    }
 }
-
-// Load Zendure data
-$dataResult = loadZendureData($dataFile);
-$zendureData = $dataResult['data'];
-$errorMessage = $dataResult['error'] ? $dataResult['message'] : null;
 
 // Load P1 meter data
 // Resolve P1 data file path (same way as main data file)
@@ -181,7 +238,17 @@ $systemStatus = getSystemStatusInfo(
                         <?php echo htmlspecialchars(formatDate($timestamp)); ?> | <?php echo htmlspecialchars(formatTimestamp($timestamp)); ?>
                         <?php if (isset($updateSource)): ?>
                             | <span style="color: <?php echo $updateSource === 'local' ? '#4caf50' : '#ff9800'; ?>;">
-                                <?php echo $updateSource === 'local' ? '🔄 Local' : '📡 Remote'; ?>
+                                <?php 
+                                if ($updateSource === 'local') {
+                                    echo '🔄 Local';
+                                } elseif ($updateSource === 'remote-api') {
+                                    echo '📡 Remote (API)';
+                                } elseif ($updateSource === 'remote-file') {
+                                    echo '📡 Remote (File)';
+                                } else {
+                                    echo '📡 Remote';
+                                }
+                                ?>
                             </span>
                         <?php endif; ?>
                     <?php else: ?>
