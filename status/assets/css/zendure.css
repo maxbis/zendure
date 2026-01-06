@@ -43,11 +43,6 @@ body {
     color: #666;
 }
 
-.header .update-button {
-    margin-left: auto;
-    flex-shrink: 0;
-}
-
 .card {
     background: #fafafa;
     border-radius: 16px;
@@ -64,40 +59,6 @@ body {
     color: #c00;
     text-align: center;
 }
-
-.update-button {
-    display: inline-block;
-    background: #64b5f6;
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    margin-left: auto;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.update-button:hover {
-    background: #42a5f5;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-1px);
-}
-
-.update-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.update-button:disabled {
-    background: #9e9e9e;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
 
 .metric-section {
     margin-bottom: 30px;
@@ -571,12 +532,6 @@ body {
 
     .header h1 {
         font-size: 2rem;
-    }
-
-    .header .update-button {
-        margin-left: 0;
-        margin-top: 15px;
-        width: auto;
     }
 
     .card {

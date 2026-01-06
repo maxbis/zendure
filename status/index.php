@@ -10,25 +10,38 @@ require_once __DIR__ . '/includes/helpers.php';
 // Load configuration
 $config = require __DIR__ . '/includes/config_loader.php';
 
-// Check if update parameter is set
-$useApiUpdate = isset($_GET['update']) && $_GET['update'] == '1';
+// Auto-detect: Try direct device access (local network) or use existing JSON (remote server)
+$updateAttempted = false;
+$updateSuccess = false;
 
-// If update parameter is set, API call will be made client-side via JavaScript
-// Otherwise, use default class-based update
-if (!$useApiUpdate) {
-    // Auto-update: Fetch fresh data from devices on every page load (default behavior)
-    // Require the read_zendure class
-    require_once __DIR__ . '/classes/read_zendure.php';
-    
-    // Fetch fresh data from device
+// Try to update via direct device access (works on local network)
+require_once __DIR__ . '/classes/read_zendure.php';
+
+try {
     $solarflow = new SolarFlow2400($config['deviceIp']);
-    $solarflow->getStatus(false); // Non-verbose, just saves data
+    $result = $solarflow->getStatus(false); // Non-verbose, just saves data
+    
+    if ($result !== false) {
+        $updateSuccess = true;
+        $updateAttempted = true;
+    }
+} catch (Exception $e) {
+    // Device not reachable (likely remote server without LAN access)
+    // Silently continue - will load existing JSON file below
+    $updateAttempted = true;
 }
 
-// Always update P1 meter data (no API endpoint available yet)
+// Always try P1 meter update (same auto-detection logic)
 require_once __DIR__ . '/classes/read_zendure_p1.php';
-$p1Meter = new ZendureP1Meter($config['p1MeterIp']);
-$p1Meter->update(false); // Non-verbose, just saves data
+try {
+    $p1Meter = new ZendureP1Meter($config['p1MeterIp']);
+    $p1Meter->update(false);
+} catch (Exception $e) {
+    // P1 meter not reachable - continue with existing data
+}
+
+// Determine update source for display
+$updateSource = $updateSuccess ? 'local' : 'remote';
 
 $dataFile = $config['dataFile'];
 
@@ -94,19 +107,16 @@ $systemStatus = getSystemStatusInfo(
                     <span style="font-size: 0.8rem; color: #666;font-style: italic;">
                     <?php if ($timestamp): ?>
                         <?php echo htmlspecialchars(formatDate($timestamp)); ?> | <?php echo htmlspecialchars(formatTimestamp($timestamp)); ?>
+                        <?php if (isset($updateSource)): ?>
+                            | <span style="color: <?php echo $updateSource === 'local' ? '#4caf50' : '#ff9800'; ?>;">
+                                <?php echo $updateSource === 'local' ? '🔄 Local' : '📡 Remote'; ?>
+                            </span>
+                        <?php endif; ?>
                     <?php else: ?>
                         No data available
                     <?php endif; ?>
                     </span> 
             </div>
-            <?php if ($zendureData): ?>
-                <div class="header-actions">
-                    <a href="?update=1" class="update-button">🔄 Update</a>
-                    <button type="button" id="auto-update-toggle" class="update-button" style="margin-left: 0.5rem;">
-                        auto
-                    </button>
-                </div>
-            <?php endif; ?>
         </div>
 
         <?php if ($errorMessage): ?>
@@ -605,44 +615,8 @@ $systemStatus = getSystemStatusInfo(
             socSetPercent: <?php echo $socSetPercent; ?>,
             minSocPercent: <?php echo $minSocPercent; ?>,
             batteryRemainingAboveMinKwh: <?php echo $batteryRemainingAboveMinKwh; ?>,
-            chargeDischargeValue: <?php echo $chargeDischargeValue ?? 0; ?>,
-            zendureFetchApiUrl: <?php echo isset($config['zendureFetchApiUrl']) ? json_encode($config['zendureFetchApiUrl']) : 'null'; ?>,
-            updateRequested: <?php echo $useApiUpdate ? 'true' : 'false'; ?>
+            chargeDischargeValue: <?php echo $chargeDischargeValue ?? 0; ?>
         };
-
-        // If update=1 is in URL, make API call and log result to console
-        if (window.zendureConfig.updateRequested && window.zendureConfig.zendureFetchApiUrl) {
-            console.log('🔄 Update requested - Calling Zendure Fetch API...');
-            console.log('API URL:', window.zendureConfig.zendureFetchApiUrl);
-            
-            fetch(window.zendureConfig.zendureFetchApiUrl)
-                .then(response => {
-                    console.log('API Response Status:', response.status, response.statusText);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('✅ Zendure Fetch API Response:', data);
-                    if (data.success) {
-                        console.log('✓ Data fetched and saved successfully');
-                        console.log('Device IP:', data.deviceIp);
-                        console.log('File:', data.file);
-                        console.log('Timestamp:', data.timestampIso);
-                    } else {
-                        console.error('✗ API Error:', data.error || 'Unknown error');
-                    }
-                    // Reload page after a short delay to show updated data
-                    setTimeout(() => {
-                        window.location.href = window.location.pathname;
-                    }, 1000);
-                })
-                .catch(error => {
-                    console.error('❌ Error calling Zendure Fetch API:', error);
-                    // Reload page anyway to show current data
-                    setTimeout(() => {
-                        window.location.href = window.location.pathname;
-                    }, 1000);
-                });
-        }
     </script>
     <script src="assets/js/zendure.js"></script>
 </body>
