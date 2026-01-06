@@ -284,7 +284,7 @@ def _read_zendure_state(
         return (None, None, None)
 
 
-def _update_zendure_data(
+def _update_zendure_data_api(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
 ) -> Optional[dict]:
@@ -347,7 +347,7 @@ def _update_zendure_data(
     return reading_data
     
 
-def _update_zendure_data_file(
+def _update_zendure_data(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
 ) -> Optional[dict]:
