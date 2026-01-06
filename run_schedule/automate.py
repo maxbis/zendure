@@ -40,7 +40,7 @@ def find_config_file() -> Path:
         FileNotFoundError: If neither config file exists
     """
     script_dir = Path(__file__).parent
-    root_config = script_dir.parent.parent / "config" / "config.json"
+    root_config = script_dir.parent / "config" / "config.json"
     local_config = script_dir / "config" / "config.json"
     
     if root_config.exists():

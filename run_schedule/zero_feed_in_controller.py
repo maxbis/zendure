@@ -34,6 +34,9 @@ POWER_FEED_MIN_DELTA = 50      # Minimum change (W) to actually adjust limits - 
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 100         # Maximum battery level (%) - stop charging above this
 
+# Network settings
+REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
+
 TEST_MODE = False
 
 
@@ -73,6 +76,73 @@ class ZeroFeedInResult:
 # ============================================================================
 # PRIVATE HELPERS
 # ============================================================================
+
+def _create_error_result(
+    error_msg: str,
+    p1_power: Optional[int] = None,
+    current_input: Optional[int] = None,
+    current_output: Optional[int] = None,
+    electric_level: Optional[int] = None,
+) -> ZeroFeedInResult:
+    """
+    Helper to create error result with consistent structure.
+    
+    Args:
+        error_msg: Error message
+        p1_power: Optional P1 power value if available
+        current_input: Optional current input limit if available
+        current_output: Optional current output limit if available
+        electric_level: Optional battery level if available
+    
+    Returns:
+        ZeroFeedInResult with error set and applied=False
+    """
+    return ZeroFeedInResult(
+        p1_power=p1_power,
+        current_input=current_input,
+        current_output=current_output,
+        electric_level=electric_level,
+        new_input=None,
+        new_output=None,
+        applied=False,
+        error=error_msg,
+    )
+
+
+def _build_device_properties(power_feed: int) -> Dict[str, Any]:
+    """
+    Build device properties dict based on power_feed value.
+    
+    Args:
+        power_feed: Power feed value in watts (positive for charge, negative for discharge, 0 to stop)
+    
+    Returns:
+        dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
+    """
+    if power_feed > 0:
+        # Charge mode: acMode 1 = Input
+        return {
+            "acMode": 1,
+            "inputLimit": int(power_feed),
+            "outputLimit": 0,
+            "smartMode": 1,
+        }
+    elif power_feed < 0:
+        # Discharge mode: acMode 2 = Output
+        return {
+            "acMode": 2,
+            "outputLimit": int(abs(power_feed)),
+            "inputLimit": 0,
+            "smartMode": 1,
+        }
+    else:
+        # Stop all
+        return {
+            "inputLimit": 0,
+            "outputLimit": 0,
+            "smartMode": 1,
+        }
+
 
 def _load_config(config_path: Path) -> Dict[str, str]:
     """
@@ -122,7 +192,7 @@ def _read_p1_meter(ip_address: str) -> Optional[int]:
     url = f"http://{ip_address}/properties/report"
 
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         data = response.json()
         total_power = data.get("total_power")
@@ -193,6 +263,69 @@ def _update_zendure_data(
     device_ip: Optional[str] = None,
 ) -> Optional[dict]:
     """
+    Fetch Zendure device data via the PHP API endpoint and return it.
+
+    The PHP endpoint (data/api/zendure_fetch_api.php) is responsible for
+    writing zendure_data.json on the web server; this function just calls
+    that API and returns the JSON payload it reports as `data`.
+    """
+    # Resolve configuration
+    if config_path is None:
+        config_path = CONFIG_FILE_PATH
+
+    try:
+        config = _load_config(Path(config_path))
+    except Exception as e:
+        log_error(f"Error loading config: {e}")
+        return None
+
+    # Get device IP from parameter or config
+    dev_ip = device_ip or config["deviceIp"]
+
+    # Get full API URL from config (fallback to apiBasePath + fixed path)
+    zendure_fetch_url = config.get("zendureFetchApiUrl")
+    if not zendure_fetch_url:
+        log_error("zendureFetchApiUrl not found in config.json; cannot call Zendure Fetch API")
+        return None
+
+    try:
+        # Call PHP API; it will fetch from the device and write zendure_data.json
+        response = requests.get(
+            zendure_fetch_url,
+            params={"ip": dev_ip},
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except requests.exceptions.RequestException as e:
+        log_error(f"Error calling Zendure Fetch API at {zendure_fetch_url}: {e}")
+        return None
+    except (json.JSONDecodeError, ValueError) as e:
+        log_error(f"Error parsing Zendure Fetch API response: {e}")
+        return None
+
+    if not isinstance(payload, dict):
+        log_error("Unexpected response format from Zendure Fetch API (not a JSON object)")
+        return None
+
+    if not payload.get("success", False):
+        err = payload.get("error") or payload.get("message") or "Unknown error"
+        log_error(f"Zendure Fetch API reported failure: {err}")
+        return None
+
+    reading_data = payload.get("data")
+    if not isinstance(reading_data, dict):
+        log_warning("Zendure Fetch API returned no valid 'data' field; using full payload as fallback")
+        reading_data = payload
+
+    return reading_data
+    
+
+def _update_zendure_data_file(
+    config_path: Optional[Path] = None,
+    device_ip: Optional[str] = None,
+) -> Optional[dict]:
+    """
     Fetch Zendure device data and save it to zendure_data.json.
 
     Args:
@@ -219,7 +352,7 @@ def _update_zendure_data(
     url = f"http://{dev_ip}/properties/report"
 
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         data = response.json()
 
@@ -267,7 +400,7 @@ def _update_zendure_data(
 
     except requests.exceptions.RequestException as e:
         log_error(f"Error connecting to Zendure device at {dev_ip}: {e}")
-        return None
+        return None 
     except (json.JSONDecodeError, KeyError) as e:
         log_error(f"Error parsing Zendure response: {e}")
         return None
@@ -296,30 +429,7 @@ def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[b
     power_feed = int(round(power_feed) * -1)
 
     # Construct properties based on power_feed value
-    if power_feed > 0:
-        # Charge mode: acMode 1 = Input
-        properties = {
-            "acMode": 1,
-            "inputLimit": int(power_feed),
-            "outputLimit": 0,
-            "smartMode": 1,
-        }
-    elif power_feed < 0:
-        # Discharge mode: acMode 2 = Output
-        properties = {
-            "acMode": 2,
-            "outputLimit": int(abs(power_feed)),
-            "inputLimit": 0,
-            "smartMode": 1,
-        }
-    else:
-        # Stop all
-        properties = {
-            "inputLimit": 0,
-            "outputLimit": 0,
-            "smartMode": 1,
-        }
-
+    properties = _build_device_properties(power_feed)
     payload = {"sn": device_sn, "properties": properties}
 
     if TEST_MODE:
@@ -330,7 +440,7 @@ def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[b
         response = requests.post(
             url,
             json=payload,
-            timeout=5,
+            timeout=REQUEST_TIMEOUT,
             headers={"Content-Type": "application/json"},
         )
         response.raise_for_status()
@@ -472,16 +582,7 @@ def execute_zero_feed_in(
     try:
         config = _load_config(Path(config_path))
     except Exception as e:
-        return ZeroFeedInResult(
-            p1_power=None,
-            current_input=None,
-            current_output=None,
-            electric_level=None,
-            new_input=None,
-            new_output=None,
-            applied=False,
-            error=str(e),
-        )
+        return _create_error_result(str(e))
 
     p1_ip = p1_meter_ip or config["p1MeterIp"]
     dev_ip = device_ip or config["deviceIp"]
@@ -491,35 +592,22 @@ def execute_zero_feed_in(
     p1_power = _read_p1_meter(p1_ip)
     log_debug(f"P1 power (grid-status): {p1_power}", include_timestamp=True)
     if p1_power is None:
-        return ZeroFeedInResult(
-            p1_power=None,
-            current_input=None,
-            current_output=None,
-            electric_level=None,
-            new_input=None,
-            new_output=None,
-            applied=False,
-            error="Failed to read P1 meter",
-        )
+        return _create_error_result("Failed to read P1 meter")
 
     current_input, current_output, electric_level = _read_zendure_state(
         config_path=config_path,
         device_ip=dev_ip,
         update=True,
     )
-    # print(f"function execute_zero_feed_in()\n  current_input: {current_input}, current_output: {current_output}")
 
     # If we cannot read current settings, still report but don't apply
     if current_input is None or current_output is None:
-        return ZeroFeedInResult(
+        return _create_error_result(
+            "Failed to read current Zendure limits from zendure_data.json",
             p1_power=p1_power,
             current_input=current_input,
             current_output=current_output,
             electric_level=electric_level,
-            new_input=None,
-            new_output=None,
-            applied=False,
-            error="Failed to read current Zendure limits from zendure_data.json",
         )
 
     # Calculate new settings
@@ -567,7 +655,6 @@ def execute_zero_feed_in(
         # Both zero or mixed (fallback: stop all)
         power_feed = 0
 
-    # print(f"send_power_feed(power_feed={power_feed})")
     success, error_msg = _send_power_feed(dev_ip, dev_sn, power_feed)
 
     return ZeroFeedInResult(
@@ -607,9 +694,6 @@ def set_power(
         ValueError: If config is invalid
         Exception: On device communication errors or P1 meter read failure
     """
-
-    # print(f"function set_power(power={power})")
-
     # Resolve config path
     if config_path is None:
         config_path = CONFIG_FILE_PATH
@@ -643,10 +727,6 @@ def set_power(
             config_path=config_path,
             apply=not test,
         )
-
-        # print(f"function set_power({power})\n  result: {result}")
-        # if test:
-        #     return power
 
         # Raise exception if there's an error
         if result.error:

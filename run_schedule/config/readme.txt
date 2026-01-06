@@ -1,0 +1,1 @@
+This is a fallbback config file, if ../config/config.json does not exists.
