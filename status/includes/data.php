@@ -9,6 +9,14 @@
  * Returns array with 'data', 'error', and 'message' keys
  */
 function loadZendureData($dataFile) {
+    if ($dataFile === null || $dataFile === '') {
+        return [
+            'data' => null,
+            'error' => true,
+            'message' => 'Data file path not configured.'
+        ];
+    }
+    
     if (!file_exists($dataFile)) {
         return [
             'data' => null,

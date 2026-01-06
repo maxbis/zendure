@@ -8,27 +8,80 @@
 require_once __DIR__ . '/includes/helpers.php';
 
 // Load configuration
-$config = require __DIR__ . '/includes/config_loader.php';
+try {
+    $config = require __DIR__ . '/includes/config_loader.php';
+    
+    // Validate that config was loaded correctly
+    if (!is_array($config)) {
+        throw new Exception("Configuration did not return an array");
+    }
+} catch (Exception $e) {
+    die("Configuration error: " . htmlspecialchars($e->getMessage()));
+}
 
-// Auto-detect: Try direct device access (local network) or use existing JSON (remote server)
+// Auto-detect: Try to read from device (local network) or use existing JSON (remote server)
 $updateAttempted = false;
 $updateSuccess = false;
 
-// Try to update via direct device access (works on local network)
-require_once __DIR__ . '/classes/read_zendure.php';
+// Include the read function
+require_once __DIR__ . '/includes/read_zendure.php';
 
+// Try to read Zendure data from device
 try {
-    $solarflow = new SolarFlow2400($config['deviceIp']);
-    $result = $solarflow->getStatus(false); // Non-verbose, just saves data
+    $deviceIp = $config['deviceIp'] ?? null;
     
-    if ($result !== false) {
-        $updateSuccess = true;
-        $updateAttempted = true;
+    if (!empty($deviceIp)) {
+        $zendureData = readZendureData($deviceIp);
+        
+        if ($zendureData !== false) {
+            // Store data via data_api.php endpoint
+            $dataApiUrl = $config['dataApiUrl'] ?? null;
+            
+            // Construct API URL if not in config
+            if (empty($dataApiUrl)) {
+                // Default to relative path from status directory
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $scriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+                $dataApiUrl = $protocol . '://' . $host . $scriptPath . '/../data/api/data_api.php?type=zendure';
+            }
+            
+            // Make POST request to store data
+            $ch = curl_init($dataApiUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($zendureData),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 5
+            ]);
+            
+            $apiResponse = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($apiResponse !== false && $httpCode === 200) {
+                $apiData = json_decode($apiResponse, true);
+                if ($apiData && isset($apiData['success']) && $apiData['success'] === true) {
+                    $updateSuccess = true;
+                    $updateAttempted = true;
+                }
+            }
+        }
     }
 } catch (Exception $e) {
-    // Device not reachable (likely remote server without LAN access)
+    // Device not reachable or API error (likely remote server)
     // Silently continue - will load existing JSON file below
     $updateAttempted = true;
+} catch (Throwable $e) {
+    // Catch any other errors
+    $updateAttempted = true;
+}
+
+// Ensure HTML content type is set (in case API set JSON header)
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
 }
 
 // Always try P1 meter update (same auto-detection logic)
@@ -40,10 +93,29 @@ try {
     // P1 meter not reachable - continue with existing data
 }
 
+// Ensure HTML content type is set (override any JSON header from API)
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8', true);
+}
+
 // Determine update source for display
 $updateSource = $updateSuccess ? 'local' : 'remote';
 
-$dataFile = $config['dataFile'];
+// Get data file path from config, with fallback
+$dataFile = $config['dataFile'] ?? null;
+
+// If dataFile is not set, try to construct it from dataDir
+if (($dataFile === null || $dataFile === '') && isset($config['dataDir'])) {
+    $dataDir = $config['dataDir'];
+    $dataFile = rtrim($dataDir, '/') . '/zendure_data.json';
+}
+
+// Final fallback: construct from default path if still not set
+if ($dataFile === null || $dataFile === '') {
+    // Default to data directory relative to Energy root
+    $defaultDataDir = dirname(__DIR__) . '/data/';
+    $dataFile = $defaultDataDir . 'zendure_data.json';
+}
 
 // Load Zendure data
 $dataResult = loadZendureData($dataFile);
