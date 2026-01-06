@@ -4,11 +4,14 @@
     const slider = document.getElementById('power-control-slider');
     const sliderValueDisplay = document.getElementById('power-control-slider-value');
     const countdownDisplaySlider = document.getElementById('countdown-display-slider');
+    const autoUpdateToggle = document.getElementById('auto-update-toggle');
     const zendureConfig = window.zendureConfig || {};
     let countdownInterval = null;
     let countdownSeconds = 0;
     let sliderCountdownInterval = null;
     let sliderCountdownSeconds = 0;
+    let autoUpdateInterval = null;
+    let isAutoUpdateEnabled = false;
 
     function disableButtons() {
         buttons.forEach(btn => btn.disabled = true);
@@ -45,7 +48,7 @@
     }
 
     function startCountdown() {
-        countdownSeconds = 8;
+        countdownSeconds = 18;
         countdownDisplay.classList.add('active');
         updateCountdown();
 
@@ -62,7 +65,7 @@
     }
 
     function startSliderCountdown() {
-        sliderCountdownSeconds = 8;
+        sliderCountdownSeconds = 18;
         if (countdownDisplaySlider) {
             countdownDisplaySlider.classList.add('active');
             updateSliderCountdown();
@@ -261,6 +264,36 @@
         return '';
     }
 
+    function setAutoUpdate(enabled) {
+        if (!autoUpdateToggle) return;
+
+        isAutoUpdateEnabled = enabled;
+
+        // Save state to localStorage
+        if (enabled) {
+            localStorage.setItem('zendureAutoUpdate', 'true');
+        } else {
+            localStorage.removeItem('zendureAutoUpdate');
+        }
+
+        if (isAutoUpdateEnabled) {
+            autoUpdateToggle.textContent = 'manual';
+            autoUpdateToggle.classList.add('active');
+            // Refresh page every 20 seconds
+            autoUpdateInterval = setInterval(() => {
+                // Reload current URL (including any query params)
+                window.location.reload();
+            }, 20000);
+        } else {
+            autoUpdateToggle.textContent = 'auto';
+            autoUpdateToggle.classList.remove('active');
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+                autoUpdateInterval = null;
+            }
+        }
+    }
+
     buttons.forEach(button => {
         // Hover tooltip with projected time at this wattage
         button.addEventListener('mouseenter', function() {
@@ -299,6 +332,19 @@
 
         // Initialize display
         updateSliderValueDisplay(slider.value);
+    }
+
+    // Auto-update toggle functionality
+    if (autoUpdateToggle) {
+        // Check localStorage on page load to restore auto-update state
+        const savedAutoUpdate = localStorage.getItem('zendureAutoUpdate');
+        if (savedAutoUpdate === 'true') {
+            setAutoUpdate(true);
+        }
+
+        autoUpdateToggle.addEventListener('click', function() {
+            setAutoUpdate(!isAutoUpdateEnabled);
+        });
     }
 })();
 

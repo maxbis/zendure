@@ -100,7 +100,12 @@ $systemStatus = getSystemStatusInfo(
                     </span> 
             </div>
             <?php if ($zendureData): ?>
-                <a href="?update=1" class="update-button">🔄 Update</a>
+                <div class="header-actions">
+                    <a href="?update=1" class="update-button">🔄 Update</a>
+                    <button type="button" id="auto-update-toggle" class="update-button" style="margin-left: 0.5rem;">
+                        auto
+                    </button>
+                </div>
             <?php endif; ?>
         </div>
 
@@ -469,14 +474,20 @@ $systemStatus = getSystemStatusInfo(
                             <span class="power-control-label-right">Charge</span>
                         </div>
                         <div class="power-control-slider-wrapper">
+                            <?php
+                            // Round charge/discharge value to nearest 100W step to match slider step
+                            $sliderValue = round($chargeDischargeValue / 100) * 100;
+                            // Clamp to slider min/max range
+                            $sliderValue = max(-800, min(1200, $sliderValue));
+                            ?>
                             <input type="range" 
                                    id="power-control-slider" 
                                    class="power-control-slider" 
                                    min="-800" 
                                    max="1200" 
                                    step="100" 
-                                   value="<?php echo htmlspecialchars((string)$chargeDischargeValue, ENT_QUOTES, 'UTF-8'); ?>">
-                            <div class="power-control-slider-value" id="power-control-slider-value">0W</div>
+                                   value="<?php echo htmlspecialchars((string)$sliderValue, ENT_QUOTES, 'UTF-8'); ?>">
+                            <div class="power-control-slider-value" id="power-control-slider-value"><?php echo htmlspecialchars((string)$chargeDischargeValue, ENT_QUOTES, 'UTF-8'); ?>W</div>
                         </div>
                         <div class="countdown-display" id="countdown-display-slider"></div>
                     </div>
@@ -594,6 +605,7 @@ $systemStatus = getSystemStatusInfo(
             socSetPercent: <?php echo $socSetPercent; ?>,
             minSocPercent: <?php echo $minSocPercent; ?>,
             batteryRemainingAboveMinKwh: <?php echo $batteryRemainingAboveMinKwh; ?>,
+            chargeDischargeValue: <?php echo $chargeDischargeValue ?? 0; ?>,
             zendureFetchApiUrl: <?php echo isset($config['zendureFetchApiUrl']) ? json_encode($config['zendureFetchApiUrl']) : 'null'; ?>,
             updateRequested: <?php echo $useApiUpdate ? 'true' : 'false'; ?>
         };
