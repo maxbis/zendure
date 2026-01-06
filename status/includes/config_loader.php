@@ -5,7 +5,8 @@
  */
 
 // Path to JSON config file (relative to this file)
-$configJsonPath = __DIR__ . '/../../zendure/config/config.json';
+// $configJsonPath = __DIR__ . '/../../zendure/config/config.json';
+$configJsonPath = __DIR__ . '/../../config/config.json';
 
 // Read and decode JSON config
 if (!file_exists($configJsonPath)) {

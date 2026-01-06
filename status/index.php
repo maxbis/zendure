@@ -45,9 +45,19 @@ try {
                 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
                 $scriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '');
                 $dataApiUrl = $protocol . '://' . $host . $scriptPath . '/../data/api/data_api.php?type=zendure';
+            } else {
+                // Ensure ?type=zendure is added to config URL if not present
+                $parsedUrl = parse_url($dataApiUrl);
+                if (!isset($parsedUrl['query']) || strpos($parsedUrl['query'], 'type=') === false) {
+                    $separator = (strpos($dataApiUrl, '?') === false) ? '?' : '&';
+                    $dataApiUrl = $dataApiUrl . $separator . 'type=zendure';
+                }
             }
             
             // Make POST request to store data
+            // DEBUG: Log API URL being used
+            error_log("DEBUG: Attempting to store zendure data via API: " . $dataApiUrl);
+            
             $ch = curl_init($dataApiUrl);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -59,15 +69,36 @@ try {
             ]);
             
             $apiResponse = curl_exec($ch);
+            $curlError = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             
+            // DEBUG: Log curl errors
+            if (!empty($curlError)) {
+                error_log("DEBUG: cURL error when storing zendure data: " . $curlError);
+            }
+            
+            // DEBUG: Log HTTP response code
+            error_log("DEBUG: API POST response code: " . $httpCode);
+            
             if ($apiResponse !== false && $httpCode === 200) {
                 $apiData = json_decode($apiResponse, true);
+                
+                // DEBUG: Log API response
+                error_log("DEBUG: API POST response: " . substr($apiResponse, 0, 500)); // Log first 500 chars
+                
                 if ($apiData && isset($apiData['success']) && $apiData['success'] === true) {
                     $updateSuccess = true;
                     $updateAttempted = true;
+                    error_log("DEBUG: Successfully stored zendure data via API");
+                } else {
+                    // DEBUG: Log API error response
+                    $errorMsg = isset($apiData['error']) ? $apiData['error'] : 'Unknown error';
+                    error_log("DEBUG: API returned success=false. Error: " . $errorMsg);
                 }
+            } else {
+                // DEBUG: Log failed request details
+                error_log("DEBUG: API POST failed. HTTP Code: " . $httpCode . ", Response: " . substr($apiResponse ?: 'No response', 0, 500));
             }
         }
     }
@@ -225,6 +256,7 @@ $systemStatus = getSystemStatusInfo(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="20">
     <title>Zendure Status</title>
     <link rel="stylesheet" href="assets/css/zendure.css">
 </head>
