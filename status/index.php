@@ -817,7 +817,7 @@ $systemStatus = getSystemStatusInfo(
 
                         <div class="power-control-buttons">
                             <div class="power-control-label-left">Discharge</div>
-                            <button class="power-control-button discharge" data-watts="-800">-800W</button>
+                            
                             <button class="power-control-button discharge" data-watts="-600">-600W</button>
                             <button class="power-control-button discharge" data-watts="-400">-400W</button>
                             <button class="power-control-button discharge" data-watts="-200">-200W</button>
@@ -828,6 +828,8 @@ $systemStatus = getSystemStatusInfo(
                             <button class="power-control-button charge" data-watts="400">400W</button>
                             <button class="power-control-button charge" data-watts="600">600W</button>
                             <button class="power-control-button charge" data-watts="800">800W</button>
+                            <button class="power-control-button charge" data-watts="1000">1000W</button>
+                    
                             <div class="power-control-label-right">Charge</div>
                         </div>
 

@@ -336,25 +336,25 @@ body {
     align-items: center;
     flex-wrap: wrap;
     margin-top: 15px;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 .power-control-label-left {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #ef5350;
     margin-right: 12px;
 }
 
 .power-control-label-right {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #66bb6a;
     margin-left: 12px;
 }
 
 .power-control-button {
-    padding: 6px 12px;
+    padding: 6px 10px;
     border: none;
     border-radius: 6px;
     font-size: 0.75rem;
