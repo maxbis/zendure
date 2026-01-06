@@ -1,5 +1,6 @@
 <?php
 // data/api/zendure_fetch_api.php
+// v2
 
 date_default_timezone_set('Europe/Amsterdam');
 

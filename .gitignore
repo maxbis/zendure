@@ -38,7 +38,6 @@ desktop.ini
 # Project-specific
 /data/*.json
 /zendure/config/*.json
-get_prices.py
 /config/*
 config.json
 /run_schedule/config/*.json
