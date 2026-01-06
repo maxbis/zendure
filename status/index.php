@@ -623,38 +623,13 @@ $systemStatus = getSystemStatusInfo(
             </div>
 
             <?php if ($updateSource === 'local'): ?>
-                 <!-- Power Control Section -->
-                 <div class="card">
-                <div class="power-control-section">
-                    <h3>⚡ Manual Power Control</h3>
-                    <div class="power-control-buttons">
-                        <div class="power-control-label-left">Discharge</div>
-                        <button class="power-control-button discharge" data-watts="-800">-800W</button>
-                        <button class="power-control-button discharge" data-watts="-600">-600W</button>
-                        <button class="power-control-button discharge" data-watts="-400">-400W</button>
-                        <button class="power-control-button discharge" data-watts="-200">-200W</button>
-                        <button class="power-control-button discharge" data-watts="-100">-100W</button>
-                        <button class="power-control-button stop" data-watts="0">0W</button>
-                        <button class="power-control-button charge" data-watts="100">100W</button>
-                        <button class="power-control-button charge" data-watts="200">200W</button>
-                        <button class="power-control-button charge" data-watts="400">400W</button>
-                        <button class="power-control-button charge" data-watts="600">600W</button>
-                        <button class="power-control-button charge" data-watts="800">800W</button>
-                        <div class="power-control-label-right">Charge</div>
-                    </div>
-                    <div class="countdown-display" id="countdown-display"></div>
-                </div>
-            </div>
-
+            
             <!-- Power control section -->
             <div class="card">
                 <div class="power-control-section">
-                    <h3>⚡ Manual Power Control (Slider)</h3>
+                    <h3>⚡ Manual Power Control</h3>
                     <div class="power-control-slider-container">
-                        <div class="power-control-slider-labels">
-                            <span class="power-control-label-left">Discharge</span>
-                            <span class="power-control-label-right">Charge</span>
-                        </div>
+
                         <div class="power-control-slider-wrapper">
                             <?php
                             // Round charge/discharge value to nearest 100W step to match slider step
@@ -671,7 +646,24 @@ $systemStatus = getSystemStatusInfo(
                                    value="<?php echo htmlspecialchars((string)$sliderValue, ENT_QUOTES, 'UTF-8'); ?>">
                             <div class="power-control-slider-value" id="power-control-slider-value"><?php echo htmlspecialchars((string)$chargeDischargeValue, ENT_QUOTES, 'UTF-8'); ?>W</div>
                         </div>
-                        <div class="countdown-display" id="countdown-display-slider"></div>
+
+                        <div class="power-control-buttons">
+                            <div class="power-control-label-left">Discharge</div>
+                            <button class="power-control-button discharge" data-watts="-800">-800W</button>
+                            <button class="power-control-button discharge" data-watts="-600">-600W</button>
+                            <button class="power-control-button discharge" data-watts="-400">-400W</button>
+                            <button class="power-control-button discharge" data-watts="-200">-200W</button>
+                            <button class="power-control-button discharge" data-watts="-100">-100W</button>
+                            <button class="power-control-button stop" data-watts="0">0W</button>
+                            <button class="power-control-button charge" data-watts="100">100W</button>
+                            <button class="power-control-button charge" data-watts="200">200W</button>
+                            <button class="power-control-button charge" data-watts="400">400W</button>
+                            <button class="power-control-button charge" data-watts="600">600W</button>
+                            <button class="power-control-button charge" data-watts="800">800W</button>
+                            <div class="power-control-label-right">Charge</div>
+                        </div>
+
+                        <div class="countdown-display" id="countdown-display"></div>
                     </div>
                 </div>
             </div>

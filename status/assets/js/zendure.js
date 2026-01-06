@@ -3,12 +3,9 @@
     const countdownDisplay = document.getElementById('countdown-display');
     const slider = document.getElementById('power-control-slider');
     const sliderValueDisplay = document.getElementById('power-control-slider-value');
-    const countdownDisplaySlider = document.getElementById('countdown-display-slider');
     const zendureConfig = window.zendureConfig || {};
     let countdownInterval = null;
     let countdownSeconds = 0;
-    let sliderCountdownInterval = null;
-    let sliderCountdownSeconds = 0;
 
     function disableButtons() {
         buttons.forEach(btn => btn.disabled = true);
@@ -29,24 +26,17 @@
             clearInterval(countdownInterval);
             countdownInterval = null;
         }
-        countdownDisplay.textContent = '';
-        countdownDisplay.classList.remove('active');
-    }
-
-    function clearSliderCountdown() {
-        if (sliderCountdownInterval) {
-            clearInterval(sliderCountdownInterval);
-            sliderCountdownInterval = null;
-        }
-        if (countdownDisplaySlider) {
-            countdownDisplaySlider.textContent = '';
-            countdownDisplaySlider.classList.remove('active');
+        if (countdownDisplay) {
+            countdownDisplay.textContent = '';
+            countdownDisplay.classList.remove('active');
         }
     }
 
     function startCountdown() {
         countdownSeconds = 18;
-        countdownDisplay.classList.add('active');
+        if (countdownDisplay) {
+            countdownDisplay.classList.add('active');
+        }
         updateCountdown();
 
         countdownInterval = setInterval(() => {
@@ -61,32 +51,9 @@
         }, 1000);
     }
 
-    function startSliderCountdown() {
-        sliderCountdownSeconds = 18;
-        if (countdownDisplaySlider) {
-            countdownDisplaySlider.classList.add('active');
-            updateSliderCountdown();
-        }
-
-        sliderCountdownInterval = setInterval(() => {
-            sliderCountdownSeconds--;
-            if (sliderCountdownSeconds <= 0) {
-                clearSliderCountdown();
-                // Reload page to refresh data
-                window.location.reload();
-            } else {
-                updateSliderCountdown();
-            }
-        }, 1000);
-    }
-
     function updateCountdown() {
-        countdownDisplay.textContent = `Updating data in ${countdownSeconds} seconds...`;
-    }
-
-    function updateSliderCountdown() {
-        if (countdownDisplaySlider) {
-            countdownDisplaySlider.textContent = `Updating data in ${sliderCountdownSeconds} seconds...`;
+        if (countdownDisplay) {
+            countdownDisplay.textContent = `Updating data in ${countdownSeconds} seconds...`;
         }
     }
 
@@ -294,7 +261,7 @@
         // Send command on change (when user releases slider)
         slider.addEventListener('change', function() {
             const watts = parseInt(this.value);
-            sendPowerCommand(watts, countdownDisplaySlider, startSliderCountdown, clearSliderCountdown);
+            sendPowerCommand(watts, countdownDisplay, startCountdown, clearCountdown);
         });
 
         // Initialize display
