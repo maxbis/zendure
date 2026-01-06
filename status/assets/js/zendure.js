@@ -247,3 +247,52 @@
     }
 })();
 
+// Page Visibility API - Refresh only when tab is active and visible
+(function() {
+    const REFRESH_INTERVAL = 20000; // 20 seconds in milliseconds
+    let refreshTimeout = null;
+
+    function scheduleRefresh() {
+        // Clear any existing timeout
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+            refreshTimeout = null;
+        }
+
+        // Only schedule refresh if page is visible
+        if (document.visibilityState === 'visible') {
+            refreshTimeout = setTimeout(function() {
+                window.location.reload();
+            }, REFRESH_INTERVAL);
+        }
+    }
+
+    function handleVisibilityChange() {
+        if (document.visibilityState === 'visible') {
+            // Page became visible - schedule refresh
+            scheduleRefresh();
+        } else {
+            // Page became hidden - cancel any pending refresh
+            if (refreshTimeout) {
+                clearTimeout(refreshTimeout);
+                refreshTimeout = null;
+            }
+        }
+    }
+
+    // Check for Page Visibility API support
+    if (typeof document.visibilityState !== 'undefined') {
+        // Listen for visibility changes
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Schedule initial refresh if page is visible
+        scheduleRefresh();
+    } else {
+        // Fallback for browsers without Page Visibility API support
+        // (though all modern browsers support it)
+        console.warn('Page Visibility API not supported, using fallback refresh');
+        refreshTimeout = setTimeout(function() {
+            window.location.reload();
+        }, REFRESH_INTERVAL);
+    }
+})();

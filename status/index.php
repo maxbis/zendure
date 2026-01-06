@@ -402,7 +402,6 @@ $systemStatus = getSystemStatusInfo(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="20">
     <title>Zendure Status</title>
     <link rel="stylesheet" href="assets/css/zendure.css">
 </head>
