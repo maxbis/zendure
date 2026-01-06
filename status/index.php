@@ -475,7 +475,7 @@ $systemStatus = getSystemStatusInfo(
                                    min="-800" 
                                    max="1200" 
                                    step="100" 
-                                   value="0">
+                                   value="<?php echo htmlspecialchars((string)$chargeDischargeValue, ENT_QUOTES, 'UTF-8'); ?>">
                             <div class="power-control-slider-value" id="power-control-slider-value">0W</div>
                         </div>
                         <div class="countdown-display" id="countdown-display-slider"></div>

@@ -17,12 +17,40 @@ from typing import Optional, Tuple, Dict, Any, Union, Literal
 import requests
 from logger import log_info, log_debug, log_warning, log_error, log_success
 
+
+def find_config_file() -> Path:
+    """
+    Find config.json file with fallback logic.
+    Checks project root config first, then local config.
+
+    Returns:
+        Path to the config file that exists
+
+    Raises:
+        FileNotFoundError: If neither config file exists
+    """
+    script_dir = Path(__file__).parent
+    root_config = script_dir.parent / "config" / "config.json"
+    local_config = script_dir / "config" / "config.json"
+
+    if root_config.exists():
+        return root_config
+    elif local_config.exists():
+        return local_config
+    else:
+        raise FileNotFoundError(
+            f"Config file not found in either location:\n"
+            f"  1. {root_config}\n"
+            f"  2. {local_config}"
+        )
+
+
 # ============================================================================
 # CONFIGURATION PARAMETERS
 # ============================================================================
 
-# Path to config.json (local to run_schedule)
-CONFIG_FILE_PATH = Path(__file__).parent / "config" / "config.json"
+# Path to config.json (with fallback to project root config)
+CONFIG_FILE_PATH = find_config_file()
 
 # Power limits (W)
 POWER_FEED_MIN = -800  # Minimum effective power feed (discharge)
@@ -144,7 +172,7 @@ def _build_device_properties(power_feed: int) -> Dict[str, Any]:
         }
 
 
-def _load_config(config_path: Path) -> Dict[str, str]:
+def _load_config(config_path: Path) -> Dict[str, Any]:
     """
     Load configuration from config.json.
 
@@ -161,6 +189,8 @@ def _load_config(config_path: Path) -> Dict[str, str]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in config file {config_path}: {e}")
 
+    # Validate required keys, but return full config so optional keys
+    # like zendureFetchApiUrl are preserved.
     p1_meter_ip = config.get("p1MeterIp")
     device_ip = config.get("deviceIp")
     device_sn = config.get("deviceSn")
@@ -172,11 +202,7 @@ def _load_config(config_path: Path) -> Dict[str, str]:
     if not device_sn:
         raise ValueError("deviceSn not found in config.json")
 
-    return {
-        "p1MeterIp": p1_meter_ip,
-        "deviceIp": device_ip,
-        "deviceSn": device_sn,
-    }
+    return config
 
 
 def _read_p1_meter(ip_address: str) -> Optional[int]:

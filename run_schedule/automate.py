@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 import requests
-from zero_feed_in_controller import set_power
+from zero_feed_in_controller import set_power, CONFIG_FILE_PATH
 from logger import log_info, log_debug, log_warning, log_error, log_success
 
 # ============================================================================
@@ -27,35 +27,6 @@ TIMEZONE = 'Europe/Amsterdam'
 # ============================================================================
 # CONFIGURATION PARAMETERS
 # ============================================================================
-
-def find_config_file() -> Path:
-    """
-    Find config.json file with fallback logic.
-    Checks project root config first, then local config.
-    
-    Returns:
-        Path to the config file that exists
-        
-    Raises:
-        FileNotFoundError: If neither config file exists
-    """
-    script_dir = Path(__file__).parent
-    root_config = script_dir.parent / "config" / "config.json"
-    local_config = script_dir / "config" / "config.json"
-    
-    if root_config.exists():
-        return root_config
-    elif local_config.exists():
-        return local_config
-    else:
-        raise FileNotFoundError(
-            f"Config file not found in either location:\n"
-            f"  1. {root_config}\n"
-            f"  2. {local_config}"
-        )
-
-# Path to config.json (with fallback to project root config)
-CONFIG_FILE_PATH = find_config_file()
 
 # Time to pause between loop iterations (seconds)
 LOOP_INTERVAL_SECONDS = 20
