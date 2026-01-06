@@ -205,26 +205,92 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
     return config
 
 
-def _read_p1_meter(ip_address: str) -> Optional[int]:
+def _read_p1_meter_full(
+    config_path: Optional[Path] = None,
+    p1_meter_ip: Optional[str] = None,
+) -> Optional[dict]:
     """
-    Fetch total_power from Zendure P1 Meter API endpoint.
+    Fetch full data from Zendure P1 Meter API endpoint and store via API.
 
     Args:
-        ip_address: IP address of the P1 meter
+        config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
+        p1_meter_ip: IP address of the P1 meter (or from config if None)
 
     Returns:
-        int: Total power in watts, or None if error
+        dict: Full P1 meter data from device, or None if error
     """
-    url = f"http://{ip_address}/properties/report"
+    # Resolve configuration
+    if config_path is None:
+        config_path = CONFIG_FILE_PATH
+
+    try:
+        config = _load_config(Path(config_path))
+    except Exception as e:
+        log_error(f"Error loading config: {e}")
+        return None
+
+    # Get P1 meter IP from parameter or config
+    p1_ip = p1_meter_ip or config.get("p1MeterIp")
+    if not p1_ip:
+        log_error("p1MeterIp not found in config.json")
+        return None
+
+    # Read from P1 meter device
+    url = f"http://{p1_ip}/properties/report"
 
     try:
         response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         data = response.json()
+
+        # Extract P1 meter data fields
+        device_id = data.get("deviceId")
         total_power = data.get("total_power")
-        return total_power
+        phase_a = data.get("a_aprt_power")
+        phase_b = data.get("b_aprt_power")
+        phase_c = data.get("c_aprt_power")
+        meter_timestamp = data.get("timestamp")
+
+        # Prepare reading data with timestamp
+        reading_data = {
+            "timestamp": datetime.now().isoformat(),
+            "deviceId": device_id,
+            "total_power": total_power,
+            "a_aprt_power": phase_a,
+            "b_aprt_power": phase_b,
+            "c_aprt_power": phase_c,
+            "meter_timestamp": meter_timestamp,
+        }
+
+        # Store via data_api.php endpoint
+        api_url = config.get("p1StoreApiUrl")
+        if api_url:
+            try:
+                store_response = requests.post(
+                    api_url,
+                    json=reading_data,
+                    timeout=REQUEST_TIMEOUT,
+                    headers={"Content-Type": "application/json"},
+                )
+                store_response.raise_for_status()
+                store_result = store_response.json()
+
+                if store_result.get("success", False):
+                    log_info(f"P1 meter data stored via API: {store_result.get('file', 'zendure_p1_data.json')}")
+                else:
+                    error_msg = store_result.get("error", "Unknown API error")
+                    log_warning(f"API returned error when storing P1 data: {error_msg}")
+            except Exception as e:
+                # Log warning but don't fail - reading was successful
+                log_warning(f"Failed to store P1 data via API: {e}")
+        else:
+            log_warning("p1StoreApiUrl not found in config.json, skipping storage")
+
+        # Return the raw device data (not the stored format)
+        return data
+
     except requests.exceptions.RequestException as e:
-        log_error(f"Error connecting to Zendure P1 at {ip_address}: {e}")
+        log_error(f"Error connecting to Zendure P1 at {p1_ip}: {e}")
         return None
     except (json.JSONDecodeError, KeyError) as e:
         log_error(f"Error parsing P1 response: {e}")
@@ -362,6 +428,7 @@ def _update_zendure_data(
     except Exception as e:
         log_error(f"Unexpected error updating Zendure data via API: {e}")
         return None
+
 
 def _update_zendure_data_file(
     config_path: Optional[Path] = None,
@@ -630,8 +697,12 @@ def execute_zero_feed_in(
     dev_ip = device_ip or config["deviceIp"]
     dev_sn = device_sn or config["deviceSn"]
 
-    # Read inputs
-    p1_power = _read_p1_meter(p1_ip)
+    # Read inputs - reads and stores P1 meter data automatically
+    p1_data = _read_p1_meter_full(config_path=config_path, p1_meter_ip=p1_ip)
+    if p1_data is None:
+        return _create_error_result("Failed to read P1 meter")
+    
+    p1_power = p1_data.get("total_power")
     log_debug(f"P1 power (grid-status): {p1_power}", include_timestamp=True)
     if p1_power is None:
         return _create_error_result("Failed to read P1 meter")
