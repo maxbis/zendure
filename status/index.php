@@ -23,6 +23,7 @@ try {
 $updateAttempted = false;
 $updateSuccess = false;
 $zendureData = null; // Initialize to track if we got data from local read
+$apiErrors = []; // Initialize error collection array
 
 // Include the read function
 require_once __DIR__ . '/includes/read_zendure.php';
@@ -55,9 +56,6 @@ try {
             }
             
             // Make POST request to store data
-            // DEBUG: Log API URL being used
-            error_log("DEBUG: Attempting to store zendure data via API: " . $dataApiUrl);
-            
             $ch = curl_init($dataApiUrl);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -73,32 +71,33 @@ try {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             
-            // DEBUG: Log curl errors
-            if (!empty($curlError)) {
-                error_log("DEBUG: cURL error when storing zendure data: " . $curlError);
-            }
-            
-            // DEBUG: Log HTTP response code
-            error_log("DEBUG: API POST response code: " . $httpCode);
-            
             if ($apiResponse !== false && $httpCode === 200) {
                 $apiData = json_decode($apiResponse, true);
-                
-                // DEBUG: Log API response
-                error_log("DEBUG: API POST response: " . substr($apiResponse, 0, 500)); // Log first 500 chars
                 
                 if ($apiData && isset($apiData['success']) && $apiData['success'] === true) {
                     $updateSuccess = true;
                     $updateAttempted = true;
-                    error_log("DEBUG: Successfully stored zendure data via API");
                 } else {
-                    // DEBUG: Log API error response
-                    $errorMsg = isset($apiData['error']) ? $apiData['error'] : 'Unknown error';
-                    error_log("DEBUG: API returned success=false. Error: " . $errorMsg);
+                    // API returned success=false
+                    $apiErrors[] = [
+                        'context' => 'Zendure Data Storage (POST)',
+                        'endpoint' => $dataApiUrl,
+                        'httpCode' => $httpCode,
+                        'curlError' => $curlError ?: null,
+                        'apiError' => isset($apiData['error']) ? $apiData['error'] : 'Unknown error',
+                        'response' => substr($apiResponse, 0, 200)
+                    ];
                 }
             } else {
-                // DEBUG: Log failed request details
-                error_log("DEBUG: API POST failed. HTTP Code: " . $httpCode . ", Response: " . substr($apiResponse ?: 'No response', 0, 500));
+                // HTTP error or cURL error
+                $apiErrors[] = [
+                    'context' => 'Zendure Data Storage (POST)',
+                    'endpoint' => $dataApiUrl,
+                    'httpCode' => $httpCode,
+                    'curlError' => $curlError ?: null,
+                    'apiError' => null,
+                    'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
+                ];
             }
         }
     }
@@ -159,10 +158,35 @@ try {
             ]);
             
             $apiResponse = curl_exec($ch);
+            $curlError = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             
-            // Note: We don't check API response success - if local read succeeded, we use the data
+            if ($apiResponse !== false && $httpCode === 200) {
+                $apiData = json_decode($apiResponse, true);
+                
+                if (!($apiData && isset($apiData['success']) && $apiData['success'] === true)) {
+                    // API returned success=false
+                    $apiErrors[] = [
+                        'context' => 'P1 Meter Data Storage (POST)',
+                        'endpoint' => $dataApiUrl,
+                        'httpCode' => $httpCode,
+                        'curlError' => $curlError ?: null,
+                        'apiError' => isset($apiData['error']) ? $apiData['error'] : 'Unknown error',
+                        'response' => substr($apiResponse, 0, 200)
+                    ];
+                }
+            } else {
+                // HTTP error or cURL error
+                $apiErrors[] = [
+                    'context' => 'P1 Meter Data Storage (POST)',
+                    'endpoint' => $dataApiUrl,
+                    'httpCode' => $httpCode,
+                    'curlError' => $curlError ?: null,
+                    'apiError' => null,
+                    'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
+                ];
+            }
         }
     }
 } catch (Exception $e) {
@@ -179,7 +203,6 @@ if (!headers_sent()) {
 // Determine update source for display
 $updateSource = $updateSuccess ? 'local' : 'remote';
 
-// Load Zendure data: try API GET if local read failed, otherwise fall back to direct file read
 $errorMessage = null;
 
 // If local read didn't succeed, try fetching via API GET
@@ -210,6 +233,7 @@ if ($zendureData === null || $zendureData === false) {
         ]);
         
         $apiResponse = curl_exec($ch);
+        $curlError = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
@@ -218,41 +242,48 @@ if ($zendureData === null || $zendureData === false) {
             if ($apiData && isset($apiData['success']) && $apiData['success'] === true && isset($apiData['data'])) {
                 $zendureData = $apiData['data'];
                 $updateSource = 'remote-api'; // Data loaded from API (which reads JSON)
+            } else {
+                // API returned success=false or missing data
+                $apiErrors[] = [
+                    'context' => 'Zendure Data Retrieval (GET)',
+                    'endpoint' => $dataApiUrl,
+                    'httpCode' => $httpCode,
+                    'curlError' => $curlError ?: null,
+                    'apiError' => isset($apiData['error']) ? $apiData['error'] : 'API returned success=false or missing data',
+                    'response' => substr($apiResponse, 0, 200)
+                ];
             }
+        } else {
+            // HTTP error or cURL error
+            $apiErrors[] = [
+                'context' => 'Zendure Data Retrieval (GET)',
+                'endpoint' => $dataApiUrl,
+                'httpCode' => $httpCode,
+                'curlError' => $curlError ?: null,
+                'apiError' => null,
+                'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
+            ];
         }
     } catch (Exception $e) {
-        // API GET failed - will fall back to direct file read below
+        // API GET failed
+        $apiErrors[] = [
+            'context' => 'Zendure Data Retrieval (GET)',
+            'endpoint' => $dataApiUrl ?? 'Unknown',
+            'httpCode' => null,
+            'curlError' => $e->getMessage(),
+            'apiError' => null,
+            'response' => null
+        ];
     } catch (Throwable $e) {
-        // Catch any other errors - will fall back to direct file read below
-    }
-}
-
-// If we still don't have data, fall back to direct file read
-if ($zendureData === null) {
-    // Get data file path from config, with fallback
-    $dataFile = $config['dataFile'] ?? null;
-    
-    // If dataFile is not set, try to construct it from dataDir
-    if (($dataFile === null || $dataFile === '') && isset($config['dataDir'])) {
-        $dataDir = $config['dataDir'];
-        $dataFile = rtrim($dataDir, '/') . '/zendure_data.json';
-    }
-    
-    // Final fallback: construct from default path if still not set
-    if ($dataFile === null || $dataFile === '') {
-        // Default to data directory relative to Energy root
-        $defaultDataDir = dirname(__DIR__) . '/data/';
-        $dataFile = $defaultDataDir . 'zendure_data.json';
-    }
-    
-    // Load Zendure data from file
-    $dataResult = loadZendureData($dataFile);
-    $zendureData = $dataResult['data'];
-    $errorMessage = $dataResult['error'] ? $dataResult['message'] : null;
-    
-    // If we successfully loaded from file and didn't get data from local/API, mark as remote-file
-    if ($zendureData !== null && $updateSource !== 'local') {
-        $updateSource = 'remote-file';
+        // Catch any other errors
+        $apiErrors[] = [
+            'context' => 'Zendure Data Retrieval (GET)',
+            'endpoint' => $dataApiUrl ?? 'Unknown',
+            'httpCode' => null,
+            'curlError' => $e->getMessage(),
+            'apiError' => null,
+            'response' => null
+        ];
     }
 }
 
@@ -284,6 +315,7 @@ if ($p1Data === null || $p1Data === false) {
         ]);
         
         $apiResponse = curl_exec($ch);
+        $curlError = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
@@ -291,12 +323,48 @@ if ($p1Data === null || $p1Data === false) {
             $apiData = json_decode($apiResponse, true);
             if ($apiData && isset($apiData['success']) && $apiData['success'] === true && isset($apiData['data'])) {
                 $p1Data = $apiData['data'];
+            } else {
+                // API returned success=false or missing data
+                $apiErrors[] = [
+                    'context' => 'P1 Meter Data Retrieval (GET)',
+                    'endpoint' => $dataApiUrl,
+                    'httpCode' => $httpCode,
+                    'curlError' => $curlError ?: null,
+                    'apiError' => isset($apiData['error']) ? $apiData['error'] : 'API returned success=false or missing data',
+                    'response' => substr($apiResponse, 0, 200)
+                ];
             }
+        } else {
+            // HTTP error or cURL error
+            $apiErrors[] = [
+                'context' => 'P1 Meter Data Retrieval (GET)',
+                'endpoint' => $dataApiUrl,
+                'httpCode' => $httpCode,
+                'curlError' => $curlError ?: null,
+                'apiError' => null,
+                'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
+            ];
         }
     } catch (Exception $e) {
-        // API GET failed - P1 data will remain null
+        // API GET failed
+        $apiErrors[] = [
+            'context' => 'P1 Meter Data Retrieval (GET)',
+            'endpoint' => $dataApiUrl ?? 'Unknown',
+            'httpCode' => null,
+            'curlError' => $e->getMessage(),
+            'apiError' => null,
+            'response' => null
+        ];
     } catch (Throwable $e) {
-        // Catch any other errors - P1 data will remain null
+        // Catch any other errors
+        $apiErrors[] = [
+            'context' => 'P1 Meter Data Retrieval (GET)',
+            'endpoint' => $dataApiUrl ?? 'Unknown',
+            'httpCode' => null,
+            'curlError' => $e->getMessage(),
+            'apiError' => null,
+            'response' => null
+        ];
     }
 }
 
@@ -353,8 +421,6 @@ $systemStatus = getSystemStatusInfo(
                                     echo '🔄 Local';
                                 } elseif ($updateSource === 'remote-api') {
                                     echo '📡 Remote (API)';
-                                } elseif ($updateSource === 'remote-file') {
-                                    echo '📡 Remote (File)';
                                 } else {
                                     echo '📡 Remote';
                                 }
@@ -368,14 +434,38 @@ $systemStatus = getSystemStatusInfo(
             </div>
         </div>
 
-        <?php if ($errorMessage): ?>
+        <?php if (!empty($apiErrors) || $errorMessage): ?>
             <div class="card">
                 <div class="error-message">
-                    <h3>Error</h3>
-                    <p><?php echo htmlspecialchars($errorMessage); ?></p>
+                    <h3>Error<?php echo count($apiErrors) > 1 ? 's' : ''; ?></h3>
+                    <?php if ($errorMessage): ?>
+                        <p><strong>General Error:</strong> <?php echo htmlspecialchars($errorMessage); ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($apiErrors)): ?>
+                        <?php foreach ($apiErrors as $error): ?>
+                            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ff9800; border-radius: 4px;">
+                                <p style="margin: 0 0 8px 0;"><strong><?php echo htmlspecialchars($error['context']); ?></strong></p>
+                                <p style="margin: 4px 0; font-size: 0.9em;"><strong>Endpoint:</strong> <?php echo htmlspecialchars($error['endpoint']); ?></p>
+                                <?php if ($error['httpCode'] !== null): ?>
+                                    <p style="margin: 4px 0; font-size: 0.9em;"><strong>HTTP Status:</strong> <?php echo htmlspecialchars($error['httpCode']); ?></p>
+                                <?php endif; ?>
+                                <?php if ($error['curlError']): ?>
+                                    <p style="margin: 4px 0; font-size: 0.9em;"><strong>Connection Error:</strong> <?php echo htmlspecialchars($error['curlError']); ?></p>
+                                <?php endif; ?>
+                                <?php if ($error['apiError']): ?>
+                                    <p style="margin: 4px 0; font-size: 0.9em;"><strong>API Error:</strong> <?php echo htmlspecialchars($error['apiError']); ?></p>
+                                <?php endif; ?>
+                                <?php if ($error['response']): ?>
+                                    <p style="margin: 4px 0; font-size: 0.85em; color: #666;"><strong>Response:</strong> <?php echo htmlspecialchars($error['response']); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
-        <?php elseif ($zendureData): ?>
+        <?php endif; ?>
+        
+        <?php if ($zendureData): ?>
 
 
             <!-- Properties Section -->

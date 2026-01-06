@@ -237,20 +237,14 @@ try {
                 throw new Exception("Invalid type: $type");
             }
             
-            // DEBUG: Log write attempt
-            error_log("DEBUG: Attempting to write $type data to: $filePath");
-            error_log("DEBUG: Data size: " . strlen(json_encode($input)) . " bytes");
-            
             if (writeDataFileAtomic($filePath, $input)) {
                 $response = [
                     'success' => true,
                     'message' => 'File saved successfully',
                     'file' => basename($filePath)
                 ];
-                error_log("DEBUG: Successfully wrote $type data to: $filePath");
             } else {
                 $error = "Failed to write file: " . basename($filePath);
-                error_log("DEBUG: $error");
                 throw new Exception($error);
             }
         }
