@@ -1,9 +1,9 @@
 {
-    "timestamp": "2026-01-06T22:23:11+01:00",
+    "timestamp": "2026-01-06T22:34:32+01:00",
     "deviceId": "qhX737DA",
-    "total_power": 570,
-    "a_aprt_power": 570,
+    "total_power": 552,
+    "a_aprt_power": 552,
     "b_aprt_power": 0,
     "c_aprt_power": 0,
-    "meter_timestamp": 1767734590
+    "meter_timestamp": 1767735271
 }

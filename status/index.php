@@ -116,13 +116,59 @@ if (!headers_sent()) {
     header('Content-Type: text/html; charset=UTF-8');
 }
 
-// Always try P1 meter update (same auto-detection logic)
-require_once __DIR__ . '/classes/read_zendure_p1.php';
+// Include the P1 read function
+require_once __DIR__ . '/includes/read_p1.php';
+
+// Try to read P1 meter data from device
+$p1Data = null;
 try {
-    $p1Meter = new ZendureP1Meter($config['p1MeterIp']);
-    $p1Meter->update(false);
+    $p1MeterIp = $config['p1MeterIp'] ?? null;
+    
+    if (!empty($p1MeterIp)) {
+        $p1Data = readP1Data($p1MeterIp);
+        
+        if ($p1Data !== false) {
+            // Store data via data_api.php endpoint
+            $dataApiUrl = $config['dataApiUrl'] ?? null;
+            
+            // Construct API URL if not in config
+            if (empty($dataApiUrl)) {
+                // Default to relative path from status directory
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $scriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+                $dataApiUrl = $protocol . '://' . $host . $scriptPath . '/../data/api/data_api.php?type=zendure_p1';
+            } else {
+                // Ensure ?type=zendure_p1 is added to config URL if not present
+                $parsedUrl = parse_url($dataApiUrl);
+                if (!isset($parsedUrl['query']) || strpos($parsedUrl['query'], 'type=') === false) {
+                    $separator = (strpos($dataApiUrl, '?') === false) ? '?' : '&';
+                    $dataApiUrl = $dataApiUrl . $separator . 'type=zendure_p1';
+                }
+            }
+            
+            // Make POST request to store data
+            $ch = curl_init($dataApiUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($p1Data),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 5
+            ]);
+            
+            $apiResponse = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            // Note: We don't check API response success - if local read succeeded, we use the data
+        }
+    }
 } catch (Exception $e) {
-    // P1 meter not reachable - continue with existing data
+    // Device not reachable - will try API GET below
+} catch (Throwable $e) {
+    // Catch any other errors - will try API GET below
 }
 
 // Ensure HTML content type is set (override any JSON header from API)
@@ -210,19 +256,51 @@ if ($zendureData === null) {
     }
 }
 
-// Load P1 meter data
-// Resolve P1 data file path (same way as main data file)
-$p1DataDirPath = $config['dataDir'];
-if (strpos($p1DataDirPath, '../') === 0) {
-    // Relative path - resolve from parent directory
-    $p1DataDir = dirname(__DIR__) . '/' . trim(str_replace('../', '', $p1DataDirPath), '/');
-} else {
-    // Absolute or relative to current directory
-    $p1DataDir = $p1DataDirPath;
+// Load P1 meter data: try API GET if local read failed
+if ($p1Data === null || $p1Data === false) {
+    try {
+        // Construct API URL for GET request
+        $dataApiUrl = $config['dataApiUrl'] ?? null;
+        
+        // Construct API URL if not in config
+        if (empty($dataApiUrl)) {
+            // Default to relative path from status directory
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptPath = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+            $dataApiUrl = $protocol . '://' . $host . $scriptPath . '/../data/api/data_api.php';
+        }
+        
+        // Remove query string if present (we'll add our own)
+        $dataApiUrl = strtok($dataApiUrl, '?');
+        $dataApiUrl = $dataApiUrl . '?type=zendure_p1';
+        
+        // Make GET request to fetch data
+        $ch = curl_init($dataApiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_CONNECTTIMEOUT => 5
+        ]);
+        
+        $apiResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($apiResponse !== false && $httpCode === 200) {
+            $apiData = json_decode($apiResponse, true);
+            if ($apiData && isset($apiData['success']) && $apiData['success'] === true && isset($apiData['data'])) {
+                $p1Data = $apiData['data'];
+            }
+        }
+    } catch (Exception $e) {
+        // API GET failed - P1 data will remain null
+    } catch (Throwable $e) {
+        // Catch any other errors - P1 data will remain null
+    }
 }
-$p1DataFile = rtrim($p1DataDir, '/') . '/zendure_p1_data.json';
-$p1DataResult = loadZendureData($p1DataFile);
-$p1Data = $p1DataResult['data'];
+
+// Extract P1 data if available
 $p1TotalPower = $p1Data['total_power'] ?? 0;
 $p1Status = ($p1TotalPower < 0) ? "EXPORTING ☀️" : "IMPORTING ⚡";
 
