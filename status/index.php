@@ -224,7 +224,7 @@ $systemStatus = getSystemStatusInfo(
                         $chargeDischargeExtraContent = $chargeDischargeTimeDisplay ? ' (' . $chargeDischargeTimeDisplay . ' h)' : null;
 
                         renderMetricBidirectional(
-                            '2. Charging/Discharging',
+                            '2. Discharging/Charging',
                             $chargeDischargeValue,
                             $chargeDischargeBarData,
                             $chargeDischargeBarClass,

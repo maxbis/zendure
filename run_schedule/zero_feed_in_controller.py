@@ -205,19 +205,19 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
     return config
 
 
-def _read_p1_meter_full(
+def _update_p1_data(
     config_path: Optional[Path] = None,
     p1_meter_ip: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Fetch full data from Zendure P1 Meter API endpoint and store via API.
+    Fetch P1 meter data directly and save it via data_api.php endpoint.
 
     Args:
         config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
         p1_meter_ip: IP address of the P1 meter (or from config if None)
 
     Returns:
-        dict: Full P1 meter data from device, or None if error
+        dict: Raw P1 meter data from device, or None if error
     """
     # Resolve configuration
     if config_path is None:
@@ -262,39 +262,62 @@ def _read_p1_meter_full(
             "meter_timestamp": meter_timestamp,
         }
 
-        # Store via data_api.php endpoint
+        # Store via data_api.php endpoint (non-fatal)
         api_url = config.get("p1StoreApiUrl")
-        if api_url:
-            try:
-                store_response = requests.post(
-                    api_url,
-                    json=reading_data,
-                    timeout=REQUEST_TIMEOUT,
-                    headers={"Content-Type": "application/json"},
-                )
-                store_response.raise_for_status()
-                store_result = store_response.json()
-
-                if store_result.get("success", False):
-                    log_info(f"P1 meter data stored via API: {store_result.get('file', 'zendure_p1_data.json')}")
-                else:
-                    error_msg = store_result.get("error", "Unknown API error")
-                    log_warning(f"API returned error when storing P1 data: {error_msg}")
-            except Exception as e:
-                # Log warning but don't fail - reading was successful
-                log_warning(f"Failed to store P1 data via API: {e}")
-        else:
-            log_warning("p1StoreApiUrl not found in config.json, skipping storage")
+        _store_data_via_api(api_url, reading_data, "P1 meter data")
 
         # Return the raw device data (not the stored format)
         return data
 
     except requests.exceptions.RequestException as e:
-        log_error(f"Error connecting to Zendure P1 at {p1_ip}: {e}")
+        log_error(f"Error reading from P1 meter at {p1_ip}: {e}")
         return None
     except (json.JSONDecodeError, KeyError) as e:
         log_error(f"Error parsing P1 response: {e}")
         return None
+
+
+def _store_data_via_api(
+    api_url: Optional[str],
+    data: dict,
+    data_type: str = "data",
+) -> bool:
+    """
+    Store data via data_api.php endpoint.
+
+    Args:
+        api_url: API endpoint URL (from config)
+        data: Data dictionary to store
+        data_type: Type of data for logging (e.g., "P1 meter data", "Zendure data")
+
+    Returns:
+        bool: True if storage was successful, False otherwise (warnings logged, doesn't raise)
+    """
+    if not api_url:
+        log_warning(f"{data_type} API URL not found in config.json, skipping storage")
+        return False
+
+    try:
+        store_response = requests.post(
+            api_url,
+            json=data,
+            timeout=REQUEST_TIMEOUT,
+            headers={"Content-Type": "application/json"},
+        )
+        store_response.raise_for_status()
+        store_result = store_response.json()
+
+        if store_result.get("success", False):
+            log_info(f"{data_type} stored via API: {store_result.get('file', 'data.json')}")
+            return True
+        else:
+            error_msg = store_result.get("error", "Unknown API error")
+            log_warning(f"API returned error when storing {data_type}: {error_msg}")
+            return False
+    except Exception as e:
+        # Log warning but don't fail - reading was successful
+        log_warning(f"Failed to store {data_type} via API: {e}")
+        return False
 
 
 def _read_zendure_data() -> Optional[dict]:
@@ -361,7 +384,7 @@ def _update_zendure_data(
         device_ip: Override Zendure device IP (else from config)
 
     Returns:
-        dict: Device data with timestamp, properties, and packData, or None on error.
+        dict: Raw device data from device, or None on error.
     """
     # Resolve configuration
     if config_path is None:
@@ -376,7 +399,7 @@ def _update_zendure_data(
     # Get device IP from parameter or config
     dev_ip = device_ip or config["deviceIp"]
 
-    # Read from Zendure device directly (same as _update_zendure_data)
+    # Read from Zendure device directly
     url = f"http://{dev_ip}/properties/report"
 
     try:
@@ -395,38 +418,21 @@ def _update_zendure_data(
             "packData": packs,
         }
 
-        # Store via data_api.php endpoint
+        # Store via data_api.php endpoint (non-fatal)
         api_url = config.get("zendureStoreApiUrl")
-        if not api_url:
-            log_error("zendureStoreApiUrl not found in config.json")
-            return None
+        _store_data_via_api(api_url, reading_data, "Zendure data")
 
-        # POST data to API
-        store_response = requests.post(
-            api_url,
-            json=reading_data,
-            timeout=REQUEST_TIMEOUT,
-            headers={"Content-Type": "application/json"},
-        )
-        store_response.raise_for_status()
-        store_result = store_response.json()
-
-        if not store_result.get("success", False):
-            error_msg = store_result.get("error", "Unknown API error")
-            log_error(f"API returned error when storing data: {error_msg}")
-            return None
-
-        log_info(f"Zendure data stored via API: {store_result.get('file', 'zendure_data.json')}")
-        return reading_data
+        # Return the raw device data (not the stored format)
+        return data
 
     except requests.exceptions.RequestException as e:
-        log_error(f"Error reading from Zendure device at {dev_ip} or storing via API: {e}")
+        log_error(f"Error reading from Zendure device at {dev_ip}: {e}")
         return None
     except (json.JSONDecodeError, KeyError) as e:
-        log_error(f"Error parsing Zendure response or API response: {e}")
+        log_error(f"Error parsing Zendure response: {e}")
         return None
     except Exception as e:
-        log_error(f"Unexpected error updating Zendure data via API: {e}")
+        log_error(f"Unexpected error updating Zendure data: {e}")
         return None
 
 
@@ -532,6 +538,9 @@ def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[b
     """
     url = f"http://{device_ip}/properties/write"
 
+    # Store original value for logging
+    original_power_feed = power_feed
+
     # In the original controller, power_feed is inverted before mapping:
     #   positive => charge (inputLimit), negative => discharge (outputLimit)
     # To keep compatibility, we keep the same behavior here.
@@ -542,10 +551,11 @@ def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[b
     payload = {"sn": device_sn, "properties": properties}
 
     if TEST_MODE:
-        log_info(f"TEST MODE: Would set power feed to {power_feed} W")
+        log_info(f"TEST MODE: Would set power feed to {original_power_feed} W")
         return (True, None)
 
     try:
+        log_info(f"Setting power feed to {original_power_feed} W...")
         response = requests.post(
             url,
             json=payload,
@@ -560,7 +570,7 @@ def _send_power_feed(device_ip: str, device_sn: str, power_feed: int) -> Tuple[b
         except json.JSONDecodeError:
             pass
 
-        log_info(f"Actually set power feed to {power_feed} W")
+        log_info(f"✓ Successfully set power feed to {original_power_feed} W")
 
         return (True, None)
 
@@ -698,7 +708,7 @@ def execute_zero_feed_in(
     dev_sn = device_sn or config["deviceSn"]
 
     # Read inputs - reads and stores P1 meter data automatically
-    p1_data = _read_p1_meter_full(config_path=config_path, p1_meter_ip=p1_ip)
+    p1_data = _update_p1_data(config_path=config_path, p1_meter_ip=p1_ip)
     if p1_data is None:
         return _create_error_result("Failed to read P1 meter")
     
