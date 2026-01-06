@@ -622,6 +622,7 @@ $systemStatus = getSystemStatusInfo(
                 </div>
             </div>
 
+            <?php if ($updateSource === 'local'): ?>
                  <!-- Power Control Section -->
                  <div class="card">
                 <div class="power-control-section">
@@ -674,6 +675,7 @@ $systemStatus = getSystemStatusInfo(
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- Battery Packs Section -->
             <div class="card">
