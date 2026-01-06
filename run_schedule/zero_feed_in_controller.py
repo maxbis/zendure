@@ -151,7 +151,7 @@ def _build_device_properties(power_feed: int) -> Dict[str, Any]:
         # Charge mode: acMode 1 = Input
         return {
             "acMode": 1,
-            "inputLimit": int(power_feed),
+            "inputLimit": int(abs(power_feed)),
             "outputLimit": 0,
             "smartMode": 1,
         }
@@ -283,17 +283,19 @@ def _read_zendure_state(
         log_warning(f"Error reading Zendure state: {e}")
         return (None, None, None)
 
-
-def _update_zendure_data_api(
+def _update_zendure_data(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Fetch Zendure device data via the PHP API endpoint and return it.
+    Fetch Zendure device data directly and save it via data_api.php endpoint.
 
-    The PHP endpoint (data/api/zendure_fetch_api.php) is responsible for
-    writing zendure_data.json on the web server; this function just calls
-    that API and returns the JSON payload it reports as `data`.
+    Args:
+        config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
+        device_ip: Override Zendure device IP (else from config)
+
+    Returns:
+        dict: Device data with timestamp, properties, and packData, or None on error.
     """
     # Resolve configuration
     if config_path is None:
@@ -308,46 +310,60 @@ def _update_zendure_data_api(
     # Get device IP from parameter or config
     dev_ip = device_ip or config["deviceIp"]
 
-    # Get full API URL from config (fallback to apiBasePath + fixed path)
-    zendure_fetch_url = config.get("zendureFetchApiUrl")
-    if not zendure_fetch_url:
-        log_error("zendureFetchApiUrl not found in config.json; cannot call Zendure Fetch API")
-        return None
+    # Read from Zendure device directly (same as _update_zendure_data)
+    url = f"http://{dev_ip}/properties/report"
 
     try:
-        # Call PHP API; it will fetch from the device and write zendure_data.json
-        response = requests.get(
-            zendure_fetch_url,
-            params={"ip": dev_ip},
-            timeout=REQUEST_TIMEOUT,
-        )
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
-        payload = response.json()
+        data = response.json()
+
+        # Extract properties and pack data
+        props = data.get("properties", {})
+        packs = data.get("packData", [])
+
+        # Prepare reading data with timestamp
+        reading_data = {
+            "timestamp": datetime.now().isoformat(),
+            "properties": props,
+            "packData": packs,
+        }
+
+        # Store via data_api.php endpoint
+        api_url = config.get("zendureStoreApiUrl")
+        if not api_url:
+            log_error("zendureStoreApiUrl not found in config.json")
+            return None
+
+        # POST data to API
+        store_response = requests.post(
+            api_url,
+            json=reading_data,
+            timeout=REQUEST_TIMEOUT,
+            headers={"Content-Type": "application/json"},
+        )
+        store_response.raise_for_status()
+        store_result = store_response.json()
+
+        if not store_result.get("success", False):
+            error_msg = store_result.get("error", "Unknown API error")
+            log_error(f"API returned error when storing data: {error_msg}")
+            return None
+
+        log_info(f"Zendure data stored via API: {store_result.get('file', 'zendure_data.json')}")
+        return reading_data
+
     except requests.exceptions.RequestException as e:
-        log_error(f"Error calling Zendure Fetch API at {zendure_fetch_url}: {e}")
+        log_error(f"Error reading from Zendure device at {dev_ip} or storing via API: {e}")
         return None
-    except (json.JSONDecodeError, ValueError) as e:
-        log_error(f"Error parsing Zendure Fetch API response: {e}")
+    except (json.JSONDecodeError, KeyError) as e:
+        log_error(f"Error parsing Zendure response or API response: {e}")
         return None
-
-    if not isinstance(payload, dict):
-        log_error("Unexpected response format from Zendure Fetch API (not a JSON object)")
-        return None
-
-    if not payload.get("success", False):
-        err = payload.get("error") or payload.get("message") or "Unknown error"
-        log_error(f"Zendure Fetch API reported failure: {err}")
+    except Exception as e:
+        log_error(f"Unexpected error updating Zendure data via API: {e}")
         return None
 
-    reading_data = payload.get("data")
-    if not isinstance(reading_data, dict):
-        log_warning("Zendure Fetch API returned no valid 'data' field; using full payload as fallback")
-        reading_data = payload
-
-    return reading_data
-    
-
-def _update_zendure_data(
+def _update_zendure_data_file(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
 ) -> Optional[dict]:
