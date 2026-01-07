@@ -19,6 +19,7 @@
  * @var string|null $ariaLabel Optional ARIA label for accessibility
  * @var bool $showValueInBar Whether to show the value inside the bar
  * @var array|null $extraValueContent Optional extra content to display after value (e.g., warning icons)
+ * @var string|null $tooltip Optional tooltip text to display on hover over the metric label
  */
 if (!isset($label) || !isset($value) || !isset($barData) || !isset($barColor) || !isset($max)) {
     return;
@@ -32,6 +33,7 @@ $rightLabel = $rightLabel ?? (string)$max . $valueSuffix;
 $showValueInBar = $showValueInBar ?? false;
 $extraValueContent = $extraValueContent ?? null;
 $noWrapper = $noWrapper ?? false;
+$tooltip = $tooltip ?? null;
 
 // Support single centered label (for battery section style)
 // If leftLabel contains a dash or range indicator, use single centered label
@@ -46,7 +48,7 @@ if ($valueSuffix) {
 ?>
 <?php if (!$noWrapper): ?>
 <div class="metric-item" role="status" aria-label="<?php echo htmlspecialchars($ariaLabel); ?>">
-    <div class="metric-label">
+    <div class="metric-label"<?php echo $tooltip ? ' title="' . htmlspecialchars($tooltip) . '"' : ''; ?>>
         <span><?php echo htmlspecialchars($label); ?></span>
         <div class="metric-value"<?php echo $valueColor ? ' style="color: ' . htmlspecialchars($valueColor) . ';"' : ''; ?>>
             <?php echo htmlspecialchars($valueDisplay); ?>
@@ -62,7 +64,7 @@ if ($valueSuffix) {
         </div>
     </div>
 <?php else: ?>
-    <div class="metric-label">
+    <div class="metric-label"<?php echo $tooltip ? ' title="' . htmlspecialchars($tooltip) . '"' : ''; ?>>
         <span><?php echo htmlspecialchars($label); ?></span>
         <div class="metric-value"<?php echo $valueColor ? ' style="color: ' . htmlspecialchars($valueColor) . ';"' : ''; ?>>
             <?php echo htmlspecialchars($valueDisplay); ?>

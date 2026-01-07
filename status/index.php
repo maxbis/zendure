@@ -607,7 +607,9 @@ $systemStatus = getSystemStatusInfo(
                             '100%',
                             'Battery Level',
                             false,
-                            [' (' . $batteryRemainingDisplay . '/' . $batteryRemainingAboveMinDisplay . ' kWh)']
+                            [' (' . $batteryRemainingDisplay . '/' . $batteryRemainingAboveMinDisplay . ' kWh)'],
+                            false,
+                            'Remaining kWh / Usable kWh above min SoC'
                         );
                         ?>
                     </div>

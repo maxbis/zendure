@@ -39,8 +39,9 @@ function renderMetricSimple($label, $value, $valueColor = null, $ariaLabel = nul
  * @param bool $showValueInBar Whether to show value inside bar
  * @param string|array|null $extraValueContent Optional extra content after value
  * @param bool $noWrapper If true, don't wrap in metric-item div
+ * @param string|null $tooltip Optional tooltip text to display on hover over the metric label
  */
-function renderMetricBar($label, $value, $barColor, $min, $max, $scaleType = 'linear', $exponent = 0.7, $valueForCalculation = null, $valueColor = null, $valueSuffix = '', $leftLabel = null, $rightLabel = null, $ariaLabel = null, $showValueInBar = false, $extraValueContent = null, $noWrapper = false) {
+function renderMetricBar($label, $value, $barColor, $min, $max, $scaleType = 'linear', $exponent = 0.7, $valueForCalculation = null, $valueColor = null, $valueSuffix = '', $leftLabel = null, $rightLabel = null, $ariaLabel = null, $showValueInBar = false, $extraValueContent = null, $noWrapper = false, $tooltip = null) {
     // Calculate the value to use for bar calculation
     $calcValue = $valueForCalculation !== null ? $valueForCalculation : $value;
     
