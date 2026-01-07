@@ -209,23 +209,23 @@ def fetch_schedule_api(api_url: str) -> Optional[Dict[str, Any]]:
 # TIME MATCHING LOGIC
 # ============================================================================
 
-def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: str) -> Optional[Any]:
+def find_current_schedule_value(resolved: List[Dict[str, Any]], current_time: str) -> Optional[Any]:
     """
     Finds the schedule value for the current time.
     
-    Finds the resolved entry with the largest time that is still <= current_hour.
+    Finds the resolved entry with the largest time that is still <= current_time.
     
     Args:
         resolved: List of resolved schedule entries, each with 'time' and 'value' keys
-        current_hour: Current hour in "HHMM" format (e.g., "2300")
+        current_time: Current time in "HHMM" format (e.g., "1811" or "2300")
         
     Returns:
         The value from the matching entry, or None if no match found
     """
     try:
-        current_hour_int = int(current_hour)
+        current_time_int = int(current_time)
         
-        # Filter entries where time <= current_hour
+        # Filter entries where time <= current_time
         valid_entries = [
             entry for entry in resolved
             if 'time' in entry and isinstance(entry['time'], (str, int))
@@ -236,13 +236,13 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
         for entry in valid_entries:
             try:
                 time_int = int(entry['time'])
-                if time_int <= current_hour_int:
+                if time_int <= current_time_int:
                     valid_entries_with_int_time.append((time_int, entry))
             except (ValueError, TypeError):
                 continue
         
         if not valid_entries_with_int_time:
-            log_warning(f"No valid entries found for current hour {current_hour}")
+            log_warning(f"No valid entries found for current time {current_time}")
             return None
         
         # Find the entry with the maximum time (closest but not exceeding)
@@ -261,7 +261,7 @@ def find_current_schedule_value(resolved: List[Dict[str, Any]], current_hour: st
 def refresh_schedule(api_url, last_api_call_time, current_time):
     """
     Fetch and process the schedule API.
-    Returns: (resolved_data, current_hour, last_api_call_time)
+    Returns: (resolved_data, current_time_str, last_api_call_time)
     """
     log_info("Fetching schedule from API...")
     
@@ -269,17 +269,19 @@ def refresh_schedule(api_url, last_api_call_time, current_time):
     
     if api_data:
         resolved_data = api_data.get('resolved')
-        current_hour = api_data.get('currentHour')
+        # Prefer currentTime (includes minutes) over currentHour (hour only)
+        # This allows entries like "1801" to be matched correctly at 18:11
+        current_time_str = api_data.get('currentTime') or api_data.get('currentHour')
 
         if resolved_data is None:
             log_warning("API response missing 'resolved' field")
-        elif current_hour is None:
-            log_warning("API response missing 'currentHour' field")
+        elif current_time_str is None:
+            log_warning("API response missing 'currentTime' and 'currentHour' fields")
         else:
-            log_success(f"API data refreshed. Current hour: {current_hour}, Resolved entries: {len(resolved_data)}")
+            log_success(f"API data refreshed. Current time: {current_time_str}, Resolved entries: {len(resolved_data)}")
         
         last_api_call_time = current_time
-        return resolved_data, current_hour, last_api_call_time
+        return resolved_data, current_time_str, last_api_call_time
     else:
         log_warning("Failed to fetch API data, set power to 0")
         resulting_power = set_power(0)
@@ -322,7 +324,7 @@ def main():
     
     last_api_call_time = 0
     resolved_data = None
-    current_hour = None
+    current_time_str = None
     old_value = None
     value = 0
     
@@ -338,16 +340,16 @@ def main():
             # Check if we need to refresh API data (at startup or every 5 minutes)
             time_since_last_api = current_time - last_api_call_time
             if time_since_last_api >= API_REFRESH_INTERVAL_SECONDS:
-                resolved_data, current_hour, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)
+                resolved_data, current_time_str, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)
             
             # Check for shutdown request again after potentially long-running operations
             if shutdown_flag[0]:
                 break
             
             # Find current schedule value if we have valid data
-            if resolved_data and current_hour:
+            if resolved_data and current_time_str:
                 old_value = value
-                value = find_current_schedule_value(resolved_data, current_hour)
+                value = find_current_schedule_value(resolved_data, current_time_str)
                 log_info(f"Current schedule value: {value}")
                 if value is None:
                     resulting_power = set_power(0)
