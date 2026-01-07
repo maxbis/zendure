@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 import requests
-from zero_feed_in_controller import set_power, CONFIG_FILE_PATH
+from zero_feed_in_controller import set_power, CONFIG_FILE_PATH, check_battery_limits
 from logger import log_info, log_debug, log_warning, log_error, log_success
 
 # ============================================================================
@@ -365,6 +365,16 @@ def main():
                 resulting_power = set_power(0)
                 log_info(f"No data found, set power to {resulting_power}")
                 post_status_update(status_api_url, 'change', old_value, resulting_power)
+
+            # Check battery limits continuously (every loop iteration)
+            # This ensures we stop charging/discharging when limits are reached
+            # even if the schedule value hasn't changed
+            should_stop, reason = check_battery_limits(config_path=CONFIG_FILE_PATH, update=False)
+            if should_stop:
+                log_warning(reason)
+                battery_check_old_value = value  # Store current value for status update
+                resulting_power = set_power(0)
+                post_status_update(status_api_url, 'change', battery_check_old_value, resulting_power)
 
             # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
             sleep_remaining = LOOP_INTERVAL_SECONDS

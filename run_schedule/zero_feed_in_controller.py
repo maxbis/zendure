@@ -792,6 +792,61 @@ def execute_zero_feed_in(
     )
 
 
+def check_battery_limits(
+    config_path: Optional[Path] = None,
+    update: bool = False,
+) -> Tuple[bool, Optional[str]]:
+    """
+    Check if we should stop charging/discharging based on current battery level and power state.
+    
+    Args:
+        config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
+        update: If True, fetch fresh data from device; if False, read from cached file (faster)
+    
+    Returns:
+        tuple: (should_stop: bool, reason: str or None)
+        - should_stop: True if we should stop charging/discharging due to battery limits
+        - reason: Explanation string, or None if no action needed
+    """
+    # Resolve config path
+    if config_path is None:
+        config_path = CONFIG_FILE_PATH
+
+    try:
+        # Read current state
+        input_limit, output_limit, electric_level = _read_zendure_state(
+            config_path=config_path,
+            device_ip=None,
+            update=update,
+        )
+
+        # If we can't read state, fail-safe: don't stop
+        if input_limit is None or output_limit is None or electric_level is None:
+            return (False, None)
+
+        # Check if charging and battery is at or above MAX_CHARGE_LEVEL
+        if input_limit > 0 and electric_level >= MAX_CHARGE_LEVEL:
+            return (
+                True,
+                f"Battery level {electric_level}% >= {MAX_CHARGE_LEVEL}%, stopping charge",
+            )
+
+        # Check if discharging and battery is at or below MIN_CHARGE_LEVEL
+        if output_limit > 0 and electric_level <= MIN_CHARGE_LEVEL:
+            return (
+                True,
+                f"Battery level {electric_level}% <= {MIN_CHARGE_LEVEL}%, stopping discharge",
+            )
+
+        # No action needed
+        return (False, None)
+
+    except Exception as e:
+        # Fail-safe: if we can't check, don't stop
+        log_warning(f"Error checking battery limits: {e}")
+        return (False, None)
+
+
 def set_power(
     power: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
     config_path: Optional[Path] = None,
