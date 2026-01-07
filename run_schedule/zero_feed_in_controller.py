@@ -60,7 +60,7 @@ POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
 POWER_FEED_MIN_THRESHOLD = 30  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
 POWER_FEED_MIN_DELTA = 50      # Minimum change (W) to actually adjust limits - if |delta| < threshold, keep current
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
-MAX_CHARGE_LEVEL = 100         # Maximum battery level (%) - stop charging above this
+MAX_CHARGE_LEVEL = 90          # Maximum battery level (%) - stop charging above this
 
 # Network settings
 REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
