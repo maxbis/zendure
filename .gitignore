@@ -1,2 +1,45 @@
-run_schedule/data/zendure_data.json
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Environment variables
+.env
+.env.local
+
+# Project-specific
+/data/*.json
+/zendure/config/*.json
+/config/*
+config.json
+/run_schedule/config/*.json
+/data/automation_status.json
+run_schedule/data/zendure_data.json
