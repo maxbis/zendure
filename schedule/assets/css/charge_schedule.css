@@ -604,3 +604,17 @@ th {
     }
 }
 
+/* Calculate Grid - Reuses existing card and schedule-item classes */
+.calculate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+@media (max-width: 900px) {
+    .calculate-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

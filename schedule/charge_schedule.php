@@ -182,6 +182,9 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
 
+        <!-- Schedule Calculator Section -->
+        <?php include __DIR__ . '/partials/calculate.php'; ?>
+
         <script>
             // Inject API URL from PHP config
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
