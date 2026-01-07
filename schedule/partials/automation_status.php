@@ -23,7 +23,7 @@
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
         // Get base path: remove /schedule/charge_schedule.php to get /Energy or root
         $basePath = dirname($scriptName);
-        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=10';
+        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=20';
         
         try {
             $context = stream_context_create([
@@ -44,7 +44,7 @@
                     // Temporarily set GET parameters and capture output
                     $originalGet = $_GET;
                     $_GET['type'] = 'all';
-                    $_GET['limit'] = '10';
+                    $_GET['limit'] = '20';
                     
                     ob_start();
                     include $apiFilePath;
@@ -110,9 +110,9 @@
                             $badgeClass = getAutomationEntryTypeClass($entryType);
                             $badgeLabel = getAutomationEntryTypeLabel($entryType); # in zendure/includes/status.php
                             $isFirst = $index === 0;
-                            $entryClass = 'automation-entry' . ($isFirst ? '' : ' automation-entry-collapsed');
+                            $entryClass = 'automation-entry' . ($isFirst ? ' automation-entry-first' : ' automation-entry-collapsed');
                         ?>
-                            <div class="<?php echo $entryClass; ?>" data-index="<?php echo $index; ?>">
+                            <div class="<?php echo $entryClass; ?>" data-index="<?php echo $index; ?>" <?php if ($isFirst && $hasMoreEntries): ?>onclick="toggleAutomationEntries()" style="cursor: pointer;"<?php endif; ?>>
                                 <span class="automation-entry-badge <?php echo $badgeClass; ?>">
                                     <?php echo htmlspecialchars($badgeLabel); ?>
                                 </span>
@@ -123,15 +123,12 @@
                                 <span class="automation-entry-details">
                                     <?php echo htmlspecialchars($entryDetails); ?>
                                 </span>
+                                <?php if ($isFirst && $hasMoreEntries): ?>
+                                    <span class="automation-entry-expand-icon">▼</span>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    <?php if ($hasMoreEntries): ?>
-                        <button class="automation-toggle-button" id="automation-toggle-button" onclick="toggleAutomationEntries()">
-                            <span class="automation-toggle-text">Show more (<?php echo $totalEntries - 1; ?> more)</span>
-                            <span class="automation-toggle-icon">▼</span>
-                        </button>
-                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         <?php else: ?>
