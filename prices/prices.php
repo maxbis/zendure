@@ -83,8 +83,11 @@ foreach ($dates as $dateIndex => $date) {
 }
 
 // Get current date and hour
+// - $currentHourStr: zero-padded string ("00".."23") to match JSON keys
+// - $currentHour: integer (0..23) for numeric comparisons
 $currentDate = date('Ymd');
-$currentHour = (int)date('H');
+$currentHourStr = date('H');
+$currentHour = (int)$currentHourStr;
 
 // Check if update is needed (on second day at 15:00 or later)
 $updateAttempted = false;
@@ -161,11 +164,13 @@ $currentIndex = -1;
 foreach ($dates as $dateIndex => $date) {
     if ($date == $currentDate) {
         // This is today
-        if (isset($priceData[$date][$currentHour])) {
-            $currentPrice = floatval($priceData[$date][$currentHour]);
+        if (isset($priceData[$date][$currentHourStr])) {
+            $currentPrice = floatval($priceData[$date][$currentHourStr]);
             // Calculate index: dateIndex * 24 + hour index
-            $hourIndex = array_search($currentHour, $hours);
-            $currentIndex = $dateIndex * 24 + $hourIndex;
+            $hourIndex = array_search($currentHourStr, $hours, true);
+            if ($hourIndex !== false) {
+                $currentIndex = $dateIndex * 24 + $hourIndex;
+            }
         }
         break;
     }
