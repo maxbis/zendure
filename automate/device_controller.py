@@ -472,13 +472,13 @@ class AutomateController(BaseDeviceController):
             tuple: (success: bool, error_message: str or None)
         """
         # Check battery limits before processing
-        # If charging (power_feed < 0) and at MAX_CHARGE_LEVEL, prevent charge
-        if power_feed < 0 and self.limit_state == 1:
+        # If charging (power_feed > 0) and at MAX_CHARGE_LEVEL, prevent charge
+        if power_feed > 0 and self.limit_state == 1:
             self.log('warning', f"Battery at MAX_CHARGE_LEVEL ({MAX_CHARGE_LEVEL}%), preventing charge")
             power_feed = 0
         
-        # If discharging (power_feed > 0) and at MIN_CHARGE_LEVEL, prevent discharge
-        if power_feed > 0 and self.limit_state == -1:
+        # If discharging (power_feed < 0) and at MIN_CHARGE_LEVEL, prevent discharge
+        if power_feed < 0 and self.limit_state == -1:
             self.log('warning', f"Battery at MIN_CHARGE_LEVEL ({MIN_CHARGE_LEVEL}%), preventing discharge")
             power_feed = 0
         
@@ -490,25 +490,17 @@ class AutomateController(BaseDeviceController):
             return (True, None)
         
         url = f"http://{self.device_ip}/properties/write"
-        
-        # Store original value for logging
-        original_power_feed = power_feed
-        
-        # In the original controller, power_feed is inverted before mapping:
-        #   positive => charge (inputLimit), negative => discharge (outputLimit)
-        # To keep compatibility, we keep the same behavior here.
-        power_feed = int(round(power_feed) * -1)
-        
+    
         # Construct properties based on power_feed value
         properties = self._build_device_properties(power_feed)
         payload = {"sn": self.device_sn, "properties": properties}
         
         if TEST_MODE:
-            self.log('info', f"TEST MODE: Would set power feed to {original_power_feed} W")
+            self.log('info', f"TEST MODE: Would set power feed to {power_feed} W")
             return (True, None)
         
         try:
-            self.log('info', f"Setting power feed to {original_power_feed} W...")
+            self.log('info', f"Setting power feed to {power_feed} W...")
             response = requests.post(
                 url,
                 json=payload,
@@ -523,13 +515,13 @@ class AutomateController(BaseDeviceController):
             except json.JSONDecodeError:
                 pass
             
-            self.log('success', f"Successfully set power feed to {original_power_feed} W")
+            self.log('success', f"Successfully set power feed to {power_feed} W")
             
             # Update previous power only on successful send (in internal convention)
             self.previous_power = original_power_feed
             
             # Accumulate power feed energy over time
-            self._accumulate_power_feed(original_power_feed)
+            self._accumulate_power_feed(power_feed)
             
             return (True, None)
         
@@ -719,14 +711,11 @@ class AutomateController(BaseDeviceController):
             Test mode is controlled by the global TEST_MODE constant.
             When TEST_MODE is True, operations are simulated but not applied.
         """
-        # Handle specific power feed (int)
+        # Handle specific power feed (int), charge is positive, discharge is negative
         if isinstance(value, int): 
-            # Convert to internal convention (CLI convention: positive=charge, negative=discharge)
-            # Internal convention: positive=discharge, negative=charge
-            internal_power_feed = -value
             
             # Send power feed
-            success, error_msg = self._send_power_feed(internal_power_feed)
+            success, error_msg = self._send_power_feed(value)
             
             if not success:
                 return PowerResult(

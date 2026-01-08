@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-Automation script for charge schedule monitoring (OOP version)
+Automation script for charge schedule monitoring (OOP version with keyboard commands)
 
 Runs continuously, checking the charge schedule API and applying power settings
-using the OOP device controller classes.
+using the OOP device controller classes. Supports interactive keyboard commands.
 """
 
 import signal
 import time
 import json
 import requests
+import sys
+import select
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -144,6 +146,166 @@ def post_status_update(status_api_url: str, event_type: str, old_value: any = No
 
 
 # ============================================================================
+# KEYBOARD COMMAND HANDLING
+# ============================================================================
+
+def print_help():
+    """Print available keyboard commands."""
+    print("\n" + "="*60)
+    print("Available Commands:")
+    print("="*60)
+    print("  h, help          - Show this help message")
+    print("  s, status        - Show current status (power, battery, schedule)")
+    print("  a, accumulators  - Print accumulator status")
+    print("  r, refresh       - Force refresh schedule from API")
+    print("  p <value>        - Set power manually (e.g., 'p 500' or 'p netzero')")
+    print("  z, zero          - Set power to 0")
+    print("  nz, netzero      - Set power to netzero mode")
+    print("  nzp, netzero+    - Set power to netzero+ mode")
+    print("  q, quit          - Quit gracefully")
+    print("="*60 + "\n")
+
+def handle_command(command: str, controller: AutomateController, 
+                   schedule_controller: ScheduleController, 
+                   status_api_url: str) -> bool:
+    """
+    Handle a keyboard command.
+    
+    Args:
+        command: The command string entered by user
+        controller: The AutomateController instance
+        schedule_controller: The ScheduleController instance
+        status_api_url: Status API URL for updates
+    
+    Returns:
+        True if should continue, False if should quit
+    """
+    command = command.strip().lower()
+    
+    if not command:
+        return True
+    
+    parts = command.split()
+    cmd = parts[0]
+    args = parts[1:] if len(parts) > 1 else []
+    
+    try:
+        if cmd in ['h', 'help']:
+            print_help()
+        
+        elif cmd in ['s', 'status']:
+            # Show current status
+            log_info("=== Current Status ===")
+            try:
+                desired_power = schedule_controller.get_desired_power(refresh=False)
+                log_info(f"Schedule desired power: {desired_power}")
+            except Exception as e:
+                log_error(f"Error getting desired power: {e}")
+            
+            controller.check_battery_limits()
+            log_info(f"Battery limit state: {controller.limit_state} (1=max, -1=min, 0=ok)")
+            
+            try:
+                zendure_data = controller.read_zendure(update_json=False)
+                if zendure_data:
+                    battery_level = zendure_data.get('batteryLevel', 'N/A')
+                    log_info(f"Battery level: {battery_level}%")
+            except Exception as e:
+                log_warning(f"Could not read Zendure data: {e}")
+        
+        elif cmd in ['a', 'accumulators']:
+            controller.print_accumulators()
+        
+        elif cmd in ['r', 'refresh']:
+            log_info("Forcing schedule refresh...")
+            try:
+                schedule_controller.fetch_schedule()
+                log_info("Schedule refreshed successfully")
+            except Exception as e:
+                log_error(f"Failed to refresh schedule: {e}")
+        
+        elif cmd == 'p' and args:
+            # Set power manually
+            power_arg = args[0]
+            try:
+                # Try to parse as integer first
+                if power_arg.lstrip('-').isdigit():
+                    power_value = int(power_arg)
+                elif power_arg in ['netzero', 'netzero+']:
+                    power_value = power_arg
+                else:
+                    log_error(f"Invalid power value: {power_arg}")
+                    log_info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
+                    return True
+                
+                log_info(f"Manually setting power to: {power_value}")
+                result = controller.set_power(power_value)
+                if result.success:
+                    log_info(f"Power set to: {result.power}")
+                    post_status_update(status_api_url, 'change', None, result.power)
+                else:
+                    log_error(f"Failed to set power: {result.error}")
+            except ValueError:
+                log_error(f"Invalid power value: {power_arg}")
+        
+        elif cmd in ['z', 'zero']:
+            log_info("Setting power to 0")
+            result = controller.set_power(0)
+            if result.success:
+                log_info(f"Power set to 0")
+                post_status_update(status_api_url, 'change', None, 0)
+            else:
+                log_error(f"Failed to set power: {result.error}")
+        
+        elif cmd in ['nz', 'netzero']:
+            log_info("Setting power to netzero")
+            result = controller.set_power('netzero')
+            if result.success:
+                log_info(f"Power set to netzero")
+                post_status_update(status_api_url, 'change', None, 'netzero')
+            else:
+                log_error(f"Failed to set power: {result.error}")
+        
+        elif cmd in ['nzp', 'netzero+']:
+            log_info("Setting power to netzero+")
+            result = controller.set_power('netzero+')
+            if result.success:
+                log_info(f"Power set to netzero+")
+                post_status_update(status_api_url, 'change', None, 'netzero+')
+            else:
+                log_error(f"Failed to set power: {result.error}")
+        
+        elif cmd in ['q', 'quit']:
+            log_info("Quit command received")
+            return False
+        
+        else:
+            log_warning(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
+    
+    except Exception as e:
+        log_error(f"Error executing command: {e}")
+    
+    return True
+
+def check_for_input(timeout: float = 0.1) -> Optional[str]:
+    """
+    Check if input is available on stdin (non-blocking).
+    
+    Args:
+        timeout: Timeout in seconds (default 0.1)
+    
+    Returns:
+        Input string if available, None otherwise
+    """
+    if select.select([sys.stdin], [], [], timeout)[0]:
+        try:
+            return sys.stdin.readline().strip()
+        except (EOFError, OSError):
+            return None
+    return None
+
+
+# ============================================================================
 # MAIN LOOP
 # ============================================================================
 
@@ -177,9 +339,10 @@ def main():
     # Log startup
     post_status_update(status_api_url, 'start')
     
-    log_info("🚀 Starting charge schedule automation script (OOP version)")
+    log_info("🚀 Starting charge schedule automation script (OOP version with keyboard commands)")
     log_info(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
     log_info(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
+    log_info("   Type 'h' or 'help' for available keyboard commands")
     print()  # Empty line for readability
     
     # Register signal handlers for graceful shutdown
@@ -195,6 +358,14 @@ def main():
             # Check for shutdown request
             if shutdown_flag[0]:
                 break
+            
+            # Check for keyboard input (non-blocking)
+            user_input = check_for_input(timeout=0.1)
+            if user_input:
+                should_continue = handle_command(user_input, controller, schedule_controller, status_api_url)
+                if not should_continue:
+                    shutdown_flag[0] = True
+                    break
             
             current_time = time.time()
             
@@ -270,10 +441,19 @@ def main():
             # Update value for next iteration
             value = desired_power
 
-            # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
+            # Interruptible sleep: sleep in 1-second chunks and check shutdown flag and input
             sleep_remaining = LOOP_INTERVAL_SECONDS
             while sleep_remaining > 0 and not shutdown_flag[0]:
-                time.sleep(min(1, sleep_remaining))
+                # Check for input during sleep
+                user_input = check_for_input(timeout=min(1.0, sleep_remaining))
+                if user_input:
+                    should_continue = handle_command(user_input, controller, schedule_controller, status_api_url)
+                    if not should_continue:
+                        shutdown_flag[0] = True
+                        break
+                
+                if not shutdown_flag[0]:
+                    time.sleep(min(1, sleep_remaining))
                 sleep_remaining -= 1
             
             # If shutdown was requested during sleep, break immediately
