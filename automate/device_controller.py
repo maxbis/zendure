@@ -160,6 +160,21 @@ class BaseDeviceController:
             except Exception as e:
                 # Don't fail if file logging fails, just print error
                 print(f"[ERROR] Failed to write to log file {file_path}: {e}")
+        
+        # Automatically write all errors to log/error.log
+        if level_lower == 'error':
+            try:
+                # Determine script directory to place log file relative to it
+                script_dir = Path(__file__).parent
+                error_log_file = script_dir / "log" / "error.log"
+                # Create parent directory if it doesn't exist
+                error_log_file.parent.mkdir(parents=True, exist_ok=True)
+                # Append to error log file
+                with open(error_log_file, 'a', encoding='utf-8') as f:
+                    f.write(output + '\n')
+            except Exception as e:
+                # Don't fail if error log file write fails, just print error
+                print(f"[ERROR] Failed to write to error log file: {e}")
 
 
 class AutomateController(BaseDeviceController):
@@ -465,12 +480,12 @@ class AutomateController(BaseDeviceController):
         Send power_feed value to Zendure device via /properties/write endpoint.
         
         Args:
-            power_feed: Power feed value in watts (positive for discharge, negative for charge)
-                       Note: This uses internal convention where positive = discharge
+            power_feed: Power feed value in watts (positive for charge, negative for discharge, 0 to stop)
         
         Returns:
             tuple: (success: bool, error_message: str or None)
         """
+        
         # Check battery limits before processing
         # If charging (power_feed > 0) and at MAX_CHARGE_LEVEL, prevent charge
         if power_feed > 0 and self.limit_state == 1:
@@ -518,7 +533,7 @@ class AutomateController(BaseDeviceController):
             self.log('success', f"Successfully set power feed to {power_feed} W")
             
             # Update previous power only on successful send (in internal convention)
-            self.previous_power = original_power_feed
+            self.previous_power = power_feed
             
             # Accumulate power feed energy over time
             self._accumulate_power_feed(power_feed)
@@ -740,12 +755,9 @@ class AutomateController(BaseDeviceController):
                     return PowerResult(success=True, power=calculated_power)
                 
                 # Apply the calculated power
-                # Convert to internal convention (CLI convention: positive=charge, negative=discharge)
-                # Internal convention: positive=discharge, negative=charge
-                internal_power_feed = -calculated_power
-                
-                # Send power feed
-                success, error_msg = self._send_power_feed(internal_power_feed)
+                # calculated_power is already in correct convention (positive=charge, negative=discharge)
+                # Send power feed directly without conversion
+                success, error_msg = self._send_power_feed(calculated_power)
                 
                 if not success:
                     return PowerResult(

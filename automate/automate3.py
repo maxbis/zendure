@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Optional
 
-from device_controller import AutomateController, ScheduleController, BaseDeviceController
+from device_controller import AutomateController, ScheduleController, BaseDeviceController, DeviceDataReader
 
 # ============================================================================
 # CONFIGURATION PARAMETERS
@@ -206,9 +206,11 @@ def handle_command(command: str, controller: AutomateController,
             log_info(f"Battery limit state: {controller.limit_state} (1=max, -1=min, 0=ok)")
             
             try:
-                zendure_data = controller.read_zendure(update_json=False)
+                reader = DeviceDataReader(config_path=controller.config_path)
+                zendure_data = reader.read_zendure(update_json=False)
                 if zendure_data:
-                    battery_level = zendure_data.get('batteryLevel', 'N/A')
+                    props = zendure_data.get("properties", {})
+                    battery_level = props.get("electricLevel", 'N/A')
                     log_info(f"Battery level: {battery_level}%")
             except Exception as e:
                 log_warning(f"Could not read Zendure data: {e}")
