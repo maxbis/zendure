@@ -335,46 +335,57 @@ def main():
                 break
             
             current_time = get_my_timestamp()
-            now_amsterdam = get_my_datetime()
             
             # Check if we need to refresh API data (at startup or every 5 minutes)
             time_since_last_api = current_time - last_api_call_time
             if time_since_last_api >= API_REFRESH_INTERVAL_SECONDS:
-                resolved_data, current_time_str, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)
+                resolved_data, current_time_str, last_api_call_time = refresh_schedule(api_url, last_api_call_time, current_time)     
             
-            # Check for shutdown request again after potentially long-running operations
-            if shutdown_flag[0]:
-                break
-            
-            # Find current schedule value if we have valid data
+            # Step 1: Determine desired_power from schedule (without calling set_power yet)
+            old_value = value
             if resolved_data and current_time_str:
-                old_value = value
-                value = find_current_schedule_value(resolved_data, current_time_str)
-                log_info(f"Current schedule value: {value}")
-                if value is None:
-                    resulting_power = set_power(0)
-                    log_info(f"No value found, set power to 0")
-                    post_status_update(status_api_url, 'change', old_value, resulting_power)
-                elif old_value != value or value == 'netzero' or value == 'netzero+':
-                    resulting_power = set_power(value)
-                    log_info(f"Value at: {resulting_power}")
-                    post_status_update(status_api_url, 'change', old_value, resulting_power)
-                else:
-                    log_info(f"No new value to set")
+                desired_power = find_current_schedule_value(resolved_data, current_time_str)
+                log_info(f"Current schedule value: {desired_power}")
             else:
-                resulting_power = set_power(0)
-                log_info(f"No data found, set power to {resulting_power}")
-                post_status_update(status_api_url, 'change', old_value, resulting_power)
-
-            # Check battery limits continuously (every loop iteration)
-            # This ensures we stop charging/discharging when limits are reached
-            # even if the schedule value hasn't changed
-            should_stop, reason = check_battery_limits(config_path=CONFIG_FILE_PATH, update=False)
-            if should_stop:
+                desired_power = 0
+                log_info(f"No schedule data found, desired power: 0")
+            
+            # Handle None value from schedule
+            if desired_power is None:
+                desired_power = 0
+                log_info(f"Schedule value is None, setting desired power to 0")
+            
+            # Step 2: Validate desired_power against battery limits
+            # Translate netzero modes to validation values for limit checking
+            validation_power = desired_power
+            if desired_power == 'netzero':
+                # netzero can charge or discharge, use -250 (discharge) as worst case for validation
+                validation_power = -250
+            elif desired_power == 'netzero+':
+                # netzero+ only charges, use +250 for validation
+                validation_power = 250
+            
+            # Check battery limits against desired power and current state
+            should_prevent, reason = check_battery_limits(
+                desired_power=validation_power,
+                update=False
+            )
+            
+            # Step 3: Override desired_power if limits are hit
+            if should_prevent:
                 log_warning(reason)
-                battery_check_old_value = value  # Store current value for status update
-                resulting_power = set_power(0)
-                post_status_update(status_api_url, 'change', battery_check_old_value, resulting_power)
+                desired_power = 0  # Override desired power to 0 when limits are reached
+            
+            # Step 4: Apply desired_power only if it differs from old_value
+            if old_value != desired_power:
+                resulting_power = set_power(desired_power)
+                log_info(f"Power set to: {resulting_power} (desired: {desired_power})")
+                post_status_update(status_api_url, 'change', old_value, resulting_power)
+            else:
+                log_info(f"No change needed (desired: {desired_power}, current: {old_value})")
+            
+            # Update value for next iteration
+            value = desired_power
 
             # Interruptible sleep: sleep in 1-second chunks and check shutdown flag
             sleep_remaining = LOOP_INTERVAL_SECONDS

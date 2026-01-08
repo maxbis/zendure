@@ -111,7 +111,7 @@ def _create_error_result(
     current_input: Optional[int] = None,
     current_output: Optional[int] = None,
     electric_level: Optional[int] = None,
-) -> ZeroFeedInResult:
+    ) -> ZeroFeedInResult:
     """
     Helper to create error result with consistent structure.
     
@@ -208,7 +208,7 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
 def _update_p1_data(
     config_path: Optional[Path] = None,
     p1_meter_ip: Optional[str] = None,
-) -> Optional[dict]:
+    ) -> Optional[dict]:
     """
     Fetch P1 meter data directly and save it via data_api.php endpoint.
 
@@ -281,7 +281,7 @@ def _store_data_via_api(
     api_url: Optional[str],
     data: dict,
     data_type: str = "data",
-) -> bool:
+    ) -> bool:
     """
     Store data via data_api.php endpoint.
 
@@ -342,7 +342,7 @@ def _read_zendure_state(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
     update: bool = True,
-) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+    ) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """
     Read current Zendure device state: inputLimit, outputLimit, and electricLevel.
     
@@ -375,7 +375,7 @@ def _read_zendure_state(
 def _update_zendure_data(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
-) -> Optional[dict]:
+    ) -> Optional[dict]:
     """
     Fetch Zendure device data directly and save it via data_api.php endpoint.
 
@@ -439,7 +439,7 @@ def _update_zendure_data(
 def _update_zendure_data_file(
     config_path: Optional[Path] = None,
     device_ip: Optional[str] = None,
-) -> Optional[dict]:
+    ) -> Optional[dict]:
     """
     Fetch Zendure device data and save it to zendure_data.json.
 
@@ -793,56 +793,80 @@ def execute_zero_feed_in(
 
 
 def check_battery_limits(
+    desired_power: Union[int, Literal['netzero', 'netzero+'], None] = None,
     config_path: Optional[Path] = None,
     update: bool = False,
-) -> Tuple[bool, Optional[str]]:
+ ) -> Tuple[bool, Optional[str]]:
     """
-    Check if we should stop charging/discharging based on current battery level and power state.
+    Check if desired power action would violate battery limits, or if current operation should be stopped.
     
     Args:
+        desired_power: The power value we want to set (positive=charge, negative=discharge, 0=stop, or netzero modes)
+                       If None, only checks current device state
         config_path: Optional path to config.json; defaults to CONFIG_FILE_PATH
         update: If True, fetch fresh data from device; if False, read from cached file (faster)
     
     Returns:
-        tuple: (should_stop: bool, reason: str or None)
-        - should_stop: True if we should stop charging/discharging due to battery limits
-        - reason: Explanation string, or None if no action needed
+        tuple: (should_prevent: bool, reason: str or None)
+        - should_prevent: True if we should prevent this action or stop current operation due to battery limits
+        - reason: Explanation string, or None if action is allowed
     """
     # Resolve config path
     if config_path is None:
         config_path = CONFIG_FILE_PATH
 
     try:
-        # Read current state
+        # Read current battery level
         input_limit, output_limit, electric_level = _read_zendure_state(
             config_path=config_path,
             device_ip=None,
             update=update,
         )
 
-        # If we can't read state, fail-safe: don't stop
-        if input_limit is None or output_limit is None or electric_level is None:
+        # If we can't read battery level, fail-safe: allow action
+        if electric_level is None:
             return (False, None)
 
-        # Check if charging and battery is at or above MAX_CHARGE_LEVEL
-        if input_limit > 0 and electric_level >= MAX_CHARGE_LEVEL:
-            return (
-                True,
-                f"Battery level {electric_level}% >= {MAX_CHARGE_LEVEL}%, stopping charge",
-            )
+        # First, check if desired action would violate limits (prevent starting)
+        if desired_power is not None:
+            if isinstance(desired_power, int):
+                # Desired charging and battery is at or above MAX_CHARGE_LEVEL
+                if desired_power > 0 and electric_level >= MAX_CHARGE_LEVEL:
+                    return (
+                        True,
+                        f"Battery level {electric_level}% >= {MAX_CHARGE_LEVEL}%, preventing charge (desired {desired_power} W)",
+                    )
+                
+                # Desired discharging and battery is at or below MIN_CHARGE_LEVEL
+                if desired_power < 0 and electric_level <= MIN_CHARGE_LEVEL:
+                    return (
+                        True,
+                        f"Battery level {electric_level}% <= {MIN_CHARGE_LEVEL}%, preventing discharge (desired {abs(desired_power)} W)",
+                    )
+            # For netzero modes, they have their own checks in _calculate_new_settings, so allow them
 
-        # Check if discharging and battery is at or below MIN_CHARGE_LEVEL
-        if output_limit > 0 and electric_level <= MIN_CHARGE_LEVEL:
-            return (
-                True,
-                f"Battery level {electric_level}% <= {MIN_CHARGE_LEVEL}%, stopping discharge",
-            )
+        # Second, check if current operation should be stopped (stop ongoing)
+        # This handles the case where we're already charging/discharging and battery reaches limit
+        if input_limit is not None and output_limit is not None:
+            # Check if currently charging and battery is at or above MAX_CHARGE_LEVEL
+            if input_limit > 0 and electric_level >= MAX_CHARGE_LEVEL:
+                return (
+                    True,
+                    f"Battery level {electric_level}% >= {MAX_CHARGE_LEVEL}%, stopping ongoing charge",
+                )
+
+            # Check if currently discharging and battery is at or below MIN_CHARGE_LEVEL
+            if output_limit > 0 and electric_level <= MIN_CHARGE_LEVEL:
+                return (
+                    True,
+                    f"Battery level {electric_level}% <= {MIN_CHARGE_LEVEL}%, stopping ongoing discharge",
+                )
 
         # No action needed
         return (False, None)
 
     except Exception as e:
-        # Fail-safe: if we can't check, don't stop
+        # Fail-safe: if we can't check, allow action
         log_warning(f"Error checking battery limits: {e}")
         return (False, None)
 
