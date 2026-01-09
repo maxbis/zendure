@@ -408,6 +408,15 @@ def main():
             if shutdown_flag[0]:
                 break
             
+            # Read P1 meter and accumulate (every iteration)
+            try:
+                reader = DeviceDataReader(config_path=controller.config_path)
+                p1_data = reader.read_p1_meter(update_json=False)  # Don't double-store
+                if p1_data and p1_data.get("total_power") is not None:
+                    controller.accumulator.accumulate_p1_reading(p1_data["total_power"])
+            except Exception as e:
+                log_warning(f"Failed to read P1 for accumulation: {e}")
+            
             # Check for keyboard input (non-blocking)
             user_input = check_for_input(timeout=0.1)
             if user_input:
