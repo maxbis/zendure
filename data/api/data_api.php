@@ -228,8 +228,100 @@ try {
             } else {
                 throw new Exception("Failed to write file: " . basename($filePath));
             }
+        } elseif ($type === 'schedule') {
+            // Special handling for schedule type
+            // Support two formats:
+            // 1. Single entry: {"key": "202512220000", "value": 22} - add to existing schedule
+            // 2. Full schedule: {"202512220000": 22, "202512220100": 33} - replace entire schedule
+            if (!is_array($input)) {
+                throw new Exception("Schedule data must be an array");
+            }
+            
+            $params = [];
+            $filePath = getDataFilePath($type, $params);
+            
+            if ($filePath === null) {
+                throw new Exception("Invalid type: schedule");
+            }
+            
+            // Check if this is a single entry object (format: {"key": "...", "value": ...})
+            if (count($input) === 2 && isset($input['key']) && isset($input['value'])) {
+                // Single entry format - add to existing schedule (like charge_schedule_api.php does)
+                $key = (string) $input['key'];
+                $val = $input['value'];
+                
+                // Validate key length
+                if (strlen($key) !== 12) {
+                    throw new Exception("Key must be 12 characters (YYYYMMDDHHmm format)");
+                }
+                
+                // Validate value
+                if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
+                    throw new Exception("Invalid value. Must be 'netzero', 'netzero+', or a number");
+                }
+                
+                // Convert numeric value to int
+                if (is_numeric($val)) {
+                    $val = (int) $val;
+                }
+                
+                // Read current schedule
+                $schedule = readDataFile($filePath);
+                if ($schedule === null) {
+                    // File doesn't exist, create empty schedule
+                    $schedule = [];
+                }
+                
+                // Normalize schedule keys to strings
+                $normalizedSchedule = [];
+                foreach ($schedule as $k => $v) {
+                    $normalizedSchedule[(string) $k] = $v;
+                }
+                $schedule = $normalizedSchedule;
+                
+                // Add the new entry
+                $schedule[$key] = $val;
+                
+                // Write updated schedule
+                if (writeDataFileAtomic($filePath, $schedule)) {
+                    $response = [
+                        'success' => true,
+                        'message' => 'Schedule entry added successfully',
+                        'file' => basename($filePath)
+                    ];
+                } else {
+                    throw new Exception("Failed to write file: " . basename($filePath));
+                }
+            } else {
+                // Full schedule format - validate and replace entire schedule
+                // Validate that keys look like schedule keys (12 characters: YYYYMMDDHHmm)
+                // Allow wildcards (*) in keys
+                foreach ($input as $key => $value) {
+                    $keyStr = (string) $key;
+                    // Schedule keys should be 12 characters (YYYYMMDDHHmm) or contain wildcards
+                    if (strlen($keyStr) !== 12 && !preg_match('/^[\d*]{12}$/', $keyStr)) {
+                        throw new Exception("Invalid schedule key format: '$keyStr'. Keys must be 12 characters (YYYYMMDDHHmm format) or contain wildcards.");
+                    }
+                    
+                    // Validate value
+                    if ($value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
+                        throw new Exception("Invalid schedule value for key '$keyStr'. Value must be 'netzero', 'netzero+', or a number.");
+                    }
+                }
+                
+                // Write the full schedule
+                if (writeDataFileAtomic($filePath, $input)) {
+                    $response = [
+                        'success' => true,
+                        'message' => 'Schedule saved successfully',
+                        'file' => basename($filePath)
+                    ];
+                } else {
+                    throw new Exception("Failed to write file: " . basename($filePath));
+                }
+            }
         } else {
-            // Handle other types (zendure, zendure_p1, schedule, automation_status)
+            // Handle other types (zendure, zendure_p1, automation_status)
             $params = [];
             $filePath = getDataFilePath($type, $params);
             

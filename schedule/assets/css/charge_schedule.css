@@ -64,70 +64,6 @@ body {
     color: #333;
 }
 
-.schedule-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    max-height: 600px;
-    overflow-y: auto;
-    flex: 1 1 auto;
-}
-
-.schedule-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    transition: all 0.2s;
-}
-
-.schedule-item:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.schedule-item-time {
-    min-width: 80px;
-    font-weight: 600;
-    color: #333;
-}
-
-.schedule-item-value {
-    flex: 1;
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-left: 16px;
-}
-
-.schedule-item-key {
-    font-size: 0.75rem;
-    color: #888;
-    font-family: monospace;
-    margin-left: 16px;
-}
-
-.time-night {
-    background-color: #e3f2fd;
-}
-
-.time-morning {
-    background-color: #fff9e6;
-}
-
-.time-afternoon {
-    background-color: #e8f5e9;
-}
-
-.time-evening {
-    background-color: #fce4ec;
-}
-
-.slot-current {
-    border: 3px solid #ff9800 !important;
-    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5), 0 2px 8px rgba(255, 152, 0, 0.3);
-    font-weight: 600;
-    position: relative;
-}
 
 .charge {
     color: #007321;
@@ -146,42 +82,11 @@ body {
     font-weight: 500;
 }
 
-/* Right Panel */
-.table-wrapper {
-    max-height: 600px;
-    overflow-y: auto;
-    margin-top: 8px;
+.netzero-plus {
+    color: #bac302;
+    font-weight: 500;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th,
-td {
-    padding: 8px 10px;
-    text-align: left;
-    border-bottom: 1px solid #e0e0e0;
-    font-size: 0.9rem;
-}
-
-th {
-    background: #f0f0f0;
-    font-weight: 600;
-    position: sticky;
-    top: 0;
-}
-
-/* Clickable table rows */
-#schedule-table tbody tr {
-    cursor: pointer;
-    transition: background-color 0.15s;
-}
-
-#schedule-table tbody tr:hover {
-    background-color: #f5f5f5;
-}
 
 .badge {
     padding: 2px 6px;
@@ -392,6 +297,11 @@ th {
     margin-top: 4px;
 }
 
+.status-bar {
+    font-size: 0.8rem;
+    color: #666;
+}
+
 .modal-footer {
     margin-top: 20px;
     display: flex;
@@ -400,18 +310,7 @@ th {
 }
 
 
-/* Automation Status - Full Width */
-.automation-status-wrapper {
-    width: 100%;
-    margin-top: 20px;
-}
-
-.automation-status-wrapper .card {
-    width: 100%;
-    max-width: 100%;
-}
-
-/* Automation Status Section */
+/* Metric Section - Shared by Automation Status and Schedule Calculator */
 .metric-section {
     margin-bottom: 30px;
 }
@@ -422,203 +321,6 @@ th {
     font-size: 1.3rem;
     border-bottom: 2px solid #64b5f6;
     padding-bottom: 8px;
-}
-
-.automation-status-header {
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.automation-last-update {
-    font-size: 0.9rem;
-    color: #666;
-    font-style: italic;
-}
-
-.automation-timestamp-full {
-    color: #999;
-    font-size: 0.85rem;
-    margin-left: 5px;
-}
-
-.automation-status-error {
-    padding: 20px;
-    background: #fee;
-    border-left: 4px solid #f00;
-    border-radius: 4px;
-    color: #c00;
-    text-align: center;
-}
-
-.automation-status-empty {
-    padding: 20px;
-    text-align: center;
-    color: #999;
-    font-style: italic;
-}
-
-.automation-entries-wrapper {
-    position: relative;
-}
-
-.automation-entries-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.automation-entry {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 15px;
-    background: #fff;
-    border-radius: 8px;
-    border: 1px solid #e0e0e0;
-    transition: all 0.2s ease;
-}
-
-.automation-entry-collapsed {
-    display: none !important;
-}
-
-.automation-entries-list.expanded .automation-entry-collapsed {
-    display: flex !important;
-}
-
-.automation-entry:hover {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-    border-color: #64b5f6;
-}
-
-.automation-entry-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    min-width: 70px;
-    text-align: center;
-}
-
-.automation-badge-start {
-    background: #c8e6c9;
-    color: #2e7d32;
-}
-
-.automation-badge-stop {
-    background: #ffcdd2;
-    color: #c62828;
-}
-
-.automation-badge-change {
-    background: #bbdefb;
-    color: #1565c0;
-}
-
-.automation-badge-heartbeat {
-    background: #e0e0e0;
-    color: #616161;
-}
-
-.automation-badge-unknown {
-    background: #f5f5f5;
-    color: #757575;
-}
-
-.automation-entry-time {
-    font-size: 0.85rem;
-    color: #666;
-    font-family: 'Courier New', monospace;
-    flex-shrink: 0;
-    min-width: 120px;
-}
-
-.automation-entry-timestamp-full {
-    color: #999;
-    font-size: 0.75rem;
-    margin-left: 5px;
-    font-family: 'Courier New', monospace;
-}
-
-.automation-entry-details {
-    flex: 1;
-    color: #333;
-    font-size: 0.9rem;
-}
-
-.automation-entry-first {
-    position: relative;
-}
-
-.automation-entry-expand-icon {
-    flex-shrink: 0;
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: #666;
-    transition: transform 0.3s ease;
-    padding-left: 12px;
-}
-
-.automation-entries-wrapper.expanded .automation-entry-expand-icon {
-    transform: rotate(180deg);
-}
-
-.automation-toggle-button {
-    width: 100%;
-    margin-top: 10px;
-    padding: 10px 15px;
-    background: #f5f5f5;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.9rem;
-    color: #666;
-    transition: all 0.2s ease;
-}
-
-.automation-toggle-button:hover {
-    background: #eeeeee;
-    border-color: #64b5f6;
-    color: #64b5f6;
-}
-
-.automation-toggle-text {
-    font-weight: 500;
-}
-
-.automation-toggle-icon {
-    transition: transform 0.3s ease;
-    font-size: 0.8rem;
-}
-
-.automation-entries-wrapper.expanded .automation-toggle-icon {
-    transform: rotate(180deg);
-}
-
-/* Responsive design for automation status */
-@media (max-width: 768px) {
-    .automation-entry {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-
-    .automation-entry-badge {
-        align-self: flex-start;
-    }
-
-    .automation-entry-time {
-        min-width: auto;
-    }
 }
 
 /* Responsive design for mini timeline */
@@ -637,31 +339,6 @@ th {
     }
 }
 
-/* Calculate Grid - Reuses existing card and schedule-item classes */
-.calculate-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-top: 20px;
-    width: 100%;
-    /* Firefox fix: ensure grid container isn't constrained by parent flex */
-    min-width: 0;
-    /* Ensure grid items can shrink properly */
-    grid-auto-flow: row;
-}
-
-/* Fallback for smaller screens - use auto-fit for responsive behavior */
-@media (max-width: 1000px) {
-    .calculate-grid {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-}
-
-@media (max-width: 900px) {
-    .calculate-grid {
-        grid-template-columns: 1fr;
-    }
-}
 
 /* Timeline Card Wrapper - Full Width */
 .timeline-card-wrapper {
@@ -783,191 +460,4 @@ th {
     z-index: 1000;
     margin-bottom: -4px;
     pointer-events: none;
-}
-
-/* Bar Graph Styles */
-.bar-graph-wrapper {
-    width: 100%;
-    margin-top: 20px;
-}
-
-.bar-graph-wrapper .card {
-    width: 100%;
-    max-width: 100%;
-}
-
-.bar-graph-container {
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 10px;
-    gap: 20px;
-    scrollbar-width: thin;
-}
-
-.bar-graph-container::-webkit-scrollbar {
-    height: 8px;
-}
-
-.bar-graph-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.bar-graph-container::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-}
-
-.bar-graph-container::-webkit-scrollbar-thumb:hover {
-    background: #bbb;
-}
-
-.bar-graph-day {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 0 0 auto;
-}
-
-.bar-graph-day-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-    position: sticky;
-    left: 0;
-}
-
-.bar-graph-row {
-    display: flex;
-    gap: 2px;
-    height: 100px;
-    width: auto;
-    padding: 8px 4px;
-    overflow: visible;
-    position: relative;
-}
-
-.bar-graph-bar {
-    flex: none;
-    width: 20px;
-    min-width: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    position: relative;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-radius: 4px 4px 0 0;
-    padding: 0;
-}
-
-.bar-graph-bar:hover {
-    background: rgba(0, 0, 0, 0.05);
-    transform: translateY(-2px);
-}
-
-.bar-graph-bar.bar-current {
-    background: rgba(255, 152, 0, 0.1);
-    border: 2px solid #ff9800;
-    border-bottom: none;
-    border-radius: 4px 4px 0 0;
-    z-index: 10;
-}
-
-.bar-graph-bar-inner {
-    width: 100%;
-    min-height: 4px;
-    border-radius: 3px 3px 0 0;
-    transition: all 0.2s ease;
-    position: relative;
-}
-
-.bar-graph-bar:hover .bar-graph-bar-inner {
-    opacity: 1 !important;
-    transform: scaleY(1.1);
-}
-
-.bar-graph-bar-label {
-    font-size: 0.65rem;
-    color: #666;
-    margin-top: 4px;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.bar-graph-bar.bar-current .bar-graph-bar-label {
-    color: #ff9800;
-    font-weight: 700;
-}
-
-/* Bar color classes matching value column colors */
-.bar-graph-bar-inner.bar-charge {
-    background: #007321;
-}
-
-.bar-graph-bar-inner.bar-netzero-plus {
-    background: #bac302;
-    /* Cyan/Light Blue for Solar Charge */
-}
-
-.bar-graph-bar-inner.bar-discharge {
-    background: #e53935;
-}
-
-.bar-graph-bar-inner.bar-neutral {
-    background: #757575;
-}
-
-.bar-graph-bar-inner.bar-netzero {
-    background: #0026ff;
-}
-
-/* Tooltip for bar graph bars */
-.bar-graph-bar[title]:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    white-space: nowrap;
-    z-index: 1000;
-    margin-bottom: 4px;
-    pointer-events: none;
-}
-
-.bar-graph-bar[title]:hover::before {
-    content: '';
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 4px solid transparent;
-    border-top-color: #333;
-    z-index: 1000;
-    margin-bottom: -4px;
-    pointer-events: none;
-}
-
-/* Responsive design for bar graph */
-@media (max-width: 768px) {
-    .bar-graph-row {
-        height: 150px;
-        gap: 1px;
-    }
-
-    .bar-graph-bar-label {
-        font-size: 0.6rem;
-    }
-
-    .bar-graph-bar-inner {
-        min-height: 6px;
-    }
 }

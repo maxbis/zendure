@@ -32,81 +32,7 @@ function getValueLabel(value) {
 }
 
 // --- UI Rendering ---
-
-function renderToday(resolved, currentHour, currentTime) {
-    const container = document.getElementById('today-schedule-grid');
-    container.innerHTML = '';
-
-    let prevVal = null;
-
-    // First pass: collect displayed slots to find the active one
-    const displayedSlots = [];
-    resolved.forEach(slot => {
-        const val = slot.value;
-        // Filter logic: Only show changes or first item
-        if (prevVal !== null &&
-            ((val === prevVal) ||
-                (val === 'netzero' && prevVal === 'netzero') ||
-                (val === 'netzero+' && prevVal === 'netzero+'))) {
-            return;
-        }
-        prevVal = val;
-        displayedSlots.push(slot);
-    });
-
-    // Find the current active entry from displayed slots (closest to current time but not larger)
-    let currentActiveTime = null;
-    displayedSlots.forEach(slot => {
-        const time = String(slot.time);
-        if (time <= currentTime) {
-            if (currentActiveTime === null || time > currentActiveTime) {
-                currentActiveTime = time;
-            }
-        }
-    });
-
-    // Second pass: render the displayed slots
-    prevVal = null;
-    resolved.forEach(slot => {
-        const val = slot.value;
-        // Filter logic: Only show changes or first item
-        if (prevVal !== null &&
-            ((val === prevVal) ||
-                (val === 'netzero' && prevVal === 'netzero') ||
-                (val === 'netzero+' && prevVal === 'netzero+'))) {
-            return;
-        }
-        prevVal = val;
-
-        const time = String(slot.time);
-        const h = parseInt(time.substring(0, 2));
-        const isCurrent = (time === currentActiveTime);
-
-        let bgClass = 'time-evening';
-        if (h >= 22 || h < 6) bgClass = 'time-night';
-        else if (h < 12) bgClass = 'time-morning';
-        else if (h < 18) bgClass = 'time-afternoon';
-
-        let valText = getValueLabel(val);
-        let valClass = 'neutral';
-        if (val === 'netzero') {
-            valClass = 'netzero';
-        } else if (val === 'netzero+') {
-            valClass = 'netzero-plus';
-        } else if (val !== null) {
-            valClass = (val > 0) ? 'charge' : ((val < 0) ? 'discharge' : 'neutral');
-        }
-
-        const div = document.createElement('div');
-        div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
-        div.innerHTML = `
-            <div class="schedule-item-time">${time.substring(0, 2)}:${time.substring(2, 4)}</div>
-            <div class="schedule-item-value ${valClass}">${valText}</div>
-            ${slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
-        `;
-        container.appendChild(div);
-    });
-}
+// renderToday() and renderEntries() are now in schedule_panels.js
 
 function renderMiniTimeline(resolved, currentTime) {
     const timeline = document.getElementById('mini-timeline');
@@ -218,164 +144,7 @@ function renderMiniTimeline(resolved, currentTime) {
     }
 }
 
-function renderEntries(entries) {
-    const tbody = document.querySelector('#schedule-table tbody');
-    tbody.innerHTML = '';
 
-    // Sort entries same as PHP: key asc
-    entries.sort((a, b) => String(a.key).localeCompare(String(b.key)));
-
-    entries.forEach((entry, idx) => {
-        const tr = document.createElement('tr');
-        tr.dataset.key = entry.key;
-        tr.dataset.value = entry.value;
-
-        // Ensure key is string (PHP might send int for numeric keys)
-        const keyStr = String(entry.key);
-        const isWild = keyStr.includes('*');
-        let displayVal = getValueLabel(entry.value);
-        let valClass = (entry.value === 'netzero') ? 'netzero' : (entry.value === 'netzero+' ? 'netzero-plus' : (entry.value > 0 ? 'charge' : (entry.value < 0 ? 'discharge' : 'neutral')));
-
-        tr.innerHTML = `
-            <td style="color:#888;">${idx + 1}</td>
-            <td style="font-family:monospace;">${keyStr}</td>
-            <td class="${valClass}" style="font-weight:500;">${displayVal}</td>
-            <td><span class="badge ${isWild ? 'badge-wildcard' : 'badge-exact'}">${isWild ? 'Wildcard' : 'Exact'}</span></td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate, tomorrowDate, scheduleEntries) {
-    const todayContainer = document.getElementById('bar-graph-today');
-    const tomorrowContainer = document.getElementById('bar-graph-tomorrow');
-
-    if (!todayContainer || !tomorrowContainer) return;
-
-    // Build a map of schedule entries for quick lookup
-    const scheduleMap = {};
-    if (scheduleEntries) {
-        scheduleEntries.forEach(entry => {
-            scheduleMap[entry.key] = entry.value;
-        });
-    }
-
-    // Build hour-value maps for today and tomorrow
-    const buildHourMap = (resolved) => {
-        const hourMap = {};
-        let lastValue = null;
-        resolved.forEach(slot => {
-            const hour = parseInt(String(slot.time).substring(0, 2));
-            const value = slot.value;
-            if (value !== null) {
-                lastValue = value;
-            }
-            hourMap[hour] = lastValue;
-        });
-        return hourMap;
-    };
-
-    const todayHourMap = buildHourMap(todayResolved);
-    const tomorrowHourMap = buildHourMap(tomorrowResolved);
-
-    // Calculate maximum absolute value for height scaling
-    let maxAbsValue = 0;
-    const allValues = [...todayResolved, ...tomorrowResolved].map(slot => slot.value);
-    allValues.forEach(val => {
-        if (val === 'netzero' || val === 'netzero+') {
-            maxAbsValue = Math.max(maxAbsValue, 250);
-        } else if (typeof val === 'number') {
-            maxAbsValue = Math.max(maxAbsValue, Math.abs(val));
-        }
-    });
-    // Ensure minimum max value for proper scaling
-    if (maxAbsValue === 0) maxAbsValue = 250;
-
-    // Get current date and hour
-    const now = new Date();
-    const currentDate = now.getFullYear().toString() +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0');
-    const currentHour = now.getHours();
-
-    // Helper function to render a row of bars
-    const renderBarRow = (hourMap, dateStr, container, isToday) => {
-        container.innerHTML = '';
-
-        for (let h = 0; h < 24; h++) {
-            const value = hourMap[h] !== undefined ? hourMap[h] : null;
-            const hourTime = String(h).padStart(2, '0') + '00';
-            const key = dateStr + hourTime;
-
-            // Determine if this is the current hour
-            const isCurrentHour = isToday && (h === currentHour) && (dateStr === currentDate);
-
-            // Determine bar color class
-            // Determine bar color class
-            let barClass = 'bar-neutral';
-            if (value === 'netzero') {
-                barClass = 'bar-netzero';
-            } else if (value === 'netzero+') {
-                barClass = 'bar-netzero-plus';
-            } else if (typeof value === 'number') {
-                barClass = (value > 0) ? 'bar-charge' : ((value < 0) ? 'bar-discharge' : 'bar-neutral');
-            }
-
-            // Calculate bar height
-            let barHeight = '4px'; // Minimum height
-            if (value === 'netzero' || value === 'netzero+') {
-                // Use 250 as proxy value
-                barHeight = Math.max(4, (250 / maxAbsValue) * 100) + '%';
-            } else if (typeof value === 'number' && value !== 0) {
-                barHeight = Math.max(4, (Math.abs(value) / maxAbsValue) * 100) + '%';
-            }
-
-            // Get display label
-            const valDisplay = getValueLabel(value);
-
-            // Create bar element
-            const barDiv = document.createElement('div');
-            barDiv.className = `bar-graph-bar ${isCurrentHour ? 'bar-current' : ''}`;
-            barDiv.dataset.date = dateStr;
-            barDiv.dataset.hour = h;
-            barDiv.dataset.time = hourTime;
-            barDiv.dataset.key = key;
-            barDiv.title = `${String(h).padStart(2, '0')}:00 - ${valDisplay}`;
-
-            const barInner = document.createElement('div');
-            barInner.className = `bar-graph-bar-inner ${barClass}`;
-            barInner.style.height = barHeight;
-
-            const barLabel = document.createElement('div');
-            barLabel.className = 'bar-graph-bar-label';
-            barLabel.textContent = String(h).padStart(2, '0');
-
-            barDiv.appendChild(barInner);
-            barDiv.appendChild(barLabel);
-
-            // Add click handler
-            barDiv.addEventListener('click', () => {
-                if (editModal) {
-                    // Check if entry exists
-                    const existingValue = scheduleMap[key];
-                    // If existingValue is undefined, we pass key as the 3rd argument (prefillKey)
-                    // and null as the 1st argument (key) to indicate "Add Mode"
-                    if (existingValue !== undefined) {
-                        editModal.open(key, existingValue);
-                    } else {
-                        editModal.open(null, null, key);
-                    }
-                }
-            });
-
-            container.appendChild(barDiv);
-        }
-    };
-
-    // Render both rows
-    renderBarRow(todayHourMap, todayDate, todayContainer, true);
-    renderBarRow(tomorrowHourMap, tomorrowDate, tomorrowContainer, false);
-}
 
 async function refreshData() {
     try {
@@ -424,39 +193,34 @@ async function refreshData() {
 
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
-            renderEntries(todayData.entries);
-            renderToday(todayData.resolved, todayData.currentHour, currentTime);
+            if (typeof renderEntries === 'function') {
+                renderEntries(todayData.entries);
+            }
+            if (typeof renderToday === 'function') {
+                renderToday(todayData.resolved, todayData.currentHour, currentTime);
+            }
             renderMiniTimeline(todayData.resolved, currentTime);
-            document.getElementById('status-bar').innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+            const statusBar = document.getElementById('status-bar');
+            if (statusBar) {
+                statusBar.innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+            }
 
             // Render bar graph with both today and tomorrow data
-            if (todayData.success && tomorrowData.success) {
+            if (todayData.success && tomorrowData.success && typeof renderBarGraph === 'function') {
                 renderBarGraph(
                     todayData.resolved || [],
                     tomorrowData.resolved || [],
                     currentTime,
                     today,
                     tomorrow,
-                    todayData.entries || []
+                    todayData.entries || [],
+                    editModal
                 );
-
-                // Auto-scroll to current time (center it)
-                setTimeout(() => {
-                    const currentBar = document.querySelector('.bar-graph-bar.bar-current');
-                    const container = document.querySelector('.bar-graph-container');
-                    if (currentBar && container) {
-                        const containerWidth = container.clientWidth;
-                        const barLeft = currentBar.offsetLeft;
-                        const barWidth = currentBar.clientWidth;
-
-                        // Calculate scroll position to center the bar
-                        const scrollPos = barLeft - (containerWidth / 2) + (barWidth / 2);
-                        container.scrollTo({
-                            left: scrollPos,
-                            behavior: 'smooth'
-                        });
-                    }
-                }, 100);
+            }
+            
+            // Fetch and render price data
+            if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
+                fetchAndRenderPrices(PRICE_API_URL);
             }
         }
     } catch (e) {
@@ -476,18 +240,4 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshData();
 });
 
-// Automation entries toggle functionality
-window.toggleAutomationEntries = function () {
-    const entriesWrapper = document.getElementById('automation-entries-wrapper');
-    const entriesList = document.getElementById('automation-entries-list');
-    if (!entriesWrapper || !entriesList) return;
-
-    if (entriesWrapper.classList.contains('expanded')) {
-        entriesWrapper.classList.remove('expanded');
-        entriesList.classList.remove('expanded');
-    } else {
-        entriesWrapper.classList.add('expanded');
-        entriesList.classList.add('expanded');
-    }
-};
 

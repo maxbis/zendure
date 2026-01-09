@@ -1,0 +1,170 @@
+/* Price Overview Bar Graph Styles */
+
+.price-graph-wrapper {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.price-graph-wrapper .card {
+    width: 100%;
+    max-width: 100%;
+}
+
+.price-graph-container {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    gap: 20px;
+    scrollbar-width: thin;
+}
+
+.price-graph-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.price-graph-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.price-graph-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.price-graph-container::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
+.price-graph-day {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 0 0 auto;
+}
+
+.price-graph-day-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+    position: sticky;
+    left: 0;
+}
+
+.price-graph-row {
+    display: flex;
+    gap: 2px;
+    height: 100px;
+    width: auto;
+    padding: 8px 4px;
+    overflow: visible;
+    position: relative;
+}
+
+.price-graph-bar {
+    flex: none;
+    width: 20px;
+    min-width: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    padding: 0;
+}
+
+.price-graph-bar:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+.price-graph-bar.price-current {
+    background: rgba(255, 152, 0, 0.1);
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    z-index: 10;
+}
+
+.price-graph-bar-inner {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 3px 3px 0 0;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.price-graph-bar:hover .price-graph-bar-inner {
+    opacity: 1 !important;
+    transform: scaleY(1.1);
+}
+
+.price-graph-bar-label {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.price-graph-bar.price-current .price-graph-bar-label {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+/* Price bar colors - gradient from green (low) to red (high) */
+.price-graph-bar-inner.price-null {
+    background: #757575;
+}
+
+/* Tooltip for price graph bars */
+.price-graph-bar[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+    pointer-events: none;
+}
+
+.price-graph-bar[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+    margin-bottom: -4px;
+    pointer-events: none;
+}
+
+/* Responsive design for price graph */
+@media (max-width: 768px) {
+    .price-graph-row {
+        height: 150px;
+        gap: 1px;
+    }
+
+    .price-graph-bar-label {
+        font-size: 0.6rem;
+    }
+
+    .price-graph-bar-inner {
+        min-height: 6px;
+    }
+}

@@ -1,0 +1,209 @@
+/* Automation Status Styles */
+
+/* Automation Status - Full Width */
+.automation-status-wrapper {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.automation-status-wrapper .card {
+    width: 100%;
+    max-width: 100%;
+}
+
+.automation-status-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.automation-last-update {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+}
+
+.automation-timestamp-full {
+    color: #999;
+    font-size: 0.85rem;
+    margin-left: 5px;
+}
+
+.automation-status-error {
+    padding: 20px;
+    background: #fee;
+    border-left: 4px solid #f00;
+    border-radius: 4px;
+    color: #c00;
+    text-align: center;
+}
+
+.automation-status-empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.automation-entries-wrapper {
+    position: relative;
+}
+
+.automation-entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.automation-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s ease;
+}
+
+.automation-entry-collapsed {
+    display: none !important;
+}
+
+.automation-entries-list.expanded .automation-entry-collapsed {
+    display: flex !important;
+}
+
+.automation-entry:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    border-color: #64b5f6;
+}
+
+.automation-entry-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    min-width: 70px;
+    text-align: center;
+}
+
+.automation-badge-start {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+
+.automation-badge-stop {
+    background: #ffcdd2;
+    color: #c62828;
+}
+
+.automation-badge-change {
+    background: #bbdefb;
+    color: #1565c0;
+}
+
+.automation-badge-heartbeat {
+    background: #e0e0e0;
+    color: #616161;
+}
+
+.automation-badge-unknown {
+    background: #f5f5f5;
+    color: #757575;
+}
+
+.automation-entry-time {
+    font-size: 0.85rem;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    flex-shrink: 0;
+    min-width: 120px;
+}
+
+.automation-entry-timestamp-full {
+    color: #999;
+    font-size: 0.75rem;
+    margin-left: 5px;
+    font-family: 'Courier New', monospace;
+}
+
+.automation-entry-details {
+    flex: 1;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.automation-entry-first {
+    position: relative;
+}
+
+.automation-entry-expand-icon {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #666;
+    transition: transform 0.3s ease;
+    padding-left: 12px;
+}
+
+.automation-entries-wrapper.expanded .automation-entry-expand-icon {
+    transform: rotate(180deg);
+}
+
+.automation-toggle-button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 15px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.automation-toggle-button:hover {
+    background: #eeeeee;
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+.automation-toggle-text {
+    font-weight: 500;
+}
+
+.automation-toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+}
+
+.automation-entries-wrapper.expanded .automation-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Responsive design for automation status */
+@media (max-width: 768px) {
+    .automation-entry {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .automation-entry-badge {
+        align-self: flex-start;
+    }
+
+    .automation-entry-time {
+        min-width: auto;
+    }
+}

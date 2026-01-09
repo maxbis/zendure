@@ -1,0 +1,141 @@
+/* Schedule Panels Styles */
+
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 250px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    scrollbar-width: thin;
+}
+
+.schedule-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.schedule-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.schedule-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.schedule-list::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+}
+
+.schedule-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.schedule-item-time {
+    min-width: 80px;
+    font-weight: 600;
+    color: #333;
+}
+
+.schedule-item-value {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-left: 16px;
+}
+
+.schedule-item-key {
+    font-size: 0.75rem;
+    color: #888;
+    font-family: monospace;
+    margin-left: 16px;
+}
+
+.time-night {
+    background-color: #e3f2fd;
+}
+
+.time-morning {
+    background-color: #fff9e6;
+}
+
+.time-afternoon {
+    background-color: #e8f5e9;
+}
+
+.time-evening {
+    background-color: #fce4ec;
+}
+
+.slot-current {
+    border: 3px solid #ff9800 !important;
+    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5), 0 2px 8px rgba(255, 152, 0, 0.3);
+    font-weight: 600;
+    position: relative;
+}
+
+/* Schedule Table Styles */
+.table-wrapper {
+    max-height:250px;
+    overflow-y: auto;
+    margin-top: 8px;
+    scrollbar-width: thin;
+}
+
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
+#schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#schedule-table th,
+#schedule-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9rem;
+}
+
+#schedule-table th {
+    background: #f0f0f0;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+/* Clickable table rows */
+#schedule-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+#schedule-table tbody tr:hover {
+    background-color: #f5f5f5;
+}

@@ -1,0 +1,27 @@
+/* Schedule Calculator Styles */
+
+/* Calculate Grid - Reuses existing card and schedule-item classes */
+.calculate-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+    width: 100%;
+    /* Firefox fix: ensure grid container isn't constrained by parent flex */
+    min-width: 0;
+    /* Ensure grid items can shrink properly */
+    grid-auto-flow: row;
+}
+
+/* Fallback for smaller screens - use auto-fit for responsive behavior */
+@media (max-width: 1000px) {
+    .calculate-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .calculate-grid {
+        grid-template-columns: 1fr;
+    }
+}
