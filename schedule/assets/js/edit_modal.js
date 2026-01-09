@@ -87,27 +87,35 @@ class EditModal {
         }
     }
 
-    open(key = null, value = null) {
+    open(key = null, value = null, prefillKey = null) {
         this.currentOriginalKey = key;
         const isAdd = (key === null);
         document.getElementById('modal-title').innerText = isAdd ? 'Add Schedule Entry' : 'Edit Schedule Entry';
         document.getElementById('btn-delete').style.display = isAdd ? 'none' : 'block';
 
         if (isAdd) {
-            // Calculate next full hour
-            const now = new Date();
-            const nextHour = new Date(now);
-            nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+            let dateStr, timeStr;
             
-            // Format date as YYYYMMDD
-            const year = nextHour.getFullYear();
-            const month = String(nextHour.getMonth() + 1).padStart(2, '0');
-            const day = String(nextHour.getDate()).padStart(2, '0');
-            const dateStr = `${year}${month}${day}`;
-            
-            // Format time as HHmm
-            const hours = String(nextHour.getHours()).padStart(2, '0');
-            const timeStr = `${hours}00`;
+            if (prefillKey) {
+                // Use the provided prefill key (YYYYMMDDHHmm)
+                dateStr = prefillKey.substring(0, 8);
+                timeStr = prefillKey.substring(8, 12);
+            } else {
+                // Calculation for default next full hour
+                const now = new Date();
+                const nextHour = new Date(now);
+                nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+                
+                // Format date as YYYYMMDD
+                const year = nextHour.getFullYear();
+                const month = String(nextHour.getMonth() + 1).padStart(2, '0');
+                const day = String(nextHour.getDate()).padStart(2, '0');
+                dateStr = `${year}${month}${day}`;
+                
+                // Format time as HHmm
+                const hours = String(nextHour.getHours()).padStart(2, '0');
+                timeStr = `${hours}00`;
+            }
             
             document.getElementById('inp-date').value = dateStr;
             document.getElementById('inp-time').value = timeStr;

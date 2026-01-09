@@ -41,7 +41,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Charge Schedule Manager</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <link rel="stylesheet" href="assets/css/charge_schedule.css">
 </head>
 
@@ -65,13 +66,17 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                     {
                         return ($h >= 22 || $h < 6) ? 'time-night' : (($h < 12) ? 'time-morning' : (($h < 18) ? 'time-afternoon' : 'time-evening'));
                     }
-                    
+
                     function getValueLabel($val)
                     {
-                        if ($val === null) return '-';
-                        if ($val === 'netzero') return 'Net Zero';
-                        if ($val === 'netzero+') return 'Solar Charge';
-                        if (is_numeric($val)) return ($val > 0 ? '+' : '') . intval($val) . ' W';
+                        if ($val === null)
+                            return '-';
+                        if ($val === 'netzero')
+                            return 'Net Zero';
+                        if ($val === 'netzero+')
+                            return 'Solar Charge';
+                        if (is_numeric($val))
+                            return ($val > 0 ? '+' : '') . intval($val) . ' W';
                         return $val . ' W';
                     }
                     $prevVal = null;
@@ -86,7 +91,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                         $prevVal = $val;
                         $displayedSlots[] = $slot;
                     }
-                    
+
                     // Find the current active entry from displayed slots (closest to current time but not larger)
                     $currentActiveTime = null;
                     foreach ($displayedSlots as $slot) {
@@ -97,7 +102,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                             }
                         }
                     }
-                    
+
                     // Second pass: render the displayed slots
                     foreach ($displayedSlots as $slot):
                         $val = $slot['value'];
@@ -108,8 +113,10 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
                         $valDisplay = getValueLabel($val);
                         $catClass = 'neutral';
-                        if ($val === 'netzero' || $val === 'netzero+') {
+                        if ($val === 'netzero') {
                             $catClass = 'netzero';
+                        } elseif ($val === 'netzero+') {
+                            $catClass = 'netzero-plus';
                         } elseif (is_numeric($val)) {
                             $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
                         }
@@ -156,7 +163,14 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                                 $idx++;
                                 $isWild = strpos($k, '*') !== false;
                                 $displayVal = getValueLabel($v);
-                                $valClass = ($v === 'netzero' || $v === 'netzero+') ? 'netzero' : ($v > 0 ? 'charge' : ($v < 0 ? 'discharge' : 'neutral'));
+                                $valClass = 'neutral';
+                                if ($v === 'netzero') {
+                                    $valClass = 'netzero';
+                                } elseif ($v === 'netzero+') {
+                                    $valClass = 'netzero-plus';
+                                } elseif (is_numeric($v)) {
+                                    $valClass = ($v > 0) ? 'charge' : (($v < 0) ? 'discharge' : 'neutral');
+                                }
                                 ?>
                                 <tr data-key="<?php echo htmlspecialchars($k); ?>"
                                     data-value="<?php echo htmlspecialchars($v); ?>">
@@ -187,7 +201,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                         <div class="bar-graph-row" id="bar-graph-today"></div>
                     </div>
                     <div class="bar-graph-day">
-                        <div class="bar-graph-day-label">Tomorrow (<?php echo htmlspecialchars(date('Ymd', strtotime('+1 day'))); ?>)</div>
+                        <div class="bar-graph-day-label">Tomorrow
+                            (<?php echo htmlspecialchars(date('Ymd', strtotime('+1 day'))); ?>)</div>
                         <div class="bar-graph-row" id="bar-graph-tomorrow"></div>
                     </div>
                 </div>
@@ -208,7 +223,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         </script>
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
-        
+
     </div>
 
 </body>
