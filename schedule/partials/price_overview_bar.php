@@ -1,22 +1,18 @@
 <!-- Price Overview Bar Graph Section - Full Width -->
 <div class="price-graph-wrapper" style="margin-top: 20px;">
-    <div class="card">
-        <h2>Price Overview</h2>
-        <div class="price-graph-container">
-            <div class="price-graph-day">
-                <div class="price-graph-day-label">Today (<?php echo htmlspecialchars($today); ?>)</div>
-                <div class="price-graph-row" id="price-graph-today"></div>
-            </div>
-            <?php 
-            $currentHourInt = (int)date('H');
-            if ($currentHourInt >= 15): 
-            ?>
-            <div class="price-graph-day">
-                <div class="price-graph-day-label">Tomorrow
-                    (<?php echo htmlspecialchars(date('Ymd', strtotime('+1 day'))); ?>)</div>
-                <div class="price-graph-row" id="price-graph-tomorrow"></div>
-            </div>
-            <?php endif; ?>
+    <div class="price-graph-layout">
+        <div class="card">
+            <h2>Today (<?php echo htmlspecialchars($today); ?>)</h2>
+            <div class="price-graph-row" id="price-graph-today"></div>
         </div>
+        <?php 
+        $currentHourInt = (int)date('H');
+        if ($currentHourInt >= 15): 
+        ?>
+        <div class="card">
+            <h2>Tomorrow (<?php echo htmlspecialchars(date('Ymd', strtotime('+1 day'))); ?>)</h2>
+            <div class="price-graph-row" id="price-graph-tomorrow"></div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>

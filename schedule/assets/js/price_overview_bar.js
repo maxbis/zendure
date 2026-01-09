@@ -83,14 +83,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     
     // Handle tomorrow container visibility
     if (tomorrowContainer) {
-        const tomorrowDayElement = tomorrowContainer.closest('.price-graph-day');
+        const tomorrowCard = tomorrowContainer.closest('.card');
         if (currentHour < 15) {
-            if (tomorrowDayElement) {
-                tomorrowDayElement.style.display = 'none';
+            if (tomorrowCard) {
+                tomorrowCard.style.display = 'none';
             }
         } else {
-            if (tomorrowDayElement) {
-                tomorrowDayElement.style.display = 'flex';
+            if (tomorrowCard) {
+                tomorrowCard.style.display = '';
             }
         }
     }

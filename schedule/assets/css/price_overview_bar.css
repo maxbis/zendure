@@ -5,52 +5,21 @@
     margin-top: 20px;
 }
 
+.price-graph-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 900px) {
+    .price-graph-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 .price-graph-wrapper .card {
     width: 100%;
     max-width: 100%;
-}
-
-.price-graph-container {
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 10px;
-    gap: 20px;
-    scrollbar-width: thin;
-}
-
-.price-graph-container::-webkit-scrollbar {
-    height: 8px;
-}
-
-.price-graph-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.price-graph-container::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-}
-
-.price-graph-container::-webkit-scrollbar-thumb:hover {
-    background: #bbb;
-}
-
-.price-graph-day {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 0 0 auto;
-}
-
-.price-graph-day-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-    position: sticky;
-    left: 0;
 }
 
 .price-graph-row {
