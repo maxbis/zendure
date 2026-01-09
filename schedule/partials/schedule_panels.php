@@ -26,9 +26,9 @@ function getValueLabel($val)
 <div class="layout">
     <!-- Left Panel: Today's Schedule -->
     <div class="card">
-        <h2>Today's Schedule (<?php echo htmlspecialchars($today); ?>)</h2>
+        <h2>Today's Schedule</h2>
         <div class="helper-text" style="margin-bottom: 10px;">
-            Showing value changes only. Highlight = Current Hour.
+        <?php echo htmlspecialchars($today); ?>
         </div>
         <div class="schedule-list" id="today-schedule-grid">
             <?php
@@ -104,7 +104,6 @@ function getValueLabel($val)
                         <th style="width: 40px;">#</th>
                         <th>Key</th>
                         <th>Value</th>
-                        <th>Type</th>
                     </tr>
                 </thead>
                 <tbody>

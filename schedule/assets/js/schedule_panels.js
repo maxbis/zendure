@@ -127,12 +127,12 @@ function renderEntries(entries) {
         const isWild = keyStr.includes('*');
         let displayVal = getValueLabel(entry.value);
         let valClass = (entry.value === 'netzero') ? 'netzero' : (entry.value === 'netzero+' ? 'netzero-plus' : (entry.value > 0 ? 'charge' : (entry.value < 0 ? 'discharge' : 'neutral')));
+        const keyBgColor = isWild ? '#fff9c4' : '#e8f5e9'; // Light yellow for wildcard, light green for exact
 
         tr.innerHTML = `
             <td style="color:#888;">${idx + 1}</td>
-            <td style="font-family:monospace;">${keyStr}</td>
+            <td style="font-family:monospace; background-color:${keyBgColor};">${keyStr}</td>
             <td class="${valClass}" style="font-weight:500;">${displayVal}</td>
-            <td><span class="badge ${isWild ? 'badge-wildcard' : 'badge-exact'}">${isWild ? 'Wildcard' : 'Exact'}</span></td>
         `;
         tbody.appendChild(tr);
     });
