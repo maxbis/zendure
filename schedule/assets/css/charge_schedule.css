@@ -29,9 +29,21 @@ body {
     margin-bottom: 8px;
 }
 
+.title-mobile {
+    display: none;
+}
+
 @media (max-width: 900px) {
     .header h1 {
         font-size: 1.8rem;
+    }
+    
+    .title-desktop {
+        display: none;
+    }
+    
+    .title-mobile {
+        display: inline;
     }
 }
 
