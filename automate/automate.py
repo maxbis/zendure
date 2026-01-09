@@ -12,6 +12,9 @@ import json
 import requests
 import sys
 import select
+import platform
+import threading
+import queue
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -289,9 +292,40 @@ def handle_command(command: str, controller: AutomateController,
     
     return True
 
+# Global input queue for cross-platform input handling
+_input_queue = queue.Queue()
+_input_thread = None
+_input_thread_running = False
+
+def _input_thread_worker():
+    """Worker thread that reads from stdin and puts lines into the queue."""
+    global _input_thread_running
+    try:
+        while _input_thread_running:
+            try:
+                line = sys.stdin.readline()
+                if line:
+                    _input_queue.put(line.strip())
+                else:
+                    # EOF reached
+                    break
+            except (EOFError, OSError):
+                break
+    except Exception:
+        pass
+
+def _start_input_thread():
+    """Start the input reading thread (for Windows compatibility)."""
+    global _input_thread, _input_thread_running
+    if _input_thread is None or not _input_thread.is_alive():
+        _input_thread_running = True
+        _input_thread = threading.Thread(target=_input_thread_worker, daemon=True)
+        _input_thread.start()
+
 def check_for_input(timeout: float = 0.1) -> Optional[str]:
     """
     Check if input is available on stdin (non-blocking).
+    Cross-platform implementation that works on both Windows and Unix.
     
     Args:
         timeout: Timeout in seconds (default 0.1)
@@ -299,12 +333,25 @@ def check_for_input(timeout: float = 0.1) -> Optional[str]:
     Returns:
         Input string if available, None otherwise
     """
-    if select.select([sys.stdin], [], [], timeout)[0]:
+    # On Windows, use threading approach since select doesn't work with stdin
+    if platform.system() == 'Windows':
+        # Start input thread if not already running
+        if _input_thread is None or not _input_thread.is_alive():
+            _start_input_thread()
+        
+        # Check if there's input in the queue (non-blocking)
         try:
-            return sys.stdin.readline().strip()
-        except (EOFError, OSError):
+            return _input_queue.get_nowait()
+        except queue.Empty:
             return None
-    return None
+    else:
+        # Unix/Linux: use select (original approach)
+        if select.select([sys.stdin], [], [], timeout)[0]:
+            try:
+                return sys.stdin.readline().strip()
+            except (EOFError, OSError):
+                return None
+        return None
 
 
 # ============================================================================
@@ -435,7 +482,7 @@ def main():
                 result = controller.set_power(desired_power)
                 if result.success:
                     resulting_power = result.power
-                    log_info(f"Power set to: {resulting_power} (desired: {desired_power})")
+                    log_info(f"Power: {resulting_power} (desired: {desired_power})")
                     post_status_update(status_api_url, 'change', old_value, resulting_power)
                 else:
                     log_error(f"Failed to set power: {result.error}")
@@ -474,6 +521,11 @@ def main():
     
     # Handle graceful shutdown from signal
     if shutdown_flag[0]:
+        # Stop input thread on Windows
+        global _input_thread_running
+        if platform.system() == 'Windows' and _input_thread_running:
+            _input_thread_running = False
+        
         log_info("👋 Shutting down gracefully...")
         log_info("   Setting power to 0 before shutdown...")
         result = controller.set_power(0)

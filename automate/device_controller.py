@@ -21,7 +21,7 @@ import requests
 # GLOBAL CONSTANTS
 # ============================================================================
 
-TEST_MODE = True  # Global test mode flag - if True, operations are simulated but not applied
+TEST_MODE = False  # Global test mode flag - if True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
 
@@ -499,7 +499,7 @@ class AutomateController(BaseDeviceController):
         
         # Check if the new power value is the same as the previous one
         if self.previous_power is not None and power_feed == self.previous_power:
-            self.log('debug', f"Power value unchanged ({power_feed} W), skipping device update")
+            self.log('info', f"Power value unchanged ({power_feed} W), skipping device update")
             # Still accumulate since power is being maintained (operation is successful)
             self._accumulate_power_feed(power_feed)
             return (True, None)
