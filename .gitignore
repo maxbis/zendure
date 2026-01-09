@@ -40,6 +40,7 @@ desktop.ini
 /zendure/config/*.json
 /config/*
 config.json
+config/config.json
 /run_schedule/config/*.json
 /data/automation_status.json
 run_schedule/data/zendure_data.json
