@@ -319,22 +319,22 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
                 
                 <table style="width: 100%; margin-top: 12px; border-collapse: collapse;">
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
                             echo $calculateTodaySums['total'] > 0 ? 'charge' : ($calculateTodaySums['total'] < 0 ? 'discharge' : 'neutral'); 
                         ?>">
                             <?php echo number_format($calculateTodaySums['total'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
                             <?php echo number_format($calculateTodaySums['positive'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
                             <?php echo number_format($calculateTodaySums['negative'], 0); ?> Wh
                         </td>
                     </tr>
@@ -348,22 +348,22 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
                 
                 <table style="width: 100%; margin-top: 12px; border-collapse: collapse;">
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
                             echo $calculateTodayFromNowSums['total'] > 0 ? 'charge' : ($calculateTodayFromNowSums['total'] < 0 ? 'discharge' : 'neutral'); 
                         ?>">
                             <?php echo number_format($calculateTodayFromNowSums['total'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
                             <?php echo number_format($calculateTodayFromNowSums['positive'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
                             <?php echo number_format($calculateTodayFromNowSums['negative'], 0); ?> Wh
                         </td>
                     </tr>
@@ -377,22 +377,22 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
                 
                 <table style="width: 100%; margin-top: 12px; border-collapse: collapse;">
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Total Sum:</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="<?php 
                             echo $calculateTomorrowSums['total'] > 0 ? 'charge' : ($calculateTomorrowSums['total'] < 0 ? 'discharge' : 'neutral'); 
                         ?>">
                             <?php echo number_format($calculateTomorrowSums['total'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Charge (Positive):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="charge">
                             <?php echo number_format($calculateTomorrowSums['positive'], 0); ?> Wh
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
-                        <td style="padding: 8px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
+                        <td style="padding: 3px 0; font-weight: 500; color: #555; text-align: left;">Discharge (Negative):</td>
+                        <td style="padding: 3px 0; font-weight: 600; font-size: 1.1rem; text-align: right;" class="discharge">
                             <?php echo number_format($calculateTomorrowSums['negative'], 0); ?> Wh
                         </td>
                     </tr>
