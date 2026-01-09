@@ -35,7 +35,8 @@ body {
 
 @media (max-width: 900px) {
     .header h1 {
-        font-size: 1.8rem;
+        font-size: 1.7rem;
+        margin-bottom: 0px;
     }
     
     .title-desktop {
