@@ -29,6 +29,12 @@ body {
     margin-bottom: 8px;
 }
 
+@media (max-width: 900px) {
+    .header h1 {
+        font-size: 1.8rem;
+    }
+}
+
 .header p {
     color: #666;
     font-size: 1rem;
