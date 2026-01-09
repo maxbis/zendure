@@ -79,13 +79,13 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Price Overview Bar Graph Section - Full Width -->
         <?php include __DIR__ . '/partials/price_overview_bar.php'; ?>
 
+        <!-- Schedule Calculator Section -->
+        <?php include __DIR__ . '/partials/calculate.php'; ?>
+
         <!-- Automation Status Section - Full Width -->
         <div class="automation-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
-
-        <!-- Schedule Calculator Section -->
-        <?php include __DIR__ . '/partials/calculate.php'; ?>
 
         <script>
             // Inject API URL from PHP config

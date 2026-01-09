@@ -43,46 +43,43 @@ try {
             'currentHour' => date('H') . '00',
             'currentTime' => date('Hi') // Current time in HHmm format (e.g., "0930")
         ];
-    } elseif ($method === 'POST') {
+    } elseif ($method === 'PUT' || $method === 'POST') {
+        // PUT handles both add and edit operations
+        // POST is a wrapper that redirects to PUT logic for backward compatibility
         $input = json_decode(file_get_contents('php://input'), true);
+        
+        // Validate required fields
         if (!isset($input['key']) || !isset($input['value'])) {
             throw new Exception("Missing key or value");
         }
+        
         $key = (string) $input['key'];
         $val = $input['value'];
+        
+        // originalKey is optional - only needed when editing and changing the key
+        $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
 
-        if (strlen($key) !== 12)
+        // Validate key format
+        if (strlen($key) !== 12) {
             throw new Exception("Key must be 12 characters");
-        if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val))
-            throw new Exception("Invalid value");
-        if (is_numeric($val))
-            $val = (int) $val;
-
-        $schedule[$key] = $val;
-        if (writeScheduleAtomic($dataFile, $schedule)) {
-            $response = ['success' => true];
-        } else {
-            throw new Exception("Failed to write file");
         }
-    } elseif ($method === 'PUT') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (!isset($input['originalKey']) || !isset($input['key']) || !isset($input['value'])) {
-            throw new Exception("Missing parameters");
-        }
-        $orig = (string) $input['originalKey'];
-        $key = (string) $input['key'];
-        $val = $input['value'];
-
-        if (strlen($key) !== 12)
-            throw new Exception("Key must be 12 characters");
-        if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val))
+        
+        // Validate value
+        if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
             throw new Exception("Invalid value");
-        if (is_numeric($val))
+        }
+        
+        // Convert numeric value to int
+        if (is_numeric($val)) {
             $val = (int) $val;
+        }
 
-        if ($orig !== $key) {
+        // If originalKey is provided and different from new key, remove the old entry
+        if ($orig !== null && $orig !== $key) {
             unset($schedule[$orig]);
         }
+        
+        // Set the new entry (or update existing one)
         $schedule[$key] = $val;
 
         if (writeScheduleAtomic($dataFile, $schedule)) {

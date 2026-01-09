@@ -19,9 +19,7 @@ class EditModal {
         document.getElementById('add-entry-btn').onclick = () => this.open();
         document.getElementById('modal-close').onclick = () => this.close();
         document.getElementById('btn-cancel').onclick = () => this.close();
-        document.getElementById('edit-modal').onclick = (e) => {
-            if (e.target === this.modal) this.close();
-        };
+        // Removed backdrop click to close - dialog only closes via explicit buttons
 
         // Mode toggle
         document.querySelectorAll('input[name="val-mode"]').forEach(r => {
@@ -47,10 +45,14 @@ class EditModal {
             if (e.target === this.confirmDialog) this.closeConfirmDialog(false);
         };
 
-        // Close confirmation dialog on Escape key
+        // Close dialogs on Escape key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.confirmDialog.classList.contains('active')) {
-                this.closeConfirmDialog(false);
+            if (e.key === 'Escape') {
+                if (this.confirmDialog.classList.contains('active')) {
+                    this.closeConfirmDialog(false);
+                } else if (this.modal.classList.contains('active')) {
+                    this.close();
+                }
             }
         });
 
@@ -61,8 +63,37 @@ class EditModal {
         const dateInput = document.getElementById('inp-date');
         const timeInput = document.getElementById('inp-time');
         
-        dateInput.addEventListener('input', (e) => this.handleWildcardExpansion(e, 8));
-        timeInput.addEventListener('input', (e) => this.handleWildcardExpansion(e, 4));
+        dateInput.addEventListener('input', (e) => {
+            this.handleWildcardExpansion(e, 8);
+            // Auto-advance to time field when date is complete
+            if (dateInput.value.length === 8 && !dateInput.value.includes('*')) {
+                timeInput.focus();
+                timeInput.select();
+            }
+        });
+        dateInput.addEventListener('blur', (e) => this.handleEmptyToWildcard(e, 8));
+        timeInput.addEventListener('input', (e) => {
+            this.handleWildcardExpansion(e, 4);
+            // Auto-advance to watts field when time is complete
+            if (timeInput.value.length === 4 && !timeInput.value.includes('*')) {
+                const wattsInput = document.getElementById('inp-watts');
+                if (!wattsInput.disabled) {
+                    wattsInput.focus();
+                    wattsInput.select();
+                }
+            }
+        });
+        timeInput.addEventListener('blur', (e) => this.handleEmptyToWildcard(e, 4));
+        
+        // Enter key to save
+        this.modal.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                if (!this.confirmDialog.classList.contains('active')) {
+                    e.preventDefault();
+                    this.handleSave();
+                }
+            }
+        });
     }
 
     handleWildcardExpansion(event, maxLength) {
@@ -84,6 +115,16 @@ class EditModal {
             // Restore cursor position (adjust if it was after the asterisk)
             const newCursorPos = Math.min(cursorPos, asteriskIndex + 1);
             input.setSelectionRange(newCursorPos, newCursorPos);
+        }
+    }
+    
+    handleEmptyToWildcard(event, maxLength) {
+        const input = event.target;
+        const value = input.value.trim();
+        
+        // If date/time is empty or cleared, fill with wildcards
+        if (value === '') {
+            input.value = '*'.repeat(maxLength);
         }
     }
 
@@ -119,7 +160,7 @@ class EditModal {
             
             document.getElementById('inp-date').value = dateStr;
             document.getElementById('inp-time').value = timeStr;
-            document.getElementById('inp-watts').value = '0';
+            document.getElementById('inp-watts').value = '';
             document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
             document.getElementById('group-watts').style.display = 'block';
             document.getElementById('inp-watts').disabled = false;
@@ -141,10 +182,16 @@ class EditModal {
                 document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
                 document.getElementById('group-watts').style.display = 'block';
                 document.getElementById('inp-watts').disabled = false;
-                document.getElementById('inp-watts').value = value;
+                document.getElementById('inp-watts').value = value || '';
             }
         }
         this.modal.classList.add('active');
+        
+        // Auto-focus on first input for quicker editing
+        setTimeout(() => {
+            document.getElementById('inp-date').focus();
+            document.getElementById('inp-date').select();
+        }, 100);
     }
 
     close() {
@@ -159,9 +206,7 @@ class EditModal {
             wattsInput.setAttribute('value', '');
         } else {
             wattsInput.disabled = false;
-            if (wattsInput.value === '') {
-                wattsInput.value = '0';
-            }
+            // Leave watts empty when switching to fixed mode - user can enter value
         }
     }
 
@@ -214,8 +259,17 @@ class EditModal {
     }
 
     async handleSave() {
-        const d = document.getElementById('inp-date').value.trim();
-        const t = document.getElementById('inp-time').value.trim();
+        let d = document.getElementById('inp-date').value.trim();
+        let t = document.getElementById('inp-time').value.trim();
+        
+        // If date/time is empty, use full wildcard
+        if (d === '') {
+            d = '********';
+        }
+        if (t === '') {
+            t = '****';
+        }
+        
         if (d.length !== 8 || t.length !== 4) return alert('Invalid Date/Time pattern length');
 
         const mode = document.querySelector('input[name="val-mode"]:checked').value;
@@ -225,23 +279,29 @@ class EditModal {
         } else if (mode === 'netzero+') {
             val = 'netzero+';
         } else {
-            val = document.getElementById('inp-watts').value;
-            if (val === '') return alert('Enter watts value');
-            val = parseInt(val);
+            val = document.getElementById('inp-watts').value.trim();
+            // If watts is empty or none, use 0
+            if (val === '' || val === null || val === undefined) {
+                val = '0';
+            }
+            val = parseInt(val, 10);
+            if (isNaN(val)) {
+                return alert('Invalid watts value');
+            }
         }
 
         const key = d + t;
         const payload = { key, value: val };
 
-        let method = 'POST';
+        // Use PUT for both add and edit (originalKey is optional)
+        // POST is still supported on the backend for backward compatibility
         if (this.currentOriginalKey) {
-            method = 'PUT';
             payload.originalKey = this.currentOriginalKey;
         }
 
         try {
             const res = await fetch(this.apiUrl, {
-                method: method,
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },

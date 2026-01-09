@@ -245,10 +245,12 @@ try {
             }
             
             // Check if this is a single entry object (format: {"key": "...", "value": ...})
+            // POST with single entry redirects to PUT logic for backward compatibility
             if (count($input) === 2 && isset($input['key']) && isset($input['value'])) {
-                // Single entry format - add to existing schedule (like charge_schedule_api.php does)
+                // Single entry format - use PUT logic (originalKey is optional)
                 $key = (string) $input['key'];
                 $val = $input['value'];
+                $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
                 
                 // Validate key length
                 if (strlen($key) !== 12) {
@@ -279,14 +281,19 @@ try {
                 }
                 $schedule = $normalizedSchedule;
                 
-                // Add the new entry
+                // If originalKey is provided and different from new key, remove the old entry
+                if ($orig !== null && $orig !== $key) {
+                    unset($schedule[$orig]);
+                }
+                
+                // Add or update the entry
                 $schedule[$key] = $val;
                 
                 // Write updated schedule
                 if (writeDataFileAtomic($filePath, $schedule)) {
                     $response = [
                         'success' => true,
-                        'message' => 'Schedule entry added successfully',
+                        'message' => 'Schedule entry saved successfully',
                         'file' => basename($filePath)
                     ];
                 } else {
@@ -350,11 +357,13 @@ try {
                 throw new Exception("Invalid JSON in request body: " . json_last_error_msg());
             }
             
-            if (!isset($input['originalKey']) || !isset($input['key']) || !isset($input['value'])) {
-                throw new Exception("Missing parameters. Required: originalKey, key, value");
+            // Validate required fields
+            if (!isset($input['key']) || !isset($input['value'])) {
+                throw new Exception("Missing parameters. Required: key, value");
             }
             
-            $orig = (string) $input['originalKey'];
+            // originalKey is optional - only needed when editing and changing the key
+            $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
             $key = (string) $input['key'];
             $val = $input['value'];
             
@@ -395,19 +404,19 @@ try {
             }
             $schedule = $normalizedSchedule;
             
-            // Update schedule: remove original key if different from new key
-            if ($orig !== $key) {
+            // If originalKey is provided and different from new key, remove the old entry
+            if ($orig !== null && $orig !== $key) {
                 unset($schedule[$orig]);
             }
             
-            // Set new value
+            // Set new value (add or update)
             $schedule[$key] = $val;
             
             // Write updated schedule
             if (writeDataFileAtomic($filePath, $schedule)) {
                 $response = [
                     'success' => true,
-                    'message' => 'Schedule entry updated successfully',
+                    'message' => 'Schedule entry saved successfully',
                     'file' => basename($filePath)
                 ];
             } else {
