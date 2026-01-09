@@ -67,7 +67,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <div class="container">
         <div class="header">
             <h1><span class="title-desktop">⚡ Charge Schedule Manager</span><span class="title-mobile">⚡ Schedule</span></h1>
-            <p id="current-time"><?php echo date('Y-m-d H:i:s'); ?></p>
+            <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p>
         </div>
 
         <!-- Schedule Panels: Today's Schedule and Schedule Entries -->
