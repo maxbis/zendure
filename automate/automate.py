@@ -429,7 +429,9 @@ def main():
                 desired_power = 0  # Override desired power to 0 when limits are reached
             
             # Step 5: Apply desired_power only if it differs from old_value
-            if old_value != desired_power:
+            should_apply = (old_value != desired_power) or (desired_power in ['netzero', 'netzero+'])
+            
+            if should_apply:
                 result = controller.set_power(desired_power)
                 if result.success:
                     resulting_power = result.power
