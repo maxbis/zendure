@@ -19,6 +19,15 @@ try {
     die("Configuration error: " . htmlspecialchars($e->getMessage()));
 }
 
+// Read location setting from config and normalize it
+$location = $config['location'] ?? null;
+if ($location !== null) {
+    $location = strtolower(trim($location));
+    if ($location !== 'local' && $location !== 'remote') {
+        $location = null; // Invalid value, fall back to legacy behavior
+    }
+}
+
 // Auto-detect: Try to read from device (local network) or use existing JSON (remote server)
 $updateAttempted = false;
 $updateSuccess = false;
@@ -28,14 +37,15 @@ $apiErrors = []; // Initialize error collection array
 // Include the read function
 require_once __DIR__ . '/includes/read_zendure.php';
 
-// Try to read Zendure data from device
-try {
-    $deviceIp = $config['deviceIp'] ?? null;
-    
-    if (!empty($deviceIp)) {
-        $zendureData = readZendureData($deviceIp);
+// Try to read Zendure data from device (skip if location is set to 'remote')
+if ($location !== 'remote') {
+    try {
+        $deviceIp = $config['deviceIp'] ?? null;
         
-        if ($zendureData !== false) {
+        if (!empty($deviceIp)) {
+            $zendureData = readZendureData($deviceIp);
+            
+            if ($zendureData !== false) {
             // Store data via data_api.php endpoint
             $dataApiUrl = $config['dataApiUrl'] ?? null;
             
@@ -99,15 +109,16 @@ try {
                     'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
                 ];
             }
+            }
         }
+    } catch (Exception $e) {
+        // Device not reachable or API error (likely remote server)
+        // Silently continue - will load existing JSON file below
+        $updateAttempted = true;
+    } catch (Throwable $e) {
+        // Catch any other errors
+        $updateAttempted = true;
     }
-} catch (Exception $e) {
-    // Device not reachable or API error (likely remote server)
-    // Silently continue - will load existing JSON file below
-    $updateAttempted = true;
-} catch (Throwable $e) {
-    // Catch any other errors
-    $updateAttempted = true;
 }
 
 // Ensure HTML content type is set (in case API set JSON header)
@@ -118,15 +129,16 @@ if (!headers_sent()) {
 // Include the P1 read function
 require_once __DIR__ . '/includes/read_p1.php';
 
-// Try to read P1 meter data from device
+// Try to read P1 meter data from device (skip if location is set to 'remote')
 $p1Data = null;
-try {
-    $p1MeterIp = $config['p1MeterIp'] ?? null;
-    
-    if (!empty($p1MeterIp)) {
-        $p1Data = readP1Data($p1MeterIp);
+if ($location !== 'remote') {
+    try {
+        $p1MeterIp = $config['p1MeterIp'] ?? null;
         
-        if ($p1Data !== false) {
+        if (!empty($p1MeterIp)) {
+            $p1Data = readP1Data($p1MeterIp);
+            
+            if ($p1Data !== false) {
             // Store data via data_api.php endpoint
             $dataApiUrl = $config['dataApiUrl'] ?? null;
             
@@ -187,12 +199,13 @@ try {
                     'response' => $apiResponse !== false ? substr($apiResponse, 0, 200) : 'No response'
                 ];
             }
+            }
         }
+    } catch (Exception $e) {
+        // Device not reachable - will try API GET below
+    } catch (Throwable $e) {
+        // Catch any other errors - will try API GET below
     }
-} catch (Exception $e) {
-    // Device not reachable - will try API GET below
-} catch (Throwable $e) {
-    // Catch any other errors - will try API GET below
 }
 
 // Ensure HTML content type is set (override any JSON header from API)
@@ -201,7 +214,12 @@ if (!headers_sent()) {
 }
 
 // Determine update source for display
-$updateSource = $updateSuccess ? 'local' : 'remote';
+// If location is set to 'local' but local read failed, fall back to remote
+if ($location === 'local' && !$updateSuccess) {
+    $updateSource = 'remote';
+} else {
+    $updateSource = $updateSuccess ? 'local' : 'remote';
+}
 
 $errorMessage = null;
 

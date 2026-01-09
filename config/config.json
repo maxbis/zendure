@@ -1,6 +1,7 @@
 {
   "dataDir": "./data/",
   "dataFile": null,
+  "location": "local",
   "deviceIp": "192.168.2.93",
   "deviceSn": "HOA1NAN9N385989",
   "p1MeterIp": "192.168.2.94",
