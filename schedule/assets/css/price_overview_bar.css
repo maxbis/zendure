@@ -20,6 +20,10 @@
 .price-graph-wrapper .card {
     width: 100%;
     max-width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .price-graph-row {
@@ -28,8 +32,29 @@
     height: 100px;
     width: auto;
     padding: 8px 4px;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
     position: relative;
+    scrollbar-width: thin;
+    min-width: 0;
+}
+
+.price-graph-row::-webkit-scrollbar {
+    height: 8px;
+}
+
+.price-graph-row::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.price-graph-row::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.price-graph-row::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
 }
 
 .price-graph-bar {
