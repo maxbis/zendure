@@ -621,6 +621,22 @@ th {
     }
 }
 
+/* Responsive design for mini timeline */
+@media (max-width: 768px) {
+    .mini-timeline {
+        height: 100px;
+        gap: 0.5px;
+    }
+    
+    .mini-timeline-label-hour {
+        font-size: 0.6rem;
+    }
+    
+    .mini-timeline-bar {
+        min-height: 6px;
+    }
+}
+
 /* Calculate Grid - Reuses existing card and schedule-item classes */
 .calculate-grid {
     display: grid;
@@ -644,6 +660,287 @@ th {
 @media (max-width: 900px) {
     .calculate-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Timeline Card Wrapper - Full Width */
+.timeline-card-wrapper {
+    width: 100%;
+}
+
+.timeline-card-wrapper .card {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Mini Timeline Styles */
+.mini-timeline {
+    display: flex;
+    gap: 1px;
+    align-items: flex-end;
+    height: 160px;
+    width: 100%;
+    padding: 8px 4px;
+    overflow: visible;
+}
+
+.mini-timeline-hour {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    padding: 2px;
+}
+
+.mini-timeline-hour:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+.mini-timeline-hour.timeline-current {
+    background: rgba(255, 152, 0, 0.1);
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    z-index: 10;
+}
+
+.mini-timeline-bar {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 3px 3px 0 0;
+    transition: all 0.2s ease;
+    position: relative;
+    /* Height will be set via inline style from PHP/JS */
+}
+
+.mini-timeline-bar.charge {
+    background: #4caf50;
+}
+
+.mini-timeline-bar.discharge {
+    background: #f44336;
+}
+
+.mini-timeline-bar.neutral {
+    background: #9e9e9e;
+}
+
+.mini-timeline-bar.netzero {
+    background: #2196f3;
+}
+
+.mini-timeline-hour:hover .mini-timeline-bar {
+    opacity: 1 !important;
+    transform: scaleY(1.1);
+}
+
+.mini-timeline-label-hour {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.mini-timeline-hour.timeline-current .mini-timeline-label-hour {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+/* Tooltip for timeline hours */
+.mini-timeline-hour[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+    pointer-events: none;
+}
+
+.mini-timeline-hour[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+    margin-bottom: -4px;
+    pointer-events: none;
+}
+
+/* Bar Graph Styles */
+.bar-graph-wrapper {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.bar-graph-wrapper .card {
+    width: 100%;
+    max-width: 100%;
+}
+
+.bar-graph-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    padding: 20px 0;
+}
+
+.bar-graph-day {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bar-graph-day-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.bar-graph-row {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 200px;
+    width: 100%;
+    padding: 8px 4px;
+    overflow: visible;
+    position: relative;
+}
+
+.bar-graph-bar {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    padding: 2px;
+}
+
+.bar-graph-bar:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+.bar-graph-bar.bar-current {
+    background: rgba(255, 152, 0, 0.1);
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    z-index: 10;
+}
+
+.bar-graph-bar-inner {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 3px 3px 0 0;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.bar-graph-bar:hover .bar-graph-bar-inner {
+    opacity: 1 !important;
+    transform: scaleY(1.1);
+}
+
+.bar-graph-bar-label {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.bar-graph-bar.bar-current .bar-graph-bar-label {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+/* Bar color classes matching value column colors */
+.bar-graph-bar-inner.bar-charge {
+    background: #007321;
+}
+
+.bar-graph-bar-inner.bar-discharge {
+    background: #e53935;
+}
+
+.bar-graph-bar-inner.bar-neutral {
+    background: #757575;
+}
+
+.bar-graph-bar-inner.bar-netzero {
+    background: #000090;
+}
+
+/* Tooltip for bar graph bars */
+.bar-graph-bar[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+    pointer-events: none;
+}
+
+.bar-graph-bar[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+    margin-bottom: -4px;
+    pointer-events: none;
+}
+
+/* Responsive design for bar graph */
+@media (max-width: 768px) {
+    .bar-graph-row {
+        height: 150px;
+        gap: 1px;
+    }
+    
+    .bar-graph-bar-label {
+        font-size: 0.6rem;
+    }
+    
+    .bar-graph-bar-inner {
+        min-height: 6px;
     }
 }
 

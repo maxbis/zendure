@@ -409,9 +409,11 @@ def main():
                 break
             
             # Read P1 meter and accumulate (every iteration)
+            # Read with update_json=True since we may use it for netzero calculation too
+            p1_data = None
             try:
                 reader = DeviceDataReader(config_path=controller.config_path)
-                p1_data = reader.read_p1_meter(update_json=False)  # Don't double-store
+                p1_data = reader.read_p1_meter(update_json=True)
                 if p1_data and p1_data.get("total_power") is not None:
                     controller.accumulator.accumulate_p1_reading(p1_data["total_power"])
             except Exception as e:
@@ -488,11 +490,11 @@ def main():
             should_apply = (old_value != desired_power) or (desired_power in ['netzero', 'netzero+'])
             
             if should_apply:
-                result = controller.set_power(desired_power)
+                # Pass p1_data to set_power to avoid reading P1 meter again for netzero calculations
+                result = controller.set_power(desired_power, p1_data=p1_data)
                 if result.success:
-                    resulting_power = result.power
-                    log_info(f"Power: {resulting_power} (desired: {desired_power})")
-                    post_status_update(status_api_url, 'change', old_value, resulting_power)
+                    log_info(f"Power: {result.power} (desired: {desired_power})")
+                    post_status_update(status_api_url, 'change', old_value, result.power)
                 else:
                     log_error(f"Failed to set power: {result.error}")
             else:

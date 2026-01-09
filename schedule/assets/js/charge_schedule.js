@@ -106,6 +106,114 @@ function renderToday(resolved, currentHour, currentTime) {
     });
 }
 
+function renderMiniTimeline(resolved, currentTime) {
+    const timeline = document.getElementById('mini-timeline');
+    if (!timeline) return;
+    
+    timeline.innerHTML = '';
+    
+    // Build a map of all hours with their values
+    const hourValues = {};
+    let lastValue = null;
+    resolved.forEach(slot => {
+        const hour = parseInt(String(slot.time).substring(0, 2));
+        const value = slot.value;
+        if (value !== null) {
+            lastValue = value;
+        }
+        hourValues[hour] = lastValue;
+    });
+    
+    // Get current hour
+    const now = new Date();
+    const currentHourInt = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInt = currentHourInt * 100 + (currentMinute >= 30 ? 30 : 0);
+    
+    // Find current active value
+    let currentActiveValue = null;
+    let currentActiveTime = null;
+    resolved.forEach(slot => {
+        const time = parseInt(String(slot.time));
+        if (time <= currentTimeInt) {
+            if (currentActiveTime === null || time > currentActiveTime) {
+                currentActiveTime = time;
+                currentActiveValue = slot.value;
+            }
+        }
+    });
+    
+    // Render all 24 hours
+    for (let h = 0; h < 24; h++) {
+        const hourTime = String(h).padStart(2, '0') + '00';
+        const value = hourValues[h] !== undefined ? hourValues[h] : null;
+        const isCurrentHour = (h === currentHourInt);
+        
+        const valDisplay = getValueLabel(value);
+        let catClass = 'neutral';
+        if (value === 'netzero' || value === 'netzero+') {
+            catClass = 'netzero';
+        } else if (typeof value === 'number') {
+            catClass = (value > 0) ? 'charge' : ((value < 0) ? 'discharge' : 'neutral');
+        }
+        
+        // Determine bar height/intensity based on value - very pronounced differences
+        let barHeight = '10%';
+        let barOpacity = 0.6;
+        if (typeof value === 'number') {
+            const absValue = Math.abs(value);
+            if (absValue > 0) {
+                // Very aggressive scaling: 10% base + (value/3) up to 100%
+                // Examples: 100W = 43%, 200W = 77%, 300W = 100%
+                barHeight = Math.min(100, 10 + (absValue / 3)) + '%';
+                barOpacity = Math.min(1.0, 0.6 + (absValue / 400));
+            }
+        } else if (value === 'netzero' || value === 'netzero+') {
+            barHeight = '80%';
+            barOpacity = 0.9;
+        }
+        
+        const hourDiv = document.createElement('div');
+        hourDiv.className = `mini-timeline-hour ${isCurrentHour ? 'timeline-current' : ''}`;
+        hourDiv.dataset.hour = h;
+        hourDiv.dataset.time = hourTime;
+        hourDiv.title = `${String(h).padStart(2, '0')}:00 - ${valDisplay}`;
+        
+        const barDiv = document.createElement('div');
+        barDiv.className = `mini-timeline-bar ${catClass}`;
+        barDiv.style.height = barHeight;
+        barDiv.style.opacity = barOpacity;
+        barDiv.setAttribute('data-height', barHeight);
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'mini-timeline-label-hour';
+        labelDiv.textContent = String(h).padStart(2, '0');
+        
+        hourDiv.appendChild(barDiv);
+        hourDiv.appendChild(labelDiv);
+        
+        // Add click handler to scroll to corresponding schedule item
+        hourDiv.addEventListener('click', () => {
+            // Find the schedule item that matches this hour
+            const scheduleItems = document.querySelectorAll('#today-schedule-grid .schedule-item');
+            scheduleItems.forEach(item => {
+                const timeText = item.querySelector('.schedule-item-time')?.textContent.trim();
+                if (timeText && timeText.startsWith(String(h).padStart(2, '0'))) {
+                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Add a temporary highlight
+                    item.style.transition = 'all 0.3s';
+                    item.style.boxShadow = '0 0 0 3px rgba(100, 181, 246, 0.5)';
+                    setTimeout(() => {
+                        item.style.boxShadow = '';
+                    }, 1000);
+                }
+            });
+        });
+        
+        timeline.appendChild(hourDiv);
+    }
+}
+
 function renderEntries(entries) {
     const tbody = document.querySelector('#schedule-table tbody');
     tbody.innerHTML = '';
@@ -134,25 +242,191 @@ function renderEntries(entries) {
     });
 }
 
+function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate, tomorrowDate, scheduleEntries) {
+    const todayContainer = document.getElementById('bar-graph-today');
+    const tomorrowContainer = document.getElementById('bar-graph-tomorrow');
+    
+    if (!todayContainer || !tomorrowContainer) return;
+    
+    // Build a map of schedule entries for quick lookup
+    const scheduleMap = {};
+    if (scheduleEntries) {
+        scheduleEntries.forEach(entry => {
+            scheduleMap[entry.key] = entry.value;
+        });
+    }
+    
+    // Build hour-value maps for today and tomorrow
+    const buildHourMap = (resolved) => {
+        const hourMap = {};
+        let lastValue = null;
+        resolved.forEach(slot => {
+            const hour = parseInt(String(slot.time).substring(0, 2));
+            const value = slot.value;
+            if (value !== null) {
+                lastValue = value;
+            }
+            hourMap[hour] = lastValue;
+        });
+        return hourMap;
+    };
+    
+    const todayHourMap = buildHourMap(todayResolved);
+    const tomorrowHourMap = buildHourMap(tomorrowResolved);
+    
+    // Calculate maximum absolute value for height scaling
+    let maxAbsValue = 0;
+    const allValues = [...todayResolved, ...tomorrowResolved].map(slot => slot.value);
+    allValues.forEach(val => {
+        if (val === 'netzero' || val === 'netzero+') {
+            maxAbsValue = Math.max(maxAbsValue, 250);
+        } else if (typeof val === 'number') {
+            maxAbsValue = Math.max(maxAbsValue, Math.abs(val));
+        }
+    });
+    // Ensure minimum max value for proper scaling
+    if (maxAbsValue === 0) maxAbsValue = 250;
+    
+    // Get current date and hour
+    const now = new Date();
+    const currentDate = now.getFullYear().toString() + 
+                       String(now.getMonth() + 1).padStart(2, '0') + 
+                       String(now.getDate()).padStart(2, '0');
+    const currentHour = now.getHours();
+    
+    // Helper function to render a row of bars
+    const renderBarRow = (hourMap, dateStr, container, isToday) => {
+        container.innerHTML = '';
+        
+        for (let h = 0; h < 24; h++) {
+            const value = hourMap[h] !== undefined ? hourMap[h] : null;
+            const hourTime = String(h).padStart(2, '0') + '00';
+            const key = dateStr + hourTime;
+            
+            // Determine if this is the current hour
+            const isCurrentHour = isToday && (h === currentHour) && (dateStr === currentDate);
+            
+            // Determine bar color class
+            let barClass = 'bar-neutral';
+            if (value === 'netzero' || value === 'netzero+') {
+                barClass = 'bar-netzero';
+            } else if (typeof value === 'number') {
+                barClass = (value > 0) ? 'bar-charge' : ((value < 0) ? 'bar-discharge' : 'bar-neutral');
+            }
+            
+            // Calculate bar height
+            let barHeight = '4px'; // Minimum height
+            if (value === 'netzero' || value === 'netzero+') {
+                // Use 250 as proxy value
+                barHeight = Math.max(4, (250 / maxAbsValue) * 100) + '%';
+            } else if (typeof value === 'number' && value !== 0) {
+                barHeight = Math.max(4, (Math.abs(value) / maxAbsValue) * 100) + '%';
+            }
+            
+            // Get display label
+            const valDisplay = getValueLabel(value);
+            
+            // Create bar element
+            const barDiv = document.createElement('div');
+            barDiv.className = `bar-graph-bar ${isCurrentHour ? 'bar-current' : ''}`;
+            barDiv.dataset.date = dateStr;
+            barDiv.dataset.hour = h;
+            barDiv.dataset.time = hourTime;
+            barDiv.dataset.key = key;
+            barDiv.title = `${String(h).padStart(2, '0')}:00 - ${valDisplay}`;
+            
+            const barInner = document.createElement('div');
+            barInner.className = `bar-graph-bar-inner ${barClass}`;
+            barInner.style.height = barHeight;
+            
+            const barLabel = document.createElement('div');
+            barLabel.className = 'bar-graph-bar-label';
+            barLabel.textContent = String(h).padStart(2, '0');
+            
+            barDiv.appendChild(barInner);
+            barDiv.appendChild(barLabel);
+            
+            // Add click handler
+            barDiv.addEventListener('click', () => {
+                if (editModal) {
+                    // Check if entry exists
+                    const existingValue = scheduleMap[key];
+                    editModal.open(existingValue !== undefined ? key : null, existingValue);
+                }
+            });
+            
+            container.appendChild(barDiv);
+        }
+    };
+    
+    // Render both rows
+    renderBarRow(todayHourMap, todayDate, todayContainer, true);
+    renderBarRow(tomorrowHourMap, tomorrowDate, tomorrowContainer, false);
+}
+
 async function refreshData() {
     try {
-        const res = await fetch(API_URL);
-        if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
+        // Get today and tomorrow dates in YYYYMMDD format
+        const now = new Date();
+        const today = now.getFullYear().toString() + 
+                     String(now.getMonth() + 1).padStart(2, '0') + 
+                     String(now.getDate()).padStart(2, '0');
+        const tomorrowDate = new Date(now);
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        const tomorrow = tomorrowDate.getFullYear().toString() + 
+                        String(tomorrowDate.getMonth() + 1).padStart(2, '0') + 
+                        String(tomorrowDate.getDate()).padStart(2, '0');
+        
+        // Fetch today's data
+        const todayUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 'date=' + today;
+        const todayRes = await fetch(todayUrl);
+        if (!todayRes.ok) {
+            throw new Error(`HTTP error! status: ${todayRes.status}`);
         }
         
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await res.text();
+        const todayContentType = todayRes.headers.get('content-type');
+        if (!todayContentType || !todayContentType.includes('application/json')) {
+            const text = await todayRes.text();
             console.error('Non-JSON response:', text.substring(0, 200));
             throw new Error('Server returned non-JSON response. Check console for details.');
         }
         
-        const data = await res.json();
-        if (data.success) {
-            renderEntries(data.entries);
-            renderToday(data.resolved, data.currentHour, data.currentTime || data.currentHour);
-            document.getElementById('status-bar').innerHTML = `<span>${data.entries.length} entries loaded.</span>`;
+        const todayData = await todayRes.json();
+        
+        // Fetch tomorrow's data
+        const tomorrowUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 'date=' + tomorrow;
+        const tomorrowRes = await fetch(tomorrowUrl);
+        if (!tomorrowRes.ok) {
+            throw new Error(`HTTP error! status: ${tomorrowRes.status}`);
+        }
+        
+        const tomorrowContentType = tomorrowRes.headers.get('content-type');
+        if (!tomorrowContentType || !tomorrowContentType.includes('application/json')) {
+            const text = await tomorrowRes.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error('Server returned non-JSON response. Check console for details.');
+        }
+        
+        const tomorrowData = await tomorrowRes.json();
+        
+        if (todayData.success) {
+            const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
+            renderEntries(todayData.entries);
+            renderToday(todayData.resolved, todayData.currentHour, currentTime);
+            renderMiniTimeline(todayData.resolved, currentTime);
+            document.getElementById('status-bar').innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+            
+            // Render bar graph with both today and tomorrow data
+            if (todayData.success && tomorrowData.success) {
+                renderBarGraph(
+                    todayData.resolved || [],
+                    tomorrowData.resolved || [],
+                    currentTime,
+                    today,
+                    tomorrow,
+                    todayData.entries || []
+                );
+            }
         }
     } catch (e) {
         console.error(e);

@@ -24,6 +24,10 @@ import requests
 TEST_MODE = False  # Global test mode flag - if True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
+MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
+MAX_CHARGE_POWER = 1200        # Maximum allowed power feed in watts
+
+
 
 
 @dataclass
@@ -653,7 +657,7 @@ class AutomateController(BaseDeviceController):
         else:
             self.limit_state = 0
     
-    def _send_power_feed(self, power_feed: int) -> Tuple[bool, Optional[str]]:
+    def _send_power_feed(self, power_feed: int) -> Tuple[bool, Optional[str], int]:
         """
         Send power_feed value to Zendure device via /properties/write endpoint.
         
@@ -661,8 +665,11 @@ class AutomateController(BaseDeviceController):
             power_feed: Power feed value in watts (positive for charge, negative for discharge, 0 to stop)
         
         Returns:
-            tuple: (success: bool, error_message: str or None)
+            tuple: (success: bool, error_message: str or None, actual_power: int)
+                   actual_power is the power value that was actually sent (after limiting/modifications)
         """
+        # Store original power for error cases
+        original_power = power_feed
         
         # Check battery limits before processing
         # If charging (power_feed > 0) and at MAX_CHARGE_LEVEL, prevent charge
@@ -674,13 +681,20 @@ class AutomateController(BaseDeviceController):
         if power_feed < 0 and self.limit_state == -1:
             self.log('warning', f"Battery at MIN_CHARGE_LEVEL ({MIN_CHARGE_LEVEL}%), preventing discharge")
             power_feed = 0
+
+        if power_feed < -MAX_DISCHARGE_POWER:
+            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_DISCHARGE_POWER ({MAX_DISCHARGE_POWER} W), limiting discharge.")
+            power_feed = -MAX_DISCHARGE_POWER
+        if power_feed > MAX_CHARGE_POWER:
+            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_CHARGE_POWER ({MAX_CHARGE_POWER} W), limiting charge")
+            power_feed = MAX_CHARGE_POWER
         
         # Check if the new power value is the same as the previous one
         if self.previous_power is not None and power_feed == self.previous_power:
             self.log('info', f"Power value unchanged ({power_feed} W), skipping device update")
             # Still accumulate since power is being maintained (operation is successful)
             self.accumulator.accumulate_power_feed(power_feed)
-            return (True, None)
+            return (True, None, power_feed)
         
         url = f"http://{self.device_ip}/properties/write"
     
@@ -690,7 +704,7 @@ class AutomateController(BaseDeviceController):
         
         if TEST_MODE:
             self.log('info', f"TEST MODE: Would set power feed to {power_feed} W")
-            return (True, None)
+            return (True, None, power_feed)
         
         try:
             self.log('info', f"Setting power feed to {power_feed} W...")
@@ -716,12 +730,12 @@ class AutomateController(BaseDeviceController):
             # Accumulate power feed energy over time
             self.accumulator.accumulate_power_feed(power_feed)
             
-            return (True, None)
+            return (True, None, power_feed)
         
         except requests.exceptions.RequestException as e:
-            return (False, str(e))
+            return (False, str(e), original_power)
         except Exception as e:
-            return (False, str(e))
+            return (False, str(e), original_power)
     
     def print_accumulators(self) -> None:
         """Debug method to log accumulator values. Delegates to PowerAccumulator."""
@@ -811,6 +825,7 @@ class AutomateController(BaseDeviceController):
     def calculate_netzero_power(
         self,
         mode: Literal['netzero', 'netzero+'] = 'netzero',
+        p1_data: Optional[Dict[str, Any]] = None,
         ) -> int:
         """
         Calculate the actual power value needed to achieve netzero/netzero+ mode.
@@ -820,6 +835,7 @@ class AutomateController(BaseDeviceController):
         
         Args:
             mode: 'netzero' (can charge or discharge) or 'netzero+' (only charge, no discharge)
+            p1_data: Optional pre-read P1 meter data. If provided, will be used instead of reading again.
         
         Returns:
             int: Power value in watts (positive=charge, negative=discharge, 0=stop)
@@ -831,10 +847,14 @@ class AutomateController(BaseDeviceController):
         # Use DeviceDataReader to get current data
         reader = DeviceDataReader(config_path=self.config_path)
         
-        # Read P1 meter data
-        p1_data = reader.read_p1_meter(update_json=True)
-        if not p1_data:
-            raise ValueError("Failed to read P1 meter data")
+        # Read P1 meter data if not provided
+        if p1_data is None:
+            p1_data = reader.read_p1_meter(update_json=True)
+            if not p1_data:
+                raise ValueError("Failed to read P1 meter data")
+        else:
+            # If P1 data was provided, still update JSON to ensure it's stored
+            reader.read_p1_meter(update_json=True)
         
         p1_power = p1_data.get("total_power")
         if p1_power is None:
@@ -887,6 +907,7 @@ class AutomateController(BaseDeviceController):
     def set_power(
             self,
             value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
+            p1_data: Optional[Dict[str, Any]] = None,
         ) -> PowerResult:
         """
         Set power feed to the Zendure battery.
@@ -896,6 +917,8 @@ class AutomateController(BaseDeviceController):
                 - int: Specific power feed in watts (positive=charge, negative=discharge, 0=stop)
                 - 'netzero' or None: Use dynamic zero feed-in calculation (default)
                 - 'netzero+': Use dynamic zero feed-in calculation, but only charge (no discharge)
+            p1_data: Optional pre-read P1 meter data. If provided and value is netzero/netzero+,
+                     will be used instead of reading P1 meter again.
         
         Returns:
             PowerResult: Result object with success status, power value, and optional error message
@@ -912,16 +935,16 @@ class AutomateController(BaseDeviceController):
         if isinstance(value, int): 
             
             # Send power feed
-            success, error_msg = self._send_power_feed(value)
+            success, error_msg, actual_power = self._send_power_feed(value)
             
             if not success:
                 return PowerResult(
                     success=False,
-                    power=value,
+                    power=actual_power,
                     error=f"Failed to set power feed: {error_msg}"
                 )
             
-            return PowerResult(success=True, power=value)
+            return PowerResult(success=True, power=actual_power)
         
         # Handle dynamic zero feed-in ('netzero' or None)
         elif value == 'netzero' or value == 'netzero+' or value is None:
@@ -930,7 +953,8 @@ class AutomateController(BaseDeviceController):
             
             try:
                 # Calculate the actual power value needed
-                calculated_power = self.calculate_netzero_power(mode=mode)
+                # Pass p1_data if provided to avoid reading P1 meter again
+                calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)
                 
                 # If test mode, just return the calculated value without applying
                 if TEST_MODE:
@@ -939,16 +963,16 @@ class AutomateController(BaseDeviceController):
                 # Apply the calculated power
                 # calculated_power is already in correct convention (positive=charge, negative=discharge)
                 # Send power feed directly without conversion
-                success, error_msg = self._send_power_feed(calculated_power)
+                success, error_msg, actual_power = self._send_power_feed(calculated_power)
                 
                 if not success:
                     return PowerResult(
                         success=False,
-                        power=calculated_power,
+                        power=actual_power,
                         error=f"Failed to set power feed: {error_msg}"
                     )
                 
-                return PowerResult(success=True, power=calculated_power)
+                return PowerResult(success=True, power=actual_power)
                 
             except Exception as e:
                 return PowerResult(
