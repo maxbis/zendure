@@ -12,6 +12,10 @@ if (!ini_get('date.timezone')) {
     date_default_timezone_set('Europe/Amsterdam');
 }
 
+// Constants for netzero evaluation in calculations
+define('NETZERO_VALUE', -350);      // netzero evaluates to -350 watts (discharge)
+define('NETZERO_PLUS_VALUE', 350);  // netzero+ evaluates to +350 watts (charge)
+
 // Load API URL from config file
 $calculateApiUrl = null;
 $configPath = __DIR__ . '/../../config/config.json';
@@ -76,6 +80,19 @@ function timeToMinutesForCalculate($timeStr) {
     return $hours * 60 + $minutes;
 }
 
+// Helper function to resolve netzero values to numeric equivalents
+function resolveNetzeroValueForCalculate($value) {
+    if ($value === 'netzero') {
+        return NETZERO_VALUE;
+    } elseif ($value === 'netzero+') {
+        return NETZERO_PLUS_VALUE;
+    } elseif (is_numeric($value)) {
+        return (float)$value;
+    } else {
+        return 0;
+    }
+}
+
 // Helper function to calculate sums from resolved array
 // Each value applies until the next time slot, so we multiply by duration
 function calculateSumsForPartial($resolved) {
@@ -106,10 +123,8 @@ function calculateSumsForPartial($resolved) {
         $entry = $sorted[$i];
         $value = $entry['value'] ?? 0;
         
-        // Handle non-numeric values (netzero, netzero+)
-        if (!is_numeric($value)) {
-            $value = 0;
-        }
+        // Resolve netzero values to numeric equivalents
+        $value = resolveNetzeroValueForCalculate($value);
         
         // Calculate duration until next entry (or end of day)
         $currentTime = $entry['time'] ?? '';
@@ -187,9 +202,8 @@ function calculateSumsFromTimeForPartial($resolved, $startTime) {
     // If we found an active entry, calculate from start time to next entry
     if ($activeEntry !== null && $activeIndex < count($sorted) - 1) {
         $value = $activeEntry['value'] ?? 0;
-        if (!is_numeric($value)) {
-            $value = 0;
-        }
+        // Resolve netzero values to numeric equivalents
+        $value = resolveNetzeroValueForCalculate($value);
         
         $nextTime = $sorted[$activeIndex + 1]['time'] ?? '';
         $nextMinutes = timeToMinutesForCalculate($nextTime);
@@ -225,10 +239,8 @@ function calculateSumsFromTimeForPartial($resolved, $startTime) {
         $entry = $sorted[$i];
         $value = $entry['value'] ?? 0;
         
-        // Handle non-numeric values (netzero, netzero+)
-        if (!is_numeric($value)) {
-            $value = 0;
-        }
+        // Resolve netzero values to numeric equivalents
+        $value = resolveNetzeroValueForCalculate($value);
         
         // Calculate duration until next entry (or end of day)
         $currentTime = $entry['time'] ?? '';

@@ -1,0 +1,74 @@
+/* Price Statistics Styles */
+
+.price-statistics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Price Statistics Card */
+.price-stat-card {
+    background: #e3f2fd;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.price-stat-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.price-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.price-stat-detail {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #888;
+    margin-top: auto;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .price-statistics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .price-statistics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .price-stat-card {
+        padding: 16px;
+    }
+    
+    .price-stat-value {
+        font-size: 1.3rem;
+    }
+    
+    .price-stat-title {
+        font-size: 0.7rem;
+    }
+    
+    .price-stat-detail {
+        font-size: 0.85rem;
+    }
+}

@@ -58,6 +58,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="stylesheet" href="assets/css/schedule_panels.css">
     <link rel="stylesheet" href="assets/css/schedule_overview_bar.css">
     <link rel="stylesheet" href="assets/css/price_overview_bar.css">
+    <link rel="stylesheet" href="assets/css/price_statistics.css">
     <link rel="stylesheet" href="assets/css/automation_status.css">
     <link rel="stylesheet" href="assets/css/schedule_calculator.css">
 </head>
@@ -79,6 +80,9 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Price Overview Bar Graph Section - Full Width -->
         <?php include __DIR__ . '/partials/price_overview_bar.php'; ?>
 
+        <!-- Price Statistics Section -->
+        <?php include __DIR__ . '/partials/price_statistics.php'; ?>
+
         <!-- Schedule Calculator Section -->
         <?php include __DIR__ . '/partials/calculate.php'; ?>
 
@@ -96,6 +100,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/schedule_panels.js"></script>
         <script src="assets/js/schedule_overview_bar.js"></script>
         <script src="assets/js/price_overview_bar.js"></script>
+        <script src="assets/js/price_statistics.js"></script>
         <script src="assets/js/automation_status.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
 
