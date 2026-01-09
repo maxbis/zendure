@@ -64,12 +64,22 @@ function formatPrice(price) {
  * Renders the price graph for today and tomorrow
  * @param {Object} priceData - Price data from API
  * @param {number} currentHour - Current hour (0-23)
+ * @param {Array} scheduleEntries - Array of schedule entries for lookup
+ * @param {Object} editModal - Edit modal instance for click handlers
  */
-function renderPriceGraph(priceData, currentHour) {
+function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const todayContainer = document.getElementById('price-graph-today');
     const tomorrowContainer = document.getElementById('price-graph-tomorrow');
     
     if (!todayContainer) return;
+    
+    // Build a map of schedule entries for quick lookup
+    const scheduleMap = {};
+    if (scheduleEntries) {
+        scheduleEntries.forEach(entry => {
+            scheduleMap[entry.key] = entry.value;
+        });
+    }
     
     // Handle tomorrow container visibility
     if (tomorrowContainer) {
@@ -154,11 +164,17 @@ function renderPriceGraph(priceData, currentHour) {
             // Format display text
             const priceDisplay = formatPrice(price);
             
+            // Create key for schedule lookup (YYYYMMDDHHmm format)
+            const hourTime = hourKey + '00';
+            const key = dateStr + hourTime;
+            
             // Create bar element
             const barDiv = document.createElement('div');
             barDiv.className = `price-graph-bar ${isCurrentHour ? 'price-current' : ''}`;
             barDiv.dataset.date = dateStr;
             barDiv.dataset.hour = h;
+            barDiv.dataset.time = hourTime;
+            barDiv.dataset.key = key;
             barDiv.dataset.price = price !== null ? price : '';
             barDiv.title = `${hourKey}:00 - ${priceDisplay}`;
             
@@ -173,6 +189,21 @@ function renderPriceGraph(priceData, currentHour) {
             
             barDiv.appendChild(barInner);
             barDiv.appendChild(barLabel);
+            
+            // Add click handler (same as schedule overview bars)
+            barDiv.addEventListener('click', () => {
+                if (editModal) {
+                    // Check if entry exists
+                    const existingValue = scheduleMap[key];
+                    // If existingValue is undefined, we pass key as the 3rd argument (prefillKey)
+                    // and null as the 1st argument (key) to indicate "Add Mode"
+                    if (existingValue !== undefined) {
+                        editModal.open(key, existingValue);
+                    } else {
+                        editModal.open(null, null, key);
+                    }
+                }
+            });
             
             container.appendChild(barDiv);
         }
@@ -213,8 +244,10 @@ function renderPriceGraph(priceData, currentHour) {
 /**
  * Fetches price data from API and renders the graph
  * @param {string} priceApiUrl - URL to price API endpoint
+ * @param {Array} scheduleEntries - Array of schedule entries for lookup
+ * @param {Object} editModal - Edit modal instance for click handlers
  */
-async function fetchAndRenderPrices(priceApiUrl) {
+async function fetchAndRenderPrices(priceApiUrl, scheduleEntries, editModal) {
     try {
         const response = await fetch(priceApiUrl);
         if (!response.ok) {
@@ -235,12 +268,12 @@ async function fetchAndRenderPrices(priceApiUrl) {
         const currentHour = now.getHours();
         
         // Render the price graph
-        renderPriceGraph(priceData, currentHour);
+        renderPriceGraph(priceData, currentHour, scheduleEntries, editModal);
     } catch (e) {
         console.error('Failed to fetch prices:', e);
         // Render with null values on error
         const now = new Date();
         const currentHour = now.getHours();
-        renderPriceGraph({ today: {}, tomorrow: {} }, currentHour);
+        renderPriceGraph({ today: {}, tomorrow: {} }, currentHour, scheduleEntries, editModal);
     }
 }

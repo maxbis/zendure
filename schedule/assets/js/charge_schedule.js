@@ -220,7 +220,7 @@ async function refreshData() {
             
             // Fetch and render price data
             if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
-                fetchAndRenderPrices(PRICE_API_URL);
+                fetchAndRenderPrices(PRICE_API_URL, todayData.entries || [], editModal);
             }
         }
     } catch (e) {
