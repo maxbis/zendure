@@ -1,9 +1,0 @@
-# Price API URLs Configuration
-# Store API URLs for fetching electricity prices
-# 
-# Configuration file for price API endpoints
-# Line 7: URL for today's prices
-# Line 8: URL for tomorrow's prices
-https://enever.nl/apiv3/stroomprijs_vandaag.php?token=9746105a73dccdd78e33d198a8fce77e
-https://enever.nl/apiv3/stroomprijs_morgen.php?token=9746105a73dccdd78e33d198a8fce77e
-

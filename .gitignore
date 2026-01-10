@@ -43,7 +43,10 @@ desktop.ini
 config.json
 config/config.json
 /run_schedule/config/*.json
+/run_schedule/config/*.json.bak
 /data/automation_status.json
 run_schedule/data/zendure_data.json
 status/data/*.json
 status/config/*.json
+status/includes/config.php
+statusa/includes/config.php
