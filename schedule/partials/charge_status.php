@@ -235,12 +235,12 @@
                     if ($clampedValue > 0) {
                         // Positive - bar extends right from center (green)
                         $barWidth = abs($clampedValue) / abs($maxPower) * 50; // 50% max (half container)
-                        $barWidth = max(2, $barWidth); // Minimum 2% for visibility
+                        $barWidth = max(6, $barWidth); // Minimum 6% for visibility (increased from 2%)
                         $barClass = 'charging';
                     } elseif ($clampedValue < 0) {
                         // Negative - bar extends left from center (red)
                         $barWidth = abs($clampedValue) / abs($minPower) * 50; // 50% max (half container)
-                        $barWidth = max(2, $barWidth); // Minimum 2% for visibility
+                        $barWidth = max(6, $barWidth); // Minimum 6% for visibility (increased from 2%)
                         $barClass = 'discharging';
                     } else {
                         // Zero - no bar

@@ -138,16 +138,18 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
             barDiv.appendChild(barLabel);
 
             // Add click handler
-            barDiv.addEventListener('click', () => {
+            barDiv.addEventListener('click', (e) => {
                 if (editModal) {
+                    // Get key from the clicked element's dataset to avoid closure issues
+                    const clickedKey = e.currentTarget.dataset.key;
                     // Check if entry exists
-                    const existingValue = scheduleMap[key];
-                    // If existingValue is undefined, we pass key as the 3rd argument (prefillKey)
+                    const existingValue = scheduleMap[clickedKey];
+                    // If existingValue is undefined, we pass clickedKey as the 3rd argument (prefillKey)
                     // and null as the 1st argument (key) to indicate "Add Mode"
                     if (existingValue !== undefined) {
-                        editModal.open(key, existingValue);
+                        editModal.open(clickedKey, existingValue);
                     } else {
-                        editModal.open(null, null, key);
+                        editModal.open(null, null, clickedKey);
                     }
                 }
             });

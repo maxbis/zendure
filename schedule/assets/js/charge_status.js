@@ -234,12 +234,12 @@ function renderChargeStatus(data, lastUpdate) {
     if (clampedValue > 0) {
         // Positive - bar extends right from center (green)
         barWidth = (Math.abs(clampedValue) / Math.abs(maxPower)) * 50; // 50% max (half container)
-        barWidth = Math.max(2, barWidth); // Minimum 2% for visibility
+        barWidth = Math.max(6, barWidth); // Minimum 6% for visibility (increased from 2%)
         barClass = 'charging';
     } else if (clampedValue < 0) {
         // Negative - bar extends left from center (red)
         barWidth = (Math.abs(clampedValue) / Math.abs(minPower)) * 50; // 50% max (half container)
-        barWidth = Math.max(2, barWidth); // Minimum 2% for visibility
+        barWidth = Math.max(6, barWidth); // Minimum 6% for visibility (increased from 2%)
         barClass = 'discharging';
     }
     
