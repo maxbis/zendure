@@ -354,7 +354,7 @@ class PowerAccumulator:
             last_quarter = (last_minute // 15) * 15
             if last_quarter == 45:
                 # Next boundary is at next hour
-                return last_time.replace(minute=0, second=0, microsecond=0).replace(hour=last_time.hour + 1)
+                return (last_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
             else:
                 # Next boundary is at next quarter
                 return last_time.replace(minute=last_quarter + 15, second=0, microsecond=0)
@@ -374,7 +374,7 @@ class PowerAccumulator:
         # Handle hourly boundary
         def hour_boundary_time(last_time):
             """Calculate next hour boundary time."""
-            return last_time.replace(minute=0, second=0, microsecond=0).replace(hour=last_time.hour + 1)
+            return (last_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
         
         tracking['last_hour'] = self._accumulate_with_boundary(
             accumulators,
