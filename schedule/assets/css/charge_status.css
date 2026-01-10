@@ -181,7 +181,9 @@
     min-width: 0;
 }
 
-.charge-power-label-value {
+/* Shared styles for label-value rows (used by both power and battery displays) */
+.charge-power-label-value,
+.charge-battery-label-value {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -190,16 +192,22 @@
     width: 100%;
 }
 
-.charge-power-label {
-    font-size: 0.9rem;
+.charge-power-label,
+.charge-battery-label {
+    font-size: 1rem;
     color: #666;
     font-weight: 500;
 }
 
 .charge-power-value {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+}
+
+.charge-battery-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
 }
 
 .charge-power-time {
@@ -293,26 +301,9 @@
     min-width: 0;
 }
 
-.charge-battery-label-value {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    width: 100%;
-}
-
-.charge-battery-label {
-    font-size: 0.9rem;
-    color: #666;
-    font-weight: 500;
-}
-
+/* Battery value has its own color override */
 .charge-battery-value {
-    font-size: 1.1rem;
-    font-weight: 600;
     color: #333;
-    font-family: 'Courier New', monospace;
 }
 
 .charge-battery-bar {
@@ -402,8 +393,12 @@
         gap: 8px;
     }
     
-    .charge-power-value {
-        font-size: 1.1rem;
+    /* Combined responsive font sizes for label-value rows */
+    .charge-power-label,
+    .charge-power-value,
+    .charge-battery-label,
+    .charge-battery-value {
+        font-size: 0.95rem;
     }
     
     .charge-power-bar-container {
@@ -412,10 +407,6 @@
     
     .charge-power-bar-label {
         font-size: 0.65rem;
-    }
-    
-    .charge-battery-value {
-        font-size: 1rem;
     }
     
     .charge-battery-bar {

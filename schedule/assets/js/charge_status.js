@@ -249,9 +249,7 @@ function renderChargeStatus(data, lastUpdate) {
         powerBarFill = `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>`;
     }
     
-    // Calculate battery capacity values
-    const totalCapacityKwh = typeof TOTAL_CAPACITY_KWH !== 'undefined' ? TOTAL_CAPACITY_KWH : 5.76;
-    const minChargeLevel = typeof MIN_CHARGE_LEVEL !== 'undefined' ? MIN_CHARGE_LEVEL : 20;
+    // Calculate battery capacity values (reuse constants already declared above at lines 174-176)
     const totalCapacityLeftKwh = (electricLevel / 100) * totalCapacityKwh;
     const usableCapacityAboveMinKwh = Math.max(0, ((electricLevel - minChargeLevel) / 100) * totalCapacityKwh);
     const batteryLevelDisplay = `${electricLevel}% (${totalCapacityLeftKwh.toFixed(2)} kWh/${usableCapacityAboveMinKwh.toFixed(2)} kWh)`;
