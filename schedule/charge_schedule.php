@@ -60,6 +60,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="stylesheet" href="assets/css/price_overview_bar.css">
     <link rel="stylesheet" href="assets/css/price_statistics.css">
     <link rel="stylesheet" href="assets/css/automation_status.css">
+    <link rel="stylesheet" href="assets/css/charge_status_defines.css">
     <link rel="stylesheet" href="assets/css/charge_status.css">
     <link rel="stylesheet" href="assets/css/schedule_calculator.css">
 </head>

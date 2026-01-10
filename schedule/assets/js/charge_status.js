@@ -66,6 +66,20 @@ function escapeHtml(text) {
 }
 
 /**
+ * Get CSS variable value from :root
+ * @param {string} variableName CSS variable name (e.g., '--charge-status-charging')
+ * @param {string} fallback Fallback value if variable is not found
+ * @return {string} CSS variable value or fallback
+ */
+function getCSSVariable(variableName, fallback) {
+    if (typeof document === 'undefined') {
+        return fallback;
+    }
+    const value = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+    return value || fallback;
+}
+
+/**
  * Update last update display
  * @param {number} lastUpdate Unix timestamp
  */
@@ -94,13 +108,18 @@ function determineChargeStatus(properties) {
     const isCharging = (acStatus == 2 || packState == 1 || outputPackPower > 0);
     const isDischarging = (packState == 2 || outputHomePower > 0);
     
+    // Read colors from CSS variables to ensure consistency with CSS
+    const chargingColor = getCSSVariable('--charge-status-charging', '#66bb6a');
+    const dischargingColor = getCSSVariable('--charge-status-discharging', '#ef5350');
+    const standbyColor = getCSSVariable('--charge-status-standby', '#9e9e9e');
+    
     if (isCharging) {
         return {
             class: 'charging',
             icon: '🔵',
             text: 'Charging',
             subtitle: 'Battery is being charged',
-            color: '#66bb6a'
+            color: chargingColor
         };
     } else if (isDischarging) {
         return {
@@ -108,7 +127,7 @@ function determineChargeStatus(properties) {
             icon: '🔴',
             text: 'Discharging',
             subtitle: 'Battery is powering the home',
-            color: '#ef5350'
+            color: dischargingColor
         };
     } else {
         return {
@@ -116,7 +135,7 @@ function determineChargeStatus(properties) {
             icon: '⚪',
             text: 'Standby',
             subtitle: 'No active power flow',
-            color: '#9e9e9e'
+            color: standbyColor
         };
     }
 }
@@ -167,7 +186,11 @@ function renderChargeStatus(data, lastUpdate) {
     
     // Format power value and calculate time estimate
     let powerDisplay = '0 W';
-    let powerColor = '#9e9e9e';
+    // Read colors from CSS variables to ensure consistency with CSS
+    const chargingColor = getCSSVariable('--charge-status-charging', '#66bb6a');
+    const dischargingColor = getCSSVariable('--charge-status-discharging', '#ef5350');
+    const standbyColor = getCSSVariable('--charge-status-standby', '#9e9e9e');
+    let powerColor = standbyColor;
     let timeEstimate = '';
     
     // Get constants
@@ -178,7 +201,7 @@ function renderChargeStatus(data, lastUpdate) {
     if (chargeDischargeValue > 0) {
         // Charging - calculate time until max level
         powerDisplay = '+' + chargeDischargeValue.toLocaleString() + ' W';
-        powerColor = '#66bb6a';
+        powerColor = chargingColor;
         const capacityToMaxKwh = ((maxChargeLevel - electricLevel) / 100) * totalCapacityKwh;
         const capacityToMaxWh = capacityToMaxKwh * 1000;
         if (chargeDischargeValue > 0 && capacityToMaxWh > 0) {
@@ -201,7 +224,7 @@ function renderChargeStatus(data, lastUpdate) {
     } else if (chargeDischargeValue < 0) {
         // Discharging - calculate time until min level
         powerDisplay = chargeDischargeValue.toLocaleString() + ' W';
-        powerColor = '#ef5350';
+        powerColor = dischargingColor;
         const capacityToMinKwh = ((electricLevel - minChargeLevel) / 100) * totalCapacityKwh;
         const capacityToMinWh = capacityToMinKwh * 1000;
         const absPower = Math.abs(chargeDischargeValue);

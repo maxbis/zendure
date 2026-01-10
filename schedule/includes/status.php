@@ -61,30 +61,34 @@ function getAcStatusText($status) {
  * Returns array with status information including class, icon, title, subtitle, and color
  */
 function getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $solarInputPower, $electricLevel) {
+    // Colors should match CSS variables defined in charge_status_defines.css:
+    // --charge-status-charging: #66bb6a, --charge-status-discharging: #ef5350, --charge-status-standby: #9e9e9e
     $status = [
         'state' => $packState,
         'class' => 'standby',
         'icon' => '⚪',
         'title' => 'Standby',
         'subtitle' => 'No active power flow',
-        'color' => '#9e9e9e'
+        'color' => '#9e9e9e' // Should match --charge-status-standby from charge_status_defines.css
     ];
 
     // Determine state based on packState and actual power values
+    // Colors should match CSS variables defined in charge_status_defines.css:
+    // --charge-status-charging: #66bb6a, --charge-status-discharging: #ef5350, --charge-status-standby: #9e9e9e
     if ($packState == 1 || $outputPackPower > 0) {
         // Charging - either from packState or if outputPackPower is active
         $status['class'] = 'charging';
         $status['icon'] = '🔵';
         $status['title'] = 'Charging';
         $status['subtitle'] = 'Battery is being charged';
-        $status['color'] = '#64b5f6';
+        $status['color'] = '#66bb6a'; // Should match --charge-status-charging from charge_status_defines.css
     } elseif ($packState == 2 || $outputHomePower > 0) {
         // Discharging - either from packState or if outputHomePower is active
         $status['class'] = 'discharging';
         $status['icon'] = '🔴';
         $status['title'] = 'Discharging';
         $status['subtitle'] = 'Battery is powering the home';
-        $status['color'] = '#ef5350';
+        $status['color'] = '#ef5350'; // Should match --charge-status-discharging from charge_status_defines.css
     }
 
     return $status;

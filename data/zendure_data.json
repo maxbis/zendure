@@ -1,5 +1,5 @@
 {
-    "timestamp": "2026-01-10T16:20:38+01:00",
+    "timestamp": "2026-01-10T16:21:46+01:00",
     "properties": {
         "heatState": 0,
         "packInputPower": 0,
@@ -48,13 +48,13 @@
         "OTAState": 0,
         "LCNState": 0,
         "factoryModeState": 0,
-        "ts": 1768058434,
+        "ts": 1768058500,
         "tsZone": 13,
         "smartMode": 1,
         "chargeMaxLimit": 2400,
         "phaseSwitch": 1,
         "packNum": 2,
-        "rssi": -38,
+        "rssi": -36,
         "is_error": 0
     },
     "packData": [

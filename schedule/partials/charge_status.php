@@ -122,12 +122,14 @@
             
             // Determine power color (green for charging, red for discharging, gray for standby)
             // Note: Power value uses different color scheme than status indicator
+            // Colors should match CSS variables defined in charge_status_defines.css:
+            // --charge-status-charging: #66bb6a, --charge-status-discharging: #ef5350, --charge-status-standby: #9e9e9e
             if ($chargeDischargeValue > 0) {
-                $powerColor = '#66bb6a'; // Green for positive (charging)
+                $powerColor = '#66bb6a'; // Green for positive (charging) - should match --charge-status-charging
             } elseif ($chargeDischargeValue < 0) {
-                $powerColor = '#ef5350'; // Red for negative (discharging)
+                $powerColor = '#ef5350'; // Red for negative (discharging) - should match --charge-status-discharging
             } else {
-                $powerColor = '#9e9e9e'; // Gray for zero (standby)
+                $powerColor = '#9e9e9e'; // Gray for zero (standby) - should match --charge-status-standby
             }
         ?>
             <?php if ($lastUpdate): ?>
