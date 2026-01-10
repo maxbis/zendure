@@ -596,7 +596,7 @@ class AutomateController(BaseDeviceController):
         Returns:
             dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
         """
-        if power_feed > 0:
+        if power_feed > 1:
             # Charge mode: acMode 1 = Input
             return {
                 "acMode": 1,
@@ -612,9 +612,17 @@ class AutomateController(BaseDeviceController):
                 "inputLimit": 0,
                 "smartMode": 1,
             }
+        elif power_feed == 1:
+            # when requested power is 1, set to 0 but don't go into standby mode
+            return {
+                "inputLimit": 0,
+                "outputLimit": 0,
+                "smartMode": 1,
+            }
         else:
             # Stop all
             return {
+                "acMode": 0,
                 "inputLimit": 0,
                 "outputLimit": 0,
                 "smartMode": 1,
@@ -800,7 +808,7 @@ class AutomateController(BaseDeviceController):
         # Apply minimum absolute threshold on resulting feed:
         # if the resulting discharge/charge is very small, turn it off.
         if abs(effective_desired) < self.POWER_FEED_MIN_THRESHOLD:
-            effective_desired = 0
+            effective_desired = 1
 
         # Apply minimum delta threshold on the CHANGE:
         # if the change is too small, keep current settings to avoid unnecessary adjustments
@@ -954,7 +962,7 @@ class AutomateController(BaseDeviceController):
             try:
                 # Calculate the actual power value needed
                 # Pass p1_data if provided to avoid reading P1 meter again
-                calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)
+                calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)   
                 
                 # If test mode, just return the calculated value without applying
                 if TEST_MODE:
