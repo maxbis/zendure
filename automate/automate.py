@@ -455,8 +455,8 @@ def main():
                 if desired_power is None:
                     desired_power = 0
                     log_info("Schedule value is None, setting desired power to 0")
-                else:
-                    log_info(f"Current schedule value: {desired_power}")
+                # else:
+                #     log_info(f"Current schedule value: {desired_power}")
             except Exception as e:
                 log_error(f"Error getting desired power from schedule: {e}")
                 desired_power = 0
@@ -503,8 +503,8 @@ def main():
                     post_status_update(status_api_url, 'change', old_value, result.power)
                 else:
                     log_error(f"Failed to set power: {result.error}")
-            else:
-                log_info(f"No change needed (desired: {desired_power}, current: {old_value})")
+            # else:
+            #     log_info(f"No change needed (desired: {desired_power}, current: {old_value})")
             
             # Update value for next iteration
             value = desired_power

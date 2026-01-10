@@ -1067,7 +1067,7 @@ class DeviceDataReader(BaseDeviceController):
             store_result = store_response.json()
             
             if store_result.get("success", False):
-                self.log('info', f"{data_type} stored via API: {store_result.get('file', 'data.json')}")
+                # self.log('info', f"{data_type} stored via API: {store_result.get('file', 'data.json')}")
                 return True
             else:
                 error_msg = store_result.get("error", "Unknown API error")
