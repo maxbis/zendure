@@ -60,6 +60,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="stylesheet" href="assets/css/price_overview_bar.css">
     <link rel="stylesheet" href="assets/css/price_statistics.css">
     <link rel="stylesheet" href="assets/css/automation_status.css">
+    <link rel="stylesheet" href="assets/css/charge_status.css">
     <link rel="stylesheet" href="assets/css/schedule_calculator.css">
 </head>
 
@@ -91,6 +92,11 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
 
+        <!-- Charge/Discharge Status Section - Full Width -->
+        <div class="charge-status-wrapper" style="margin-top: 20px;">
+            <?php include __DIR__ . '/partials/charge_status.php'; ?>
+        </div>
+
         <script>
             // Inject API URL from PHP config
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
@@ -103,6 +109,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/price_statistics.js"></script>
         <script src="assets/js/schedule_calculator.js"></script>
         <script src="assets/js/automation_status.js"></script>
+        <script src="assets/js/charge_status.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
 
     </div>

@@ -1,0 +1,424 @@
+/* Charge/Discharge Status Styles */
+
+/* Charge Status - Full Width */
+.charge-status-wrapper {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.charge-status-wrapper .card {
+    width: 100%;
+    max-width: 100%;
+}
+
+.charge-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.charge-last-update {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+}
+
+.charge-timestamp-full {
+    color: #999;
+    font-size: 0.85rem;
+    margin-left: 5px;
+}
+
+/* Refresh Button */
+.charge-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: #666;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.charge-refresh-btn:hover:not(:disabled) {
+    background: #eeeeee;
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+.charge-refresh-btn:active:not(:disabled) {
+    background: #e0e0e0;
+    transform: scale(0.98);
+}
+
+.charge-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.charge-refresh-btn .refresh-icon {
+    font-size: 1rem;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.charge-refresh-btn.refreshing .refresh-icon {
+    animation: spin 1s linear infinite;
+}
+
+.charge-refresh-btn .refresh-text {
+    font-weight: 500;
+}
+
+/* Spin animation for refresh icon */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.charge-status-error {
+    padding: 20px;
+    background: #fee;
+    border-left: 4px solid #f00;
+    border-radius: 4px;
+    color: #c00;
+    text-align: center;
+}
+
+.charge-status-empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.charge-status-content {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+/* Status Indicator */
+.charge-status-indicator {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 0;
+}
+
+.charge-status-indicator.charging {
+    border-color: #66bb6a;
+    background: #f1f8f4;
+}
+
+.charge-status-indicator.discharging {
+    border-color: #ef5350;
+    background: #fef5f5;
+}
+
+.charge-status-indicator.standby {
+    border-color: #9e9e9e;
+    background: #f5f5f5;
+}
+
+.charge-status-icon {
+    font-size: 2rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.charge-status-text {
+    text-align: left;
+    flex: 1;
+}
+
+.charge-status-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.charge-status-subtitle {
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
+}
+
+/* Power Display */
+.charge-power-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    flex: 1;
+    min-width: 0;
+}
+
+.charge-power-label-value {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+.charge-power-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.charge-power-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+}
+
+.charge-power-time {
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: #666;
+    margin-left: 4px;
+}
+
+/* Power Bar Container */
+.charge-power-bar-container {
+    width: 100%;
+    height: 16px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+}
+
+.charge-power-bar-center {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: #333;
+    z-index: 2;
+}
+
+.charge-power-bar-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    min-width: 2px;
+}
+
+/* Bar extending right from center (positive/green) */
+.charge-power-bar-fill.charging {
+    left: 50%;
+    border-radius: 0 2px 2px 0;
+    background: #66bb6a; /* Green for charging */
+}
+
+/* Bar extending left from center (negative/red) */
+.charge-power-bar-fill.discharging {
+    right: 50%;
+    border-radius: 2px 0 0 2px;
+    background: #ef5350; /* Red for discharging */
+}
+
+.charge-power-bar-label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: #666;
+    z-index: 3;
+}
+
+.charge-power-bar-label.left {
+    left: 4px;
+}
+
+.charge-power-bar-label.right {
+    right: 4px;
+}
+
+.charge-power-bar-label.center {
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #333;
+    font-weight: 700;
+    background: #e0e0e0;
+    padding: 0 2px;
+}
+
+/* Battery Display */
+.charge-battery-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    flex: 1;
+    min-width: 0;
+}
+
+.charge-battery-label-value {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+.charge-battery-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.charge-battery-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+.charge-battery-bar {
+    width: 100%;
+    height: 16px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.charge-battery-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    min-width: 2px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Battery bar markers for min/max charge levels */
+.charge-battery-bar-marker {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: #666;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.charge-battery-bar-marker.min {
+    background: #ff9800; /* Orange for minimum */
+}
+
+.charge-battery-bar-marker.max {
+    background: #2196f3; /* Blue for maximum */
+}
+
+/* Responsive design for charge status */
+@media (max-width: 768px) {
+    .charge-status-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .charge-refresh-btn {
+        align-self: flex-start;
+    }
+    
+    .charge-status-content {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .charge-status-indicator,
+    .charge-power-display,
+    .charge-battery-display {
+        flex: none;
+        width: 100%;
+    }
+    
+    .charge-status-indicator {
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    .charge-status-icon {
+        font-size: 1.75rem;
+    }
+    
+    .charge-status-text {
+        text-align: left;
+    }
+    
+    .charge-status-title {
+        font-size: 0.95rem;
+    }
+    
+    .charge-status-subtitle {
+        font-size: 0.7rem;
+    }
+    
+    .charge-power-display {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .charge-power-value {
+        font-size: 1.1rem;
+    }
+    
+    .charge-power-bar-container {
+        height: 14px;
+    }
+    
+    .charge-power-bar-label {
+        font-size: 0.65rem;
+    }
+    
+    .charge-battery-value {
+        font-size: 1rem;
+    }
+    
+    .charge-battery-bar {
+        height: 14px;
+    }
+}
