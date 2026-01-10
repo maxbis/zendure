@@ -808,7 +808,7 @@ class AutomateController(BaseDeviceController):
         # Apply minimum absolute threshold on resulting feed:
         # if the resulting discharge/charge is very small, turn it off.
         if abs(effective_desired) < self.POWER_FEED_MIN_THRESHOLD:
-            effective_desired = 1
+            effective_desired = 0  # Set to 0 to stop, will return 1 in calculate_netzero_power() to avoid standby
 
         # Apply minimum delta threshold on the CHANGE:
         # if the change is too small, keep current settings to avoid unnecessary adjustments
@@ -894,12 +894,12 @@ class AutomateController(BaseDeviceController):
         # Convert to CLI convention (positive=charge, negative=discharge)
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
-            # If calculation says to discharge, return 0 (netzero+ doesn't discharge)
+            # If calculation says to discharge, return 1 (netzero+ doesn't discharge, use 1 to avoid standby)
             if new_output > 0:
-                return 0
+                return 1
             else:
-                # Charging or stopped
-                return new_input
+                # Charging or stopped - if stopped (0), return 1 to avoid standby
+                return new_input if new_input > 0 else 1
         else:
             # Regular netzero mode
             if new_output > 0:
@@ -909,8 +909,8 @@ class AutomateController(BaseDeviceController):
                 # Charging: return positive value
                 return new_input
             else:
-                # Stopped
-                return 0
+                # Stopped - return 1 to avoid standby mode (sets limits to 0 but keeps acMode)
+                return 1
     
     def set_power(
             self,
