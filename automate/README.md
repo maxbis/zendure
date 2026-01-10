@@ -54,3 +54,48 @@ python3 /path/to/your/project/automate/automate2.py
 ```
 
 The script will run in the foreground. To run it as a background service, you can use a process manager like `systemd` or `supervisor`.
+
+## Power Control Logic & Behavior
+
+The `AutomateController` handles various power setting scenarios with specific behaviors:
+
+### 1. Manual Power Setting (Specific Value)
+
+When a specific integer power value is set (e.g., via schedule or manual command):
+
+*   **Charge (> 0)**:
+    *   **Device Command:** `{"acMode": 1, "inputLimit": <value>, "outputLimit": 0, "smartMode": 1}`
+    *   **Result:** Device switches to **Input Mode** (Charge).
+*   **Discharge (< 0)**:
+    *   **Device Command:** `{"acMode": 2, "inputLimit": 0, "outputLimit": <abs(value)>, "smartMode": 1}`
+    *   **Result:** Device switches to **Output Mode** (Discharge).
+*   **Stop (0)**:
+    *   **Device Command:** `{"acMode": 0, "inputLimit": 0, "outputLimit": 0, "smartMode": 1}`
+    *   **Result:** Device switches to **Standby Mode** (`acMode: 0`).
+
+### 2. NetZero & NetZero+ Modes
+
+In **NetZero** modes, the system dynamically calculates the required power based on the P1 meter reading.
+
+*   **Calculated Power > 0 (Charge)**:
+    *   **Device Command:** `{"acMode": 1, "inputLimit": <value>, "outputLimit": 0, "smartMode": 1}`
+*   **Calculated Power < 0 (Discharge)**:
+    *   **Device Command:** `{"acMode": 2, "inputLimit": 0, "outputLimit": <abs(value)>, "smartMode": 1}`
+*   **Calculated Power is 0 or very low (Deadband)**:
+    *   When the calculated power is exactly 0 or within the small "deadband" (e.g., -10W where threshold is 30W), the system targets 0W.
+    *   **Device Command:** `{"inputLimit": 0, "outputLimit": 0, "smartMode": 1}`
+    *   **Critical Detail:** **`acMode` is NOT included** in the payload. This is intentional to prevent the device from switching to Standby Mode (acMode 0), allowing it to stay in its current mode (e.g., Output) but with 0 limits, which often results in a smoother response when power is needed again.
+
+### 3. Charging Limits (Battery Protection)
+
+When the battery reaches its **Maximum Charge Level** (e.g., 95%):
+
+*   **Scenario A: NetZero Mode (Calculated Charge) or NetZero+**:
+    *   Logic detects that charging is required but not permitted due to the limit.
+    *   **Action:** The system forces the power setpoint to `0`.
+    *   **Device Command:** `{"acMode": 0, "inputLimit": 0, "outputLimit": 0, "smartMode": 1}`
+    *   **Result:** Device enters **Standby Mode** (`acMode: 0`).
+*   **Scenario B: NetZero Mode (Calculated Discharge)**:
+    *   Logic allows discharge even if battery is full (unless minimum limit is reached).
+    *   **Result:** Functionality continues normally (`acMode: 2`).
+
