@@ -604,7 +604,7 @@ class AutomateController(BaseDeviceController):
                 "outputLimit": 0,
                 "smartMode": 1,
             }
-        elif power_feed < 0:
+        elif power_feed < -1:
             # Discharge mode: acMode 2 = Output
             return {
                 "acMode": 2,
@@ -612,8 +612,8 @@ class AutomateController(BaseDeviceController):
                 "inputLimit": 0,
                 "smartMode": 1,
             }
-        elif power_feed == 1:
-            # when requested power is 1, set to 0 but don't go into standby mode
+        elif abs(power_feed) == 1:
+            # when requested power is (-1 or 1), set to 0 but don't go into standby mode
             return {
                 "inputLimit": 0,
                 "outputLimit": 0,
