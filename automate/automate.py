@@ -436,6 +436,12 @@ def main():
                     schedule_controller.fetch_schedule()
                     last_api_refresh_time = current_time
                     log_info("Schedule data refreshed from API")
+                    # Accumulate power feed before printing accumulators to ensure accurate values
+                    try:
+                        current_power = controller.previous_power if controller.previous_power is not None else 0
+                        controller.accumulator.accumulate_power_feed(current_power)
+                    except Exception as e:
+                        log_warning(f"Failed to accumulate power feed before printing: {e}")
                     # Print accumulator status every 5 minutes when schedule is updated
                     controller.print_accumulators()
                 except Exception as e:
