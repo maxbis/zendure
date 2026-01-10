@@ -7,7 +7,7 @@
 ?>
 
 <!-- Price Statistics Section -->
-<div class="card" style="margin-top: 20px;">
+<div class="card" style="margin-top: 12px; padding-bottom: 12px;">
     <div class="metric-section">
         <h3>⚡ Price Statistics</h3>
         <div id="price-statistics-grid" class="price-statistics-grid">

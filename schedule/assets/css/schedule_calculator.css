@@ -1,16 +1,49 @@
 /* Schedule Calculator Styles */
 
+/* Reduce bottom spacing inside the white card container for calculator */
+.card:has(.calculate-grid) {
+    padding-bottom: 12px;
+}
+
+.card:has(.calculate-grid) .metric-section {
+    margin-bottom: 0;
+}
+
 /* Calculate Grid - Reuses existing card and schedule-item classes */
 .calculate-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-top: 20px;
+    gap: 12px;
+    margin-top: 12px;
     width: 100%;
     /* Firefox fix: ensure grid container isn't constrained by parent flex */
     min-width: 0;
     /* Ensure grid items can shrink properly */
     grid-auto-flow: row;
+}
+
+/* Make nested cards more compact */
+.calculate-grid .card {
+    padding: 12px;
+    border-radius: 10px;
+}
+
+.calculate-grid .card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+
+.calculate-grid .card small {
+    font-size: 0.75rem;
+}
+
+.calculate-grid .card table {
+    margin-top: 8px !important;
+}
+
+.calculate-grid .card table td {
+    padding: 2px 0 !important;
+    font-size: 0.9rem !important;
 }
 
 /* Fallback for smaller screens - use auto-fit for responsive behavior */
@@ -23,5 +56,13 @@
 @media (max-width: 900px) {
     .calculate-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .calculate-grid .card {
+        padding: 10px;
+    }
+    
+    .calculate-grid .card h2 {
+        font-size: 1rem;
     }
 }

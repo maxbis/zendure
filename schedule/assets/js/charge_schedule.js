@@ -222,6 +222,15 @@ async function refreshData() {
             if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
                 fetchAndRenderPrices(PRICE_API_URL, todayData.entries || [], editModal);
             }
+            
+            // Update schedule calculator with today's and tomorrow's data
+            if (todayData.success && tomorrowData.success && typeof renderScheduleCalculator === 'function') {
+                renderScheduleCalculator(
+                    todayData.resolved || [],
+                    tomorrowData.resolved || [],
+                    currentTime
+                );
+            }
         }
     } catch (e) {
         console.error(e);

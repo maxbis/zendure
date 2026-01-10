@@ -101,6 +101,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/schedule_overview_bar.js"></script>
         <script src="assets/js/price_overview_bar.js"></script>
         <script src="assets/js/price_statistics.js"></script>
+        <script src="assets/js/schedule_calculator.js"></script>
         <script src="assets/js/automation_status.js"></script>
         <script src="assets/js/charge_schedule.js"></script>
 

@@ -12,6 +12,9 @@
 }
 
 .automation-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
     border-bottom: 1px solid #e0e0e0;
@@ -27,6 +30,62 @@
     color: #999;
     font-size: 0.85rem;
     margin-left: 5px;
+}
+
+/* Refresh Button */
+.automation-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: #666;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.automation-refresh-btn:hover:not(:disabled) {
+    background: #eeeeee;
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+.automation-refresh-btn:active:not(:disabled) {
+    background: #e0e0e0;
+    transform: scale(0.98);
+}
+
+.automation-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.automation-refresh-btn .refresh-icon {
+    font-size: 1rem;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.automation-refresh-btn.refreshing .refresh-icon {
+    animation: spin 1s linear infinite;
+}
+
+.automation-refresh-btn .refresh-text {
+    font-weight: 500;
+}
+
+/* Spin animation for refresh icon */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .automation-status-error {
@@ -193,6 +252,16 @@
 
 /* Responsive design for automation status */
 @media (max-width: 768px) {
+    .automation-status-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .automation-refresh-btn {
+        align-self: flex-start;
+    }
+    
     .automation-entry {
         flex-direction: column;
         align-items: flex-start;

@@ -25,6 +25,9 @@
         $basePath = dirname($scriptName);
         $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=20';
         
+        // Store API URL for JavaScript
+        echo '<script>const AUTOMATION_STATUS_API_URL = ' . json_encode($automationStatusUrl, JSON_UNESCAPED_SLASHES) . ';</script>';
+        
         try {
             $context = stream_context_create([
                 'http' => [
@@ -77,7 +80,7 @@
         
         if ($automationStatusError):
         ?>
-            <div class="automation-status-error">
+            <div class="automation-status-error" id="automation-status-error">
                 <p><?php echo htmlspecialchars($automationStatusError); ?></p>
             </div>
         <?php elseif ($automationStatusData && isset($automationStatusData['lastChanges'])): 
@@ -86,15 +89,26 @@
         ?>
             <?php if ($lastUpdate): ?>
                 <div class="automation-status-header">
-                    <span class="automation-last-update">
+                    <span class="automation-last-update" id="automation-last-update">
                         Last update: <?php echo htmlspecialchars(formatRelativeTime($lastUpdate)); ?>
                         <span class="automation-timestamp-full">(<?php echo htmlspecialchars(date('Y-m-d H:i:s', $lastUpdate)); ?>)</span>
                     </span>
+                    <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="refreshAutomationStatus()" title="Refresh automation status">
+                        <span class="refresh-icon">↻</span>
+                        <span class="refresh-text">Refresh</span>
+                    </button>
+                </div>
+            <?php else: ?>
+                <div class="automation-status-header">
+                    <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="refreshAutomationStatus()" title="Refresh automation status">
+                        <span class="refresh-icon">↻</span>
+                        <span class="refresh-text">Refresh</span>
+                    </button>
                 </div>
             <?php endif; ?>
             
             <?php if (empty($entries)): ?>
-                <div class="automation-status-empty">
+                <div class="automation-status-empty" id="automation-status-empty">
                     <p>No automation entries yet</p>
                 </div>
             <?php else: 
@@ -102,7 +116,7 @@
                 $hasMoreEntries = $totalEntries > 1;
             ?>
                 <div class="automation-entries-wrapper" id="automation-entries-wrapper">
-                    <div class="automation-entries-list" id="automation-entries-list">
+                    <div class="automation-entries-list" id="automation-entries-list" data-total-entries="<?php echo $totalEntries; ?>">
                         <?php foreach ($entries as $index => $entry): 
                             $entryType = $entry['type'] ?? 'unknown';
                             $entryTimestamp = $entry['timestamp'] ?? 0;
@@ -132,10 +146,9 @@
                 </div>
             <?php endif; ?>
         <?php else: ?>
-            <div class="automation-status-empty">
+            <div class="automation-status-empty" id="automation-status-empty">
                 <p>No automation entries yet</p>
             </div>
         <?php endif; ?>
     </div>
 </div>
-
