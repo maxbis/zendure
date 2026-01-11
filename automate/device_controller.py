@@ -680,7 +680,7 @@ class AutomateController(BaseDeviceController):
                    actual_power is the power value that was actually sent (after limiting/modifications)
         """
 
-        self.log('info', f"Sending power feed: {power_feed} W")
+        # self.log('info', f"Sending power feed: {power_feed} W")
 
         # Store original power for error cases
         original_power = power_feed
