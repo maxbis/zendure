@@ -902,12 +902,12 @@ class AutomateController(BaseDeviceController):
         # Convert to CLI convention (positive=charge, negative=discharge)
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
-            # If calculation says to discharge, return 1 (netzero+ doesn't discharge, use 1 to avoid standby)
+            # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
             if new_output > 0:
-                return 1
+                return 0
             else:
                 # Charging or stopped - if stopped (0), return 1 to avoid standby
-                return new_input if new_input > 0 else 1
+                return new_input if new_input > 0 else 0
         else:
             # Regular netzero mode
             if new_output > 0:
@@ -917,8 +917,7 @@ class AutomateController(BaseDeviceController):
                 # Charging: return positive value
                 return new_input
             else:
-                # Stopped - return 1 to avoid standby mode (sets limits to 0 but keeps acMode)
-                return 1
+                return 0
     
     def set_power(
             self,

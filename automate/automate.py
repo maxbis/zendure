@@ -401,6 +401,8 @@ def main():
     last_api_refresh_time = 0
     old_value = None
     value = 0
+    zero_count = 0
+    zero_count_threshold = 10  # If the power has been set to 0 for 10 consecutive iterations, set device in standby mode
     
     try:
         while True:
@@ -508,6 +510,20 @@ def main():
             
             # Update value for next iteration
             value = desired_power
+
+            # Count the number of times the power has been set to 0
+            if value == 0:
+                zero_count += 1
+            else:
+                zero_count = 0
+        
+            # If the power has been set to 0 for zero_count_threshold consecutive iterations, set device in standby mode
+            if zero_count == zero_count_threshold:
+                log_info(f"0 power for {zero_count_threshold} consecutive iterations, setting device in standby mode")
+                controller.set_power(1)
+                sleep(2)
+                controller.set_power(0)
+            
 
             # Interruptible sleep: sleep in 1-second chunks and check shutdown flag and input
             sleep_remaining = LOOP_INTERVAL_SECONDS
