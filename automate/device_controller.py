@@ -679,6 +679,9 @@ class AutomateController(BaseDeviceController):
             tuple: (success: bool, error_message: str or None, actual_power: int)
                    actual_power is the power value that was actually sent (after limiting/modifications)
         """
+
+        slef.log('info', f"Sending power feed: {power_feed} W")
+
         # Store original power for error cases
         original_power = power_feed
         
