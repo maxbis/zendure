@@ -586,7 +586,7 @@ class AutomateController(BaseDeviceController):
             log_file_path=str(self.POWER_LOG_FILE)
         )
     
-    def _build_device_properties(self, power_feed: int) -> Dict[str, Any]:
+    def _build_device_properties(self, power_feed: int, stand_by: bool = False) -> Dict[str, Any]:
         """
         Build device properties dict based on power_feed value.
         
@@ -596,6 +596,8 @@ class AutomateController(BaseDeviceController):
         Returns:
             dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
         """
+
+
         if power_feed > 1:
             # Charge mode: acMode 1 = Input
             return {
@@ -612,21 +614,22 @@ class AutomateController(BaseDeviceController):
                 "inputLimit": 0,
                 "smartMode": 1,
             }
-        elif abs(power_feed) == 1:
-            # when requested power is (-1 or 1), set to 0 but don't go into standby mode
+        elif stand_by:
+            # Go into Stand-by mode
             return {
+                "acMode": 0,
                 "inputLimit": 0,
                 "outputLimit": 0,
                 "smartMode": 1,
-            }
+                }
         else:
-            # Stop all
+            # zer0 charging
             return {
-                "acMode": 1,
                 "inputLimit": 0,
                 "outputLimit": 0,
                 "smartMode": 1,
             }
+
     
     def check_battery_limits(self) -> None:
         """
