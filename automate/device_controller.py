@@ -732,6 +732,7 @@ class AutomateController(BaseDeviceController):
         request_standby = (power_feed == 0 and not self.stopping_discharge)
         properties = self._build_device_properties(power_feed, request_standby=request_standby)
         print(f"Properties: {properties}")
+        print(f"Request standby: {request_standby}")
         payload = {"sn": self.device_sn, "properties": properties}
         
         if TEST_MODE:
