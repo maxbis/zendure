@@ -129,8 +129,9 @@ body {
 
 .btn {
     border: none;
+    min-width: 45px;
+    min-height: 25px;
     border-radius: 6px;
-    padding: 2px 8px;
     font-size: 0.80rem;
     cursor: pointer;
     font-weight: 500;
