@@ -579,6 +579,7 @@ class AutomateController(BaseDeviceController):
         self.device_sn = device_sn
         self.previous_power = None  # Track the last successfully set power value (internal convention)
         self.limit_state = 0  # Battery limit state: -1 (MIN), 0 (OK), 1 (MAX)
+        self.stopping_discharge = False  # Track if we're transitioning from discharge to stop (two-step process)
         
         # Initialize power accumulator
         self.accumulator = PowerAccumulator(
@@ -586,17 +587,18 @@ class AutomateController(BaseDeviceController):
             log_file_path=str(self.POWER_LOG_FILE)
         )
     
-    def _build_device_properties(self, power_feed: int) -> Dict[str, Any]:
+    def _build_device_properties(self, power_feed: int, request_standby: bool = False) -> Dict[str, Any]:
         """
         Build device properties dict based on power_feed value.
         
         Args:
             power_feed: Power feed value in watts (positive for charge, negative for discharge, 0 to stop)
+            stopping_discharge: If True and power_feed is 0, only set outputLimit to 0 (first step of transition)
         
         Returns:
             dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
         """
-        if power_feed > 1:
+        if power_feed > 0:
             # Charge mode: acMode 1 = Input
             return {
                 "acMode": 1,
@@ -604,7 +606,7 @@ class AutomateController(BaseDeviceController):
                 "outputLimit": 0,
                 "smartMode": 1,
             }
-        elif power_feed < -1:
+        elif power_feed < 0:
             # Discharge mode: acMode 2 = Output
             return {
                 "acMode": 2,
@@ -612,20 +614,21 @@ class AutomateController(BaseDeviceController):
                 "inputLimit": 0,
                 "smartMode": 1,
             }
-        elif abs(power_feed) == 1:
-            # when requested power is (-1 or 1), set to 0 but don't go into standby mode
-            return {
-                "inputLimit": 0,
-                "outputLimit": 0,
-                "smartMode": 1,
-            }
-        else:
-            # Stop all
+        elif request_standby:
+            # Stop all (final step after transition, or direct stop)
             return {
                 "acMode": 0,
                 "inputLimit": 0,
                 "outputLimit": 0,
                 "smartMode": 1,
+            }
+        else:
+            # First step of transition from discharge to stop: Set outputLimit to 0, but keep acMode at 2
+            return {
+                "outputLimit": 0,
+                "inputLimit": 0,
+                "smartMode": 1,
+                # acMode is NOT included - device stays in Output mode (2)
             }
     
     def check_battery_limits(self) -> None:
@@ -698,16 +701,33 @@ class AutomateController(BaseDeviceController):
             power_feed = MAX_CHARGE_POWER
         
         # Check if the new power value is the same as the previous one
-        if self.previous_power is not None and power_feed == self.previous_power:
+        # (but not if we're in the middle of a transition)
+        if self.previous_power is not None and power_feed == self.previous_power and not self.stopping_discharge:
             self.log('info', f"Power value unchanged ({power_feed} W), skipping device update")
             # Still accumulate since power is being maintained (operation is successful)
             self.accumulator.accumulate_power_feed(power_feed)
             return (True, None, power_feed)
         
+        # Handle two-step transition from discharge to stop
+        was_discharging = self.previous_power is not None and self.previous_power < 0
+        is_stopping = power_feed == 0
+        
+        if was_discharging and is_stopping and not self.stopping_discharge:
+            # First step: Set outputLimit to 0, but keep acMode at 2
+            self.stopping_discharge = True
+            self.log('info', "Transitioning from discharge to stop: First setting outputLimit to 0")
+        elif self.stopping_discharge and power_feed == 0:
+            # Second step: Set acMode to 0 (full stop)
+            self.stopping_discharge = False
+            self.log('info', "Transitioning from discharge to stop: Setting acMode to 0 (full stop)")
+        elif power_feed != 0:
+            # Not stopping anymore, reset the flag
+            self.stopping_discharge = False
+        
         url = f"http://{self.device_ip}/properties/write"
     
         # Construct properties based on power_feed value
-        properties = self._build_device_properties(power_feed)
+        properties = self._build_device_properties(power_feed, stopping_discharge=self.stopping_discharge)
         payload = {"sn": self.device_sn, "properties": properties}
         
         if TEST_MODE:
