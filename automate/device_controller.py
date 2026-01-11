@@ -730,7 +730,9 @@ class AutomateController(BaseDeviceController):
         url = f"http://{self.device_ip}/properties/write"
     
         # Construct properties based on power_feed value
-        properties = self._build_device_properties(power_feed, stopping_discharge=self.stopping_discharge)
+        # request_standby: True = set acMode to 0 (final step), False = set outputLimit to 0 without acMode (first step)
+        request_standby = (power_feed == 0 and not self.stopping_discharge)
+        properties = self._build_device_properties(power_feed, request_standby=request_standby)
         payload = {"sn": self.device_sn, "properties": properties}
         
         if TEST_MODE:
