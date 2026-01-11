@@ -596,7 +596,8 @@ class AutomateController(BaseDeviceController):
         Returns:
             dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
         """
-
+        if self.previous_power is not None and self.previous_power == 0:
+            stand_by = True
 
         if power_feed > 1:
             # Charge mode: acMode 1 = Input
