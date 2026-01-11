@@ -600,8 +600,6 @@ class AutomateController(BaseDeviceController):
         if self.previous_power is not None and self.previous_power == 1:
             stand_by = True
 
-        print(f"Stand by: {stand_by}")
-
         if power_feed > 1:
             # Charge mode: acMode 1 = Input
             return {
