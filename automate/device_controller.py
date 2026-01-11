@@ -680,9 +680,6 @@ class AutomateController(BaseDeviceController):
                    actual_power is the power value that was actually sent (after limiting/modifications)
         """
 
-        self.log('info', f"Sending power feed: {power_feed} W")
-        print(f"Sending power feed: {power_feed} W")
-
         # Store original power for error cases
         original_power = power_feed
         
@@ -734,6 +731,7 @@ class AutomateController(BaseDeviceController):
         # request_standby: True = set acMode to 0 (final step), False = set outputLimit to 0 without acMode (first step)
         request_standby = (power_feed == 0 and not self.stopping_discharge)
         properties = self._build_device_properties(power_feed, request_standby=request_standby)
+        print(f"Properties: {properties}")
         payload = {"sn": self.device_sn, "properties": properties}
         
         if TEST_MODE:
