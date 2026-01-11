@@ -8,6 +8,7 @@ the functionality in zero_feed_in_controller.py.
 """
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -996,6 +997,23 @@ class AutomateController(BaseDeviceController):
         
         else:
             raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', or None")
+
+    def set_standby_mode(self) -> PowerResult:
+        """
+        Put the device into standby mode.
+        Executes the sequence: 1W -> 2s sleep -> 0W.
+        """
+        self.log('info', "Initiating standby sequence...")
+        # Step 1: Set to 1W to prime the previous_power state
+        res1 = self.set_power(1)
+        if not res1.success:
+            return res1
+        
+        # Step 2: Wait for state to settle
+        time.sleep(2)
+        
+        # Step 3: Set to 0W to trigger standby logic
+        return self.set_power(0)
 
 
 class DeviceDataReader(BaseDeviceController):
