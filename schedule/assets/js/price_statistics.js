@@ -23,7 +23,7 @@ function formatPrice(price) {
 function calculatePriceStatistics(priceData) {
     const todayPrices = priceData?.today || {};
     const tomorrowPrices = priceData?.tomorrow || {};
-    
+
     // Collect all prices from today and tomorrow
     const allPrices = [];
     for (let h = 0; h < 24; h++) {
@@ -35,7 +35,7 @@ function calculatePriceStatistics(priceData) {
             allPrices.push(parseFloat(tomorrowPrices[hourKey]));
         }
     }
-    
+
     if (allPrices.length === 0) {
         return {
             minPrice: null,
@@ -46,20 +46,20 @@ function calculatePriceStatistics(priceData) {
             percentile: null
         };
     }
-    
+
     // Calculate statistics
     const minPrice = Math.min(...allPrices);
     const maxPrice = Math.max(...allPrices);
     const avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
     const delta = maxPrice - minPrice;
-    
+
     // Get current price (from current hour of today)
     const now = new Date();
     const currentHour = String(now.getHours()).padStart(2, '0');
-    const currentPrice = todayPrices[currentHour] !== null && todayPrices[currentHour] !== undefined 
-        ? parseFloat(todayPrices[currentHour]) 
+    const currentPrice = todayPrices[currentHour] !== null && todayPrices[currentHour] !== undefined
+        ? parseFloat(todayPrices[currentHour])
         : null;
-    
+
     // Calculate percentile
     let percentile = null;
     if (currentPrice !== null && maxPrice > minPrice) {
@@ -68,7 +68,7 @@ function calculatePriceStatistics(priceData) {
         // All prices are the same
         percentile = 50.0;
     }
-    
+
     return {
         minPrice,
         maxPrice,
@@ -93,7 +93,7 @@ function renderPriceStatistics(stats) {
     if (minDetailEl && stats.delta !== null) {
         minDetailEl.textContent = `Delta ${formatPrice(stats.delta)}`;
     }
-    
+
     // Maximum Price
     const maxValueEl = document.getElementById('price-stat-max-value');
     const maxDetailEl = document.getElementById('price-stat-max-detail');
@@ -103,13 +103,13 @@ function renderPriceStatistics(stats) {
     if (maxDetailEl && stats.delta !== null) {
         maxDetailEl.textContent = `Delta ${formatPrice(stats.delta)}`;
     }
-    
+
     // Average Price
     const avgValueEl = document.getElementById('price-stat-avg-value');
     if (avgValueEl) {
         avgValueEl.textContent = formatPrice(stats.avgPrice);
     }
-    
+
     // Current Price
     const currentValueEl = document.getElementById('price-stat-current-value');
     const currentDetailEl = document.getElementById('price-stat-current-detail');
@@ -133,19 +133,19 @@ async function fetchAndRenderPriceStatistics(priceApiUrl) {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
             console.error('Non-JSON response from price API:', text.substring(0, 200));
             throw new Error('Server returned non-JSON response. Check console for details.');
         }
-        
+
         const priceData = await response.json();
-        
+
         // Calculate statistics
         const stats = calculatePriceStatistics(priceData);
-        
+
         // Render statistics
         renderPriceStatistics(stats);
     } catch (e) {
@@ -168,6 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL) {
         fetchAndRenderPriceStatistics(PRICE_API_URL);
     } else {
-        console.warn('PRICE_API_URL not defined, cannot fetch price statistics');
+        console.log('Price statistics disabled: PRICE_API_URL is not configured.');
     }
 });

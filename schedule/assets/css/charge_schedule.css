@@ -483,3 +483,335 @@ body {
     margin-bottom: -4px;
     pointer-events: none;
 }
+
+/* 
+   --------------------------------------------------------------------------
+   CONSOLIDATED STYLES (Refactor)
+   Common styles moved from partials to here to reduce duplication.
+   --------------------------------------------------------------------------
+*/
+
+/* 1. Global Scrollbar Styling (Webkit) */
+.custom-scroll::-webkit-scrollbar,
+.schedule-list::-webkit-scrollbar,
+.table-wrapper::-webkit-scrollbar,
+.bar-graph-row::-webkit-scrollbar,
+.price-graph-row::-webkit-scrollbar {
+    width: 8px; /* For vertical */
+    height: 8px; /* For horizontal */
+}
+
+.custom-scroll::-webkit-scrollbar-track,
+.schedule-list::-webkit-scrollbar-track,
+.table-wrapper::-webkit-scrollbar-track,
+.bar-graph-row::-webkit-scrollbar-track,
+.price-graph-row::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb,
+.schedule-list::-webkit-scrollbar-thumb,
+.table-wrapper::-webkit-scrollbar-thumb,
+.bar-graph-row::-webkit-scrollbar-thumb,
+.price-graph-row::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover,
+.schedule-list::-webkit-scrollbar-thumb:hover,
+.table-wrapper::-webkit-scrollbar-thumb:hover,
+.bar-graph-row::-webkit-scrollbar-thumb:hover,
+.price-graph-row::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
+/* 2. Common Chart/Graph Layouts */
+.chart-wrapper,
+.bar-graph-wrapper,
+.price-graph-wrapper {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.chart-layout,
+.bar-graph-layout,
+.price-graph-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 900px) {
+    .chart-layout,
+    .bar-graph-layout,
+    .price-graph-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Chart Card specific tweaks (flex column) */
+.bar-graph-wrapper .card,
+.price-graph-wrapper .card {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; 
+}
+
+/* 3. Common Graph Row (Scrollable Container) */
+.chart-row,
+.bar-graph-row,
+.price-graph-row {
+    display: flex;
+    gap: 2px;
+    height: 100px;
+    width: auto;
+    padding: 8px 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    scrollbar-width: thin;
+    min-width: 0;
+}
+
+/* 4. Common Graph Bar Base Styles */
+.chart-bar,
+.bar-graph-bar,
+.price-graph-bar {
+    flex: none;
+    width: 20px;
+    min-width: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    padding: 0;
+}
+
+.chart-bar:hover,
+.bar-graph-bar:hover,
+.price-graph-bar:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+.chart-bar.current,
+.bar-graph-bar.bar-current,
+.price-graph-bar.price-current {
+    background: rgba(255, 152, 0, 0.1);
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    z-index: 10;
+}
+
+/* 5. Common Graph Bar Inner (The colored part) */
+.chart-bar-inner,
+.bar-graph-bar-inner,
+.price-graph-bar-inner {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 3px 3px 0 0;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.chart-bar:hover .chart-bar-inner,
+.bar-graph-bar:hover .bar-graph-bar-inner,
+.price-graph-bar:hover .price-graph-bar-inner {
+    opacity: 1 !important;
+    transform: scaleY(1.1);
+}
+
+/* 6. Common Graph Bar Label */
+.chart-bar-label,
+.bar-graph-bar-label,
+.price-graph-bar-label {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.chart-bar.current .chart-bar-label,
+.bar-graph-bar.bar-current .bar-graph-bar-label,
+.price-graph-bar.price-current .price-graph-bar-label {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+/* 7. Common Tooltip Styles for Bars */
+.has-tooltip[title]:hover::after,
+.bar-graph-bar[title]:hover::after,
+.price-graph-bar[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+    pointer-events: none;
+}
+
+.has-tooltip[title]:hover::before,
+.bar-graph-bar[title]:hover::before,
+.price-graph-bar[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+    margin-bottom: -4px;
+    pointer-events: none;
+}
+
+/* Responsive adjustments for graphs */
+@media (max-width: 768px) {
+    .chart-row,
+    .bar-graph-row,
+    .price-graph-row {
+        height: 150px;
+        gap: 1px;
+    }
+
+    .chart-bar-label,
+    .bar-graph-bar-label,
+    .price-graph-bar-label {
+        font-size: 0.6rem;
+    }
+
+    .chart-bar-inner,
+    .bar-graph-bar-inner,
+    .price-graph-bar-inner {
+        min-height: 6px;
+    }
+}
+
+/* 
+   --------------------------------------------------------------------------
+   Specific Schedule Panels Styles (Moved from schedule_panels.css)
+   --------------------------------------------------------------------------
+*/
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 250px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    scrollbar-width: thin;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    margin-bottom: 2px;
+}
+
+.schedule-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.schedule-item-time {
+    min-width: 80px;
+    font-weight: 600;
+    color: #333;
+}
+
+.schedule-item-value {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-left: 8px; /* Fixed typo 8x -> 8px inferred */
+}
+
+.schedule-item-key {
+    font-size: 0.75rem;
+    color: #888;
+    font-family: monospace;
+    margin-left: 8px;
+}
+
+.time-night { background-color: #e3f2fd; }
+.time-morning { background-color: #fff9e6; }
+.time-afternoon { background-color: #e8f5e9; }
+.time-evening { background-color: #fce4ec; }
+
+.slot-current {
+    border: 3px solid #ff9800 !important;
+    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5), 0 2px 8px rgba(255, 152, 0, 0.3);
+    font-weight: 600;
+    position: relative;
+}
+
+.table-wrapper {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 8px;
+    scrollbar-width: thin;
+}
+
+#schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#schedule-table th,
+#schedule-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9rem;
+}
+
+#schedule-table th {
+    background: #f0f0f0;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+#schedule-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+#schedule-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* 
+   --------------------------------------------------------------------------
+   Specific Graph Colors (Moved from partials)
+   --------------------------------------------------------------------------
+*/
+/* Charge Schedule Bar Colors */
+.bar-graph-bar-inner.bar-charge { background: #007321; }
+.bar-graph-bar-inner.bar-netzero-plus { background: #bac302; }
+.bar-graph-bar-inner.bar-discharge { background: #e53935; }
+.bar-graph-bar-inner.bar-neutral { background: #757575; }
+.bar-graph-bar-inner.bar-netzero { background: #0026ff; }
+
+/* Price Graph Colors */
+.price-graph-bar-inner.price-null { background: #757575; }
