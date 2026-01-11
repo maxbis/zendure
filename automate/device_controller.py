@@ -622,7 +622,7 @@ class AutomateController(BaseDeviceController):
         else:
             # Stop all
             return {
-                "acMode": 0,
+                "acMode": 1,
                 "inputLimit": 0,
                 "outputLimit": 0,
                 "smartMode": 1,
