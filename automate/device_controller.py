@@ -596,8 +596,6 @@ class AutomateController(BaseDeviceController):
         Returns:
             dict: Device properties with acMode, inputLimit, outputLimit, and smartMode
         """
-        print(f"Previous power: {self.previous_power}")
-        print(f"Power feed: {power_feed}")
 
         if self.previous_power is not None and self.previous_power == 1:
             stand_by = True
@@ -622,7 +620,7 @@ class AutomateController(BaseDeviceController):
             }
         elif stand_by:
             # Go into Stand-by mode
-            print("Going into Stand-by mode")
+            self.log('info', "Going into Stand-by mode")
             return {
                 "acMode": 0,
                 "inputLimit": 0,
