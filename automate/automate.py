@@ -521,7 +521,7 @@ def main():
             if zero_count == zero_count_threshold:
                 log_info(f"0 power for {zero_count_threshold} consecutive iterations, setting device in standby mode")
                 controller.set_power(1)
-                sleep(2)
+                time.sleep(2)
                 controller.set_power(0)
             
 
