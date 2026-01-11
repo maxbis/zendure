@@ -12,6 +12,7 @@ class ConfirmDialog {
         this.closeBtn = document.getElementById('confirm-dialog-close');
         
         this.resolve = null;
+        this.isAlertMode = false;
         this.init();
     }
 
@@ -22,7 +23,7 @@ class ConfirmDialog {
         // Cancel button
         this.cancelBtn.onclick = () => this.close(false);
         
-        // Confirm button
+        // Confirm button (will be set in show/alert methods)
         this.confirmBtn.onclick = () => this.close(true);
         
         // Backdrop click to close
@@ -51,12 +52,19 @@ class ConfirmDialog {
     show(message, title = 'Confirm', confirmText = 'Confirm', confirmClass = 'btn-primary') {
         return new Promise((resolve) => {
             this.resolve = resolve;
+            this.isAlertMode = false;
             this.titleEl.textContent = title;
             this.messageEl.textContent = message;
+            
+            // Ensure cancel button is visible
+            this.cancelBtn.style.display = '';
             
             // Update confirm button text and class
             this.confirmBtn.textContent = confirmText;
             this.confirmBtn.className = `btn ${confirmClass}`;
+            
+            // Set confirm button handler
+            this.confirmBtn.onclick = () => this.close(true);
             
             this.dialog.classList.add('active');
             
@@ -65,11 +73,48 @@ class ConfirmDialog {
         });
     }
 
+    /**
+     * Show alert dialog (single button, no cancel)
+     * @param {string} message - The message to display
+     * @param {string} title - Optional title (default: "Alert")
+     * @param {string} buttonText - Optional button text (default: "OK")
+     * @param {string} buttonClass - Optional button class (default: "btn-primary")
+     * @returns {Promise<void>} - Promise that resolves when the user clicks OK
+     */
+    alert(message, title = 'Alert', buttonText = 'OK', buttonClass = 'btn-primary') {
+        return new Promise((resolve) => {
+            this.resolve = resolve;
+            this.isAlertMode = true;
+            this.titleEl.textContent = title;
+            this.messageEl.textContent = message;
+            
+            // Update confirm button text and class
+            this.confirmBtn.textContent = buttonText;
+            this.confirmBtn.className = `btn ${buttonClass}`;
+            
+            // Hide cancel button for alert mode
+            this.cancelBtn.style.display = 'none';
+            
+            // Set confirm button handler (always resolves to true for alerts)
+            this.confirmBtn.onclick = () => this.close(true);
+            
+            this.dialog.classList.add('active');
+            
+            // Focus the confirm/OK button
+            this.confirmBtn.focus();
+        });
+    }
+
     close(confirmed) {
         this.dialog.classList.remove('active');
         if (this.resolve) {
             this.resolve(confirmed);
             this.resolve = null;
+        }
+        // Restore cancel button visibility (in case it was hidden in alert mode)
+        if (this.isAlertMode) {
+            this.cancelBtn.style.display = '';
+            this.isAlertMode = false;
         }
     }
 }

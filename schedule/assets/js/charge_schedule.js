@@ -300,7 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const count = result.count || 0;
                 
                 if (count === 0) {
-                    alert('No outdated schedule entries to delete.');
+                    await confirmDialog.alert(
+                        'No outdated schedule entries to delete.',
+                        'No Entries to Clear',
+                        'OK',
+                        'btn-primary'
+                    );
                     return;
                 }
 
