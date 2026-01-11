@@ -681,6 +681,7 @@ class AutomateController(BaseDeviceController):
         """
 
         self.log('info', f"Sending power feed: {power_feed} W")
+        print(f"Sending power feed: {power_feed} W")
 
         # Store original power for error cases
         original_power = power_feed
