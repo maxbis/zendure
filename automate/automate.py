@@ -426,10 +426,15 @@ class AutomationApp:
             if result.success:
                 self.log_info(f"Power: {result.power} (desired: {desired_power})")
                 self._post_status_update('change', self.old_value, result.power)
+                # Update self.value with the actual power that was set (result.power)
+                # This is important for netzero modes where calculated power may differ from 'netzero'
+                self.value = result.power
             else:
                 self.log_error(f"Failed to set power: {result.error}")
-        
-        self.value = desired_power
+                # Don't update self.value if setting failed - keep previous value
+        else:
+            # Power didn't change, but still update self.value to desired_power for consistency
+            self.value = desired_power
 
     def _handle_standby_check(self):
         """Check if we need to enter standby mode."""
