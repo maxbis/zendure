@@ -1352,9 +1352,15 @@ class ScheduleController(BaseDeviceController):
         
         if self.current_time_str is None:
             raise ValueError("Current time string is not available")
+
+        # Calculate current time string fresh each time (not using stored value)
+        # Format: HHmm (e.g., "0930" for 9:30 AM, "1700" for 5:00 PM)
+        tz = ZoneInfo(self.TIMEZONE)
+        now = datetime.now(tz=tz)
+        current_time_str = now.strftime('%H%M')
         
         # Find the current schedule value
-        desired_power = self._find_current_schedule_value(resolved, self.current_time_str)
+        desired_power = self._find_current_schedule_value(resolved, current_time_str)
         
         return desired_power
     

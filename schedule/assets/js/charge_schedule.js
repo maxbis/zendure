@@ -238,12 +238,98 @@ async function refreshData() {
     }
 }
 
+/**
+ * Clear old schedule entries (API call)
+ * @param {boolean} simulate - If true, only simulate deletion (returns count)
+ * @returns {Promise<Object>} - Promise with response object
+ */
+async function clearOldEntries(simulate = true) {
+    try {
+        const action = simulate ? 'simulate' : 'delete';
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error('Server returned non-JSON response. Check console for details.');
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error clearing old entries:', error);
+        throw error;
+    }
+}
+
 // Initialize application
 let editModal;
+let confirmDialog;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize edit modal with callback to refresh data after save/delete
     editModal = new EditModal(API_URL, refreshData);
+
+    // Initialize confirm dialog
+    confirmDialog = new ConfirmDialog();
+
+    // Add click handler for Clear button
+    const clearBtn = document.getElementById('clear-entry-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            try {
+                // First, simulate to get count
+                const result = await clearOldEntries(true);
+                
+                if (!result.success) {
+                    alert('Error: ' + (result.error || 'Failed to check old entries'));
+                    return;
+                }
+
+                const count = result.count || 0;
+                
+                if (count === 0) {
+                    alert('No outdated schedule entries to delete.');
+                    return;
+                }
+
+                // Show confirmation dialog
+                const confirmed = await confirmDialog.show(
+                    `Are you sure you want to delete ${count} outdated schedule entries?`,
+                    'Clear Old Entries',
+                    'Delete',
+                    'btn-danger'
+                );
+
+                if (confirmed) {
+                    // Perform actual deletion
+                    const deleteResult = await clearOldEntries(false);
+                    
+                    if (!deleteResult.success) {
+                        alert('Error: ' + (deleteResult.error || 'Failed to delete old entries'));
+                        return;
+                    }
+
+                    // Refresh data to show updated entries
+                    await refreshData();
+                }
+            } catch (error) {
+                console.error('Error in clear button handler:', error);
+                alert('Error: ' + error.message);
+            }
+        });
+    }
 
     // Initial data load
     refreshData();

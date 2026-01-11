@@ -129,9 +129,9 @@ body {
 
 .btn {
     border: none;
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 0.85rem;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.80rem;
     cursor: pointer;
     font-weight: 500;
     transition: all 0.2s ease-out;
@@ -180,6 +180,26 @@ body {
     border-color: #64b5f6;
     color: #64b5f6;
     box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2);
+}
+
+.btn-clear {
+    background: #bdbdbd;
+    color: #fff;
+}
+
+.btn-clear:hover {
+    background: #ffb3ba;
+    box-shadow: 0 4px 12px rgba(255, 179, 186, 0.4);
+}
+
+.btn-add {
+    background: #a3c9e2;
+    color: #fff;
+}
+
+.btn-add:hover {
+    background: #8bb4d6;
+    box-shadow: 0 4px 12px rgba(163, 201, 226, 0.4);
 }
 
 .btn-icon {
@@ -238,6 +258,10 @@ body {
 }
 
 #confirm-dialog {
+    z-index: 2000;
+}
+
+#confirm-dialog-generic {
     z-index: 2000;
 }
 

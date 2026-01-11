@@ -158,3 +158,118 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
 
     return $result;
 }
+
+/**
+ * Extract date part from key (first 8 characters)
+ * @param string $key - The schedule key (12 characters: YYYYMMDDHHmm)
+ * @return string - Date part (YYYYMMDD)
+ */
+function extractDateFromKey($key)
+{
+    if (strlen($key) < 8) {
+        return '';
+    }
+    return substr($key, 0, 8);
+}
+
+/**
+ * Check if a wildcard pattern can match any date >= yesterday
+ * @param string $datePattern - Date pattern with wildcards (e.g., "2024****")
+ * @param string $yesterdayDate - Yesterday's date in YYYYMMDD format
+ * @return bool - True if pattern should be kept (can match yesterday or later), false if should be deleted
+ */
+function shouldKeepWildcard($datePattern, $yesterdayDate)
+{
+    // If pattern has no wildcards, treat as exact match
+    if (strpos($datePattern, '*') === false) {
+        return $datePattern >= $yesterdayDate;
+    }
+
+    $pattern = str_split($datePattern);
+    $yesterdayChars = str_split($yesterdayDate);
+    
+    // Strategy 1: Build the latest possible date that matches the pattern (wildcards as 9)
+    $latestDate = '';
+    for ($i = 0; $i < 8; $i++) {
+        $latestDate .= ($pattern[$i] === '*') ? '9' : $pattern[$i];
+    }
+    
+    // If the latest possible date is < yesterday, all matches are older -> delete
+    if ($latestDate < $yesterdayDate) {
+        return false;
+    }
+    
+    // Strategy 2: Try to construct a date >= yesterday by replacing wildcards with yesterday's digits
+    $testDate = '';
+    for ($i = 0; $i < 8; $i++) {
+        $testDate .= ($pattern[$i] === '*') ? $yesterdayChars[$i] : $pattern[$i];
+    }
+    
+    // If this date matches the pattern and is >= yesterday, keep it
+    if ($testDate >= $yesterdayDate) {
+        // Verify the test date matches the pattern
+        $matches = true;
+        for ($i = 0; $i < 8; $i++) {
+            if ($pattern[$i] !== '*' && $pattern[$i] !== $testDate[$i]) {
+                $matches = false;
+                break;
+            }
+        }
+        if ($matches) {
+            return true;
+        }
+    }
+    
+    // Strategy 3: Try to construct the earliest date >= yesterday that matches the pattern
+    // This is more complex, but for safety, if we can't easily determine, keep it
+    // (Better to keep a few extra entries than delete something that might be needed)
+    return true;
+}
+
+/**
+ * Clear old schedule entries (older than yesterday)
+ * @param array $schedule - The schedule array
+ * @param bool $simulate - If true, only count entries without deleting
+ * @return array - Array with 'count' and optionally 'entries' (keys to delete)
+ */
+function clearOldEntries($schedule, $simulate = true)
+{
+    // Calculate yesterday's date (YYYYMMDD format)
+    $yesterdayDate = date('Ymd', strtotime('-1 day'));
+    
+    $keysToDelete = [];
+    
+    foreach ($schedule as $key => $value) {
+        $keyStr = (string) $key;
+        
+        // Skip invalid keys (must be 12 characters)
+        if (strlen($keyStr) !== 12) {
+            continue;
+        }
+        
+        // Extract date part (first 8 characters)
+        $datePart = extractDateFromKey($keyStr);
+        
+        // Check if date part has wildcards
+        $hasWildcard = (strpos($datePart, '*') !== false);
+        
+        if ($hasWildcard) {
+            // For wildcard patterns, check if ALL matching dates are older than yesterday
+            // If the pattern can match any date >= yesterday, keep it
+            if (!shouldKeepWildcard($datePart, $yesterdayDate)) {
+                $keysToDelete[] = $keyStr;
+            }
+        } else {
+            // For exact dates, check if date < yesterday
+            if ($datePart < $yesterdayDate) {
+                $keysToDelete[] = $keyStr;
+            }
+        }
+    }
+    
+    // Always return entries so they can be deleted if not simulating
+    return [
+        'count' => count($keysToDelete),
+        'entries' => $keysToDelete
+    ];
+}

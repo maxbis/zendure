@@ -73,6 +73,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Schedule Panels: Today's Schedule and Schedule Entries -->
         <?php include __DIR__ . '/partials/schedule_panels.php'; ?>
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
+        <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
 
         <!-- Bar Graph Section - Full Width -->
         <?php include __DIR__ . '/partials/schedule_overview_bar.php'; ?>
@@ -102,6 +103,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
         </script>
         <script src="assets/js/edit_modal.js"></script>
+        <script src="assets/js/confirm_dialog.js"></script>
         <script src="assets/js/schedule_panels.js"></script>
         <script src="assets/js/schedule_overview_bar.js"></script>
         <script src="assets/js/price_overview_bar.js"></script>

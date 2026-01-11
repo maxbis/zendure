@@ -92,7 +92,10 @@ function getValueLabel($val)
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h2>Schedule Entries</h2>
-            <button class="btn btn-primary" id="add-entry-btn">Add Entry</button>
+            <div style="display:flex; gap:8px; width:100px;">
+                <button class="btn btn-clear" id="clear-entry-btn" style="flex:1;">Clear</button>
+                <button class="btn btn-add" id="add-entry-btn" style="flex:1;">Add</button>
+            </div>
         </div>
         <div class="status-bar" id="status-bar" style="margin-top:5px; font-size:0.8rem; color:#666;">
             <span><?php echo count($schedule); ?> entries loaded.</span>
