@@ -32,6 +32,41 @@ function getTempColor($temp) {
 }
 
 /**
+ * Get color for temperature display with enhanced gradient
+ * Blue (cold) -> Light yellow -> Yellow -> Green -> Orange -> Red (hot)
+ * Scale: -10 to +40 degrees Celsius
+ * 
+ * @param float $temp Temperature in Celsius (-10 to +40)
+ * @return string Hex color code
+ */
+function getTempColorEnhanced($temp) {
+    // Clamp temperature to range
+    $temp = max(-10, min(40, $temp));
+    
+    // Simplified color mapping for -10 to +40 range
+    // -10 to 0: Blue (#2196f3)
+    // 0 to 10: Light yellow (#fff9c4)
+    // 10 to 20: Yellow (#fff176)
+    // 20 to 30: Green (#81c784)
+    // 30 to 35: Orange (#ff9800)
+    // 35 to 40: Red (#e57373)
+    
+    if ($temp <= 0) {
+        return '#4fc3f7'; // Blue
+    } elseif ($temp <= 5) {
+        return '#fff176'; // Light yellow
+    } elseif ($temp <= 15) {
+        return '#ffe500'; // Yellow
+    } elseif ($temp <= 25) {
+        return '#81c784'; // Green
+    } elseif ($temp <= 30) {
+        return '#ff9800'; // Orange
+    } else {
+        return '#e57373'; // Red
+    }
+}
+
+/**
  * Get color for WiFi signal strength (RSSI)
  * Green for good signal (8-10), yellow for medium (5-7), red for poor (0-4)
  * 

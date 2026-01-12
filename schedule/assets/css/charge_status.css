@@ -9,6 +9,11 @@
 .charge-status-wrapper .card {
     width: 100%;
     max-width: 100%;
+    padding-bottom: 12px;
+}
+
+.charge-status-wrapper .card .metric-section {
+    margin-bottom: 0;
 }
 
 .charge-status-header {

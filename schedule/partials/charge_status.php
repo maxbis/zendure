@@ -7,6 +7,10 @@
  * battery level, and timestamp. Helper functions (getSystemStatusInfo, formatRelativeTime, etc.) 
  * are available via status.php included in the parent file.
  */
+
+// Include required functions for temperature conversion and color calculation
+require_once __DIR__ . '/../includes/formatters.php';
+require_once __DIR__ . '/../includes/colors.php';
 ?>
 <!-- Charge/Discharge Status Section -->
 <div class="card">
@@ -137,6 +141,62 @@
             $acStatus = $properties['acStatus'] ?? 0;
             $electricLevel = $properties['electricLevel'] ?? 0;
             $solarInputPower = $properties['solarInputPower'] ?? 0;
+            $rssi = $properties['rssi'] ?? -90; // Default to min_rssi if not available
+            
+            // Calculate RSSI score: (rssi - min_rssi) / (max_rssi - min_rssi) * 10
+            $minRssi = -90;
+            $maxRssi = -30;
+            $rssiScore = (($rssi - $minRssi) / ($maxRssi - $minRssi)) * 10;
+            $rssiScore = max(0, min(10, $rssiScore)); // Clamp between 0 and 10
+            
+            // Determine RSSI color based on score
+            $rssiColor = '#e57373'; // Default: Red
+            if ($rssiScore >= 8) {
+                $rssiColor = '#81c784'; // Green - Good/strong (≥-59)
+            } elseif ($rssiScore >= 5) {
+                $rssiColor = '#fff176'; // Yellow - Fair/usable (-69 to -60)
+            } elseif ($rssiScore >= 3) {
+                $rssiColor = '#ff9800'; // Orange - Weak/unreliable (-79 to -70)
+            } else {
+                $rssiColor = '#e57373'; // Red - Very weak/unusable (≤-80)
+            }
+            
+            // Calculate temperatures (system and battery packs)
+            $hyperTmp = $properties['hyperTmp'] ?? 2731; // Default to 0°C if not available
+            $systemTempCelsius = convertHyperTmp($hyperTmp);
+            $systemHeatState = $properties['heatState'] ?? 0;
+            $systemTempColor = getTempColorEnhanced($systemTempCelsius);
+            
+            // Battery pack temperatures
+            $packData = $zendureData['packData'] ?? [];
+            $pack1TempCelsius = 0;
+            $pack1HeatState = 0;
+            $pack1TempColor = '#81c784'; // Default green
+            $pack2TempCelsius = 0;
+            $pack2HeatState = 0;
+            $pack2TempColor = '#81c784'; // Default green
+            
+            if (isset($packData[0]) && isset($packData[0]['maxTemp'])) {
+                $pack1TempCelsius = convertHyperTmp($packData[0]['maxTemp']);
+                $pack1HeatState = $packData[0]['heatState'] ?? 0;
+                $pack1TempColor = getTempColorEnhanced($pack1TempCelsius);
+            }
+            
+            if (isset($packData[1]) && isset($packData[1]['maxTemp'])) {
+                $pack2TempCelsius = convertHyperTmp($packData[1]['maxTemp']);
+                $pack2HeatState = $packData[1]['heatState'] ?? 0;
+                $pack2TempColor = getTempColorEnhanced($pack2TempCelsius);
+            }
+            
+            // Temperature bar calculation helper (scale -10 to +40)
+            $minTemp = -10;
+            $maxTemp = 40;
+            $systemTempPercent = (($systemTempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
+            $systemTempPercent = max(0, min(100, $systemTempPercent));
+            $pack1TempPercent = (($pack1TempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
+            $pack1TempPercent = max(0, min(100, $pack1TempPercent));
+            $pack2TempPercent = (($pack2TempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
+            $pack2TempPercent = max(0, min(100, $pack2TempPercent));
             
             // Calculate charge/discharge value (positive = charging, negative = discharging)
             $chargeDischargeValue = ($outputPackPower > 0) ? $outputPackPower : (($outputHomePower > 0) ? -$outputHomePower : 0);
@@ -356,11 +416,71 @@
                     </div>
                 </div>
                 
-                <!-- Empty Box (Row 1) -->
+                <!-- RSSI (WiFi Signal) -->
+                <div class="charge-battery-display">
+                    <div class="charge-battery-label-value">
+                        <span class="charge-battery-label">WiFi Signal:</span>
+                        <span class="charge-battery-value">
+                            <?php 
+                            echo number_format($rssiScore, 1) . '/10 (' . number_format($rssi) . ' dBm)';
+                            ?>
+                        </span>
+                    </div>
+                    <div class="charge-battery-bar">
+                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $rssiScore * 10))); ?>%; background-color: <?php echo htmlspecialchars($rssiColor); ?>;"></div>
+                    </div>
+                </div>
+                
+                <!-- Empty Box (placeholder) -->
                 <div class="charge-empty-box"></div>
                 
-                <!-- Empty Box (Row 2) -->
-                <div class="charge-empty-box"></div>
+                <!-- System Temperature -->
+                <div class="charge-battery-display">
+                    <div class="charge-battery-label-value">
+                        <span class="charge-battery-label">System Temp:</span>
+                        <span class="charge-battery-value">
+                            <?php 
+                            $systemHeatIcon = $systemHeatState == 1 ? '🔥' : '❄️';
+                            echo number_format($systemTempCelsius, 1) . '°C ' . $systemHeatIcon;
+                            ?>
+                        </span>
+                    </div>
+                    <div class="charge-battery-bar">
+                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($systemTempPercent); ?>%; background-color: <?php echo htmlspecialchars($systemTempColor); ?>;"></div>
+                    </div>
+                </div>
+                
+                <!-- Battery Pack 1 Temperature -->
+                <div class="charge-battery-display">
+                    <div class="charge-battery-label-value">
+                        <span class="charge-battery-label">Battery 1 Temp:</span>
+                        <span class="charge-battery-value">
+                            <?php 
+                            $pack1HeatIcon = $pack1HeatState == 1 ? '🔥' : '❄️';
+                            echo number_format($pack1TempCelsius, 1) . '°C ' . $pack1HeatIcon;
+                            ?>
+                        </span>
+                    </div>
+                    <div class="charge-battery-bar">
+                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack1TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack1TempColor); ?>;"></div>
+                    </div>
+                </div>
+                
+                <!-- Battery Pack 2 Temperature -->
+                <div class="charge-battery-display">
+                    <div class="charge-battery-label-value">
+                        <span class="charge-battery-label">Battery 2 Temp:</span>
+                        <span class="charge-battery-value">
+                            <?php 
+                            $pack2HeatIcon = $pack2HeatState == 1 ? '🔥' : '❄️';
+                            echo number_format($pack2TempCelsius, 1) . '°C ' . $pack2HeatIcon;
+                            ?>
+                        </span>
+                    </div>
+                    <div class="charge-battery-bar">
+                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack2TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack2TempColor); ?>;"></div>
+                    </div>
+                </div>
             </div>
         <?php else: ?>
             <div class="charge-status-empty" id="charge-status-empty">

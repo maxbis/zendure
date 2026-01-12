@@ -180,10 +180,73 @@ function renderChargeStatus(data, lastUpdate, p1Data) {
     }
     
     const properties = data.properties;
+    const electricLevel = properties.electricLevel || 0;
     
     // Get P1 power value
     const p1TotalPower = (p1Data && p1Data.total_power) ? p1Data.total_power : 0;
     const gridPowerDisplay = p1TotalPower.toLocaleString() + ' W';
+    
+    // Calculate RSSI score and color
+    const rssi = properties.rssi !== undefined ? properties.rssi : -90;
+    const minRssi = -90;
+    const maxRssi = -30;
+    let rssiScore = ((rssi - minRssi) / (maxRssi - minRssi)) * 10;
+    rssiScore = Math.max(0, Math.min(10, rssiScore)); // Clamp between 0 and 10
+    
+    // Determine RSSI color based on score
+    let rssiColor = '#e57373'; // Default: Red
+    if (rssiScore >= 8) {
+        rssiColor = '#81c784'; // Green - Good/strong (≥-59)
+    } else if (rssiScore >= 5) {
+        rssiColor = '#fff176'; // Yellow - Fair/usable (-69 to -60)
+    } else if (rssiScore >= 3) {
+        rssiColor = '#ff9800'; // Orange - Weak/unreliable (-79 to -70)
+    } else {
+        rssiColor = '#e57373'; // Red - Very weak/unusable (≤-80)
+    }
+    
+    const rssiDisplay = rssiScore.toFixed(1) + '/10 (' + rssi + ' dBm)';
+    
+    // Calculate temperatures (system and battery packs)
+    const hyperTmp = properties.hyperTmp !== undefined ? properties.hyperTmp : 2731; // Default to 0°C
+    const systemTempCelsius = (hyperTmp - 2731) / 10.0;
+    const systemHeatState = properties.heatState !== undefined ? properties.heatState : 0;
+    const systemTempColor = getTempColorEnhanced(systemTempCelsius);
+    
+    // Battery pack temperatures
+    const packData = data.packData || [];
+    let pack1TempCelsius = 0;
+    let pack1HeatState = 0;
+    let pack1TempColor = '#81c784'; // Default green
+    let pack2TempCelsius = 0;
+    let pack2HeatState = 0;
+    let pack2TempColor = '#81c784'; // Default green
+    
+    if (packData[0] && packData[0].maxTemp !== undefined) {
+        pack1TempCelsius = (packData[0].maxTemp - 2731) / 10.0;
+        pack1HeatState = packData[0].heatState !== undefined ? packData[0].heatState : 0;
+        pack1TempColor = getTempColorEnhanced(pack1TempCelsius);
+    }
+    
+    if (packData[1] && packData[1].maxTemp !== undefined) {
+        pack2TempCelsius = (packData[1].maxTemp - 2731) / 10.0;
+        pack2HeatState = packData[1].heatState !== undefined ? packData[1].heatState : 0;
+        pack2TempColor = getTempColorEnhanced(pack2TempCelsius);
+    }
+    
+    // Temperature bar calculation helper (scale -10 to +40)
+    const minTemp = -10;
+    const maxTemp = 40;
+    let systemTempPercent = ((systemTempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+    systemTempPercent = Math.max(0, Math.min(100, systemTempPercent));
+    let pack1TempPercent = ((pack1TempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+    pack1TempPercent = Math.max(0, Math.min(100, pack1TempPercent));
+    let pack2TempPercent = ((pack2TempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+    pack2TempPercent = Math.max(0, Math.min(100, pack2TempPercent));
+    
+    const systemTempDisplay = systemTempCelsius.toFixed(1) + '°C ' + (systemHeatState == 1 ? '🔥' : '❄️');
+    const pack1TempDisplay = pack1TempCelsius.toFixed(1) + '°C ' + (pack1HeatState == 1 ? '🔥' : '❄️');
+    const pack2TempDisplay = pack2TempCelsius.toFixed(1) + '°C ' + (pack2HeatState == 1 ? '🔥' : '❄️');
     
     // Calculate Grid bar width for -2800 to +2800 range
     const minGridPower = -2800;
@@ -211,7 +274,6 @@ function renderChargeStatus(data, lastUpdate, p1Data) {
     }
     const status = determineChargeStatus(properties);
     const chargeDischargeValue = calculateChargeDischargeValue(properties);
-    const electricLevel = properties.electricLevel || 0;
     
     // Format power value and calculate time estimate
     let powerDisplay = '0 W';
@@ -368,11 +430,52 @@ function renderChargeStatus(data, lastUpdate, p1Data) {
                 </div>
             </div>
             
-            <!-- Empty Box (Row 1) -->
+            <!-- RSSI (WiFi Signal) -->
+            <div class="charge-battery-display">
+                <div class="charge-battery-label-value">
+                    <span class="charge-battery-label">WiFi Signal:</span>
+                    <span class="charge-battery-value">${escapeHtml(rssiDisplay)}</span>
+                </div>
+                <div class="charge-battery-bar">
+                    <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, rssiScore * 10))}%; background-color: ${rssiColor};"></div>
+                </div>
+            </div>
+            
+            <!-- Empty Box (placeholder) -->
             <div class="charge-empty-box"></div>
             
-            <!-- Empty Box (Row 2) -->
-            <div class="charge-empty-box"></div>
+            <!-- System Temperature -->
+            <div class="charge-battery-display">
+                <div class="charge-battery-label-value">
+                    <span class="charge-battery-label">System Temp:</span>
+                    <span class="charge-battery-value">${escapeHtml(systemTempDisplay)}</span>
+                </div>
+                <div class="charge-battery-bar">
+                    <div class="charge-battery-bar-fill" style="width: ${systemTempPercent}%; background-color: ${systemTempColor};"></div>
+                </div>
+            </div>
+            
+            <!-- Battery Pack 1 Temperature -->
+            <div class="charge-battery-display">
+                <div class="charge-battery-label-value">
+                    <span class="charge-battery-label">Battery 1 Temp:</span>
+                    <span class="charge-battery-value">${escapeHtml(pack1TempDisplay)}</span>
+                </div>
+                <div class="charge-battery-bar">
+                    <div class="charge-battery-bar-fill" style="width: ${pack1TempPercent}%; background-color: ${pack1TempColor};"></div>
+                </div>
+            </div>
+            
+            <!-- Battery Pack 2 Temperature -->
+            <div class="charge-battery-display">
+                <div class="charge-battery-label-value">
+                    <span class="charge-battery-label">Battery 2 Temp:</span>
+                    <span class="charge-battery-value">${escapeHtml(pack2TempDisplay)}</span>
+                </div>
+                <div class="charge-battery-bar">
+                    <div class="charge-battery-bar-fill" style="width: ${pack2TempPercent}%; background-color: ${pack2TempColor};"></div>
+                </div>
+            </div>
         `;
     }
 }
