@@ -105,10 +105,32 @@
 }
 
 .charge-status-content {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 12px;
     padding: 10px 0;
+}
+
+/* Grid Box and Power Display - Shared Styles */
+.charge-power-box,
+.charge-power-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    min-width: 0;
+}
+
+.charge-power-box-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
 }
 
 /* Status Indicator */
@@ -123,7 +145,6 @@
     border-radius: 8px;
     border: 2px solid #e0e0e0;
     transition: all 0.3s ease;
-    flex: 1;
     min-width: 0;
 }
 
@@ -166,21 +187,6 @@
     font-style: italic;
 }
 
-/* Power Display */
-.charge-power-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 12px;
-    background: #fff;
-    border-radius: 8px;
-    border: 1px solid #e0e0e0;
-    flex: 1;
-    min-width: 0;
-}
-
 /* Shared styles for label-value rows (used by both power and battery displays) */
 .charge-power-label-value,
 .charge-battery-label-value {
@@ -217,8 +223,9 @@
     margin-left: 4px;
 }
 
-/* Power Bar Container */
-.charge-power-bar-container {
+/* Power Bar Container and Grid Bar Container - Shared Styles */
+.charge-power-bar-container,
+.charge-grid-bar-container {
     width: 100%;
     height: 16px;
     background: #e0e0e0;
@@ -227,7 +234,8 @@
     overflow: hidden;
 }
 
-.charge-power-bar-center {
+.charge-power-bar-center,
+.charge-grid-bar-center {
     position: absolute;
     left: 50%;
     top: 0;
@@ -237,29 +245,46 @@
     z-index: 2;
 }
 
-.charge-power-bar-fill {
+.charge-power-bar-fill,
+.charge-grid-bar-fill {
     position: absolute;
     top: 0;
     height: 100%;
     transition: width 0.3s ease, background-color 0.3s ease;
-    min-width: 8px; /* Increased from 2px to ensure small values are visible */
+    min-width: 8px;
 }
 
-/* Bar extending right from center (positive/green) */
+/* Power bar - extending right from center (positive/green) */
 .charge-power-bar-fill.charging {
     left: 50%;
     border-radius: 0 2px 2px 0;
     background: var(--charge-status-charging);
 }
 
-/* Bar extending left from center (negative/red) */
+/* Power bar - extending left from center (negative/red) */
 .charge-power-bar-fill.discharging {
     right: 50%;
     border-radius: 2px 0 0 2px;
     background: var(--charge-status-discharging);
 }
 
-.charge-power-bar-label {
+/* Grid bar - extending right from center (positive/blue) */
+.charge-grid-bar-fill.positive {
+    left: 50%;
+    border-radius: 0 2px 2px 0;
+    background: #2196f3; /* Blue for positive */
+}
+
+/* Grid bar - extending left from center (negative/green) */
+.charge-grid-bar-fill.negative {
+    right: 50%;
+    border-radius: 2px 0 0 2px;
+    background: #66bb6a; /* Green for negative */
+}
+
+/* Bar labels - Shared Styles */
+.charge-power-bar-label,
+.charge-grid-bar-label {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -269,15 +294,18 @@
     z-index: 3;
 }
 
-.charge-power-bar-label.left {
+.charge-power-bar-label.left,
+.charge-grid-bar-label.left {
     left: 4px;
 }
 
-.charge-power-bar-label.right {
+.charge-power-bar-label.right,
+.charge-grid-bar-label.right {
     right: 4px;
 }
 
-.charge-power-bar-label.center {
+.charge-power-bar-label.center,
+.charge-grid-bar-label.center {
     left: 50%;
     transform: translate(-50%, -50%);
     color: #333;
@@ -297,8 +325,13 @@
     background: #fff;
     border-radius: 8px;
     border: 1px solid #e0e0e0;
-    flex: 1;
     min-width: 0;
+}
+
+/* Empty Box */
+.charge-empty-box {
+    min-width: 0;
+    /* Empty box - no content, just maintains grid layout */
 }
 
 /* Battery value has its own color override */
@@ -356,15 +389,21 @@
     }
     
     .charge-status-content {
-        flex-direction: column;
+        grid-template-columns: 1fr;
         gap: 10px;
     }
     
+    .charge-power-box,
     .charge-status-indicator,
     .charge-power-display,
-    .charge-battery-display {
+    .charge-battery-display,
+    .charge-empty-box {
         flex: none;
         width: 100%;
+    }
+    
+    .charge-empty-box {
+        display: none; /* Hide empty boxes on mobile */
     }
     
     .charge-status-indicator {
@@ -388,8 +427,13 @@
         font-size: 0.7rem;
     }
     
+    .charge-power-box,
     .charge-power-display {
         flex-direction: column;
+        gap: 8px;
+    }
+    
+    .charge-power-box-content {
         gap: 8px;
     }
     
@@ -401,11 +445,13 @@
         font-size: 0.95rem;
     }
     
-    .charge-power-bar-container {
+    .charge-power-bar-container,
+    .charge-grid-bar-container {
         height: 14px;
     }
     
-    .charge-power-bar-label {
+    .charge-power-bar-label,
+    .charge-grid-bar-label {
         font-size: 0.65rem;
     }
     

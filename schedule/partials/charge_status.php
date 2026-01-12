@@ -15,6 +15,7 @@
         <?php
         // Fetch Zendure data from API
         $zendureData = null;
+        $p1Data = null;
         $chargeStatusError = null;
         $lastUpdate = null;
         
@@ -29,6 +30,7 @@
             $basePath = '';
         }
         $dataApiUrl = $scheme . '://' . $host . $basePath . '/data/api/data_api.php?type=zendure';
+        $p1ApiUrl = $scheme . '://' . $host . $basePath . '/data/api/data_api.php?type=zendure_p1';
         
         // Charge level constants (available throughout the partial)
         $MIN_CHARGE_LEVEL = 20; // Minimum charge level (percent)
@@ -38,6 +40,7 @@
         // Store API URL and constants for JavaScript
         echo '<script>
             const CHARGE_STATUS_API_URL = ' . json_encode($dataApiUrl, JSON_UNESCAPED_SLASHES) . ';
+            const P1_API_URL = ' . json_encode($p1ApiUrl, JSON_UNESCAPED_SLASHES) . ';
             const MIN_CHARGE_LEVEL = ' . $MIN_CHARGE_LEVEL . ';
             const MAX_CHARGE_LEVEL = ' . $MAX_CHARGE_LEVEL . ';
             const TOTAL_CAPACITY_KWH = ' . $TOTAL_CAPACITY_KWH . ';
@@ -88,6 +91,32 @@
                 }
             } else {
                 $chargeStatusError = 'Charge status unavailable (no data returned from API).';
+            }
+            
+            // Fetch P1 data from API
+            $p1JsonData = @file_get_contents($p1ApiUrl, false, $context);
+            
+            if ($p1JsonData === false || empty($p1JsonData)) {
+                // Try alternative: direct file path (for local file access)
+                $apiFilePath = __DIR__ . '/../../data/api/data_api.php';
+                if (file_exists($apiFilePath)) {
+                    // Temporarily set GET parameters and capture output
+                    $originalGet = $_GET;
+                    $_GET['type'] = 'zendure_p1';
+                    
+                    ob_start();
+                    include $apiFilePath;
+                    $p1JsonData = ob_get_clean();
+                    
+                    $_GET = $originalGet;
+                }
+            }
+            
+            if (!empty($p1JsonData)) {
+                $p1ApiResponse = json_decode($p1JsonData, true);
+                if ($p1ApiResponse && isset($p1ApiResponse['success']) && $p1ApiResponse['success'] && isset($p1ApiResponse['data'])) {
+                    $p1Data = $p1ApiResponse['data'];
+                }
             }
         } catch (Exception $e) {
             $chargeStatusError = 'Charge status unavailable: ' . htmlspecialchars($e->getMessage());
@@ -280,6 +309,58 @@
                         <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $electricLevel))); ?>%; background-color: <?php echo htmlspecialchars($systemStatus['color']); ?>;"></div>
                     </div>
                 </div>
+                
+                <!-- Grid -->
+                <div class="charge-power-box">
+                    <div class="charge-power-box-content">
+                        <?php
+                        $p1TotalPower = $p1Data['total_power'] ?? 0;
+                        $gridPowerDisplay = number_format($p1TotalPower) . ' W';
+                        
+                        // Calculate bar width for -2800 to +2800 range
+                        $minGridPower = -2800;
+                        $maxGridPower = 2800;
+                        $clampedGridValue = max($minGridPower, min($maxGridPower, $p1TotalPower));
+                        $gridBarClass = 'positive'; // Default, will be overridden if negative
+                        $gridBarWidth = 0;
+                        
+                        if ($clampedGridValue > 0) {
+                            // Positive - bar extends right from center (blue)
+                            $gridBarWidth = abs($clampedGridValue) / abs($maxGridPower) * 50; // 50% max (half container)
+                            $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
+                            $gridBarClass = 'positive';
+                        } elseif ($clampedGridValue < 0) {
+                            // Negative - bar extends left from center (green)
+                            $gridBarWidth = abs($clampedGridValue) / abs($minGridPower) * 50; // 50% max (half container)
+                            $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
+                            $gridBarClass = 'negative';
+                        } else {
+                            // Zero - no bar
+                            $gridBarWidth = 0;
+                            $gridBarClass = '';
+                        }
+                        ?>
+                        <div class="charge-power-label-value">
+                            <span class="charge-power-label">Grid:</span>
+                            <span class="charge-power-value"><?php echo htmlspecialchars($gridPowerDisplay); ?></span>
+                        </div>
+                        <div class="charge-grid-bar-container">
+                            <div class="charge-grid-bar-label left">-2800 W</div>
+                            <div class="charge-grid-bar-label center">0</div>
+                            <div class="charge-grid-bar-label right">+2800 W</div>
+                            <div class="charge-grid-bar-center"></div>
+                            <?php if ($gridBarWidth > 0): ?>
+                                <div class="charge-grid-bar-fill <?php echo htmlspecialchars($gridBarClass); ?>" style="width: <?php echo $gridBarWidth; ?>%;"></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Empty Box (Row 1) -->
+                <div class="charge-empty-box"></div>
+                
+                <!-- Empty Box (Row 2) -->
+                <div class="charge-empty-box"></div>
             </div>
         <?php else: ?>
             <div class="charge-status-empty" id="charge-status-empty">

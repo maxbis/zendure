@@ -30,7 +30,10 @@ if ($configPathToUse && file_exists($configPathToUse)) {
             if (isset($config['apiUrl'])) {
                 $apiUrl = $config['apiUrl'];
             }
-            if (isset($config['priceUrls']['get_prices'])) {
+            // Check for get_price (singular) first, then get_prices (plural) for backward compatibility
+            if (isset($config['priceUrls']['get_price'])) {
+                $priceApiUrl = $config['priceUrls']['get_price'];
+            } elseif (isset($config['priceUrls']['get_prices'])) {
                 $priceApiUrl = $config['priceUrls']['get_prices'];
             }
         }

@@ -162,7 +162,7 @@ function calculateChargeDischargeValue(properties) {
  * @param {Object} data Zendure data object
  * @param {number} lastUpdate Unix timestamp of last update
  */
-function renderChargeStatus(data, lastUpdate) {
+function renderChargeStatus(data, lastUpdate, p1Data) {
     const contentDiv = document.getElementById('charge-status-content');
     const errorDiv = document.getElementById('charge-status-error');
     const emptyDiv = document.getElementById('charge-status-empty');
@@ -180,6 +180,35 @@ function renderChargeStatus(data, lastUpdate) {
     }
     
     const properties = data.properties;
+    
+    // Get P1 power value
+    const p1TotalPower = (p1Data && p1Data.total_power) ? p1Data.total_power : 0;
+    const gridPowerDisplay = p1TotalPower.toLocaleString() + ' W';
+    
+    // Calculate Grid bar width for -2800 to +2800 range
+    const minGridPower = -2800;
+    const maxGridPower = 2800;
+    const clampedGridValue = Math.max(minGridPower, Math.min(maxGridPower, p1TotalPower));
+    let gridBarWidth = 0;
+    let gridBarClass = '';
+    
+    if (clampedGridValue > 0) {
+        // Positive - bar extends right from center (blue)
+        gridBarWidth = (Math.abs(clampedGridValue) / Math.abs(maxGridPower)) * 50; // 50% max (half container)
+        gridBarWidth = Math.max(6, gridBarWidth); // Minimum 6% for visibility
+        gridBarClass = 'positive';
+    } else if (clampedGridValue < 0) {
+        // Negative - bar extends left from center (green)
+        gridBarWidth = (Math.abs(clampedGridValue) / Math.abs(minGridPower)) * 50; // 50% max (half container)
+        gridBarWidth = Math.max(6, gridBarWidth); // Minimum 6% for visibility
+        gridBarClass = 'negative';
+    }
+    
+    // Build Grid bar HTML
+    let gridBarFill = '';
+    if (gridBarWidth > 0) {
+        gridBarFill = `<div class="charge-grid-bar-fill ${gridBarClass}" style="width: ${gridBarWidth}%;"></div>`;
+    }
     const status = determineChargeStatus(properties);
     const chargeDischargeValue = calculateChargeDischargeValue(properties);
     const electricLevel = properties.electricLevel || 0;
@@ -321,6 +350,29 @@ function renderChargeStatus(data, lastUpdate) {
                     <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, electricLevel))}%; background-color: ${status.color};"></div>
                 </div>
             </div>
+            
+            <!-- Grid -->
+            <div class="charge-power-box">
+                <div class="charge-power-box-content">
+                    <div class="charge-power-label-value">
+                        <span class="charge-power-label">Grid:</span>
+                        <span class="charge-power-value">${escapeHtml(gridPowerDisplay)}</span>
+                    </div>
+                    <div class="charge-grid-bar-container">
+                        <div class="charge-grid-bar-label left">-2800 W</div>
+                        <div class="charge-grid-bar-label center">0</div>
+                        <div class="charge-grid-bar-label right">+2800 W</div>
+                        <div class="charge-grid-bar-center"></div>
+                        ${gridBarFill}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Empty Box (Row 1) -->
+            <div class="charge-empty-box"></div>
+            
+            <!-- Empty Box (Row 2) -->
+            <div class="charge-empty-box"></div>
         `;
     }
 }
@@ -370,6 +422,7 @@ async function refreshChargeStatus() {
             ? CHARGE_STATUS_API_URL 
             : '../data/api/data_api.php?type=zendure';
         
+        // Fetch Zendure data
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
@@ -399,8 +452,30 @@ async function refreshChargeStatus() {
                     : Math.floor(new Date(zendureData.timestamp).getTime() / 1000);
             }
             
+            // Fetch P1 data
+            let p1Data = null;
+            try {
+                let p1ApiUrl = typeof P1_API_URL !== 'undefined' 
+                    ? P1_API_URL 
+                    : '../data/api/data_api.php?type=zendure_p1';
+                
+                const p1Response = await fetch(p1ApiUrl);
+                if (p1Response.ok) {
+                    const p1ContentType = p1Response.headers.get('content-type');
+                    if (p1ContentType && p1ContentType.includes('application/json')) {
+                        const p1ApiResponse = await p1Response.json();
+                        if (p1ApiResponse.success && p1ApiResponse.data) {
+                            p1Data = p1ApiResponse.data;
+                        }
+                    }
+                }
+            } catch (p1Error) {
+                console.warn('Failed to fetch P1 data:', p1Error);
+                // Continue without P1 data - not critical
+            }
+            
             // Render status
-            renderChargeStatus(zendureData, lastUpdate);
+            renderChargeStatus(zendureData, lastUpdate, p1Data);
             
             // Hide any error
             const errorDiv = document.getElementById('charge-status-error');
