@@ -1,6 +1,71 @@
-# Data API Documentation
+# 📊 Data API Documentation
 
-This document describes all functions available in the Data API system.
+This document describes the API interface for managing JSON data files on the Raspberry Pi storage system.
+
+---
+
+## 🛠 Supported Data Types
+
+The `type` parameter in the query string determines which file or logic is accessed.
+
+### 1. Price Data (`type=price`)
+* **Filename Pattern:** `priceYYYYMMDD.json` (e.g., `price20241222.json`)
+* **Operations:**
+    * `GET`: Read prices for a specific date (requires `&date=YYYYMMDD`).
+    * `POST`: Write/Update prices for a specific date.
+    * `DELETE`: Remove a price file.
+    * `LIST`: `GET ?type=price&list=true` to see all price files.
+* **Maintenance:** Files older than 4 days are automatically moved to the `price_archive/` directory.
+
+### 2. Zendure Device Data
+* **Standard (`type=zendure`):** Manages `zendure_data.json`.
+* **P1 Meter (`type=zendure_p1`):** Manages `zendure_p1_data.json`.
+* **Operations:** `GET` (Read), `POST` (Write).
+
+### 3. Charge Schedule (`type=schedule`)
+* **Filename:** `charge_schedule.json`
+* **Operations:**
+    * `GET`: Read the schedule. Use `&resolved=true` for the computed format.
+    * `POST`: Overwrite the full schedule or run maintenance (`{"action": "simulate"|"delete"}`).
+    * `PUT`: Update or add a single entry.
+    * `DELETE`: Remove a single entry from the schedule.
+
+### 4. Automation Status (`type=automation_status`)
+* **Filename:** `automation_status.json`
+* **Operations:** `GET` (Read), `POST` (Write).
+
+### 5. Generic JSON Files (`type=file`)
+* **Filename Pattern:** Any `.json` file in the data directory.
+* **Usage:** Requires `&name=filename.json`.
+* **Security:** Filenames are sanitized; only `.json` extensions are permitted.
+
+---
+
+## 🔍 Discovery & Listing
+
+To see existing files in the `/data/` directory:
+
+| Action | Endpoint |
+| :--- | :--- |
+| **List All Files** | `GET /data/api/data_api.php?type=list` |
+| **Filter by Pattern** | `GET /data/api/data_api.php?type=list&pattern=price*.json` |
+
+---
+
+## ⚙️ System Notes (Raspberry Pi 2 / Bookworm)
+
+Files are created on the first **Write (POST)** request. Ensure the web server has permission to write to the data directory:
+
+```bash
+sudo chown -R www-data:www-data /var/www/html/data/
+
+
+####################################################################
+
+# Data API Documentation
+This part describes all functions available in the Data API system.
+
+####################################################################
 
 ## Overview
 
