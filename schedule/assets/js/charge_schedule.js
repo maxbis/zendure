@@ -347,34 +347,85 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Call the calculate schedule API
-                const response = await fetch(CALCULATE_SCHEDULE_API_URL, {
+                // First, simulate to get count
+                const simulateResponse = await fetch(CALCULATE_SCHEDULE_API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    body: JSON.stringify({ action: 'simulate' })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                if (!simulateResponse.ok) {
+                    throw new Error(`HTTP error! status: ${simulateResponse.status}`);
                 }
 
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
+                const simulateContentType = simulateResponse.headers.get('content-type');
+                if (!simulateContentType || !simulateContentType.includes('application/json')) {
+                    const text = await simulateResponse.text();
                     console.error('Non-JSON response from calculate schedule API:', text.substring(0, 200));
                     throw new Error('Server returned non-JSON response. Check console for details.');
                 }
 
-                const data = await response.json();
+                const simulateData = await simulateResponse.json();
                 
-                if (!data.success) {
-                    alert('Error: ' + (data.error || 'Failed to calculate schedule'));
+                if (!simulateData.success) {
+                    alert('Error: ' + (simulateData.error || 'Failed to simulate schedule calculation'));
                     return;
                 }
 
-                // Refresh data to show updated entries
-                await refreshData();
+                const pairsCount = simulateData.count || 0;
+                const entriesCount = simulateData.entries_added || 0;
+                
+                if (pairsCount === 0) {
+                    await confirmDialog.alert(
+                        'No schedule entries can be added based on current price differences.',
+                        'No Entries to Add',
+                        'OK',
+                        'btn-primary'
+                    );
+                    return;
+                }
+
+                // Show confirmation dialog
+                const confirmed = await confirmDialog.show(
+                    `Are you sure you want to add ${entriesCount} schedule entries (${pairsCount} charge/discharge pairs)?`,
+                    'Auto Calculate Schedule',
+                    'Add',
+                    'btn-auto'
+                );
+
+                if (confirmed) {
+                    // Perform actual calculation
+                    const calculateResponse = await fetch(CALCULATE_SCHEDULE_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: 'calculate' })
+                    });
+
+                    if (!calculateResponse.ok) {
+                        throw new Error(`HTTP error! status: ${calculateResponse.status}`);
+                    }
+
+                    const calculateContentType = calculateResponse.headers.get('content-type');
+                    if (!calculateContentType || !calculateContentType.includes('application/json')) {
+                        const text = await calculateResponse.text();
+                        console.error('Non-JSON response from calculate schedule API:', text.substring(0, 200));
+                        throw new Error('Server returned non-JSON response. Check console for details.');
+                    }
+
+                    const calculateData = await calculateResponse.json();
+                    
+                    if (!calculateData.success) {
+                        alert('Error: ' + (calculateData.error || 'Failed to calculate schedule'));
+                        return;
+                    }
+
+                    // Refresh data to show updated entries
+                    await refreshData();
+                }
             } catch (error) {
                 console.error('Error in auto button handler:', error);
                 alert('Error: ' + error.message);

@@ -20,6 +20,17 @@ $fallbackConfigPath = __DIR__ . '/../../run_schedule/config/config.json';
 
 $response = ['success' => false];
 
+// Check for action parameter (simulate or calculate)
+$method = $_SERVER['REQUEST_METHOD'];
+$simulate = false;
+
+if ($method === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (isset($input['action']) && $input['action'] === 'simulate') {
+        $simulate = true;
+    }
+}
+
 try {
     // Load configuration
     $configPathToUse = file_exists($configPath) ? $configPath : (file_exists($fallbackConfigPath) ? $fallbackConfigPath : null);
@@ -205,17 +216,29 @@ try {
         $entriesAdded += 2;
     }
     
-    // Save schedule if entries were added
-    if ($entriesAdded > 0) {
-        if (!writeScheduleAtomic($dataFile, $schedule)) {
-            throw new Exception('Failed to save schedule');
-        }
-    }
+    // Calculate number of pairs (each pair = 2 entries)
+    $pairsCount = $entriesAdded / 2;
     
-    $response = [
-        'success' => true,
-        'entries_added' => $entriesAdded
-    ];
+    if ($simulate) {
+        // Simulate mode: return count without saving
+        $response = [
+            'success' => true,
+            'count' => (int)$pairsCount,
+            'entries_added' => $entriesAdded
+        ];
+    } else {
+        // Calculate mode: save schedule if entries were added
+        if ($entriesAdded > 0) {
+            if (!writeScheduleAtomic($dataFile, $schedule)) {
+                throw new Exception('Failed to save schedule');
+            }
+        }
+        
+        $response = [
+            'success' => true,
+            'entries_added' => $entriesAdded
+        ];
+    }
     
 } catch (Exception $e) {
     $response = [
