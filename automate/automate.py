@@ -412,8 +412,13 @@ class AutomationApp:
             # Initialize logger
             self.logger = Logger(self.controller)
             
-            # Get status API URL
-            status_api_url = self.schedule_controller.config.get("statusApiUrl")
+            # Get status API URL - select based on location (matching schedule directory pattern)
+            location = self.schedule_controller.config.get("location", "remote")
+            if location == "local":
+                status_api_url = self.schedule_controller.config.get("statusApiUrl-local")
+            else:
+                status_api_url = self.schedule_controller.config.get("statusApiUrl")
+            
             if not status_api_url:
                 self.logger.error("statusApiUrl not found in config.json")
                 return False

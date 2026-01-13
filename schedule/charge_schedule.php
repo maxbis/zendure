@@ -27,14 +27,22 @@ if ($configPathToUse && file_exists($configPathToUse)) {
     if ($configJson !== false) {
         $config = json_decode($configJson, true);
         if ($config !== null) {
-            if (isset($config['apiUrl'])) {
-                $apiUrl = $config['apiUrl'];
+            if (isset($config['scheduleApiUrl'])) {
+                $apiUrl = $config['scheduleApiUrl'];
             }
             // Check for get_price (singular) first, then get_prices (plural) for backward compatibility
             if (isset($config['priceUrls']['get_price'])) {
                 $priceApiUrl = $config['priceUrls']['get_price'];
             } elseif (isset($config['priceUrls']['get_prices'])) {
                 $priceApiUrl = $config['priceUrls']['get_prices'];
+            }
+            
+            // Select zendureFetchApiUrl based on location (zendureStoreApiUrl removed - derive from dataApiUrl)
+            $location = $config['location'] ?? 'remote';
+            if ($location === 'local') {
+                $zendureFetchApiUrl = $config['zendureFetchApiUrl-local'] ?? null;
+            } else {
+                $zendureFetchApiUrl = $config['zendureFetchApiUrl'] ?? null;
             }
         }
     }
@@ -98,6 +106,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Charge/Discharge Status Section - Full Width -->
         <div class="charge-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/charge_status.php'; ?>
+            <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
         </div>
 
         <script>

@@ -17,13 +17,37 @@
         $automationStatusData = null;
         $automationStatusError = null;
         
-        // Build HTTP URL to the API endpoint
-        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        // Get base path: remove /schedule/charge_schedule.php to get /Energy or root
-        $basePath = dirname($scriptName);
-        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=20';
+        // Load API URL from config file
+        $automationStatusUrl = null;
+        $configPath = __DIR__ . '/../../config/config.json';
+        if (file_exists($configPath)) {
+            $configJson = file_get_contents($configPath);
+            if ($configJson !== false) {
+                $config = json_decode($configJson, true);
+                if ($config !== null) {
+                    $location = $config['location'] ?? 'remote';
+                    if ($location === 'local') {
+                        $baseUrl = $config['statusApiUrl-local'] ?? null;
+                    } else {
+                        $baseUrl = $config['statusApiUrl'] ?? null;
+                    }
+                    
+                    if ($baseUrl) {
+                        $automationStatusUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=all&limit=20';
+                    }
+                }
+            }
+        }
+        
+        // Fallback to dynamic construction if config not available
+        if ($automationStatusUrl === null) {
+            $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+            // Get base path: remove /schedule/charge_schedule.php to get /Energy or root
+            $basePath = dirname($scriptName);
+            $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=20';
+        }
         
         // Store API URL for JavaScript
         echo '<script>const AUTOMATION_STATUS_API_URL = ' . json_encode($automationStatusUrl, JSON_UNESCAPED_SLASHES) . ';</script>';

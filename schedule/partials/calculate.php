@@ -23,8 +23,18 @@ if (file_exists($configPath)) {
     $configJson = file_get_contents($configPath);
     if ($configJson !== false) {
         $config = json_decode($configJson, true);
-        if ($config !== null && isset($config['apiUrl'])) {
-            $calculateApiUrl = $config['apiUrl'];
+        if ($config !== null) {
+            if (isset($config['scheduleApiUrl'])) {
+                $calculateApiUrl = $config['scheduleApiUrl'];
+            }
+            
+            // Select zendureFetchApiUrl based on location (zendureStoreApiUrl removed - derive from dataApiUrl)
+            $location = $config['location'] ?? 'remote';
+            if ($location === 'local') {
+                $zendureFetchApiUrl = $config['zendureFetchApiUrl-local'] ?? null;
+            } else {
+                $zendureFetchApiUrl = $config['zendureFetchApiUrl'] ?? null;
+            }
         }
     }
 }

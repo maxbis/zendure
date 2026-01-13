@@ -1,46 +1,24 @@
 <?php
 /**
- * Charge/Discharge Status Partial
- * Displays current battery charge/discharge status from cached Zendure data
+ * Charge/Discharge Status Partial (Core)
+ * Displays current battery charge/discharge status from cached Zendure data.
  * 
- * Fetches data from data_api.php?type=zendure and displays status, power values,
- * battery level, and timestamp. Helper functions (getSystemStatusInfo, formatRelativeTime, etc.) 
- * are available via status.php included in the parent file.
+ * This core partial renders:
+ * - Status indicator (standby/charging/discharging)
+ * - Power value and bar
+ * - Main battery level bar
+ *
+ * Shared data loading is handled by charge_status_data.php so it can be reused
+ * by other partials without duplicating HTTP calls or config parsing.
  */
 
-// Include required functions for temperature conversion and color calculation
-require_once __DIR__ . '/../includes/formatters.php';
-require_once __DIR__ . '/../includes/colors.php';
+require_once __DIR__ . '/charge_status_data.php';
 ?>
 <!-- Charge/Discharge Status Section -->
 <div class="card">
     <div class="metric-section">
         <h3>🔋 Charge/Discharge Status</h3>
         <?php
-        // Fetch Zendure data from API
-        $zendureData = null;
-        $p1Data = null;
-        $chargeStatusError = null;
-        $lastUpdate = null;
-        
-        // Build HTTP URL to the data API endpoint
-        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        // Get base path: go up from /schedule/charge_schedule.php to get root
-        $basePath = dirname(dirname($scriptName));
-        // Ensure basePath is not empty and handle root case
-        if ($basePath === '/' || $basePath === '\\' || $basePath === '.') {
-            $basePath = '';
-        }
-        $dataApiUrl = $scheme . '://' . $host . $basePath . '/data/api/data_api.php?type=zendure';
-        $p1ApiUrl = $scheme . '://' . $host . $basePath . '/data/api/data_api.php?type=zendure_p1';
-        
-        // Charge level constants (available throughout the partial)
-        $MIN_CHARGE_LEVEL = 20; // Minimum charge level (percent)
-        $MAX_CHARGE_LEVEL = 90; // Maximum charge level (percent)
-        $TOTAL_CAPACITY_KWH = 5.76; // Total battery capacity in kWh (57600 Wh / 1000)
-        
         // Store API URL and constants for JavaScript
         echo '<script>
             const CHARGE_STATUS_API_URL = ' . json_encode($dataApiUrl, JSON_UNESCAPED_SLASHES) . ';
@@ -49,83 +27,7 @@ require_once __DIR__ . '/../includes/colors.php';
             const MAX_CHARGE_LEVEL = ' . $MAX_CHARGE_LEVEL . ';
             const TOTAL_CAPACITY_KWH = ' . $TOTAL_CAPACITY_KWH . ';
         </script>';
-        
-        try {
-            $context = stream_context_create([
-                'http' => [
-                    'timeout' => 5,
-                    'ignore_errors' => true,
-                    'method' => 'GET',
-                    'header' => 'User-Agent: Charge-Schedule-Page'
-                ]
-            ]);
-            
-            $jsonData = @file_get_contents($dataApiUrl, false, $context);
-            
-            if ($jsonData === false || empty($jsonData)) {
-                // Try alternative: direct file path (for local file access)
-                $apiFilePath = __DIR__ . '/../../data/api/data_api.php';
-                if (file_exists($apiFilePath)) {
-                    // Temporarily set GET parameters and capture output
-                    $originalGet = $_GET;
-                    $_GET['type'] = 'zendure';
-                    
-                    ob_start();
-                    include $apiFilePath;
-                    $jsonData = ob_get_clean();
-                    
-                    $_GET = $originalGet;
-                }
-            }
-            
-            if (!empty($jsonData)) {
-                $apiResponse = json_decode($jsonData, true);
-                if ($apiResponse && isset($apiResponse['success']) && $apiResponse['success'] && isset($apiResponse['data'])) {
-                    $zendureData = $apiResponse['data'];
-                    // Get timestamp from data or API response
-                    if (isset($apiResponse['timestamp'])) {
-                        $lastUpdate = is_numeric($apiResponse['timestamp']) ? $apiResponse['timestamp'] : strtotime($apiResponse['timestamp']);
-                    } elseif (isset($zendureData['timestamp'])) {
-                        $lastUpdate = is_numeric($zendureData['timestamp']) ? $zendureData['timestamp'] : strtotime($zendureData['timestamp']);
-                    }
-                    $chargeStatusError = null;
-                } else {
-                    $errorMsg = isset($apiResponse['error']) ? $apiResponse['error'] : 'Unknown error';
-                    $chargeStatusError = 'Failed to load charge status: ' . htmlspecialchars($errorMsg);
-                }
-            } else {
-                $chargeStatusError = 'Charge status unavailable (no data returned from API).';
-            }
-            
-            // Fetch P1 data from API
-            $p1JsonData = @file_get_contents($p1ApiUrl, false, $context);
-            
-            if ($p1JsonData === false || empty($p1JsonData)) {
-                // Try alternative: direct file path (for local file access)
-                $apiFilePath = __DIR__ . '/../../data/api/data_api.php';
-                if (file_exists($apiFilePath)) {
-                    // Temporarily set GET parameters and capture output
-                    $originalGet = $_GET;
-                    $_GET['type'] = 'zendure_p1';
-                    
-                    ob_start();
-                    include $apiFilePath;
-                    $p1JsonData = ob_get_clean();
-                    
-                    $_GET = $originalGet;
-                }
-            }
-            
-            if (!empty($p1JsonData)) {
-                $p1ApiResponse = json_decode($p1JsonData, true);
-                if ($p1ApiResponse && isset($p1ApiResponse['success']) && $p1ApiResponse['success'] && isset($p1ApiResponse['data'])) {
-                    $p1Data = $p1ApiResponse['data'];
-                }
-            }
-        } catch (Exception $e) {
-            $chargeStatusError = 'Charge status unavailable: ' . htmlspecialchars($e->getMessage());
-        }
-        
+
         if ($chargeStatusError):
         ?>
             <div class="charge-status-error" id="charge-status-error">
@@ -141,62 +43,6 @@ require_once __DIR__ . '/../includes/colors.php';
             $acStatus = $properties['acStatus'] ?? 0;
             $electricLevel = $properties['electricLevel'] ?? 0;
             $solarInputPower = $properties['solarInputPower'] ?? 0;
-            $rssi = $properties['rssi'] ?? -90; // Default to min_rssi if not available
-            
-            // Calculate RSSI score: (rssi - min_rssi) / (max_rssi - min_rssi) * 10
-            $minRssi = -90;
-            $maxRssi = -30;
-            $rssiScore = (($rssi - $minRssi) / ($maxRssi - $minRssi)) * 10;
-            $rssiScore = max(0, min(10, $rssiScore)); // Clamp between 0 and 10
-            
-            // Determine RSSI color based on score
-            $rssiColor = '#e57373'; // Default: Red
-            if ($rssiScore >= 8) {
-                $rssiColor = '#81c784'; // Green - Good/strong (≥-59)
-            } elseif ($rssiScore >= 5) {
-                $rssiColor = '#fff176'; // Yellow - Fair/usable (-69 to -60)
-            } elseif ($rssiScore >= 3) {
-                $rssiColor = '#ff9800'; // Orange - Weak/unreliable (-79 to -70)
-            } else {
-                $rssiColor = '#e57373'; // Red - Very weak/unusable (≤-80)
-            }
-            
-            // Calculate temperatures (system and battery packs)
-            $hyperTmp = $properties['hyperTmp'] ?? 2731; // Default to 0°C if not available
-            $systemTempCelsius = convertHyperTmp($hyperTmp);
-            $systemHeatState = $properties['heatState'] ?? 0;
-            $systemTempColor = getTempColorEnhanced($systemTempCelsius);
-            
-            // Battery pack temperatures
-            $packData = $zendureData['packData'] ?? [];
-            $pack1TempCelsius = 0;
-            $pack1HeatState = 0;
-            $pack1TempColor = '#81c784'; // Default green
-            $pack2TempCelsius = 0;
-            $pack2HeatState = 0;
-            $pack2TempColor = '#81c784'; // Default green
-            
-            if (isset($packData[0]) && isset($packData[0]['maxTemp'])) {
-                $pack1TempCelsius = convertHyperTmp($packData[0]['maxTemp']);
-                $pack1HeatState = $packData[0]['heatState'] ?? 0;
-                $pack1TempColor = getTempColorEnhanced($pack1TempCelsius);
-            }
-            
-            if (isset($packData[1]) && isset($packData[1]['maxTemp'])) {
-                $pack2TempCelsius = convertHyperTmp($packData[1]['maxTemp']);
-                $pack2HeatState = $packData[1]['heatState'] ?? 0;
-                $pack2TempColor = getTempColorEnhanced($pack2TempCelsius);
-            }
-            
-            // Temperature bar calculation helper (scale -10 to +40)
-            $minTemp = -10;
-            $maxTemp = 40;
-            $systemTempPercent = (($systemTempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
-            $systemTempPercent = max(0, min(100, $systemTempPercent));
-            $pack1TempPercent = (($pack1TempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
-            $pack1TempPercent = max(0, min(100, $pack1TempPercent));
-            $pack2TempPercent = (($pack2TempCelsius - $minTemp) / ($maxTemp - $minTemp)) * 100;
-            $pack2TempPercent = max(0, min(100, $pack2TempPercent));
             
             // Calculate charge/discharge value (positive = charging, negative = discharging)
             $chargeDischargeValue = ($outputPackPower > 0) ? $outputPackPower : (($outputHomePower > 0) ? -$outputHomePower : 0);
@@ -367,118 +213,6 @@ require_once __DIR__ . '/../includes/colors.php';
                         <div class="charge-battery-bar-marker min" style="left: <?php echo $MIN_CHARGE_LEVEL; ?>%;" title="Minimum: <?php echo $MIN_CHARGE_LEVEL; ?>%"></div>
                         <div class="charge-battery-bar-marker max" style="left: <?php echo $MAX_CHARGE_LEVEL; ?>%;" title="Maximum: <?php echo $MAX_CHARGE_LEVEL; ?>%"></div>
                         <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $electricLevel))); ?>%; background-color: <?php echo htmlspecialchars($systemStatus['color']); ?>;"></div>
-                    </div>
-                </div>
-                
-                <!-- Empty Box (placeholder) -->
-                <div class="charge-empty-box"></div>
-                
-                <!-- Grid -->
-                <div class="charge-power-box">
-                    <div class="charge-power-box-content">
-                        <?php
-                        $p1TotalPower = $p1Data['total_power'] ?? 0;
-                        $gridPowerDisplay = number_format($p1TotalPower) . ' W';
-                        
-                        // Calculate bar width for -2800 to +2800 range
-                        $minGridPower = -2800;
-                        $maxGridPower = 2800;
-                        $clampedGridValue = max($minGridPower, min($maxGridPower, $p1TotalPower));
-                        $gridBarClass = 'positive'; // Default, will be overridden if negative
-                        $gridBarWidth = 0;
-                        
-                        if ($clampedGridValue > 0) {
-                            // Positive - bar extends right from center (blue)
-                            $gridBarWidth = abs($clampedGridValue) / abs($maxGridPower) * 50; // 50% max (half container)
-                            $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
-                            $gridBarClass = 'positive';
-                        } elseif ($clampedGridValue < 0) {
-                            // Negative - bar extends left from center (green)
-                            $gridBarWidth = abs($clampedGridValue) / abs($minGridPower) * 50; // 50% max (half container)
-                            $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
-                            $gridBarClass = 'negative';
-                        } else {
-                            // Zero - no bar
-                            $gridBarWidth = 0;
-                            $gridBarClass = '';
-                        }
-                        ?>
-                        <div class="charge-power-label-value">
-                            <span class="charge-power-label">Grid:</span>
-                            <span class="charge-power-value"><?php echo htmlspecialchars($gridPowerDisplay); ?></span>
-                        </div>
-                        <div class="charge-grid-bar-container">
-                            <div class="charge-grid-bar-label left">-2800 W</div>
-                            <div class="charge-grid-bar-label center">0</div>
-                            <div class="charge-grid-bar-label right">+2800 W</div>
-                            <div class="charge-grid-bar-center"></div>
-                            <?php if ($gridBarWidth > 0): ?>
-                                <div class="charge-grid-bar-fill <?php echo htmlspecialchars($gridBarClass); ?>" style="width: <?php echo $gridBarWidth; ?>%;"></div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- RSSI (WiFi Signal) -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">WiFi Signal:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            echo number_format($rssiScore, 1) . '/10 (' . number_format($rssi) . ' dBm)';
-                            ?>
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $rssiScore * 10))); ?>%; background-color: <?php echo htmlspecialchars($rssiColor); ?>;"></div>
-                    </div>
-                </div>
-                
-                <!-- System Temperature -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">System Temp:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            $systemHeatIcon = $systemHeatState == 1 ? '🔥' : '❄️';
-                            echo number_format($systemTempCelsius, 1) . '°C ' . $systemHeatIcon;
-                            ?>
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($systemTempPercent); ?>%; background-color: <?php echo htmlspecialchars($systemTempColor); ?>;"></div>
-                    </div>
-                </div>
-                
-                <!-- Battery Pack 1 Temperature -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 1 Temp:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            $pack1HeatIcon = $pack1HeatState == 1 ? '🔥' : '❄️';
-                            echo number_format($pack1TempCelsius, 1) . '°C ' . $pack1HeatIcon;
-                            ?>
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack1TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack1TempColor); ?>;"></div>
-                    </div>
-                </div>
-                
-                <!-- Battery Pack 2 Temperature -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 2 Temp:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            $pack2HeatIcon = $pack2HeatState == 1 ? '🔥' : '❄️';
-                            echo number_format($pack2TempCelsius, 1) . '°C ' . $pack2HeatIcon;
-                            ?>
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack2TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack2TempColor); ?>;"></div>
                     </div>
                 </div>
             </div>

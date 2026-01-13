@@ -1026,8 +1026,6 @@ class DeviceDataReader(BaseDeviceController):
     # Config keys
     CONFIG_KEY_P1_METER_IP = "p1MeterIp"
     CONFIG_KEY_DEVICE_IP = "deviceIp"
-    CONFIG_KEY_P1_STORE_API_URL = "p1StoreApiUrl"
-    CONFIG_KEY_ZENDURE_STORE_API_URL = "zendureStoreApiUrl"
     
     # API endpoints
     API_ENDPOINT_PROPERTIES_REPORT = "/properties/report"
@@ -1145,7 +1143,18 @@ class DeviceDataReader(BaseDeviceController):
                 }
                 
                 # Store via data_api.php endpoint (non-fatal)
-                api_url = self.config.get(self.CONFIG_KEY_P1_STORE_API_URL)
+                # Derive p1StoreApiUrl from dataApiUrl based on location
+                location = self.config.get("location", "remote")
+                if location == "local":
+                    base_url = self.config.get("dataApiUrl-local")
+                else:
+                    base_url = self.config.get("dataApiUrl")
+                
+                if base_url:
+                    api_url = base_url + ("&" if "?" in base_url else "?") + "type=zendure_p1"
+                else:
+                    api_url = None
+                
                 self._store_data_via_api(api_url, reading_data, "P1 meter data")
             
             # Return the raw device data (not the stored format)
@@ -1194,7 +1203,18 @@ class DeviceDataReader(BaseDeviceController):
                 }
                 
                 # Store via data_api.php endpoint (non-fatal)
-                api_url = self.config.get(self.CONFIG_KEY_ZENDURE_STORE_API_URL)
+                # Derive zendureStoreApiUrl from dataApiUrl based on location
+                location = self.config.get("location", "remote")
+                if location == "local":
+                    base_url = self.config.get("dataApiUrl-local")
+                else:
+                    base_url = self.config.get("dataApiUrl")
+                
+                if base_url:
+                    api_url = base_url + ("&" if "?" in base_url else "?") + "type=zendure"
+                else:
+                    api_url = None
+                
                 self._store_data_via_api(api_url, reading_data, "Zendure data")
             
             # Return the raw device data (not the stored format)
