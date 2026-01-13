@@ -336,6 +336,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Add click handler for Auto button
+    const autoBtn = document.getElementById('auto-entry-btn');
+    if (autoBtn) {
+        autoBtn.addEventListener('click', async () => {
+            try {
+                // Check if API URL is defined
+                if (!CALCULATE_SCHEDULE_API_URL) {
+                    alert('Error: Calculate schedule API URL is not configured.');
+                    return;
+                }
+
+                // Call the calculate schedule API
+                const response = await fetch(CALCULATE_SCHEDULE_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response from calculate schedule API:', text.substring(0, 200));
+                    throw new Error('Server returned non-JSON response. Check console for details.');
+                }
+
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Error: ' + (data.error || 'Failed to calculate schedule'));
+                    return;
+                }
+
+                // Refresh data to show updated entries
+                await refreshData();
+            } catch (error) {
+                console.error('Error in auto button handler:', error);
+                alert('Error: ' + error.message);
+            }
+        });
+    }
+
     // Initial data load
     refreshData();
 });

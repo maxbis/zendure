@@ -205,6 +205,16 @@ body {
     box-shadow: 0 4px 12px rgba(163, 201, 226, 0.4);
 }
 
+.btn-auto {
+    background: #95c896;
+    color: #fff;
+}
+
+.btn-auto:hover {
+    background: #54a558;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
 .btn-icon {
     background: transparent;
     border: none;

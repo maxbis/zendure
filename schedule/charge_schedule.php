@@ -16,6 +16,7 @@ $dataFile = __DIR__ . '/../data/charge_schedule.json';
 // Load API URL from config file
 $apiUrl = 'api/charge_schedule_api.php'; // Default fallback
 $priceApiUrl = null; // Price API URL
+$calculateScheduleApiUrl = null; // Calculate schedule API URL
 
 // Try main config.json first, then fallback to run_schedule/config/config.json
 $mainConfigPath = __DIR__ . '/../config/config.json';
@@ -35,6 +36,11 @@ if ($configPathToUse && file_exists($configPathToUse)) {
                 $priceApiUrl = $config['priceUrls']['get_price'];
             } elseif (isset($config['priceUrls']['get_prices'])) {
                 $priceApiUrl = $config['priceUrls']['get_prices'];
+            }
+            
+            // Get calculate schedule API URL
+            if (isset($config['calculate_schedule_apiUrl'])) {
+                $calculateScheduleApiUrl = $config['calculate_schedule_apiUrl'];
             }
             
             // Select zendureFetchApiUrl based on location (zendureStoreApiUrl removed - derive from dataApiUrl)
@@ -118,6 +124,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             // Inject API URL from PHP config
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
+            const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
         </script>
 
         <script src="assets/js/edit_modal.js"></script>
