@@ -9,7 +9,7 @@ require_once __DIR__ . '/charge_schedule_functions.php';
 header('Content-Type: application/json');
 
 // Constants
-define('MIN_PRICE_DELTA', 0.05); // Minimum price difference in EUR/kWh required to trade
+define('MIN_PRICE_DELTA', 0.18); // Minimum price difference in EUR/kWh required to trade
 define('CHARGE_POWER', 500); // Charge power in watts
 define('DISCHARGE_POWER', 500); // Discharge power in watts
 
