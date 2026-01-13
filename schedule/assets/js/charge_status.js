@@ -413,6 +413,9 @@ function renderChargeStatus(data, lastUpdate, p1Data) {
                 </div>
             </div>
             
+            <!-- Empty Box (placeholder) -->
+            <div class="charge-empty-box"></div>
+            
             <!-- Grid -->
             <div class="charge-power-box">
                 <div class="charge-power-box-content">
@@ -440,9 +443,6 @@ function renderChargeStatus(data, lastUpdate, p1Data) {
                     <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, rssiScore * 10))}%; background-color: ${rssiColor};"></div>
                 </div>
             </div>
-            
-            <!-- Empty Box (placeholder) -->
-            <div class="charge-empty-box"></div>
             
             <!-- System Temperature -->
             <div class="charge-battery-display">

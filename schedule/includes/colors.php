@@ -11,27 +11,6 @@ define('COLOR_CHARGING', '#66bb6a');    // Green - battery charging
 define('COLOR_DISCHARGING', '#ef5350'); // Red - battery discharging
 
 /**
- * Get color for temperature display
- * Blue for cold (-10 to 0), transitioning to red for warm (30 to 40)
- * 
- * @param float $temp Temperature in Celsius
- * @return string Hex color code
- */
-function getTempColor($temp) {
-    if ($temp <= 0) {
-        return '#4fc3f7'; // Light blue
-    } elseif ($temp <= 15) {
-        return '#81c784'; // Green
-    } elseif ($temp <= 25) {
-        return '#fff176'; // Yellow
-    } elseif ($temp <= 35) {
-        return '#ffb74d'; // Orange
-    } else {
-        return '#e57373'; // Red
-    }
-}
-
-/**
  * Get color for temperature display with enhanced gradient
  * Blue (cold) -> Light yellow -> Yellow -> Green -> Orange -> Red (hot)
  * Scale: -10 to +40 degrees Celsius

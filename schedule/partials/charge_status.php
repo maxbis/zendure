@@ -370,6 +370,9 @@ require_once __DIR__ . '/../includes/colors.php';
                     </div>
                 </div>
                 
+                <!-- Empty Box (placeholder) -->
+                <div class="charge-empty-box"></div>
+                
                 <!-- Grid -->
                 <div class="charge-power-box">
                     <div class="charge-power-box-content">
@@ -430,9 +433,6 @@ require_once __DIR__ . '/../includes/colors.php';
                         <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $rssiScore * 10))); ?>%; background-color: <?php echo htmlspecialchars($rssiColor); ?>;"></div>
                     </div>
                 </div>
-                
-                <!-- Empty Box (placeholder) -->
-                <div class="charge-empty-box"></div>
                 
                 <!-- System Temperature -->
                 <div class="charge-battery-display">
