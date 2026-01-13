@@ -189,7 +189,31 @@ try {
         ];
         
         $data = loadStatusData($dataFile);
-        $data['entries'][] = $entry;
+        
+        // Check if the new entry matches the last entry (same type, oldValue, newValue)
+        $shouldUpdateTimestamp = false;
+        if (!empty($data['entries'])) {
+            $lastEntry = end($data['entries']);
+            $lastIndex = count($data['entries']) - 1;
+            
+            // Get values with null fallback for missing keys (using strict comparison)
+            $lastOldValue = isset($lastEntry['oldValue']) ? $lastEntry['oldValue'] : null;
+            $lastNewValue = isset($lastEntry['newValue']) ? $lastEntry['newValue'] : null;
+            
+            // Compare type, oldValue, and newValue using strict comparison (=== handles null correctly)
+            if (isset($lastEntry['type']) && $lastEntry['type'] === $entry['type'] &&
+                $lastOldValue === $entry['oldValue'] &&
+                $lastNewValue === $entry['newValue']) {
+                // Match found: update timestamp of last entry instead of adding new one
+                $data['entries'][$lastIndex]['timestamp'] = $entry['timestamp'];
+                $shouldUpdateTimestamp = true;
+            }
+        }
+        
+        // Only add new entry if it doesn't match the last one
+        if (!$shouldUpdateTimestamp) {
+            $data['entries'][] = $entry;
+        }
         
         // Cleanup old entries (keep last 3 days)
         $data['entries'] = array_values(cleanupOldEntries($data['entries'], $retentionSeconds));
