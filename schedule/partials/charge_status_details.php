@@ -17,7 +17,7 @@ require_once __DIR__ . '/charge_status_data.php';
 <div class="card">
     <div class="metric-section">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0;">🌡️ System &amp; Grid Status</h3>
+            <h3 style="margin: 0;">🌡️ System &amp; Grid</h3>
             <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional status details" style="margin-left: auto;">
                 <span class="refresh-icon charge-details-toggle-icon">▼</span>
                 <span class="refresh-text charge-details-toggle-text">Show more</span>
