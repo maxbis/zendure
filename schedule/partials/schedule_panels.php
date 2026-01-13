@@ -92,8 +92,9 @@ function getValueLabel($val)
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h2>Schedule Entries</h2>
-            <div style="display:flex; gap:8px; width:100px;">
+            <div style="display:flex; gap:8px; width:150px;">
                 <button class="btn btn-clear" id="clear-entry-btn" style="flex:1;">Clear</button>
+                <button class="btn btn-auto" id="auto-entry-btn" style="flex:1;">Auto</button>
                 <button class="btn btn-add" id="add-entry-btn" style="flex:1;">Add</button>
             </div>
         </div>
