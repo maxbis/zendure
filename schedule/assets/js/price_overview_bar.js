@@ -61,6 +61,18 @@ function formatPrice(price) {
 }
 
 /**
+ * Formats price as cents (price * 100, rounded to 0 decimals)
+ * @param {number|null} price - Price value or null
+ * @returns {string} Price in cents as string, or empty string for null
+ */
+function formatPriceCents(price) {
+    if (price === null || price === undefined || isNaN(price)) {
+        return '';
+    }
+    return Math.round(price * 100).toString();
+}
+
+/**
  * Renders the price graph for today and tomorrow
  * @param {Object} priceData - Price data from API
  * @param {number} currentHour - Current hour (0-23)
@@ -187,8 +199,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barLabel.className = 'price-graph-bar-label';
             barLabel.textContent = hourKey;
             
+            // Create price label element
+            const priceLabel = document.createElement('div');
+            priceLabel.className = 'price-graph-bar-price';
+            priceLabel.textContent = formatPriceCents(price);
+            
             barDiv.appendChild(barInner);
             barDiv.appendChild(barLabel);
+            barDiv.appendChild(priceLabel);
             
             // Add click handler (same as schedule overview bars)
             barDiv.addEventListener('click', () => {
