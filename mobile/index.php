@@ -49,6 +49,7 @@ function getValueLabel($val)
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.png">
     <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
@@ -160,6 +161,11 @@ function getValueLabel($val)
 
                 foreach ($displayedSlots as $slot):
                     $val = $slot['value'];
+                    // Request: don't show when there is no value
+                    if ($val === null) {
+                        continue;
+                    }
+
                     $time = $slot['time'];
                     $h = intval(substr($time, 0, 2));
                     $isCurrent = ($time === $currentActiveTime);
