@@ -57,14 +57,15 @@ function getAcStatusText($status) {
 }
 
 /**
- * Determine overall system status based on packState and power values
+ * Determine overall system status based on acMode
  * Returns array with status information including class, icon, title, subtitle, and color
+ * acMode: 0=Stand-by, 1=Charging, 2=Discharging
  */
-function getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $solarInputPower, $electricLevel) {
+function getSystemStatusInfo($acMode, $outputPackPower, $outputHomePower, $solarInputPower, $electricLevel) {
     // Colors should match CSS variables defined in charge_status_defines.css:
     // --charge-status-charging: #66bb6a, --charge-status-discharging: #ef5350, --charge-status-standby: #9e9e9e
     $status = [
-        'state' => $packState,
+        'state' => $acMode,
         'class' => 'standby',
         'icon' => '⚪',
         'title' => 'Standby',
@@ -72,24 +73,26 @@ function getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $so
         'color' => '#9e9e9e' // Should match --charge-status-standby from charge_status_defines.css
     ];
 
-    // Determine state based on packState and actual power values
+    // Determine state based on acMode
+    // acMode: 0=Stand-by, 1=Charging, 2=Discharging
     // Colors should match CSS variables defined in charge_status_defines.css:
     // --charge-status-charging: #66bb6a, --charge-status-discharging: #ef5350, --charge-status-standby: #9e9e9e
-    if ($packState == 1 || $outputPackPower > 0) {
-        // Charging - either from packState or if outputPackPower is active
+    if ($acMode == 1) {
+        // Charging
         $status['class'] = 'charging';
         $status['icon'] = '🔵';
         $status['title'] = 'Charging';
         $status['subtitle'] = 'Battery is being charged';
         $status['color'] = '#66bb6a'; // Should match --charge-status-charging from charge_status_defines.css
-    } elseif ($packState == 2 || $outputHomePower > 0) {
-        // Discharging - either from packState or if outputHomePower is active
+    } elseif ($acMode == 2) {
+        // Discharging
         $status['class'] = 'discharging';
         $status['icon'] = '🔴';
         $status['title'] = 'Discharging';
         $status['subtitle'] = 'Battery is powering the home';
         $status['color'] = '#ef5350'; // Should match --charge-status-discharging from charge_status_defines.css
     }
+    // else acMode == 0, already set to Standby (default)
 
     return $status;
 }

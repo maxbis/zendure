@@ -97,24 +97,20 @@ function updateChargeLastUpdateDisplay(lastUpdate) {
 
 /**
  * Determine charge/discharge status from properties
+ * Uses acMode: 0=Stand-by, 1=Charging, 2=Discharging
  * @param {Object} properties Zendure properties object
  * @return {Object} Status object with class, icon, text, and color
  */
 function determineChargeStatus(properties) {
-    const packState = properties.packState || 0;
-    const outputPackPower = properties.outputPackPower || 0;
-    const outputHomePower = properties.outputHomePower || 0;
-    const acStatus = properties.acStatus || 0;
-    
-    const isCharging = (acStatus == 2 || packState == 1 || outputPackPower > 0);
-    const isDischarging = (packState == 2 || outputHomePower > 0);
+    const acMode = properties.acMode || 0;
     
     // Read colors from CSS variables to ensure consistency with CSS
     const chargingColor = getCSSVariable('--charge-status-charging', '#66bb6a');
     const dischargingColor = getCSSVariable('--charge-status-discharging', '#ef5350');
     const standbyColor = getCSSVariable('--charge-status-standby', '#9e9e9e');
     
-    if (isCharging) {
+    if (acMode == 1) {
+        // Charging
         return {
             class: 'charging',
             icon: '🔵',
@@ -122,7 +118,8 @@ function determineChargeStatus(properties) {
             subtitle: 'Battery is being charged',
             color: chargingColor
         };
-    } else if (isDischarging) {
+    } else if (acMode == 2) {
+        // Discharging
         return {
             class: 'discharging',
             icon: '🔴',
@@ -131,6 +128,7 @@ function determineChargeStatus(properties) {
             color: dischargingColor
         };
     } else {
+        // Stand-by (acMode == 0)
         return {
             class: 'standby',
             icon: '⚪',

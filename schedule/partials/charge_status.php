@@ -34,7 +34,7 @@ require_once __DIR__ . '/charge_status_data.php';
             $properties = $zendureData['properties'];
             
             // Extract properties for status determination
-            $packState = $properties['packState'] ?? 0;
+            $acMode = $properties['acMode'] ?? 0;
             $outputPackPower = $properties['outputPackPower'] ?? 0;
             $outputHomePower = $properties['outputHomePower'] ?? 0;
             $acStatus = $properties['acStatus'] ?? 0;
@@ -44,8 +44,8 @@ require_once __DIR__ . '/charge_status_data.php';
             // Calculate charge/discharge value (positive = charging, negative = discharging)
             $chargeDischargeValue = ($outputPackPower > 0) ? $outputPackPower : (($outputHomePower > 0) ? -$outputHomePower : 0);
             
-            // Get system status info using helper function
-            $systemStatus = getSystemStatusInfo($packState, $outputPackPower, $outputHomePower, $solarInputPower, $electricLevel);
+            // Get system status info using helper function (acMode: 0=Stand-by, 1=Charging, 2=Discharging)
+            $systemStatus = getSystemStatusInfo($acMode, $outputPackPower, $outputHomePower, $solarInputPower, $electricLevel);
             
             // Use system status values (from helper function)
             $statusClass = $systemStatus['class'];
