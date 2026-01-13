@@ -305,7 +305,18 @@ class CommandHandler:
             elif cmd in ['r', 'refresh']:
                 self.logger.info("Forcing schedule refresh...")
                 try:
-                    self.schedule_controller.fetch_schedule()
+                    # Get the API URL from config
+                    api_url = self.schedule_controller.config.get("apiUrl")
+                    if api_url:
+                        print("\n" + "="*60)
+                        print("API URL:")
+                        print("="*60)
+                        print(api_url)
+                        print("="*60 + "\n")
+                    else:
+                        self.logger.warning("API URL not found in config")
+                    
+                    api_response = self.schedule_controller.fetch_schedule()
                     self.logger.info("Schedule refreshed successfully")
                 except Exception as e:
                     self.logger.error(f"Failed to refresh schedule: {e}")
