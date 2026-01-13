@@ -1299,7 +1299,7 @@ class ScheduleController(BaseDeviceController):
             return data
             
         except requests.exceptions.RequestException as e:
-            self.log('error', f"Error fetching schedule API: {e}")
+            self.log('error', f"Error fetching schedule API: {e} (URL: {api_url})")
             raise
         except json.JSONDecodeError as e:
             self.log('error', f"Error parsing JSON response: {e}")
