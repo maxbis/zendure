@@ -503,6 +503,7 @@ class AutomationApp:
                     self.logger.warning(f"Failed to accumulate power feed before printing: {e}")
                 
                 self.controller.print_accumulators()
+                self.status_api.post_update('Rescan', None, None)
             except Exception as e:
                 self.logger.error(f"Failed to refresh schedule: {e}")
 
