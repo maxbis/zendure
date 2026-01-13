@@ -127,22 +127,34 @@ require_once __DIR__ . '/charge_status_data.php';
                         $gridPowerDisplay = number_format($p1TotalPower) . ' W';
 
                         // Calculate bar width for -2800 to +2800 range
-                        $minGridPower = -2800;
-                        $maxGridPower = 2800;
+                        $minGridPower = -1200;
+                        $maxGridPower = 1200;
                         $clampedGridValue = max($minGridPower, min($maxGridPower, $p1TotalPower));
                         $gridBarClass = 'positive'; // Default, will be overridden if negative
                         $gridBarWidth = 0;
+
+                        // Detect if power exceeds min/max limits
+                        $isAboveMax = $p1TotalPower > $maxGridPower;
+                        $isBelowMin = $p1TotalPower < $minGridPower;
 
                         if ($clampedGridValue > 0) {
                             // Positive - bar extends right from center (blue)
                             $gridBarWidth = abs($clampedGridValue) / abs($maxGridPower) * 50; // 50% max (half container)
                             $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
                             $gridBarClass = 'positive';
+                            // Add overflow class if above max
+                            if ($isAboveMax) {
+                                $gridBarClass .= ' overflow';
+                            }
                         } elseif ($clampedGridValue < 0) {
                             // Negative - bar extends left from center (green)
                             $gridBarWidth = abs($clampedGridValue) / abs($minGridPower) * 50; // 50% max (half container)
                             $gridBarWidth = max(6, $gridBarWidth); // Minimum 6% for visibility
                             $gridBarClass = 'negative';
+                            // Add overflow class if below min
+                            if ($isBelowMin) {
+                                $gridBarClass .= ' overflow';
+                            }
                         } else {
                             // Zero - no bar
                             $gridBarWidth = 0;
@@ -154,9 +166,9 @@ require_once __DIR__ . '/charge_status_data.php';
                             <span class="charge-power-value"><?php echo htmlspecialchars($gridPowerDisplay); ?></span>
                         </div>
                         <div class="charge-grid-bar-container">
-                            <div class="charge-grid-bar-label left">-2800 W</div>
+                            <div class="charge-grid-bar-label left"><?= $minGridPower ?> W</div>
                             <div class="charge-grid-bar-label center">0</div>
-                            <div class="charge-grid-bar-label right">+2800 W</div>
+                            <div class="charge-grid-bar-label right">+<?= $maxGridPower ?> W</div>
                             <div class="charge-grid-bar-center"></div>
                             <?php if ($gridBarWidth > 0): ?>
                                 <div class="charge-grid-bar-fill <?php echo htmlspecialchars($gridBarClass); ?>" style="width: <?php echo $gridBarWidth; ?>%;"></div>

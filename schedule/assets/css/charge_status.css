@@ -287,6 +287,15 @@
     background: #66bb6a; /* Green for negative */
 }
 
+/* Grid bar overflow - red color when exceeding min/max */
+.charge-grid-bar-fill.positive.overflow {
+    background: #f44336; /* Red for positive overflow */
+}
+
+.charge-grid-bar-fill.negative.overflow {
+    background: #f44336; /* Red for negative overflow */
+}
+
 /* Bar labels - Shared Styles */
 .charge-power-bar-label,
 .charge-grid-bar-label {
