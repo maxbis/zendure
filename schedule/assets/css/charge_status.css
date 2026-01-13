@@ -20,20 +20,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    _border-bottom: 1px solid #e0e0e0;
 }
 
 .charge-last-update {
-    font-size: 0.9rem;
-    color: #666;
+    font-size: 0.8rem;
+    color: #888;
     font-style: italic;
 }
 
 .charge-timestamp-full {
     color: #999;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     margin-left: 5px;
 }
 
@@ -337,6 +337,25 @@
 .charge-empty-box {
     min-width: 0;
     /* Empty box - no content, just maintains grid layout */
+}
+
+/* Collapsible section for charge status details (rows 2-3) */
+.charge-status-details-collapsible {
+    display: none;
+    grid-column: 1 / -1; /* Span all columns when visible */
+}
+
+.charge-status-details-collapsible.expanded {
+    display: contents; /* Makes wrapper transparent to grid layout */
+}
+
+/* Toggle button styling - uses same styles as refresh button */
+.charge-details-toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+#charge-details-toggle.expanded .charge-details-toggle-icon {
+    transform: rotate(180deg);
 }
 
 /* Battery value has its own color override */

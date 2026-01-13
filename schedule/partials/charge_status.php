@@ -17,19 +17,16 @@ require_once __DIR__ . '/charge_status_data.php';
 <!-- Charge/Discharge Status Section -->
 <div class="card">
     <div class="metric-section">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
         <h3>🔋 Charge/Discharge Status</h3>
-        <?php
-        // Store API URL and constants for JavaScript
-        echo '<script>
-            const CHARGE_STATUS_API_URL = ' . json_encode($dataApiUrl, JSON_UNESCAPED_SLASHES) . ';
-            const P1_API_URL = ' . json_encode($p1ApiUrl, JSON_UNESCAPED_SLASHES) . ';
-            const MIN_CHARGE_LEVEL = ' . $MIN_CHARGE_LEVEL . ';
-            const MAX_CHARGE_LEVEL = ' . $MAX_CHARGE_LEVEL . ';
-            const TOTAL_CAPACITY_KWH = ' . $TOTAL_CAPACITY_KWH . ';
-        </script>';
-
-        if ($chargeStatusError):
-        ?>
+        <button class="charge-refresh-btn" id="charge-refresh-btn" onclick="window.location.reload();" title="Refresh charge status">
+            <span class="refresh-icon">↻</span>
+            <span class="refresh-text">Refresh</span>
+        </button>
+    </div>
+    <?php
+    if ($chargeStatusError):
+    ?>
             <div class="charge-status-error" id="charge-status-error">
                 <p><?php echo htmlspecialchars($chargeStatusError); ?></p>
             </div>
@@ -67,25 +64,7 @@ require_once __DIR__ . '/charge_status_data.php';
                 $powerColor = '#9e9e9e'; // Gray for zero (standby) - should match --charge-status-standby
             }
         ?>
-            <?php if ($lastUpdate): ?>
-                <div class="charge-status-header">
-                    <span class="charge-last-update" id="charge-last-update">
-                        Last update: <?php echo htmlspecialchars(formatRelativeTime($lastUpdate)); ?>
-                        <span class="charge-timestamp-full">(<?php echo htmlspecialchars(date('Y-m-d H:i:s', $lastUpdate)); ?>)</span>
-                    </span>
-                    <button class="charge-refresh-btn" id="charge-refresh-btn" onclick="refreshChargeStatus()" title="Refresh charge status">
-                        <span class="refresh-icon">↻</span>
-                        <span class="refresh-text">Refresh</span>
-                    </button>
-                </div>
-            <?php else: ?>
-                <div class="charge-status-header">
-                    <button class="charge-refresh-btn" id="charge-refresh-btn" onclick="refreshChargeStatus()" title="Refresh charge status">
-                        <span class="refresh-icon">↻</span>
-                        <span class="refresh-text">Refresh</span>
-                    </button>
-                </div>
-            <?php endif; ?>
+          
             
             <div class="charge-status-content" id="charge-status-content">
                 <!-- Status Indicator -->
@@ -221,5 +200,13 @@ require_once __DIR__ . '/charge_status_data.php';
                 <p>No charge status data available</p>
             </div>
         <?php endif; ?>
+        <?php if ($lastUpdate): ?>
+                <div class="charge-status-header">
+                    <span class="charge-last-update" id="charge-last-update">
+                        Last update: <?php echo htmlspecialchars(formatRelativeTime($lastUpdate)); ?>
+                        <span class="charge-timestamp-full">(<?php echo htmlspecialchars(date('Y-m-d H:i:s', $lastUpdate)); ?>)</span>
+                    </span>
+                </div>
+            <?php endif; ?>
     </div>
 </div>

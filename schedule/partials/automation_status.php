@@ -11,7 +11,13 @@
 <!-- Automation Status Section -->
 <div class="card">
     <div class="metric-section">
-        <h3>🤖 Automation Status</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>🤖 Automation Status</h3>
+            <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="window.location.reload();" title="Refresh automation status">
+                            <span class="refresh-icon">↻</span>
+                            <span class="refresh-text">Refresh</span>
+            </button>
+        </div>
         <?php
         // Fetch automation status from API
         $automationStatusData = null;
@@ -111,25 +117,7 @@
             $entries = $automationStatusData['lastChanges'];
             $lastUpdate = $automationStatusData['lastUpdate'] ?? null;
         ?>
-            <?php if ($lastUpdate): ?>
-                <div class="automation-status-header">
-                    <span class="automation-last-update" id="automation-last-update">
-                        Last update: <?php echo htmlspecialchars(formatRelativeTime($lastUpdate)); ?>
-                        <span class="automation-timestamp-full">(<?php echo htmlspecialchars(date('Y-m-d H:i:s', $lastUpdate)); ?>)</span>
-                    </span>
-                    <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="refreshAutomationStatus()" title="Refresh automation status">
-                        <span class="refresh-icon">↻</span>
-                        <span class="refresh-text">Refresh</span>
-                    </button>
-                </div>
-            <?php else: ?>
-                <div class="automation-status-header">
-                    <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="refreshAutomationStatus()" title="Refresh automation status">
-                        <span class="refresh-icon">↻</span>
-                        <span class="refresh-text">Refresh</span>
-                    </button>
-                </div>
-            <?php endif; ?>
+
             
             <?php if (empty($entries)): ?>
                 <div class="automation-status-empty" id="automation-status-empty">

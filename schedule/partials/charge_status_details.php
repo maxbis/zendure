@@ -16,7 +16,14 @@ require_once __DIR__ . '/charge_status_data.php';
 <!-- Charge/Discharge Status Details Section -->
 <div class="card">
     <div class="metric-section">
-        <h3>🌡️ System &amp; Grid Status</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">🌡️ System &amp; Grid Status</h3>
+            <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional status details" style="margin-left: auto;">
+                <span class="refresh-icon charge-details-toggle-icon">▼</span>
+                <span class="refresh-text charge-details-toggle-text">Show more</span>
+            </button>
+        </div>
+        
         <?php
         if ($chargeStatusError):
         ?>
@@ -25,7 +32,11 @@ require_once __DIR__ . '/charge_status_data.php';
             </div>
         <?php elseif ($zendureData && isset($zendureData['properties'])): 
             $properties = $zendureData['properties'];
+        ?>
+            <div class="charge-status-header">
 
+            </div>
+        <?php 
             // RSSI (WiFi signal)
             $rssi = $properties['rssi'] ?? -90; // Default to min_rssi if not available
             $minRssi = -90;
@@ -105,6 +116,8 @@ require_once __DIR__ . '/charge_status_data.php';
             $pack2TotalCapacityLeftKwh = ($pack2Soc / 100) * $packCapacityKwh;
             $pack2UsableCapacityAboveMinKwh = max(0, (($pack2Soc - $MIN_CHARGE_LEVEL) / 100) * $packCapacityKwh);
         ?>
+
+
             <div class="charge-status-content" id="charge-status-details-content">
                 <!-- Grid -->
                 <div class="charge-power-box">
@@ -183,75 +196,78 @@ require_once __DIR__ . '/charge_status_data.php';
                     </div>
                 </div>
 
-                <!-- Empty placeholder before Battery 1 Level (box alignment) -->
-                <div class="charge-empty-box"></div>
+                <!-- Collapsible section: rows 2-3 (Battery 1 & 2 levels and temps) -->
+                <div class="charge-status-details-collapsible" id="charge-status-details-collapsible">
+                    <!-- Empty placeholder before Battery 1 Level (box alignment) -->
+                    <div class="charge-empty-box"></div>
 
-                <!-- Battery 1 Level -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 1 Level:</span>
-                        <span class="charge-battery-value">
-                            <?php
-                            echo number_format($pack1Soc) . '% (' . number_format($pack1TotalCapacityLeftKwh, 2) . ' kWh/' . number_format($pack1UsableCapacityAboveMinKwh, 2) . ' kWh)';
-                            ?>
-                        </span>
+                    <!-- Battery 1 Level -->
+                    <div class="charge-battery-display">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">Battery 1 Level:</span>
+                            <span class="charge-battery-value">
+                                <?php
+                                echo number_format($pack1Soc) . '% (' . number_format($pack1TotalCapacityLeftKwh, 2) . ' kWh/' . number_format($pack1UsableCapacityAboveMinKwh, 2) . ' kWh)';
+                                ?>
+                            </span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-marker min" style="left: <?php echo $MIN_CHARGE_LEVEL; ?>%;" title="Minimum: <?php echo $MIN_CHARGE_LEVEL; ?>%"></div>
+                            <div class="charge-battery-bar-marker max" style="left: <?php echo $MAX_CHARGE_LEVEL; ?>%;" title="Maximum: <?php echo $MAX_CHARGE_LEVEL; ?>%"></div>
+                            <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $pack1Soc))); ?>%; background-color: #81c784;"></div>
+                        </div>
                     </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-marker min" style="left: <?php echo $MIN_CHARGE_LEVEL; ?>%;" title="Minimum: <?php echo $MIN_CHARGE_LEVEL; ?>%"></div>
-                        <div class="charge-battery-bar-marker max" style="left: <?php echo $MAX_CHARGE_LEVEL; ?>%;" title="Maximum: <?php echo $MAX_CHARGE_LEVEL; ?>%"></div>
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $pack1Soc))); ?>%; background-color: #81c784;"></div>
-                    </div>
-                </div>
 
-                <!-- Battery 1 Temperature -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 1 Temp:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            $pack1HeatIcon = $pack1HeatState == 1 ? '🔥' : '❄️';
-                            echo number_format($pack1TempCelsius, 1) . '°C ' . $pack1HeatIcon;
-                            ?>
-                        </span>
+                    <!-- Battery 1 Temperature -->
+                    <div class="charge-battery-display">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">Battery 1 Temp:</span>
+                            <span class="charge-battery-value">
+                                <?php 
+                                $pack1HeatIcon = $pack1HeatState == 1 ? '🔥' : '❄️';
+                                echo number_format($pack1TempCelsius, 1) . '°C ' . $pack1HeatIcon;
+                                ?>
+                            </span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack1TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack1TempColor); ?>;"></div>
+                        </div>
                     </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack1TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack1TempColor); ?>;"></div>
-                    </div>
-                </div>
 
-                <!-- Empty placeholder before Battery 2 Level (box alignment) -->
-                <div class="charge-empty-box"></div>
+                    <!-- Empty placeholder before Battery 2 Level (box alignment) -->
+                    <div class="charge-empty-box"></div>
 
-                <!-- Battery 2 Level -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 2 Level:</span>
-                        <span class="charge-battery-value">
-                            <?php
-                            echo number_format($pack2Soc) . '% (' . number_format($pack2TotalCapacityLeftKwh, 2) . ' kWh/' . number_format($pack2UsableCapacityAboveMinKwh, 2) . ' kWh)';
-                            ?>
-                        </span>
+                    <!-- Battery 2 Level -->
+                    <div class="charge-battery-display">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">Battery 2 Level:</span>
+                            <span class="charge-battery-value">
+                                <?php
+                                echo number_format($pack2Soc) . '% (' . number_format($pack2TotalCapacityLeftKwh, 2) . ' kWh/' . number_format($pack2UsableCapacityAboveMinKwh, 2) . ' kWh)';
+                                ?>
+                            </span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-marker min" style="left: <?php echo $MIN_CHARGE_LEVEL; ?>%;" title="Minimum: <?php echo $MIN_CHARGE_LEVEL; ?>%"></div>
+                            <div class="charge-battery-bar-marker max" style="left: <?php echo $MAX_CHARGE_LEVEL; ?>%;" title="Maximum: <?php echo $MAX_CHARGE_LEVEL; ?>%"></div>
+                            <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $pack2Soc))); ?>%; background-color: #81c784;"></div>
+                        </div>
                     </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-marker min" style="left: <?php echo $MIN_CHARGE_LEVEL; ?>%;" title="Minimum: <?php echo $MIN_CHARGE_LEVEL; ?>%"></div>
-                        <div class="charge-battery-bar-marker max" style="left: <?php echo $MAX_CHARGE_LEVEL; ?>%;" title="Maximum: <?php echo $MAX_CHARGE_LEVEL; ?>%"></div>
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars(min(100, max(0, $pack2Soc))); ?>%; background-color: #81c784;"></div>
-                    </div>
-                </div>
 
-                <!-- Battery 2 Temperature -->
-                <div class="charge-battery-display">
-                    <div class="charge-battery-label-value">
-                        <span class="charge-battery-label">Battery 2 Temp:</span>
-                        <span class="charge-battery-value">
-                            <?php 
-                            $pack2HeatIcon = $pack2HeatState == 1 ? '🔥' : '❄️';
-                            echo number_format($pack2TempCelsius, 1) . '°C ' . $pack2HeatIcon;
-                            ?>
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar">
-                        <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack2TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack2TempColor); ?>;"></div>
+                    <!-- Battery 2 Temperature -->
+                    <div class="charge-battery-display">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">Battery 2 Temp:</span>
+                            <span class="charge-battery-value">
+                                <?php 
+                                $pack2HeatIcon = $pack2HeatState == 1 ? '🔥' : '❄️';
+                                echo number_format($pack2TempCelsius, 1) . '°C ' . $pack2HeatIcon;
+                                ?>
+                            </span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack2TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack2TempColor); ?>;"></div>
+                        </div>
                     </div>
                 </div>
             </div>

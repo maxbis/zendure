@@ -106,6 +106,9 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Charge/Discharge Status Section - Full Width -->
         <div class="charge-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/charge_status.php'; ?>
+        </div>
+        
+        <div class="charge-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
         </div>
 
@@ -114,6 +117,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
         </script>
+
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/confirm_dialog.js"></script>
         <script src="assets/js/schedule_panels.js"></script>
