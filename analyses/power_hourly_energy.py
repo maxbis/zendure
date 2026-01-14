@@ -99,9 +99,19 @@ def _format_wh(x: float) -> str:
 
 
 def main() -> int:
-    log_path = LOG_PATH
-    if len(sys.argv) > 1:
-        log_path = Path(sys.argv[1])
+    # Require the first CLI argument as input path.
+    # Example: python analyses/power_hourly_energy.py path/to/automate.log
+    if len(sys.argv) != 2 or sys.argv[1] in {"-h", "--help"}:
+        print(
+            "Usage: python analyses/power_hourly_energy.py <path-to-log>\n"
+            "\n"
+            "Example:\n"
+            "  python analyses/power_hourly_energy.py automate/log/automate.log\n",
+            file=sys.stderr,
+        )
+        return 2
+
+    log_path = Path(sys.argv[1])
 
     samples, file_end = read_power_samples_and_file_end(log_path)
     hourly = integrate_hourly_wh(samples, file_end)
