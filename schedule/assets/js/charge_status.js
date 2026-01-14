@@ -1,164 +1,35 @@
 /**
  * Charge/Discharge Status
- * Client-side logic simplified: server renders status; refresh button reloads page.
- * This file is retained for backwards-compatibility; no AJAX refresh is performed anymore.
+ * Client-side logic for fetching and rendering charge/discharge status
  */
 
 /**
- * Format relative time (e.g., "2 minutes ago", "1 hour ago")
- * @param {number} timestamp Unix timestamp
- * @return {string} Formatted relative time or absolute time if > 24 hours
+ * Refresh charge status from API
  */
-function formatRelativeTime(timestamp) {
-    if (!timestamp) {
-        return 'Unknown';
+async function refreshChargeStatus() {
+    if (typeof CHARGE_STATUS_ZENDURE_API_URL === 'undefined' || !CHARGE_STATUS_ZENDURE_API_URL) {
+        console.error('CHARGE_STATUS_ZENDURE_API_URL is not defined');
+        return;
     }
-    
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
-    
-    if (diff < 60) {
-        return 'Just now';
-    } else if (diff < 3600) {
-        const minutes = Math.floor(diff / 60);
-        return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
-    } else if (diff < 86400) {
-        const hours = Math.floor(diff / 3600);
-        return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
-    } else {
-        // For times > 24 hours, show absolute time
-        const date = new Date(timestamp * 1000);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    try {
+        const p1ApiUrl = (typeof CHARGE_STATUS_P1_API_URL !== 'undefined') ? CHARGE_STATUS_P1_API_URL : null;
+        const { zendureData, p1Data } = await fetchChargeStatus(CHARGE_STATUS_ZENDURE_API_URL, p1ApiUrl);
+        renderChargeStatus(zendureData, p1Data);
+
+        // Also render the details section (System & Grid) if the render function exists
+        if (typeof renderChargeStatusDetails === 'function') {
+            renderChargeStatusDetails(zendureData, p1Data);
+        }
+    } catch (error) {
+        console.error('Failed to refresh charge status:', error);
+
+        // Render error state
+        renderChargeStatus({
+            success: false,
+            error: error.message || 'Failed to load charge status'
+        });
     }
-}
-
-/**
- * Format absolute timestamp for display
- * @param {number} timestamp Unix timestamp
- * @return {string} Formatted timestamp
- */
-function formatAbsoluteTime(timestamp) {
-    if (!timestamp) return '';
-    const date = new Date(timestamp * 1000);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-/**
- * Escape HTML to prevent XSS
- * @param {string} text Text to escape
- * @return {string} Escaped text
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-/**
- * Get CSS variable value from :root
- * @param {string} variableName CSS variable name (e.g., '--charge-status-charging')
- * @param {string} fallback Fallback value if variable is not found
- * @return {string} CSS variable value or fallback
- */
-function getCSSVariable(variableName, fallback) {
-    if (typeof document === 'undefined') {
-        return fallback;
-    }
-    const value = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
-    return value || fallback;
-}
-
-/**
- * Update last update display
- * @param {number} lastUpdate Unix timestamp
- */
-function updateChargeLastUpdateDisplay(lastUpdate) {
-    const lastUpdateSpan = document.getElementById('charge-last-update');
-    if (!lastUpdateSpan) return;
-    
-    if (lastUpdate) {
-        const relativeTime = formatRelativeTime(lastUpdate);
-        const absoluteTime = formatAbsoluteTime(lastUpdate);
-        lastUpdateSpan.innerHTML = `Last update: ${escapeHtml(relativeTime)} <span class="charge-timestamp-full">(${escapeHtml(absoluteTime)})</span>`;
-    }
-}
-
-/**
- * Determine charge/discharge status from properties
- * Uses acMode: 0=Stand-by, 1=Charging, 2=Discharging
- * @param {Object} properties Zendure properties object
- * @return {Object} Status object with class, icon, text, and color
- */
-function determineChargeStatus(properties) {
-    const acMode = properties.acMode || 0;
-    
-    // Read colors from CSS variables to ensure consistency with CSS
-    const chargingColor = getCSSVariable('--charge-status-charging', '#66bb6a');
-    const dischargingColor = getCSSVariable('--charge-status-discharging', '#ef5350');
-    const standbyColor = getCSSVariable('--charge-status-standby', '#9e9e9e');
-    
-    if (acMode == 1) {
-        // Charging
-        return {
-            class: 'charging',
-            icon: '🔵',
-            text: 'Charging',
-            subtitle: 'Battery is being charged',
-            color: chargingColor
-        };
-    } else if (acMode == 2) {
-        // Discharging
-        return {
-            class: 'discharging',
-            icon: '🔴',
-            text: 'Discharging',
-            subtitle: 'Battery is powering the home',
-            color: dischargingColor
-        };
-    } else {
-        // Stand-by (acMode == 0)
-        return {
-            class: 'standby',
-            icon: '⚪',
-            text: 'Standby',
-            subtitle: 'No active power flow',
-            color: standbyColor
-        };
-    }
-}
-
-/**
- * Calculate charge/discharge value
- * @param {Object} properties Zendure properties object
- * @return {number} Charge/discharge value (positive = charging, negative = discharging)
- */
-function calculateChargeDischargeValue(properties) {
-    const outputPackPower = properties.outputPackPower || 0;
-    const outputHomePower = properties.outputHomePower || 0;
-    
-    if (outputPackPower > 0) {
-        return outputPackPower;
-    } else if (outputHomePower > 0) {
-        return -outputHomePower;
-    }
-    return 0;
-}
-
-// No-op stub retained only for backward compatibility; the PHP button now reloads the page.
-function refreshChargeStatus() {
-    window.location.reload();
 }
 
 /**
@@ -169,14 +40,14 @@ function toggleChargeStatusDetails() {
     const collapsibleSection = document.getElementById('charge-status-details-collapsible');
     const toggleButton = document.getElementById('charge-details-toggle');
     const toggleText = toggleButton?.querySelector('.charge-details-toggle-text');
-    
+
     if (!collapsibleSection || !toggleButton) {
         return;
     }
-    
+
     // Toggle expanded class on collapsible section
     const isExpanded = collapsibleSection.classList.toggle('expanded');
-    
+
     // Update toggle button appearance and text
     if (isExpanded) {
         toggleButton.classList.add('expanded');
@@ -190,3 +61,23 @@ function toggleChargeStatusDetails() {
         }
     }
 }
+
+// Initialize charge status refresh button
+document.addEventListener('DOMContentLoaded', () => {
+    const refreshBtn = document.getElementById('charge-refresh-btn');
+    if (refreshBtn) {
+        // Remove old onclick handler
+        refreshBtn.onclick = null;
+
+        // Add new event listener
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.5';
+
+            await refreshChargeStatus();
+
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = '1';
+        });
+    }
+});

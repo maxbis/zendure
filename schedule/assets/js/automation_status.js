@@ -1,7 +1,6 @@
 /**
  * Automation Status
- * Client-side logic simplified: only keeps entry toggle behavior.
- * The refresh button now performs a full page reload via its onclick handler.
+ * Client-side logic for fetching and rendering automation status
  */
 
 // Automation entries toggle functionality
@@ -19,3 +18,45 @@ window.toggleAutomationEntries = function () {
     }
 };
 
+/**
+ * Refresh automation status from API
+ */
+async function refreshAutomationStatus() {
+    if (typeof AUTOMATION_STATUS_API_URL === 'undefined' || !AUTOMATION_STATUS_API_URL) {
+        console.error('AUTOMATION_STATUS_API_URL is not defined');
+        return;
+    }
+
+    try {
+        const data = await fetchAutomationStatus(AUTOMATION_STATUS_API_URL);
+        renderAutomationStatus(data);
+    } catch (error) {
+        console.error('Failed to refresh automation status:', error);
+
+        // Render error state
+        renderAutomationStatus({
+            success: false,
+            error: error.message || 'Failed to load automation status'
+        });
+    }
+}
+
+// Initialize automation status refresh button
+document.addEventListener('DOMContentLoaded', () => {
+    const refreshBtn = document.getElementById('automation-refresh-btn');
+    if (refreshBtn) {
+        // Remove old onclick handler
+        refreshBtn.onclick = null;
+
+        // Add new event listener
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.5';
+
+            await refreshAutomationStatus();
+
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = '1';
+        });
+    }
+});

@@ -19,7 +19,7 @@ require_once __DIR__ . '/charge_status_data.php';
     <div class="metric-section">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h3>🔋 Charge/Discharge</h3>
-        <button class="charge-refresh-btn" id="charge-refresh-btn" onclick="window.location.reload();" title="Refresh charge status">
+        <button class="charge-refresh-btn" id="charge-refresh-btn" title="Refresh charge status">
             <span class="refresh-icon">↻</span>
             <span class="refresh-text">Refresh</span>
         </button>

@@ -151,3 +151,67 @@ async function deleteScheduleEntry(apiUrl, key) {
 
     return await response.json();
 }
+
+/**
+ * Fetch automation status data
+ * @param {string} apiUrl - The automation status API URL
+ * @returns {Promise<Object>} - Promise resolving to automation status data
+ */
+async function fetchAutomationStatus(apiUrl) {
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check console for details.');
+    }
+
+    return await response.json();
+}
+
+/**
+ * Fetch charge/discharge status data
+ * @param {string} zendureApiUrl - The Zendure data API URL
+ * @param {string} p1ApiUrl - The P1 data API URL (optional)
+ * @returns {Promise<Object>} - Promise resolving to charge status data
+ */
+async function fetchChargeStatus(zendureApiUrl, p1ApiUrl = null) {
+    const response = await fetch(zendureApiUrl);
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check console for details.');
+    }
+
+    const zendureData = await response.json();
+
+    // Optionally fetch P1 data if URL provided
+    let p1Data = null;
+    if (p1ApiUrl) {
+        try {
+            const p1Response = await fetch(p1ApiUrl);
+            if (p1Response.ok) {
+                const p1ContentType = p1Response.headers.get('content-type');
+                if (p1ContentType && p1ContentType.includes('application/json')) {
+                    p1Data = await p1Response.json();
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to fetch P1 data:', error);
+            // Continue without P1 data
+        }
+    }
+
+    return { zendureData, p1Data };
+}

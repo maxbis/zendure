@@ -70,6 +70,14 @@ $MIN_CHARGE_LEVEL = 20; // Minimum charge level (percent)
 $MAX_CHARGE_LEVEL = 90; // Maximum charge level (percent)
 $TOTAL_CAPACITY_KWH = 5.76; // Total battery capacity in kWh (57600 Wh / 1000)
 
+// Store API URLs for JavaScript
+echo '<script>';
+echo 'const CHARGE_STATUS_ZENDURE_API_URL = ' . json_encode($dataApiUrl, JSON_UNESCAPED_SLASHES) . ';';
+if ($p1ApiUrl) {
+    echo 'const CHARGE_STATUS_P1_API_URL = ' . json_encode($p1ApiUrl, JSON_UNESCAPED_SLASHES) . ';';
+}
+echo '</script>';
+
 try {
     $context = stream_context_create([
         'http' => [

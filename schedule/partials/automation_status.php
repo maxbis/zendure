@@ -13,7 +13,7 @@
     <div class="metric-section">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>🤖 Automation Status</h3>
-            <button class="automation-refresh-btn" id="automation-refresh-btn" onclick="window.location.reload();" title="Refresh automation status">
+            <button class="automation-refresh-btn" id="automation-refresh-btn" title="Refresh automation status">
                             <span class="refresh-icon">↻</span>
                             <span class="refresh-text">Refresh</span>
             </button>
