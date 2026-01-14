@@ -1258,8 +1258,19 @@ class ScheduleController(BaseDeviceController):
             ValueError: If config is invalid or missing required keys
         """
         super().__init__(config_path)
-        self.schedule_data: Optional[Dict[str, Any]] = None
-        self.current_time_str: Optional[str] = None
+        self.schedule_data: Optional[List[Dict[str, Any]]] = None
+        self.schedule_date: Optional[date] = None
+    
+    def _get_current_time_str(self) -> str:
+        """
+        Get current time in HHMM format using Europe/Amsterdam timezone.
+        
+        Returns:
+            Current time as string in "HHMM" format (e.g., "1902")
+        """
+        tz = ZoneInfo('Europe/Amsterdam')
+        now = datetime.now(tz=tz)
+        return now.strftime('%H%M')
     
     def fetch_schedule(self) -> Dict[str, Any]:
         """
@@ -1286,15 +1297,18 @@ class ScheduleController(BaseDeviceController):
                 error_msg = data.get('error', 'Unknown error')
                 raise ValueError(f"API returned success=false: {error_msg}")
             
-            # Store in class properties
-            self.schedule_data = data
-            # Prefer currentTime (includes minutes) over currentHour (hour only)
-            self.current_time_str = data.get('currentTime') or data.get('currentHour')
+            # Extract and store only the resolved array
+            resolved = data.get('resolved')
+            if resolved is None:
+                raise ValueError("API response missing 'resolved' field")
             
-            if self.current_time_str is None:
-                raise ValueError("API response missing 'currentTime' and 'currentHour' fields")
+            # Store resolved array and date
+            self.schedule_data = resolved
+            tz = ZoneInfo('Europe/Amsterdam')
+            self.schedule_date = datetime.now(tz=tz).date()
             
-            self.log('info', f"Schedule fetched successfully. Current time: {self.current_time_str}, Resolved entries: {len(data.get('resolved', []))}")
+            current_time_str = self._get_current_time_str()
+            self.log('info', f"Schedule fetched successfully. Current time: {current_time_str}, Resolved entries: {len(resolved)}")
             
             return data
             
@@ -1389,15 +1403,11 @@ class ScheduleController(BaseDeviceController):
         if not self.schedule_data:
             raise ValueError("Schedule data is not available")
         
-        resolved = self.schedule_data.get('resolved')
-        if resolved is None:
-            raise ValueError("API response missing 'resolved' field")
-        
-        if self.current_time_str is None:
-            raise ValueError("Current time string is not available")
+        # Compute current time locally
+        current_time_str = self._get_current_time_str()
         
         # Find the current schedule value
-        desired_power = self._find_current_schedule_value(resolved, self.current_time_str)
+        desired_power = self._find_current_schedule_value(self.schedule_data, current_time_str)
         
         return desired_power
     
