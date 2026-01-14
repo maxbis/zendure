@@ -110,7 +110,8 @@ def main() -> int:
         charge, discharge = hourly[hour_start]
         date_str = hour_start.strftime("%Y%m%d")
         hour_str = hour_start.strftime("%H00")
-        print(f"{date_str} {hour_str} {_format_wh(charge)} {_format_wh(discharge)}")
+        if charge > 0 or discharge > 0:
+            print(f"{date_str} {hour_str} {_format_wh(charge)} {_format_wh(discharge)}")
 
     return 0
 
