@@ -50,8 +50,10 @@ def read_power_samples_and_file_end(log_path: Path) -> tuple[list[PowerSample], 
 
     if last_ts is None:
         raise ValueError(f"No timestamped lines found in log: {log_path}")
+    # Some logs may legitimately contain no `Power:` samples (e.g., partial logs).
+    # In that case we return an empty sample list and let the caller output nothing.
     if not samples:
-        raise ValueError(f"No 'Power:' samples found in log: {log_path}")
+        return [], last_ts
 
     samples.sort(key=lambda s: s.ts)
     return samples, last_ts
