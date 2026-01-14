@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Path to the log file to analyze.
 # You can set this to an absolute path, or leave it as the default repo-relative path.
-LOG_PATH: Path = (Path(__file__).resolve().parents[2] / "automate" / "log" / "automate.log")
+LOG_PATH: Path = (Path(__file__).resolve().parents[2] / "automation" / "log" / "automate.log")
 
 # Output rounding: round to whole Wh for readability.
 ROUND_TO_WHOLE_WH: bool = True
