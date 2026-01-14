@@ -131,15 +131,23 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
         </script>
 
+        <!-- Core modules (must load first) -->
+        <script src="assets/js/schedule_utils.js"></script>
+        <script src="assets/js/schedule_api.js"></script>
+        <script src="assets/js/schedule_renderer.js"></script>
+
+        <!-- UI components -->
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/confirm_dialog.js"></script>
-        <script src="assets/js/schedule_panels.js"></script>
-        <script src="assets/js/schedule_overview_bar.js"></script>
+
+        <!-- Feature modules -->
         <script src="assets/js/price_overview_bar.js"></script>
         <script src="assets/js/price_statistics.js"></script>
         <script src="assets/js/schedule_calculator.js"></script>
         <script src="assets/js/automation_status.js"></script>
         <script src="assets/js/charge_status.js"></script>
+
+        <!-- Main application (must load last) -->
         <script src="assets/js/charge_schedule.js"></script>
 
     </div>

@@ -1,9 +1,13 @@
 /**
  * Charge Schedule Manager
  * Main application logic for rendering and managing schedule data
- * 
+ *
+ * Dependencies:
+ * - schedule_utils.js - Utility functions
+ * - schedule_api.js - API communication
+ * - schedule_renderer.js - DOM rendering
+ *
  * API_URL is injected from PHP (charge_schedule.php) which reads it from config.json
- * If not defined, fallback to old endpoint
  */
 
 // API_URL is injected from PHP via inline script tag
@@ -13,200 +17,40 @@ if (typeof API_URL === 'undefined') {
     window.API_URL = 'api/charge_schedule_api.php';
 }
 
-// Helper function to get label from radio button by value
-function getValueLabel(value) {
-    if (value === null || typeof value === 'undefined') return '-';
-    if (typeof value === 'number') return (value > 0 ? '+' : '') + value + ' W';
-
-    // Try to find the radio button with matching value and get its label attribute
-    const radio = document.querySelector(`input[name="val-mode"][value="${value}"]`);
-    if (radio && radio.hasAttribute('label')) {
-        return radio.getAttribute('label');
-    }
-
-    // Fallback to hardcoded values if modal not loaded yet
-    if (value === 'netzero') return 'Net Zero';
-    if (value === 'netzero+') return 'Solar Charge';
-
-    return value + ' W';
-}
-
-// --- UI Rendering ---
-// renderToday() and renderEntries() are now in schedule_panels.js
-
-function renderMiniTimeline(resolved, currentTime) {
-    const timeline = document.getElementById('mini-timeline');
-    if (!timeline) return;
-
-    timeline.innerHTML = '';
-
-    // Build a map of all hours with their values
-    const hourValues = {};
-    let lastValue = null;
-    resolved.forEach(slot => {
-        const hour = parseInt(String(slot.time).substring(0, 2));
-        const value = slot.value;
-        if (value !== null) {
-            lastValue = value;
-        }
-        hourValues[hour] = lastValue;
-    });
-
-    // Get current hour
-    const now = new Date();
-    const currentHourInt = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeInt = currentHourInt * 100 + (currentMinute >= 30 ? 30 : 0);
-
-    // Find current active value
-    let currentActiveValue = null;
-    let currentActiveTime = null;
-    resolved.forEach(slot => {
-        const time = parseInt(String(slot.time));
-        if (time <= currentTimeInt) {
-            if (currentActiveTime === null || time > currentActiveTime) {
-                currentActiveTime = time;
-                currentActiveValue = slot.value;
-            }
-        }
-    });
-
-    // Render all 24 hours
-    for (let h = 0; h < 24; h++) {
-        const hourTime = String(h).padStart(2, '0') + '00';
-        const value = hourValues[h] !== undefined ? hourValues[h] : null;
-        const isCurrentHour = (h === currentHourInt);
-
-        const valDisplay = getValueLabel(value);
-        let catClass = 'neutral';
-        if (value === 'netzero') {
-            catClass = 'netzero';
-        } else if (value === 'netzero+') {
-            catClass = 'netzero-plus';
-        } else if (typeof value === 'number') {
-            catClass = (value > 0) ? 'charge' : ((value < 0) ? 'discharge' : 'neutral');
-        }
-
-        // Determine bar height/intensity based on value - very pronounced differences
-        let barHeight = '10%';
-        let barOpacity = 0.6;
-        if (typeof value === 'number') {
-            const absValue = Math.abs(value);
-            if (absValue > 0) {
-                // Very aggressive scaling: 10% base + (value/3) up to 100%
-                // Examples: 100W = 43%, 200W = 77%, 300W = 100%
-                barHeight = Math.min(100, 10 + (absValue / 3)) + '%';
-                barOpacity = Math.min(1.0, 0.6 + (absValue / 400));
-            }
-        } else if (value === 'netzero' || value === 'netzero+') {
-            barHeight = '80%';
-            barOpacity = 0.9;
-        }
-
-        const hourDiv = document.createElement('div');
-        hourDiv.className = `mini-timeline-hour ${isCurrentHour ? 'timeline-current' : ''}`;
-        hourDiv.dataset.hour = h;
-        hourDiv.dataset.time = hourTime;
-        hourDiv.title = `${String(h).padStart(2, '0')}:00 - ${valDisplay}`;
-
-        const barDiv = document.createElement('div');
-        barDiv.className = `mini-timeline-bar ${catClass}`;
-        barDiv.style.height = barHeight;
-        barDiv.style.opacity = barOpacity;
-        barDiv.setAttribute('data-height', barHeight);
-
-        const labelDiv = document.createElement('div');
-        labelDiv.className = 'mini-timeline-label-hour';
-        labelDiv.textContent = String(h).padStart(2, '0');
-
-        hourDiv.appendChild(barDiv);
-        hourDiv.appendChild(labelDiv);
-
-        // Add click handler to scroll to corresponding schedule item
-        hourDiv.addEventListener('click', () => {
-            // Find the schedule item that matches this hour
-            const scheduleItems = document.querySelectorAll('#today-schedule-grid .schedule-item');
-            scheduleItems.forEach(item => {
-                const timeText = item.querySelector('.schedule-item-time')?.textContent.trim();
-                if (timeText && timeText.startsWith(String(h).padStart(2, '0'))) {
-                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Add a temporary highlight
-                    item.style.transition = 'all 0.3s';
-                    item.style.boxShadow = '0 0 0 3px rgba(100, 181, 246, 0.5)';
-                    setTimeout(() => {
-                        item.style.boxShadow = '';
-                    }, 1000);
-                }
-            });
-        });
-
-        timeline.appendChild(hourDiv);
-    }
-}
-
-
-
+/**
+ * Refresh all schedule data and update UI
+ */
 async function refreshData() {
     try {
         // Get today and tomorrow dates in YYYYMMDD format
         const now = new Date();
-        const today = now.getFullYear().toString() +
-            String(now.getMonth() + 1).padStart(2, '0') +
-            String(now.getDate()).padStart(2, '0');
+        const today = formatDateYYYYMMDD(now);
+
         const tomorrowDate = new Date(now);
         tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-        const tomorrow = tomorrowDate.getFullYear().toString() +
-            String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
-            String(tomorrowDate.getDate()).padStart(2, '0');
+        const tomorrow = formatDateYYYYMMDD(tomorrowDate);
 
         // Fetch today's data
-        const todayUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 'date=' + today;
-        const todayRes = await fetch(todayUrl);
-        if (!todayRes.ok) {
-            throw new Error(`HTTP error! status: ${todayRes.status}`);
-        }
-
-        const todayContentType = todayRes.headers.get('content-type');
-        if (!todayContentType || !todayContentType.includes('application/json')) {
-            const text = await todayRes.text();
-            console.error('Non-JSON response:', text.substring(0, 200));
-            throw new Error('Server returned non-JSON response. Check console for details.');
-        }
-
-        const todayData = await todayRes.json();
+        const todayData = await fetchScheduleData(API_URL, today);
 
         // Fetch tomorrow's data
-        const tomorrowUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 'date=' + tomorrow;
-        const tomorrowRes = await fetch(tomorrowUrl);
-        if (!tomorrowRes.ok) {
-            throw new Error(`HTTP error! status: ${tomorrowRes.status}`);
-        }
-
-        const tomorrowContentType = tomorrowRes.headers.get('content-type');
-        if (!tomorrowContentType || !tomorrowContentType.includes('application/json')) {
-            const text = await tomorrowRes.text();
-            console.error('Non-JSON response:', text.substring(0, 200));
-            throw new Error('Server returned non-JSON response. Check console for details.');
-        }
-
-        const tomorrowData = await tomorrowRes.json();
+        const tomorrowData = await fetchScheduleData(API_URL, tomorrow);
 
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
-            if (typeof renderEntries === 'function') {
-                renderEntries(todayData.entries);
-            }
-            if (typeof renderToday === 'function') {
-                renderToday(todayData.resolved, todayData.currentHour, currentTime);
-            }
+
+            // Render all UI components
+            renderEntries(todayData.entries);
+            renderToday(todayData.resolved, todayData.currentHour, currentTime);
             renderMiniTimeline(todayData.resolved, currentTime);
+
             const statusBar = document.getElementById('status-bar');
             if (statusBar) {
                 statusBar.innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
             }
 
             // Render bar graph with both today and tomorrow data
-            if (todayData.success && tomorrowData.success && typeof renderBarGraph === 'function') {
+            if (todayData.success && tomorrowData.success) {
                 renderBarGraph(
                     todayData.resolved || [],
                     tomorrowData.resolved || [],
@@ -217,13 +61,13 @@ async function refreshData() {
                     editModal
                 );
             }
-            
-            // Fetch and render price data
+
+            // Fetch and render price data (if available)
             if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
                 fetchAndRenderPrices(PRICE_API_URL, todayData.entries || [], editModal);
             }
-            
-            // Update schedule calculator with today's and tomorrow's data
+
+            // Update schedule calculator with today's and tomorrow's data (if available)
             if (todayData.success && tomorrowData.success && typeof renderScheduleCalculator === 'function') {
                 renderScheduleCalculator(
                     todayData.resolved || [],
@@ -239,44 +83,121 @@ async function refreshData() {
 }
 
 /**
- * Clear old schedule entries (API call)
- * @param {boolean} simulate - If true, only simulate deletion (returns count)
- * @returns {Promise<Object>} - Promise with response object
+ * Handle clear button click
  */
-async function clearOldEntries(simulate = true) {
+async function handleClearClick() {
     try {
-        const action = simulate ? 'simulate' : 'delete';
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: action })
-        });
+        // First, simulate to get count
+        const result = await clearOldEntries(API_URL, true);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (!result.success) {
+            alert('Error: ' + (result.error || 'Failed to check old entries'));
+            return;
         }
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Non-JSON response:', text.substring(0, 200));
-            throw new Error('Server returned non-JSON response. Check console for details.');
+        const count = result.count || 0;
+
+        if (count === 0) {
+            await confirmDialog.alert(
+                'No outdated schedule entries to delete.',
+                'No Entries to Clear',
+                'OK',
+                'btn-primary'
+            );
+            return;
         }
 
-        const data = await response.json();
-        return data;
+        // Show confirmation dialog
+        const confirmed = await confirmDialog.show(
+            `Are you sure you want to delete ${count} outdated schedule entries?`,
+            'Clear Old Entries',
+            'Delete',
+            'btn-danger'
+        );
+
+        if (confirmed) {
+            // Perform actual deletion
+            const deleteResult = await clearOldEntries(API_URL, false);
+
+            if (!deleteResult.success) {
+                alert('Error: ' + (deleteResult.error || 'Failed to delete old entries'));
+                return;
+            }
+
+            // Refresh data to show updated entries
+            await refreshData();
+        }
     } catch (error) {
-        console.error('Error clearing old entries:', error);
-        throw error;
+        console.error('Error in clear button handler:', error);
+        alert('Error: ' + error.message);
     }
 }
 
-// Initialize application
+/**
+ * Handle auto button click
+ */
+async function handleAutoClick() {
+    try {
+        // Check if API URL is defined
+        if (!CALCULATE_SCHEDULE_API_URL) {
+            alert('Error: Calculate schedule API URL is not configured.');
+            return;
+        }
+
+        // First, simulate to get count
+        const simulateData = await calculateSchedule(CALCULATE_SCHEDULE_API_URL, true);
+
+        if (!simulateData.success) {
+            alert('Error: ' + (simulateData.error || 'Failed to simulate schedule calculation'));
+            return;
+        }
+
+        const pairsCount = simulateData.count || 0;
+        const entriesCount = simulateData.entries_added || 0;
+
+        if (pairsCount === 0) {
+            await confirmDialog.alert(
+                'No schedule entries can be added based on current price differences.',
+                'No Entries to Add',
+                'OK',
+                'btn-primary'
+            );
+            return;
+        }
+
+        // Show confirmation dialog
+        const confirmed = await confirmDialog.show(
+            `Are you sure you want to add ${entriesCount} schedule entries (${pairsCount} charge/discharge pairs)?`,
+            'Auto Calculate Schedule',
+            'Add',
+            'btn-auto'
+        );
+
+        if (confirmed) {
+            // Perform actual calculation
+            const calculateData = await calculateSchedule(CALCULATE_SCHEDULE_API_URL, false);
+
+            if (!calculateData.success) {
+                alert('Error: ' + (calculateData.error || 'Failed to calculate schedule'));
+                return;
+            }
+
+            // Refresh data to show updated entries
+            await refreshData();
+        }
+    } catch (error) {
+        console.error('Error in auto button handler:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+// Global instances
 let editModal;
 let confirmDialog;
 
+/**
+ * Initialize application
+ */
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize edit modal with callback to refresh data after save/delete
     editModal = new EditModal(API_URL, refreshData);
@@ -287,154 +208,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add click handler for Clear button
     const clearBtn = document.getElementById('clear-entry-btn');
     if (clearBtn) {
-        clearBtn.addEventListener('click', async () => {
-            try {
-                // First, simulate to get count
-                const result = await clearOldEntries(true);
-                
-                if (!result.success) {
-                    alert('Error: ' + (result.error || 'Failed to check old entries'));
-                    return;
-                }
-
-                const count = result.count || 0;
-                
-                if (count === 0) {
-                    await confirmDialog.alert(
-                        'No outdated schedule entries to delete.',
-                        'No Entries to Clear',
-                        'OK',
-                        'btn-primary'
-                    );
-                    return;
-                }
-
-                // Show confirmation dialog
-                const confirmed = await confirmDialog.show(
-                    `Are you sure you want to delete ${count} outdated schedule entries?`,
-                    'Clear Old Entries',
-                    'Delete',
-                    'btn-danger'
-                );
-
-                if (confirmed) {
-                    // Perform actual deletion
-                    const deleteResult = await clearOldEntries(false);
-                    
-                    if (!deleteResult.success) {
-                        alert('Error: ' + (deleteResult.error || 'Failed to delete old entries'));
-                        return;
-                    }
-
-                    // Refresh data to show updated entries
-                    await refreshData();
-                }
-            } catch (error) {
-                console.error('Error in clear button handler:', error);
-                alert('Error: ' + error.message);
-            }
-        });
+        clearBtn.addEventListener('click', handleClearClick);
     }
 
     // Add click handler for Auto button
     const autoBtn = document.getElementById('auto-entry-btn');
     if (autoBtn) {
-        autoBtn.addEventListener('click', async () => {
-            try {
-                // Check if API URL is defined
-                if (!CALCULATE_SCHEDULE_API_URL) {
-                    alert('Error: Calculate schedule API URL is not configured.');
-                    return;
-                }
-
-                // First, simulate to get count
-                const simulateResponse = await fetch(CALCULATE_SCHEDULE_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ action: 'simulate' })
-                });
-
-                if (!simulateResponse.ok) {
-                    throw new Error(`HTTP error! status: ${simulateResponse.status}`);
-                }
-
-                const simulateContentType = simulateResponse.headers.get('content-type');
-                if (!simulateContentType || !simulateContentType.includes('application/json')) {
-                    const text = await simulateResponse.text();
-                    console.error('Non-JSON response from calculate schedule API:', text.substring(0, 200));
-                    throw new Error('Server returned non-JSON response. Check console for details.');
-                }
-
-                const simulateData = await simulateResponse.json();
-                
-                if (!simulateData.success) {
-                    alert('Error: ' + (simulateData.error || 'Failed to simulate schedule calculation'));
-                    return;
-                }
-
-                const pairsCount = simulateData.count || 0;
-                const entriesCount = simulateData.entries_added || 0;
-                
-                if (pairsCount === 0) {
-                    await confirmDialog.alert(
-                        'No schedule entries can be added based on current price differences.',
-                        'No Entries to Add',
-                        'OK',
-                        'btn-primary'
-                    );
-                    return;
-                }
-
-                // Show confirmation dialog
-                const confirmed = await confirmDialog.show(
-                    `Are you sure you want to add ${entriesCount} schedule entries (${pairsCount} charge/discharge pairs)?`,
-                    'Auto Calculate Schedule',
-                    'Add',
-                    'btn-auto'
-                );
-
-                if (confirmed) {
-                    // Perform actual calculation
-                    const calculateResponse = await fetch(CALCULATE_SCHEDULE_API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ action: 'calculate' })
-                    });
-
-                    if (!calculateResponse.ok) {
-                        throw new Error(`HTTP error! status: ${calculateResponse.status}`);
-                    }
-
-                    const calculateContentType = calculateResponse.headers.get('content-type');
-                    if (!calculateContentType || !calculateContentType.includes('application/json')) {
-                        const text = await calculateResponse.text();
-                        console.error('Non-JSON response from calculate schedule API:', text.substring(0, 200));
-                        throw new Error('Server returned non-JSON response. Check console for details.');
-                    }
-
-                    const calculateData = await calculateResponse.json();
-                    
-                    if (!calculateData.success) {
-                        alert('Error: ' + (calculateData.error || 'Failed to calculate schedule'));
-                        return;
-                    }
-
-                    // Refresh data to show updated entries
-                    await refreshData();
-                }
-            } catch (error) {
-                console.error('Error in auto button handler:', error);
-                alert('Error: ' + error.message);
-            }
-        });
+        autoBtn.addEventListener('click', handleAutoClick);
     }
 
     // Initial data load
     refreshData();
 });
-
-
