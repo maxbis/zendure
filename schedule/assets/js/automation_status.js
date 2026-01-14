@@ -42,18 +42,25 @@ async function refreshAutomationStatus() {
 }
 
 // Initialize automation status refresh button
+// This button now refreshes all sections: Automation Status, Charge/Discharge, and System & Grid
 document.addEventListener('DOMContentLoaded', () => {
     const refreshBtn = document.getElementById('automation-refresh-btn');
     if (refreshBtn) {
         // Remove old onclick handler
         refreshBtn.onclick = null;
 
-        // Add new event listener
+        // Add new event listener - calls unified refresh function
         refreshBtn.addEventListener('click', async () => {
             refreshBtn.disabled = true;
             refreshBtn.style.opacity = '0.5';
 
-            await refreshAutomationStatus();
+            // Refresh all sections (Automation Status, Charge/Discharge, and System & Grid)
+            if (typeof refreshAllStatus === 'function') {
+                await refreshAllStatus();
+            } else {
+                // Fallback to just automation status if unified function not available
+                await refreshAutomationStatus();
+            }
 
             refreshBtn.disabled = false;
             refreshBtn.style.opacity = '1';

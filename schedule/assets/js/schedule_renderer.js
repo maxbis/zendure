@@ -748,69 +748,260 @@ function formatTimeEstimate(hours) {
 }
 
 /**
+ * Convert hyperTmp from one-tenth Kelvin to Celsius
+ * Formula: (hyperTmp - 2731) / 10.0
+ */
+function convertHyperTmpJS(hyperTmp) {
+    return (hyperTmp - 2731) / 10.0;
+}
+
+/**
+ * Get color for temperature display with enhanced gradient
+ * Blue (cold) -> Light yellow -> Yellow -> Green -> Orange -> Red (hot)
+ * Scale: -10 to +40 degrees Celsius
+ */
+function getTempColorEnhancedJS(temp) {
+    // Clamp temperature to range
+    temp = Math.max(-10, Math.min(40, temp));
+    
+    if (temp <= 0) {
+        return '#4fc3f7'; // Blue
+    } else if (temp <= 5) {
+        return '#fff176'; // Light yellow
+    } else if (temp <= 15) {
+        return '#ffe500'; // Yellow
+    } else if (temp <= 25) {
+        return '#81c784'; // Green
+    } else if (temp <= 30) {
+        return '#ff9800'; // Orange
+    } else {
+        return '#e57373'; // Red
+    }
+}
+
+/**
+ * Find element by label text within a container
+ */
+function findElementByLabel(container, labelText) {
+    const labels = container.querySelectorAll('.charge-battery-label');
+    for (const label of labels) {
+        if (label.textContent.trim().startsWith(labelText)) {
+            return label.closest('.charge-battery-display');
+        }
+    }
+    return null;
+}
+
+/**
  * Render charge status details section (System & Grid)
- * Updates only the Grid power value dynamically
+ * Updates all System & Grid values dynamically
  * @param {Object} zendureData - Zendure data from API
  * @param {Object} p1Data - P1 data from API (optional)
  */
 function renderChargeStatusDetails(zendureData, p1Data = null) {
-    // Find the Grid power display elements
+    const detailsContainer = document.getElementById('charge-status-details-content');
+    if (!detailsContainer) {
+        console.warn('Charge status details container not found');
+        return;
+    }
+
+    // Constants
+    const MIN_CHARGE_LEVEL = 20;
+    const MAX_CHARGE_LEVEL = 90;
+    const TOTAL_CAPACITY_KWH = 5.76;
+    const minTemp = -10;
+    const maxTemp = 40;
+
+    // Extract Zendure data
+    const properties = zendureData?.data?.properties || zendureData?.properties || {};
+    const packData = zendureData?.data?.packData || zendureData?.packData || [];
+    const packNum = properties.packNum || Math.max(1, packData.length);
+    const packCapacityKwh = TOTAL_CAPACITY_KWH / Math.max(1, packNum);
+
+    // Update Grid power
     const gridValueSpan = document.querySelector('.charge-power-box .charge-power-value');
     const gridBarFill = document.querySelector('.charge-grid-bar-fill');
     const gridBarContainer = document.querySelector('.charge-grid-bar-container');
 
-    if (!gridValueSpan || !gridBarContainer) {
-        console.warn('Grid power display elements not found');
-        return;
+    if (gridValueSpan && gridBarContainer) {
+        // P1 data can be flat or nested - handle both cases
+        const p1TotalPower = p1Data?.total_power || p1Data?.data?.total_power || 0;
+        const gridPowerDisplay = p1TotalPower.toLocaleString() + ' W';
+
+        gridValueSpan.textContent = gridPowerDisplay;
+
+        // Calculate bar width for -1200 to +1200 range
+        const minGridPower = -1200;
+        const maxGridPower = 1200;
+        const clampedGridValue = Math.max(minGridPower, Math.min(maxGridPower, p1TotalPower));
+
+        let gridBarWidth = 0;
+        let gridBarClass = '';
+        const isAboveMax = p1TotalPower > maxGridPower;
+        const isBelowMin = p1TotalPower < minGridPower;
+
+        if (clampedGridValue > 0) {
+            gridBarWidth = Math.max(6, (Math.abs(clampedGridValue) / Math.abs(maxGridPower)) * 50);
+            gridBarClass = 'positive';
+            if (isAboveMax) {
+                gridBarClass += ' overflow';
+            }
+        } else if (clampedGridValue < 0) {
+            gridBarWidth = Math.max(6, (Math.abs(clampedGridValue) / Math.abs(minGridPower)) * 50);
+            gridBarClass = 'negative';
+            if (isBelowMin) {
+                gridBarClass += ' overflow';
+            }
+        }
+
+        // Update or create the bar fill
+        if (gridBarFill) {
+            if (gridBarWidth > 0) {
+                gridBarFill.className = 'charge-grid-bar-fill ' + gridBarClass;
+                gridBarFill.style.width = gridBarWidth + '%';
+            } else {
+                gridBarFill.remove();
+            }
+        } else if (gridBarWidth > 0) {
+            const newBarFill = document.createElement('div');
+            newBarFill.className = 'charge-grid-bar-fill ' + gridBarClass;
+            newBarFill.style.width = gridBarWidth + '%';
+            gridBarContainer.appendChild(newBarFill);
+        }
     }
 
-    // Extract P1 data
-    const p1Properties = p1Data?.data?.properties || p1Data?.properties || p1Data;
-    const p1TotalPower = p1Properties.data.total_power || 0;
-    const gridPowerDisplay = p1TotalPower.toLocaleString() + ' W';
+    // Update WiFi Signal (RSSI)
+    const wifiDisplay = findElementByLabel(detailsContainer, 'WiFi Signal:');
+    if (wifiDisplay) {
+        const rssi = properties.rssi ?? -90;
+        const minRssi = -90;
+        const maxRssi = -30;
+        let rssiScore = ((rssi - minRssi) / (maxRssi - minRssi)) * 10;
+        rssiScore = Math.max(0, Math.min(10, rssiScore));
 
-    // Update the grid power value
-    gridValueSpan.textContent = gridPowerDisplay;
-
-    // Calculate bar width for -1200 to +1200 range
-    const minGridPower = -1200;
-    const maxGridPower = 1200;
-    const clampedGridValue = Math.max(minGridPower, Math.min(maxGridPower, p1TotalPower));
-
-    let gridBarWidth = 0;
-    let gridBarClass = '';
-    const isAboveMax = p1TotalPower > maxGridPower;
-    const isBelowMin = p1TotalPower < minGridPower;
-
-    if (clampedGridValue > 0) {
-        // Positive - bar extends right from center (blue)
-        gridBarWidth = Math.max(6, (Math.abs(clampedGridValue) / Math.abs(maxGridPower)) * 50);
-        gridBarClass = 'positive';
-        if (isAboveMax) {
-            gridBarClass += ' overflow';
+        let rssiColor = '#e57373'; // Default: Red
+        if (rssiScore >= 8) {
+            rssiColor = '#81c784'; // Green
+        } else if (rssiScore >= 5) {
+            rssiColor = '#fff176'; // Yellow
+        } else if (rssiScore >= 3) {
+            rssiColor = '#ff9800'; // Orange
         }
-    } else if (clampedGridValue < 0) {
-        // Negative - bar extends left from center (green)
-        gridBarWidth = Math.max(6, (Math.abs(clampedGridValue) / Math.abs(minGridPower)) * 50);
-        gridBarClass = 'negative';
-        if (isBelowMin) {
-            gridBarClass += ' overflow';
+
+        const wifiValue = wifiDisplay.querySelector('.charge-battery-value');
+        const wifiBarFill = wifiDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (wifiValue) {
+            wifiValue.textContent = `${rssiScore.toFixed(1)}/10 (${rssi.toLocaleString()} dBm)`;
+        }
+        if (wifiBarFill) {
+            wifiBarFill.style.width = `${Math.min(100, Math.max(0, rssiScore * 10))}%`;
+            wifiBarFill.style.backgroundColor = rssiColor;
         }
     }
 
-    // Update or create the bar fill
-    if (gridBarFill) {
-        if (gridBarWidth > 0) {
-            gridBarFill.className = 'charge-grid-bar-fill ' + gridBarClass;
-            gridBarFill.style.width = gridBarWidth + '%';
-        } else {
-            gridBarFill.remove();
+    // Update System Temperature
+    const systemTempDisplay = findElementByLabel(detailsContainer, 'System Temp:');
+    if (systemTempDisplay) {
+        const hyperTmp = properties.hyperTmp ?? 2731;
+        const systemTempCelsius = convertHyperTmpJS(hyperTmp);
+        const systemHeatState = properties.heatState ?? 0;
+        const systemTempColor = getTempColorEnhancedJS(systemTempCelsius);
+        const systemTempPercent = ((systemTempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+        const clampedSystemTempPercent = Math.max(0, Math.min(100, systemTempPercent));
+
+        const systemTempValue = systemTempDisplay.querySelector('.charge-battery-value');
+        const systemTempBarFill = systemTempDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (systemTempValue) {
+            const systemHeatIcon = systemHeatState == 1 ? '🔥' : '❄️';
+            systemTempValue.textContent = `${systemTempCelsius.toFixed(1)}°C ${systemHeatIcon}`;
         }
-    } else if (gridBarWidth > 0) {
-        // Create new bar fill
-        const newBarFill = document.createElement('div');
-        newBarFill.className = 'charge-grid-bar-fill ' + gridBarClass;
-        newBarFill.style.width = gridBarWidth + '%';
-        gridBarContainer.appendChild(newBarFill);
+        if (systemTempBarFill) {
+            systemTempBarFill.style.width = `${clampedSystemTempPercent}%`;
+            systemTempBarFill.style.backgroundColor = systemTempColor;
+        }
+    }
+
+    // Update Battery 1 Level
+    const battery1LevelDisplay = findElementByLabel(detailsContainer, 'Battery 1 Level:');
+    if (battery1LevelDisplay) {
+        const pack1Soc = packData[0]?.socLevel ?? 0;
+        const pack1TotalCapacityLeftKwh = (pack1Soc / 100) * packCapacityKwh;
+        const pack1UsableCapacityAboveMinKwh = Math.max(0, ((pack1Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+
+        const battery1Value = battery1LevelDisplay.querySelector('.charge-battery-value');
+        const battery1BarFill = battery1LevelDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (battery1Value) {
+            battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1TotalCapacityLeftKwh.toFixed(2)} kWh/${pack1UsableCapacityAboveMinKwh.toFixed(2)} kWh)`;
+        }
+        if (battery1BarFill) {
+            battery1BarFill.style.width = `${Math.min(100, Math.max(0, pack1Soc))}%`;
+        }
+    }
+
+    // Update Battery 1 Temperature
+    const battery1TempDisplay = findElementByLabel(detailsContainer, 'Battery 1 Temp:');
+    if (battery1TempDisplay) {
+        const pack1MaxTemp = packData[0]?.maxTemp ?? 2731;
+        const pack1TempCelsius = convertHyperTmpJS(pack1MaxTemp);
+        const pack1HeatState = packData[0]?.heatState ?? 0;
+        const pack1TempColor = getTempColorEnhancedJS(pack1TempCelsius);
+        const pack1TempPercent = ((pack1TempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+        const clampedPack1TempPercent = Math.max(0, Math.min(100, pack1TempPercent));
+
+        const battery1TempValue = battery1TempDisplay.querySelector('.charge-battery-value');
+        const battery1TempBarFill = battery1TempDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (battery1TempValue) {
+            const pack1HeatIcon = pack1HeatState == 1 ? '🔥' : '❄️';
+            battery1TempValue.textContent = `${pack1TempCelsius.toFixed(1)}°C ${pack1HeatIcon}`;
+        }
+        if (battery1TempBarFill) {
+            battery1TempBarFill.style.width = `${clampedPack1TempPercent}%`;
+            battery1TempBarFill.style.backgroundColor = pack1TempColor;
+        }
+    }
+
+    // Update Battery 2 Level
+    const battery2LevelDisplay = findElementByLabel(detailsContainer, 'Battery 2 Level:');
+    if (battery2LevelDisplay) {
+        const pack2Soc = packData[1]?.socLevel ?? 0;
+        const pack2TotalCapacityLeftKwh = (pack2Soc / 100) * packCapacityKwh;
+        const pack2UsableCapacityAboveMinKwh = Math.max(0, ((pack2Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+
+        const battery2Value = battery2LevelDisplay.querySelector('.charge-battery-value');
+        const battery2BarFill = battery2LevelDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (battery2Value) {
+            battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2TotalCapacityLeftKwh.toFixed(2)} kWh/${pack2UsableCapacityAboveMinKwh.toFixed(2)} kWh)`;
+        }
+        if (battery2BarFill) {
+            battery2BarFill.style.width = `${Math.min(100, Math.max(0, pack2Soc))}%`;
+        }
+    }
+
+    // Update Battery 2 Temperature
+    const battery2TempDisplay = findElementByLabel(detailsContainer, 'Battery 2 Temp:');
+    if (battery2TempDisplay) {
+        const pack2MaxTemp = packData[1]?.maxTemp ?? 2731;
+        const pack2TempCelsius = convertHyperTmpJS(pack2MaxTemp);
+        const pack2HeatState = packData[1]?.heatState ?? 0;
+        const pack2TempColor = getTempColorEnhancedJS(pack2TempCelsius);
+        const pack2TempPercent = ((pack2TempCelsius - minTemp) / (maxTemp - minTemp)) * 100;
+        const clampedPack2TempPercent = Math.max(0, Math.min(100, pack2TempPercent));
+
+        const battery2TempValue = battery2TempDisplay.querySelector('.charge-battery-value');
+        const battery2TempBarFill = battery2TempDisplay.querySelector('.charge-battery-bar-fill');
+        
+        if (battery2TempValue) {
+            const pack2HeatIcon = pack2HeatState == 1 ? '🔥' : '❄️';
+            battery2TempValue.textContent = `${pack2TempCelsius.toFixed(1)}°C ${pack2HeatIcon}`;
+        }
+        if (battery2TempBarFill) {
+            battery2TempBarFill.style.width = `${clampedPack2TempPercent}%`;
+            battery2TempBarFill.style.backgroundColor = pack2TempColor;
+        }
     }
 }
