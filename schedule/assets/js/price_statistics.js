@@ -18,7 +18,7 @@ function formatPrice(price) {
 /**
  * Calculates price statistics from price data
  * @param {Object} priceData - Price data from API with today and tomorrow
- * @returns {Object} Statistics object with min, max, avg, current, delta, percentile
+ * @returns {Object} Statistics object with min, max, avg, current, delta, percentile, stdDev, coefficientOfVariation
  */
 function calculatePriceStatistics(priceData) {
     const todayPrices = priceData?.today || {};
@@ -43,7 +43,9 @@ function calculatePriceStatistics(priceData) {
             avgPrice: null,
             currentPrice: null,
             delta: null,
-            percentile: null
+            percentile: null,
+            stdDev: null,
+            coefficientOfVariation: null
         };
     }
 
@@ -52,6 +54,18 @@ function calculatePriceStatistics(priceData) {
     const maxPrice = Math.max(...allPrices);
     const avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
     const delta = maxPrice - minPrice;
+
+    // Calculate standard deviation
+    const variance = allPrices.reduce((sum, price) => {
+        return sum + Math.pow(price - avgPrice, 2);
+    }, 0) / allPrices.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Calculate coefficient of variation (as percentage)
+    // CV = (stdDev / avgPrice) * 100
+    const coefficientOfVariation = avgPrice > 0 
+        ? (stdDev / avgPrice) * 100 
+        : null;
 
     // Get current price (from current hour of today)
     const now = new Date();
@@ -75,7 +89,9 @@ function calculatePriceStatistics(priceData) {
         avgPrice,
         currentPrice,
         delta,
-        percentile
+        percentile,
+        stdDev,
+        coefficientOfVariation
     };
 }
 
@@ -106,8 +122,19 @@ function renderPriceStatistics(stats) {
 
     // Average Price
     const avgValueEl = document.getElementById('price-stat-avg-value');
+    const avgDetailEl = document.getElementById('price-stat-avg-detail');
     if (avgValueEl) {
         avgValueEl.textContent = formatPrice(stats.avgPrice);
+    }
+    if (avgDetailEl) {
+        // Display volatility: Coefficient of Variation as primary metric
+        if (stats.coefficientOfVariation !== null && !isNaN(stats.coefficientOfVariation)) {
+            avgDetailEl.textContent = `${stats.coefficientOfVariation.toFixed(1)}% volatility (σ ${formatPrice(stats.stdDev)})`;
+            avgDetailEl.style.display = 'block';
+        } else {
+            avgDetailEl.textContent = '-';
+            avgDetailEl.style.display = 'none';
+        }
     }
 
     // Current Price
@@ -157,7 +184,9 @@ async function fetchAndRenderPriceStatistics(priceApiUrl) {
             avgPrice: null,
             currentPrice: null,
             delta: null,
-            percentile: null
+            percentile: null,
+            stdDev: null,
+            coefficientOfVariation: null
         });
     }
 }
