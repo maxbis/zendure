@@ -11,15 +11,44 @@ let autoRefreshIntervalId = null;
 let wasPageHidden = false;
 
 /**
+ * Hide the refresh button temporarily to indicate auto-refresh is happening
+ */
+function indicateAutoRefresh() {
+    const refreshBtn = document.getElementById('automation-refresh-btn');
+    if (refreshBtn) {
+        // Hide button for 1 second (button uses inline-flex in CSS)
+        refreshBtn.style.display = 'none';
+        setTimeout(() => {
+            refreshBtn.style.display = 'inline-flex';
+        }, 1000);
+    }
+}
+
+/**
  * Refresh all status sections (Automation Status, Charge/Discharge, and System & Grid)
  * This unified function updates all three sections in one go
  */
-async function refreshAllStatus() {
+async function refreshAllStatus(isAutoRefresh = false) {
+    // Log refresh operation
+    console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
+    
+    const apisCalled = [];
+    
     // Fetch both automation status and charge status in parallel
 
     // Fetch automation status
     let automationPromise = Promise.resolve(null);
     if (typeof AUTOMATION_STATUS_API_URL !== 'undefined' && AUTOMATION_STATUS_API_URL) {
+        // Detect config key based on URL pattern (localhost = local, otherwise remote)
+        const isLocalUrl = AUTOMATION_STATUS_API_URL.includes('localhost') || AUTOMATION_STATUS_API_URL.includes('127.0.0.1');
+        const statusConfigKey = 'statusApiUrl' + (isLocalUrl ? '-local' : '');
+        
+        apisCalled.push({
+            name: 'Automation Status API',
+            url: AUTOMATION_STATUS_API_URL,
+            configKey: statusConfigKey
+        });
+        
         automationPromise = fetchAutomationStatus(AUTOMATION_STATUS_API_URL)
             .then(data => {
                 renderAutomationStatus(data);
@@ -38,9 +67,27 @@ async function refreshAllStatus() {
     // Fetch charge status
     let chargePromise = Promise.resolve(null);
     if (typeof CHARGE_STATUS_ZENDURE_API_URL !== 'undefined' && CHARGE_STATUS_ZENDURE_API_URL) {
+        // Detect config key based on URL pattern (localhost = local, otherwise remote)
+        const isLocalUrl = CHARGE_STATUS_ZENDURE_API_URL.includes('localhost') || CHARGE_STATUS_ZENDURE_API_URL.includes('127.0.0.1');
+        const dataConfigKey = 'dataApiUrl' + (isLocalUrl ? '-local' : '');
+        
+        apisCalled.push({
+            name: 'Charge Status API (Zendure)',
+            url: CHARGE_STATUS_ZENDURE_API_URL,
+            configKey: dataConfigKey
+        });
+        
+        const p1ApiUrl = (typeof CHARGE_STATUS_P1_API_URL !== 'undefined') ? CHARGE_STATUS_P1_API_URL : null;
+        if (p1ApiUrl) {
+            apisCalled.push({
+                name: 'Charge Status API (P1 Meter)',
+                url: p1ApiUrl,
+                configKey: dataConfigKey // P1 uses same base URL with ?type=zendure_p1
+            });
+        }
+        
         chargePromise = (async () => {
             try {
-                const p1ApiUrl = (typeof CHARGE_STATUS_P1_API_URL !== 'undefined') ? CHARGE_STATUS_P1_API_URL : null;
                 const { zendureData, p1Data } = await fetchChargeStatus(CHARGE_STATUS_ZENDURE_API_URL, p1ApiUrl);
                 renderChargeStatus(zendureData, p1Data);
 
@@ -60,8 +107,19 @@ async function refreshAllStatus() {
         })();
     }
 
+    // Log APIs being called
+    if (apisCalled.length > 0) {
+        console.log('📡 APIs being called:');
+        apisCalled.forEach(api => {
+            console.log(`  - ${api.name}:`, api.url);
+            console.log(`    Config key: ${api.configKey}`);
+        });
+    }
+    
     // Wait for both to complete (they run in parallel)
     await Promise.all([automationPromise, chargePromise]);
+    
+    console.log('✅ Refresh completed');
 }
 
 /**
@@ -149,13 +207,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Page became visible after being hidden - start auto-refresh
             // Do immediate refresh first
             if (typeof refreshAllStatus === 'function') {
-                refreshAllStatus();
+                indicateAutoRefresh();
+                refreshAllStatus(true);
             }
             
             // Then set up interval for periodic refresh
             autoRefreshIntervalId = setInterval(() => {
                 if (typeof refreshAllStatus === 'function') {
-                    refreshAllStatus();
+                    indicateAutoRefresh();
+                    refreshAllStatus(true);
                 }
             }, AUTO_REFRESH_INTERVAL);
             
