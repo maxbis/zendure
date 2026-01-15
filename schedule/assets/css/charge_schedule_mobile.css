@@ -1,0 +1,880 @@
+/* Mobile Dark Mode Schedule Page Styles */
+
+:root {
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1e;
+    --bg-tertiary: #2d2d2d;
+    --text-primary: #606060;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #888;
+    --border-color: #404040;
+    --charge-color: #4caf50;
+    --discharge-color: #f44336;
+    --neutral-color: #757575;
+    --netzero-color: #2196f3;
+    --netzero-plus-color: #bac302;
+}
+
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body.mobile-dark {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    padding: 12px;
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+/* Header - Compact */
+.header {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+/* Cards - Dark Mode */
+.card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.card h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+}
+
+/* Layout - Single Column for Mobile */
+.layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Color Classes */
+.charge {
+    color: var(--charge-color);
+}
+
+.discharge {
+    color: var(--discharge-color);
+}
+
+.neutral {
+    color: var(--neutral-color);
+}
+
+.netzero {
+    color: var(--netzero-color);
+    font-weight: 500;
+}
+
+.netzero-plus {
+    color: var(--netzero-plus-color);
+    font-weight: 500;
+}
+
+/* Buttons - Dark Mode */
+.btn {
+    border: none;
+    min-width: 45px;
+    min-height: 28px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease-out;
+    position: relative;
+    overflow: hidden;
+    padding: 6px 12px;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background: #64b5f6;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #42a5f5;
+}
+
+.btn-danger {
+    background: #ef5350;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #e53935;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-outline:hover {
+    background: var(--bg-tertiary);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+.btn-add {
+    background: #a3c9e2;
+    color: #fff;
+}
+
+.btn-add:hover {
+    background: #8bb4d6;
+}
+
+/* Schedule List - Compact */
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    scrollbar-width: thin;
+}
+
+.schedule-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.schedule-list::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.schedule-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.schedule-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+    margin-bottom: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.schedule-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border-color: #555;
+}
+
+.schedule-item-time {
+    min-width: 60px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.schedule-item-value {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-left: 8px;
+}
+
+/* Ensure schedule item values are readable in dark mode */
+.schedule-item-value.charge {
+    color: #81c784; /* Lighter green for dark mode */
+}
+
+.schedule-item-value.discharge {
+    color: #e57373; /* Lighter red for dark mode */
+}
+
+.schedule-item-value.neutral {
+    color: #9e9e9e; /* Light gray */
+}
+
+.schedule-item-value.netzero {
+    color: #64b5f6; /* Light blue for dark mode */
+}
+
+.schedule-item-value.netzero-plus {
+    color: #d4e157; /* Light yellow-green for dark mode */
+}
+
+.schedule-item-key {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-family: monospace;
+    margin-left: 8px;
+}
+
+/* Time-based background colors - Dark Mode (Improved for readability) */
+.time-night { 
+    background-color: rgba(33, 150, 243, 0.25);
+    border-color: rgba(33, 150, 243, 0.5);
+    color: var(--text-primary);
+}
+.time-morning { 
+    background-color: rgba(255, 193, 7, 0.25);
+    border-color: rgba(255, 193, 7, 0.5);
+    color: var(--text-primary);
+}
+.time-afternoon { 
+    background-color: rgba(76, 175, 80, 0.25);
+    border-color: rgba(76, 175, 80, 0.5);
+    color: var(--text-primary);
+}
+.time-evening { 
+    background-color: rgba(244, 67, 54, 0.25);
+    border-color: rgba(244, 67, 54, 0.5);
+    color: var(--text-primary);
+}
+
+.slot-current {
+    border: 2px solid #ff9800 !important;
+    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5), 0 2px 8px rgba(255, 152, 0, 0.3);
+    font-weight: 600;
+}
+
+/* Table - Dark Mode */
+.table-wrapper {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 8px;
+    scrollbar-width: thin;
+}
+
+.table-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+#schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#schedule-table th,
+#schedule-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+#schedule-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-primary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#schedule-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s;
+    color: var(--text-primary);
+    background-color: transparent; /* Ensure no light backgrounds */
+}
+
+#schedule-table tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02); /* Very subtle dark mode alternating */
+}
+
+#schedule-table tbody tr:nth-child(odd) {
+    background-color: transparent;
+}
+
+#schedule-table tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Ensure table cell colors are readable in dark mode */
+#schedule-table tbody td.charge {
+    color: #81c784; /* Lighter green for dark mode */
+}
+
+#schedule-table tbody td.discharge {
+    color: #e57373; /* Lighter red for dark mode */
+}
+
+#schedule-table tbody td.neutral {
+    color: #9e9e9e; /* Light gray */
+}
+
+#schedule-table tbody td.netzero {
+    color: #64b5f6; /* Light blue for dark mode */
+}
+
+#schedule-table tbody td.netzero-plus {
+    color: #d4e157; /* Light yellow-green for dark mode */
+}
+
+/* Status Bar */
+.status-bar {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 6px;
+}
+
+.helper-text {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+}
+
+/* Modal - Dark Mode */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+}
+
+.modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.modal-dialog {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    transform: scale(0.9) translateY(-20px);
+    opacity: 0;
+    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.modal-backdrop.active .modal-dialog {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease-out;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--discharge-color);
+    transform: rotate(90deg) scale(1.1);
+}
+
+.modal-body {
+    margin-bottom: 16px;
+}
+
+.modal-body p {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #64b5f6;
+}
+
+.helper-text {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+}
+
+.modal-footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Price Graph - Mobile with Scrollbar */
+.price-graph-wrapper-mobile {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.price-graph-wrapper-mobile .card {
+    padding: 12px;
+}
+
+.price-graph-row-mobile {
+    display: flex;
+    gap: 2px;
+    height: 80px;
+    width: auto;
+    padding: 6px 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    scrollbar-width: thin;
+    min-width: 0;
+}
+
+.price-graph-row-mobile::-webkit-scrollbar {
+    height: 6px;
+}
+
+.price-graph-row-mobile::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.price-graph-row-mobile::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.price-graph-row-mobile::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Style existing price-graph-bar classes within mobile container */
+.price-graph-row-mobile .price-graph-bar {
+    flex: none;
+    width: 18px;
+    min-width: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    padding: 0;
+}
+
+.price-graph-row-mobile .price-graph-bar:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.price-graph-row-mobile .price-graph-bar.price-current {
+    background: rgba(255, 152, 0, 0.2);
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    z-index: 10;
+}
+
+.price-graph-row-mobile .price-graph-bar-inner {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 3px 3px 0 0;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.price-graph-row-mobile .price-graph-bar-label {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.price-graph-row-mobile .price-graph-bar.price-current .price-graph-bar-label {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+.price-graph-row-mobile .price-graph-bar-price {
+    font-size: 0.55rem;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    font-weight: 400;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.price-graph-row-mobile .price-graph-bar.price-current .price-graph-bar-price {
+    color: #ff9800;
+    font-weight: 600;
+}
+
+/* Charge Status - Three Boxes Layout */
+.charge-status-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.charge-status-box {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 12px;
+}
+
+.charge-status-box-title {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.charge-status-box-content {
+    color: var(--text-primary);
+}
+
+/* Automation Status - Dark Mode */
+.automation-status-wrapper {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.automation-status-wrapper .card {
+    padding: 12px;
+}
+
+.automation-entry {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 0.85rem;
+}
+
+.automation-entry:hover {
+    border-color: #555;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.automation-entry-time {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.automation-entry-details {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.automation-entry-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+}
+
+.automation-status-error {
+    background: rgba(244, 67, 54, 0.2);
+    border-left: 4px solid var(--discharge-color);
+    color: var(--discharge-color);
+    padding: 12px;
+    font-size: 0.85rem;
+}
+
+.automation-status-empty {
+    color: var(--text-tertiary);
+    padding: 12px;
+    font-size: 0.85rem;
+}
+
+.automation-refresh-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    font-size: 0.75rem;
+}
+
+.automation-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+/* Charge Status Content - Dark Mode Overrides */
+.charge-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.charge-status-error {
+    padding: 12px;
+    background: rgba(244, 67, 54, 0.2);
+    border-left: 4px solid var(--discharge-color);
+    border-radius: 4px;
+    color: var(--discharge-color);
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.charge-status-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.charge-status-indicator {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+.charge-status-indicator.charging {
+    border-color: var(--charge-color);
+    background: rgba(76, 175, 80, 0.15);
+}
+
+.charge-status-indicator.discharging {
+    border-color: var(--discharge-color);
+    background: rgba(244, 67, 54, 0.15);
+}
+
+.charge-status-indicator.standby {
+    border-color: var(--neutral-color);
+    background: var(--bg-tertiary);
+}
+
+.charge-status-title {
+    color: var(--text-primary);
+}
+
+.charge-status-subtitle {
+    color: var(--text-secondary);
+}
+
+.charge-power-display,
+.charge-battery-display {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+.charge-power-label,
+.charge-battery-label {
+    color: var(--text-secondary);
+}
+
+.charge-power-value,
+.charge-battery-value {
+    color: var(--text-primary);
+}
+
+.charge-power-bar-container,
+.charge-battery-bar {
+    background: var(--bg-primary);
+}
+
+.charge-power-bar-label {
+    color: var(--text-secondary);
+}
+
+.charge-battery-bar-marker {
+    background: var(--text-tertiary);
+}
+
+/* Metric Section */
+.metric-section {
+    margin-bottom: 0;
+}
+
+.metric-section h3 {
+    color: var(--text-primary);
+    border-bottom-color: var(--border-color);
+}
+
+/* Additional compact styling */
+.charge-status-mobile .charge-status-box {
+    padding: 10px;
+}
+
+.charge-status-mobile .charge-status-box-title {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+}
+
+.charge-status-mobile .charge-status-box-content {
+    font-size: 0.9rem;
+}
+
+/* Compact form elements */
+.form-group input[type="radio"] {
+    margin-right: 4px;
+}
+
+.form-group label {
+    font-size: 0.75rem;
+    margin-bottom: 3px;
+}
+
+code {
+    background: var(--bg-tertiary);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+/* Compact modal */
+.modal-dialog {
+    padding: 16px;
+}
+
+.modal-body {
+    margin-bottom: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    body.mobile-dark {
+        padding: 8px;
+    }
+    
+    .header h1 {
+        font-size: 1.3rem;
+    }
+    
+    .card {
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+    
+    .card h2 {
+        font-size: 0.95rem;
+        margin-bottom: 10px;
+    }
+    
+    .card h3 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    .schedule-item {
+        padding: 8px 10px;
+    }
+    
+    .schedule-item-time {
+        min-width: 50px;
+        font-size: 0.85rem;
+    }
+    
+    .schedule-item-value {
+        font-size: 0.9rem;
+    }
+    
+    #schedule-table th,
+    #schedule-table td {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+}
