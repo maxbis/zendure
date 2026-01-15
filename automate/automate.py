@@ -31,7 +31,7 @@ LOOP_INTERVAL_SECONDS = 20
 API_REFRESH_INTERVAL_SECONDS = 300
 
 # Number of consecutive 0-power iterations before setting device to standby
-ZERO_COUNT_THRESHOLD = 10
+ZERO_COUNT_THRESHOLD = 21
 
 # ============================================================================
 # LOGGER CLASS
