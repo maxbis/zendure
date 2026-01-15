@@ -21,7 +21,7 @@ class DataService {
         this.cache = new Map();
         this.subscribers = new Map();
         this.pendingRequests = new Map();
-        this.defaultTTL = options.defaultTTL || 30000; // 30 seconds
+        this.defaultTTL = options.defaultTTL || 10000; // 10 seconds
         this.enableStaleWhileRevalidate = options.enableStaleWhileRevalidate !== false;
     }
     

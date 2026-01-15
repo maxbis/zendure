@@ -21,6 +21,9 @@ if (typeof API_URL === 'undefined') {
     window.API_URL = 'api/charge_schedule_api.php';
 }
 
+// Cache TTL constant (10 seconds in milliseconds)
+const CACHE_TTL = 10000;
+
 // Initialize global services
 let appState = null;
 let dataService = null;
@@ -55,13 +58,13 @@ const refreshData = debounce(async function() {
             todayData = await dataService.fetch(
                 `schedule:${today}`,
                 () => apiClient.get('', { date: today }),
-                { ttl: 30000 } // 30 second cache
+                { ttl: CACHE_TTL }
             );
             
             tomorrowData = await dataService.fetch(
                 `schedule:${tomorrow}`,
                 () => apiClient.get('', { date: tomorrow }),
-                { ttl: 30000 }
+                { ttl: CACHE_TTL }
             );
         } else {
             // Fallback to direct API calls
@@ -331,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Initialize data service
         dataService = new DataService(apiClient, {
-            defaultTTL: 30000, // 30 seconds
+            defaultTTL: CACHE_TTL,
             enableStaleWhileRevalidate: true
         });
     }

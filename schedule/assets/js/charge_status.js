@@ -3,6 +3,13 @@
  * Client-side logic for fetching and rendering charge/discharge status
  */
 
+// Auto-refresh interval when page becomes visible (20 seconds in milliseconds)
+const AUTO_REFRESH_INTERVAL = 20000;
+
+// Track auto-refresh interval
+let autoRefreshIntervalId = null;
+let wasPageHidden = false;
+
 /**
  * Refresh all status sections (Automation Status, Charge/Discharge, and System & Grid)
  * This unified function updates all three sections in one go
@@ -118,3 +125,41 @@ function toggleChargeStatusDetails() {
 
 // Charge/Discharge refresh button removed - use Automation Status refresh button instead
 // which calls refreshAllStatus() to update all sections
+
+/**
+ * Auto-refresh when page becomes visible after being hidden
+ * Refreshes every 20 seconds when the tab is visible
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    // Track initial state
+    wasPageHidden = document.hidden;
+    
+    // Handle visibility changes
+    document.addEventListener('visibilitychange', () => {
+        const isHidden = document.hidden;
+        
+        if (isHidden) {
+            // Page became hidden - stop auto-refresh
+            if (autoRefreshIntervalId !== null) {
+                clearInterval(autoRefreshIntervalId);
+                autoRefreshIntervalId = null;
+            }
+            wasPageHidden = true;
+        } else if (wasPageHidden) {
+            // Page became visible after being hidden - start auto-refresh
+            // Do immediate refresh first
+            if (typeof refreshAllStatus === 'function') {
+                refreshAllStatus();
+            }
+            
+            // Then set up interval for periodic refresh
+            autoRefreshIntervalId = setInterval(() => {
+                if (typeof refreshAllStatus === 'function') {
+                    refreshAllStatus();
+                }
+            }, AUTO_REFRESH_INTERVAL);
+            
+            wasPageHidden = false;
+        }
+    });
+});
