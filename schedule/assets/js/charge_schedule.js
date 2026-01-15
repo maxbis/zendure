@@ -6,6 +6,10 @@
  * - schedule_utils.js - Utility functions
  * - schedule_api.js - API communication
  * - schedule_renderer.js - DOM rendering
+ * - state_manager.js - State management
+ * - data_service.js - Data caching service
+ * - component_base.js - Component base class
+ * - utils_performance.js - Performance utilities
  *
  * API_URL is injected from PHP (charge_schedule.php) which reads it from config.json
  */
@@ -17,10 +21,18 @@ if (typeof API_URL === 'undefined') {
     window.API_URL = 'api/charge_schedule_api.php';
 }
 
+// Initialize global services
+let appState = null;
+let dataService = null;
+let apiClient = null;
+let schedulePanelComponent = null;
+let priceGraphComponent = null;
+
 /**
  * Refresh all schedule data and update UI
+ * Uses debouncing and state management for better performance
  */
-async function refreshData() {
+const refreshData = debounce(async function() {
     try {
         // Get today and tomorrow dates in YYYYMMDD format
         const now = new Date();
@@ -30,23 +42,70 @@ async function refreshData() {
         tomorrowDate.setDate(tomorrowDate.getDate() + 1);
         const tomorrow = formatDateYYYYMMDD(tomorrowDate);
 
-        // Fetch today's data
-        const todayData = await fetchScheduleData(API_URL, today);
+        // Update loading state
+        if (appState) {
+            appState.setState({ loading: { schedule: true } });
+        }
 
-        // Fetch tomorrow's data
-        const tomorrowData = await fetchScheduleData(API_URL, tomorrow);
+        // Fetch data using data service (with caching)
+        let todayData, tomorrowData;
+        
+        if (dataService && apiClient) {
+            // Use data service for caching
+            todayData = await dataService.fetch(
+                `schedule:${today}`,
+                () => apiClient.get('', { date: today }),
+                { ttl: 30000 } // 30 second cache
+            );
+            
+            tomorrowData = await dataService.fetch(
+                `schedule:${tomorrow}`,
+                () => apiClient.get('', { date: tomorrow }),
+                { ttl: 30000 }
+            );
+        } else {
+            // Fallback to direct API calls
+            todayData = await fetchScheduleData(API_URL, today);
+            tomorrowData = await fetchScheduleData(API_URL, tomorrow);
+        }
 
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
 
-            // Render all UI components
-            renderEntries(todayData.entries);
-            renderToday(todayData.resolved, todayData.currentHour, currentTime);
-            renderMiniTimeline(todayData.resolved, currentTime);
+            // Update state
+            if (appState) {
+                appState.setState({
+                    schedule: {
+                        entries: todayData.entries || [],
+                        resolved: todayData.resolved || [],
+                        currentTime: currentTime,
+                        currentHour: todayData.currentHour
+                    },
+                    scheduleTomorrow: {
+                        resolved: tomorrowData.resolved || []
+                    },
+                    loading: { schedule: false }
+                });
+            }
 
-            const statusBar = document.getElementById('status-bar');
-            if (statusBar) {
-                statusBar.innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+            // Update components if using component architecture
+            if (schedulePanelComponent) {
+                schedulePanelComponent.update({
+                    entries: todayData.entries || [],
+                    resolved: todayData.resolved || [],
+                    currentTime: currentTime,
+                    currentHour: todayData.currentHour
+                });
+            } else {
+                // Fallback to direct rendering
+                renderEntries(todayData.entries);
+                renderToday(todayData.resolved, todayData.currentHour, currentTime);
+                renderMiniTimeline(todayData.resolved, currentTime);
+
+                const statusBar = document.getElementById('status-bar');
+                if (statusBar) {
+                    statusBar.innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+                }
             }
 
             // Render bar graph with both today and tomorrow data
@@ -77,10 +136,20 @@ async function refreshData() {
             }
         }
     } catch (e) {
-        console.error(e);
-        alert('Connection failed: ' + e.message);
+        console.error('Error refreshing data:', e);
+        if (appState) {
+            appState.setState({ 
+                loading: { schedule: false },
+                errors: { schedule: e.message }
+            });
+        }
+        if (window.notifications) {
+            window.notifications.error('Failed to refresh schedule data: ' + e.message);
+        } else {
+            alert('Connection failed: ' + e.message);
+        }
     }
-}
+}, 300); // Debounce for 300ms
 
 /**
  * Handle clear button click
@@ -91,7 +160,12 @@ async function handleClearClick() {
         const result = await clearOldEntries(API_URL, true);
 
         if (!result.success) {
-            alert('Error: ' + (result.error || 'Failed to check old entries'));
+            const errorMsg = result.error || 'Failed to check old entries';
+            if (window.notifications) {
+                window.notifications.error(errorMsg);
+            } else {
+                alert('Error: ' + errorMsg);
+            }
             return;
         }
 
@@ -120,8 +194,18 @@ async function handleClearClick() {
             const deleteResult = await clearOldEntries(API_URL, false);
 
             if (!deleteResult.success) {
-                alert('Error: ' + (deleteResult.error || 'Failed to delete old entries'));
+                const errorMsg = deleteResult.error || 'Failed to delete old entries';
+                if (window.notifications) {
+                    window.notifications.error(errorMsg);
+                } else {
+                    alert('Error: ' + errorMsg);
+                }
                 return;
+            }
+            
+            // Show success notification
+            if (window.notifications) {
+                window.notifications.success(`Deleted ${count} outdated entries`);
             }
 
             // Refresh data to show updated entries
@@ -129,7 +213,11 @@ async function handleClearClick() {
         }
     } catch (error) {
         console.error('Error in clear button handler:', error);
-        alert('Error: ' + error.message);
+        if (window.notifications) {
+            window.notifications.error('Error clearing entries: ' + error.message);
+        } else {
+            alert('Error: ' + error.message);
+        }
     }
 }
 
@@ -140,7 +228,12 @@ async function handleAutoClick() {
     try {
         // Check if API URL is defined
         if (!CALCULATE_SCHEDULE_API_URL) {
-            alert('Error: Calculate schedule API URL is not configured.');
+            const errorMsg = 'Calculate schedule API URL is not configured.';
+            if (window.notifications) {
+                window.notifications.error(errorMsg);
+            } else {
+                alert('Error: ' + errorMsg);
+            }
             return;
         }
 
@@ -148,7 +241,12 @@ async function handleAutoClick() {
         const simulateData = await calculateSchedule(CALCULATE_SCHEDULE_API_URL, true);
 
         if (!simulateData.success) {
-            alert('Error: ' + (simulateData.error || 'Failed to simulate schedule calculation'));
+            const errorMsg = simulateData.error || 'Failed to simulate schedule calculation';
+            if (window.notifications) {
+                window.notifications.error(errorMsg);
+            } else {
+                alert('Error: ' + errorMsg);
+            }
             return;
         }
 
@@ -178,8 +276,18 @@ async function handleAutoClick() {
             const calculateData = await calculateSchedule(CALCULATE_SCHEDULE_API_URL, false);
 
             if (!calculateData.success) {
-                alert('Error: ' + (calculateData.error || 'Failed to calculate schedule'));
+                const errorMsg = calculateData.error || 'Failed to calculate schedule';
+                if (window.notifications) {
+                    window.notifications.error(errorMsg);
+                } else {
+                    alert('Error: ' + errorMsg);
+                }
                 return;
+            }
+
+            // Show success notification
+            if (window.notifications) {
+                window.notifications.success(`Added ${entriesCount} schedule entries`);
             }
 
             // Refresh data to show updated entries
@@ -187,7 +295,11 @@ async function handleAutoClick() {
         }
     } catch (error) {
         console.error('Error in auto button handler:', error);
-        alert('Error: ' + error.message);
+        if (window.notifications) {
+            window.notifications.error('Error calculating schedule: ' + error.message);
+        } else {
+            alert('Error: ' + error.message);
+        }
     }
 }
 
@@ -196,25 +308,99 @@ let editModal;
 let confirmDialog;
 
 /**
- * Initialize application
+ * Initialize application with state management and components
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize state manager
+    appState = new StateManager({
+        schedule: null,
+        prices: null,
+        automationStatus: null,
+        chargeStatus: null,
+        loading: {},
+        errors: {}
+    });
+
+    // Initialize API client
+    if (typeof ApiClient !== 'undefined') {
+        apiClient = new ApiClient(API_URL, {
+            timeout: 10000,
+            retries: 3,
+            retryDelay: 1000
+        });
+
+        // Initialize data service
+        dataService = new DataService(apiClient, {
+            defaultTTL: 30000, // 30 seconds
+            enableStaleWhileRevalidate: true
+        });
+    }
+
     // Initialize edit modal with callback to refresh data after save/delete
     editModal = new EditModal(API_URL, refreshData);
 
     // Initialize confirm dialog
     confirmDialog = new ConfirmDialog();
 
-    // Add click handler for Clear button
-    const clearBtn = document.getElementById('clear-entry-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', handleClearClick);
+    // Initialize components (if available)
+    if (typeof SchedulePanelComponent !== 'undefined') {
+        const scheduleContainer = document.querySelector('.layout');
+        if (scheduleContainer) {
+            schedulePanelComponent = new SchedulePanelComponent(scheduleContainer, {
+                stateManager: appState,
+                apiClient: apiClient,
+                config: { editModal: editModal }
+            });
+            schedulePanelComponent.init();
+        }
     }
 
-    // Add click handler for Auto button
+    if (typeof PriceGraphComponent !== 'undefined') {
+        const priceContainer = document.querySelector('.price-graph-wrapper');
+        if (priceContainer) {
+            priceGraphComponent = new PriceGraphComponent(priceContainer, {
+                stateManager: appState,
+                apiClient: apiClient,
+                config: { 
+                    editModal: editModal,
+                    priceApiUrl: typeof PRICE_API_URL !== 'undefined' ? PRICE_API_URL : null
+                }
+            });
+            priceGraphComponent.init();
+        }
+    }
+
+    // Add click handler for Clear button (with debouncing)
+    const clearBtn = document.getElementById('clear-entry-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', debounce(handleClearClick, 500));
+    }
+
+    // Add click handler for Auto button (with debouncing)
     const autoBtn = document.getElementById('auto-entry-btn');
     if (autoBtn) {
-        autoBtn.addEventListener('click', handleAutoClick);
+        autoBtn.addEventListener('click', debounce(handleAutoClick, 500));
+    }
+
+    // Lazy load heavy sections
+    if (typeof lazyLoadComponent !== 'undefined') {
+        // Lazy load charge status details
+        const chargeDetailsSection = document.querySelector('.charge-status-wrapper:last-of-type');
+        if (chargeDetailsSection) {
+            lazyLoadComponent(chargeDetailsSection, () => {
+                // Charge status details will load when scrolled into view
+                console.log('Charge status details section loaded');
+            }, { rootMargin: '200px' });
+        }
+
+        // Lazy load automation status if it's far down the page
+        const automationSection = document.querySelector('.automation-status-wrapper');
+        if (automationSection) {
+            lazyLoadComponent(automationSection, () => {
+                // Automation status will load when scrolled into view
+                console.log('Automation status section loaded');
+            }, { rootMargin: '200px' });
+        }
     }
 
     // Initial data load

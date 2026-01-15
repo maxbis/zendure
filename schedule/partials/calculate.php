@@ -16,28 +16,14 @@ if (!ini_get('date.timezone')) {
 define('NETZERO_VALUE', -350);      // netzero evaluates to -350 watts (discharge)
 define('NETZERO_PLUS_VALUE', 350);  // netzero+ evaluates to +350 watts (charge)
 
-// Load API URL from config file
-$calculateApiUrl = null;
-$configPath = __DIR__ . '/../../config/config.json';
-if (file_exists($configPath)) {
-    $configJson = file_get_contents($configPath);
-    if ($configJson !== false) {
-        $config = json_decode($configJson, true);
-        if ($config !== null) {
-            if (isset($config['scheduleApiUrl'])) {
-                $calculateApiUrl = $config['scheduleApiUrl'];
-            }
-            
-            // Select zendureFetchApiUrl based on location (zendureStoreApiUrl removed - derive from dataApiUrl)
-            $location = $config['location'] ?? 'remote';
-            if ($location === 'local') {
-                $zendureFetchApiUrl = $config['zendureFetchApiUrl-local'] ?? null;
-            } else {
-                $zendureFetchApiUrl = $config['zendureFetchApiUrl'] ?? null;
-            }
-        }
-    }
+// Ensure ConfigLoader is available
+if (!class_exists('ConfigLoader')) {
+    require_once __DIR__ . '/../includes/config_loader.php';
 }
+
+// Load API URL from centralized config loader
+$calculateApiUrl = ConfigLoader::get('scheduleApiUrl');
+$zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 
 // Fallback if config not found
 if ($calculateApiUrl === null) {

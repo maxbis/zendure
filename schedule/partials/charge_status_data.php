@@ -20,34 +20,25 @@ $charge_status_data_initialized = true;
 require_once __DIR__ . '/../includes/formatters.php';
 require_once __DIR__ . '/../includes/colors.php';
 
+// Ensure ConfigLoader is available
+if (!class_exists('ConfigLoader')) {
+    require_once __DIR__ . '/../includes/config_loader.php';
+}
+
 // Fetch Zendure data from API
 $zendureData = null;
 $p1Data = null;
 $chargeStatusError = null;
 $lastUpdate = null;
 
-// Load API URLs from config file
+// Load API URLs from centralized config loader
+$baseUrl = ConfigLoader::getWithLocation('dataApiUrl');
 $dataApiUrl = null;
 $p1ApiUrl = null;
-$configPath = __DIR__ . '/../../config/config.json';
-if (file_exists($configPath)) {
-    $configJson = file_get_contents($configPath);
-    if ($configJson !== false) {
-        $config = json_decode($configJson, true);
-        if ($config !== null) {
-            $location = $config['location'] ?? 'remote';
-            if ($location === 'local') {
-                $baseUrl = $config['dataApiUrl-local'] ?? null;
-            } else {
-                $baseUrl = $config['dataApiUrl'] ?? null;
-            }
 
-            if ($baseUrl) {
-                $dataApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure';
-                $p1ApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure_p1';
-            }
-        }
-    }
+if ($baseUrl) {
+    $dataApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure';
+    $p1ApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure_p1';
 }
 
 // Fallback to dynamic construction if config not available

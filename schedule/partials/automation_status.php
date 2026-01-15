@@ -19,30 +19,21 @@
             </button>
         </div>
         <?php
+        // Ensure ConfigLoader is available
+        if (!class_exists('ConfigLoader')) {
+            require_once __DIR__ . '/../includes/config_loader.php';
+        }
+        
         // Fetch automation status from API
         $automationStatusData = null;
         $automationStatusError = null;
         
-        // Load API URL from config file
+        // Load API URL from centralized config loader
+        $baseUrl = ConfigLoader::getWithLocation('statusApiUrl');
         $automationStatusUrl = null;
-        $configPath = __DIR__ . '/../../config/config.json';
-        if (file_exists($configPath)) {
-            $configJson = file_get_contents($configPath);
-            if ($configJson !== false) {
-                $config = json_decode($configJson, true);
-                if ($config !== null) {
-                    $location = $config['location'] ?? 'remote';
-                    if ($location === 'local') {
-                        $baseUrl = $config['statusApiUrl-local'] ?? null;
-                    } else {
-                        $baseUrl = $config['statusApiUrl'] ?? null;
-                    }
-                    
-                    if ($baseUrl) {
-                        $automationStatusUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=all&limit=20';
-                    }
-                }
-            }
+        
+        if ($baseUrl) {
+            $automationStatusUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=all&limit=20';
         }
         
         // Fallback to dynamic construction if config not available

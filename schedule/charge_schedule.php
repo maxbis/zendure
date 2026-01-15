@@ -14,49 +14,18 @@ require_once __DIR__ . '/../login/validate.php';
 require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include local helpers for automation status functions
 require_once __DIR__ . '/includes/status.php';
+// Include centralized configuration loader
+require_once __DIR__ . '/includes/config_loader.php';
 
 $dataFile = __DIR__ . '/../data/charge_schedule.json';
 
-// Load API URL from config file
-$apiUrl = 'api/charge_schedule_api.php'; // Default fallback
-$priceApiUrl = null; // Price API URL
-$calculateScheduleApiUrl = null; // Calculate schedule API URL
-
-// Try main config.json first, then fallback to run_schedule/config/config.json
-$mainConfigPath = __DIR__ . '/../config/config.json';
-$configPath = __DIR__ . '/../run_schedule/config/config.json';
-$configPathToUse = file_exists($mainConfigPath) ? $mainConfigPath : (file_exists($configPath) ? $configPath : null);
-
-if ($configPathToUse && file_exists($configPathToUse)) {
-    $configJson = file_get_contents($configPathToUse);
-    if ($configJson !== false) {
-        $config = json_decode($configJson, true);
-        if ($config !== null) {
-            if (isset($config['scheduleApiUrl'])) {
-                $apiUrl = $config['scheduleApiUrl'];
-            }
-            // Check for get_price (singular) first, then get_prices (plural) for backward compatibility
-            if (isset($config['priceUrls']['get_price'])) {
-                $priceApiUrl = $config['priceUrls']['get_price'];
-            } elseif (isset($config['priceUrls']['get_prices'])) {
-                $priceApiUrl = $config['priceUrls']['get_prices'];
-            }
-            
-            // Get calculate schedule API URL
-            if (isset($config['calculate_schedule_apiUrl'])) {
-                $calculateScheduleApiUrl = $config['calculate_schedule_apiUrl'];
-            }
-            
-            // Select zendureFetchApiUrl based on location (zendureStoreApiUrl removed - derive from dataApiUrl)
-            $location = $config['location'] ?? 'remote';
-            if ($location === 'local') {
-                $zendureFetchApiUrl = $config['zendureFetchApiUrl-local'] ?? null;
-            } else {
-                $zendureFetchApiUrl = $config['zendureFetchApiUrl'] ?? null;
-            }
-        }
-    }
-}
+// Load API URLs from centralized config loader
+$apiUrl = ConfigLoader::get('scheduleApiUrl', 'api/charge_schedule_api.php');
+// Check for get_price (singular) first, then get_prices (plural) for backward compatibility
+$priceApiUrl = ConfigLoader::get('priceUrls.get_price') 
+            ?? ConfigLoader::get('priceUrls.get_prices');
+$calculateScheduleApiUrl = ConfigLoader::get('calculate_schedule_apiUrl');
+$zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 
 // Initial Server-Side Render Data
 $schedule = loadSchedule($dataFile);
@@ -132,6 +101,12 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         </script>
 
         <!-- Core modules (must load first) -->
+        <script src="assets/js/api_client.js"></script>
+        <script src="assets/js/notification_service.js"></script>
+        <script src="assets/js/state_manager.js"></script>
+        <script src="assets/js/data_service.js"></script>
+        <script src="assets/js/utils_performance.js"></script>
+        <script src="assets/js/component_base.js"></script>
         <script src="assets/js/schedule_utils.js"></script>
         <script src="assets/js/schedule_api.js"></script>
         <script src="assets/js/schedule_renderer.js"></script>
@@ -140,6 +115,10 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/edit_modal.js"></script>
         <script src="assets/js/confirm_dialog.js"></script>
 
+        <!-- Component modules -->
+        <script src="assets/js/components/schedule_panel_component.js"></script>
+        <script src="assets/js/components/price_graph_component.js"></script>
+        
         <!-- Feature modules -->
         <script src="assets/js/price_overview_bar.js"></script>
         <script src="assets/js/price_statistics.js"></script>
