@@ -4,7 +4,7 @@
     --bg-primary: #121212;
     --bg-secondary: #1e1e1e;
     --bg-tertiary: #2d2d2d;
-    --text-primary: #606060;
+    --text-primary: #909090;
     --text-secondary: #b0b0b0;
     --text-tertiary: #888;
     --border-color: #404040;
@@ -645,30 +645,36 @@ body.mobile-dark {
     padding: 12px;
 }
 
-.automation-entry {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
+/* Override automation_status.css with higher specificity for mobile dark mode */
+body.mobile-dark .automation-entry,
+.automation-status-wrapper .automation-entry {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
     padding: 10px 12px;
     font-size: 0.85rem;
 }
 
-.automation-entry:hover {
-    border-color: #555;
+body.mobile-dark .automation-entry:hover,
+.automation-status-wrapper .automation-entry:hover {
+    border-color: #555 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.automation-entry-time {
-    color: var(--text-secondary);
+body.mobile-dark .automation-entry-time,
+.automation-status-wrapper .automation-entry-time {
+    color: var(--text-secondary) !important;
     font-size: 0.8rem;
 }
 
-.automation-entry-details {
-    color: var(--text-primary);
+body.mobile-dark .automation-entry-details,
+.automation-status-wrapper .automation-entry-details {
+    color: var(--text-primary) !important;
     font-size: 0.85rem;
 }
 
-.automation-entry-badge {
+body.mobile-dark .automation-entry-badge,
+.automation-status-wrapper .automation-entry-badge {
     font-size: 0.7rem;
     padding: 3px 8px;
 }
@@ -726,38 +732,54 @@ body.mobile-dark {
     font-size: 0.85rem;
 }
 
-.charge-status-indicator {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
+/* Override charge_status.css with higher specificity for mobile dark mode */
+body.mobile-dark .charge-status-indicator,
+.charge-status-mobile .charge-status-indicator {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
 }
 
-.charge-status-indicator.charging {
-    border-color: var(--charge-color);
-    background: rgba(76, 175, 80, 0.15);
+body.mobile-dark .charge-status-indicator.charging,
+.charge-status-mobile .charge-status-indicator.charging {
+    border-color: var(--charge-color) !important;
+    background: rgba(76, 175, 80, 0.15) !important;
 }
 
-.charge-status-indicator.discharging {
-    border-color: var(--discharge-color);
-    background: rgba(244, 67, 54, 0.15);
+body.mobile-dark .charge-status-indicator.discharging,
+.charge-status-mobile .charge-status-indicator.discharging {
+    border-color: var(--discharge-color) !important;
+    background: rgba(244, 67, 54, 0.15) !important;
 }
 
-.charge-status-indicator.standby {
-    border-color: var(--neutral-color);
-    background: var(--bg-tertiary);
+body.mobile-dark .charge-status-indicator.standby,
+.charge-status-mobile .charge-status-indicator.standby {
+    border-color: var(--neutral-color) !important;
+    background: var(--bg-tertiary) !important;
 }
 
 .charge-status-title {
-    color: var(--text-primary);
+    color: var(--text-secondary) !important;
+}
+
+.charge-battery-level {
+    color: var(--text-secondary) !important;
+}
+
+.charge-battery-value {
+    color: var(--text-primary) !important;
 }
 
 .charge-status-subtitle {
-    color: var(--text-secondary);
+    color: var(--text-secondary) !important;
 }
 
-.charge-power-display,
-.charge-battery-display {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
+/* Override charge_status.css with higher specificity for mobile dark mode */
+body.mobile-dark .charge-power-display,
+.charge-status-mobile .charge-power-display,
+body.mobile-dark .charge-battery-display,
+.charge-status-mobile .charge-battery-display {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
 }
 
 .charge-power-label,
