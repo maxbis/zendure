@@ -5,6 +5,7 @@
 
 // Auto-refresh interval when page becomes visible (20 seconds in milliseconds)
 const AUTO_REFRESH_INTERVAL = 20000;
+const DEBUG_MODE = false;
 
 // Track auto-refresh interval
 let autoRefreshIntervalId = null;
@@ -30,7 +31,9 @@ function indicateAutoRefresh() {
  */
 async function refreshAllStatus(isAutoRefresh = false) {
     // Log refresh operation
-    console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
+    if (DEBUG_MODE) {
+        console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
+    }
     
     const apisCalled = [];
     
@@ -108,7 +111,7 @@ async function refreshAllStatus(isAutoRefresh = false) {
     }
 
     // Log APIs being called
-    if (apisCalled.length > 0) {
+    if (apisCalled.length > 0 && DEBUG_MODE) {
         console.log('📡 APIs being called:');
         apisCalled.forEach(api => {
             console.log(`  - ${api.name}:`, api.url);
@@ -119,7 +122,8 @@ async function refreshAllStatus(isAutoRefresh = false) {
     // Wait for both to complete (they run in parallel)
     await Promise.all([automationPromise, chargePromise]);
     
-    console.log('✅ Refresh completed');
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`✅ Refresh completed [${timestamp}]`);
 }
 
 /**
@@ -185,6 +189,55 @@ function toggleChargeStatusDetails() {
 // which calls refreshAllStatus() to update all sections
 
 /**
+ * Start auto-refresh interval (if page is visible)
+ */
+function startAutoRefresh() {
+    // Clear any existing interval first
+    if (autoRefreshIntervalId !== null) {
+        clearInterval(autoRefreshIntervalId);
+        autoRefreshIntervalId = null;
+    }
+    
+    // Only start interval if page is visible
+    if (!document.hidden) {
+        // Do immediate refresh first
+        if (typeof refreshAllStatus === 'function') {
+            indicateAutoRefresh();
+            refreshAllStatus(true);
+        }
+        
+        // Then set up interval for periodic refresh
+        autoRefreshIntervalId = setInterval(() => {
+            // Double-check page is still visible before refreshing
+            if (!document.hidden && typeof refreshAllStatus === 'function') {
+                if (DEBUG_MODE) {
+                    console.log('⏰ Auto-refresh interval triggered');
+                }
+                indicateAutoRefresh();
+                refreshAllStatus(true);
+            } else if (document.hidden) {
+                if (DEBUG_MODE) {
+                    console.log('⏰ Auto-refresh skipped (page hidden)');
+                }
+            }
+        }, AUTO_REFRESH_INTERVAL);
+        
+        console.log('⏰ Auto-refresh interval started (every ' + (AUTO_REFRESH_INTERVAL / 1000) + ' seconds)');
+    }
+}
+
+/**
+ * Stop auto-refresh interval
+ */
+function stopAutoRefresh() {
+    if (autoRefreshIntervalId !== null) {
+        clearInterval(autoRefreshIntervalId);
+        autoRefreshIntervalId = null;
+        console.log('⏸️ Auto-refresh interval stopped');
+    }
+}
+
+/**
  * Auto-refresh when page becomes visible after being hidden
  * Refreshes every 20 seconds when the tab is visible
  */
@@ -192,34 +245,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Track initial state
     wasPageHidden = document.hidden;
     
+    // Start auto-refresh if page is visible on initial load
+    if (!document.hidden) {
+        startAutoRefresh();
+    }
+    
     // Handle visibility changes
     document.addEventListener('visibilitychange', () => {
         const isHidden = document.hidden;
         
         if (isHidden) {
             // Page became hidden - stop auto-refresh
-            if (autoRefreshIntervalId !== null) {
-                clearInterval(autoRefreshIntervalId);
-                autoRefreshIntervalId = null;
-            }
+            stopAutoRefresh();
             wasPageHidden = true;
-        } else if (wasPageHidden) {
-            // Page became visible after being hidden - start auto-refresh
-            // Do immediate refresh first
-            if (typeof refreshAllStatus === 'function') {
-                indicateAutoRefresh();
-                refreshAllStatus(true);
+        } else {
+            // Page became visible
+            if (wasPageHidden) {
+                // Page became visible after being hidden - start auto-refresh
+                startAutoRefresh();
+                wasPageHidden = false;
             }
-            
-            // Then set up interval for periodic refresh
-            autoRefreshIntervalId = setInterval(() => {
-                if (typeof refreshAllStatus === 'function') {
-                    indicateAutoRefresh();
-                    refreshAllStatus(true);
-                }
-            }, AUTO_REFRESH_INTERVAL);
-            
-            wasPageHidden = false;
         }
     });
 });
