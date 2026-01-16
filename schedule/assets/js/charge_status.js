@@ -26,6 +26,71 @@ function indicateAutoRefresh() {
 }
 
 /**
+ * Lightweight update of current time indicators in price graph and schedule bar graph
+ * Updates the current hour indicator without full re-render of the graphs
+ */
+function updateGraphTimeIndicators() {
+    const now = new Date();
+    
+    // Get current date in YYYYMMDD format (using the same logic as the graphs)
+    let currentDate;
+    if (typeof formatDateYYYYMMDD === 'function') {
+        currentDate = formatDateYYYYMMDD(now);
+    } else {
+        // Fallback if formatDateYYYYMMDD is not available
+        currentDate = now.getFullYear().toString() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0');
+    }
+    
+    const currentHour = now.getHours();
+    
+    // Update price graph bars (handle both price-graph-bar.price-current and price-bar.price-bar-current)
+    // Remove current class from all price bars
+    const priceCurrentBars = document.querySelectorAll('.price-graph-bar.price-current, .price-bar.price-bar-current');
+    priceCurrentBars.forEach(bar => {
+        bar.classList.remove('price-current', 'price-bar-current');
+    });
+    
+    // Find and mark the current hour bar in price graph
+    const priceBars = document.querySelectorAll('.price-graph-bar[data-date], .price-bar[data-date]');
+    priceBars.forEach(bar => {
+        const barDate = bar.dataset.date;
+        const barHour = parseInt(bar.dataset.hour, 10);
+        
+        if (barDate === currentDate && barHour === currentHour) {
+            // Add appropriate class based on which type of bar it is
+            if (bar.classList.contains('price-graph-bar')) {
+                bar.classList.add('price-current');
+            } else if (bar.classList.contains('price-bar')) {
+                bar.classList.add('price-bar-current');
+            }
+        }
+    });
+    
+    // Update schedule bar graph (only if it exists - desktop only)
+    const barGraphContainer = document.getElementById('bar-graph-today');
+    if (barGraphContainer) {
+        // Remove current class from all schedule bars
+        const scheduleCurrentBars = document.querySelectorAll('.bar-graph-bar.bar-current');
+        scheduleCurrentBars.forEach(bar => {
+            bar.classList.remove('bar-current');
+        });
+        
+        // Find and mark the current hour bar in schedule bar graph
+        const scheduleBars = document.querySelectorAll('.bar-graph-bar[data-date]');
+        scheduleBars.forEach(bar => {
+            const barDate = bar.dataset.date;
+            const barHour = parseInt(bar.dataset.hour, 10);
+            
+            if (barDate === currentDate && barHour === currentHour) {
+                bar.classList.add('bar-current');
+            }
+        });
+    }
+}
+
+/**
  * Refresh all status sections (Automation Status, Charge/Discharge, and System & Grid)
  * This unified function updates all three sections in one go
  */
@@ -121,6 +186,11 @@ async function refreshAllStatus(isAutoRefresh = false) {
     
     // Wait for both to complete (they run in parallel)
     await Promise.all([automationPromise, chargePromise]);
+    
+    // Update current time indicators in graphs during auto-refresh
+    if (isAutoRefresh) {
+        updateGraphTimeIndicators();
+    }
     
     const timestamp = new Date().toLocaleTimeString();
     console.log(`✅ Refresh completed [${timestamp}]`);
