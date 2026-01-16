@@ -7,7 +7,6 @@
  * - schedule_api.js - API communication
  * - schedule_renderer.js - DOM rendering
  * - state_manager.js - State management
- * - data_service.js - Data caching service
  * - component_base.js - Component base class
  * - utils_performance.js - Performance utilities
  *
@@ -21,21 +20,16 @@ if (typeof API_URL === 'undefined') {
     window.API_URL = 'api/charge_schedule_api.php';
 }
 
-// Cache TTL constant (10 seconds in milliseconds)
-const CACHE_TTL = 10000;
-
 // Initialize global services
 let appState = null;
-let dataService = null;
 let apiClient = null;
 let schedulePanelComponent = null;
 let priceGraphComponent = null;
 
 /**
- * Refresh all schedule data and update UI
- * Uses debouncing and state management for better performance
+ * Internal refresh function that does the actual work
  */
-const refreshData = debounce(async function() {
+async function _refreshDataInternal() {
     try {
         // Get today and tomorrow dates in YYYYMMDD format
         const now = new Date();
@@ -50,27 +44,9 @@ const refreshData = debounce(async function() {
             appState.setState({ loading: { schedule: true } });
         }
 
-        // Fetch data using data service (with caching)
-        let todayData, tomorrowData;
-        
-        if (dataService && apiClient) {
-            // Use data service for caching
-            todayData = await dataService.fetch(
-                `schedule:${today}`,
-                () => apiClient.get('', { date: today }),
-                { ttl: CACHE_TTL }
-            );
-            
-            tomorrowData = await dataService.fetch(
-                `schedule:${tomorrow}`,
-                () => apiClient.get('', { date: tomorrow }),
-                { ttl: CACHE_TTL }
-            );
-        } else {
-            // Fallback to direct API calls
-            todayData = await fetchScheduleData(API_URL, today);
-            tomorrowData = await fetchScheduleData(API_URL, tomorrow);
-        }
+        // Always fetch fresh data directly
+        const todayData = await fetchScheduleData(API_URL, today);
+        const tomorrowData = await fetchScheduleData(API_URL, tomorrow);
 
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
@@ -152,7 +128,22 @@ const refreshData = debounce(async function() {
             alert('Connection failed: ' + e.message);
         }
     }
+}
+
+/**
+ * Refresh all schedule data and update UI
+ * Uses debouncing and state management for better performance
+ */
+const refreshData = debounce(async function() {
+    await _refreshDataInternal();
 }, 300); // Debounce for 300ms
+
+/**
+ * Refresh data immediately without debounce (for use after delete/save operations)
+ */
+async function refreshDataImmediate() {
+    await _refreshDataInternal();
+}
 
 /**
  * Handle clear button click
@@ -211,8 +202,8 @@ async function handleClearClick() {
                 window.notifications.success(`Deleted ${count} outdated entries`);
             }
 
-            // Refresh data to show updated entries
-            await refreshData();
+            // Refresh data immediately to show updated entries
+            await refreshDataImmediate();
         }
     } catch (error) {
         console.error('Error in clear button handler:', error);
@@ -293,8 +284,8 @@ async function handleAutoClick() {
                 window.notifications.success(`Added ${entriesCount} schedule entries`);
             }
 
-            // Refresh data to show updated entries
-            await refreshData();
+            // Refresh data immediately to show updated entries
+            await refreshDataImmediate();
         }
     } catch (error) {
         console.error('Error in auto button handler:', error);
@@ -330,12 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
             timeout: 10000,
             retries: 3,
             retryDelay: 1000
-        });
-
-        // Initialize data service
-        dataService = new DataService(apiClient, {
-            defaultTTL: CACHE_TTL,
-            enableStaleWhileRevalidate: true
         });
     }
 

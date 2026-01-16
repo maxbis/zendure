@@ -248,7 +248,13 @@ class EditModal {
             const json = await res.json();
             if (json.success) {
                 this.close();
-                if (this.onSaveCallback) this.onSaveCallback();
+                // Call refreshData immediately without debounce to ensure UI updates
+                if (typeof refreshDataImmediate !== 'undefined') {
+                    await refreshDataImmediate();
+                } else if (this.onSaveCallback) {
+                    // Fallback to callback if immediate refresh not available
+                    this.onSaveCallback();
+                }
             } else {
                 alert(json.error || 'Delete failed');
             }
@@ -322,7 +328,13 @@ class EditModal {
             const json = await res.json();
             if (json.success) {
                 this.close();
-                if (this.onSaveCallback) this.onSaveCallback();
+                // Call refreshData immediately without debounce to ensure UI updates
+                if (typeof refreshDataImmediate !== 'undefined') {
+                    await refreshDataImmediate();
+                } else if (this.onSaveCallback) {
+                    // Fallback to callback if immediate refresh not available
+                    this.onSaveCallback();
+                }
             } else {
                 alert(json.error || 'Save failed');
             }
