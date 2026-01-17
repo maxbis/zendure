@@ -195,31 +195,51 @@ function calculateSumsFromTimeForPartial($resolved, $startTime) {
         }
     }
     
-    // If we found an active entry, calculate from start time to next entry
-    if ($activeEntry !== null && $activeIndex < count($sorted) - 1) {
+    // If we found an active entry, calculate from start time to next entry (or end of day)
+    if ($activeEntry !== null) {
         $value = $activeEntry['value'] ?? 0;
         // Resolve netzero values to numeric equivalents
         $value = resolveNetzeroValueForCalculate($value);
         
-        $nextTime = $sorted[$activeIndex + 1]['time'] ?? '';
-        $nextMinutes = timeToMinutesForCalculate($nextTime);
-        $durationHours = ($nextMinutes - $startMinutes) / 60.0;
-        
-        if ($durationHours > 0) {
-            $energy = $value * $durationHours;
-            $total += $energy;
-            if ($value > 0) {
-                $positive += $energy;
-            } elseif ($value < 0) {
-                $negative += $energy;
+        if ($activeIndex < count($sorted) - 1) {
+            // There's a next entry, calculate from start time to next entry
+            $nextTime = $sorted[$activeIndex + 1]['time'] ?? '';
+            $nextMinutes = timeToMinutesForCalculate($nextTime);
+            $durationHours = ($nextMinutes - $startMinutes) / 60.0;
+            
+            if ($durationHours > 0) {
+                $energy = $value * $durationHours;
+                $total += $energy;
+                if ($value > 0) {
+                    $positive += $energy;
+                } elseif ($value < 0) {
+                    $negative += $energy;
+                }
             }
+            
+            // Continue from the next entry
+            $startIndex = $activeIndex + 1;
+        } else {
+            // This is the last entry, calculate from start time to end of day (24:00)
+            $endOfDayMinutes = 24 * 60; // 24:00 = 1440 minutes
+            $durationHours = ($endOfDayMinutes - $startMinutes) / 60.0;
+            
+            if ($durationHours > 0) {
+                $energy = $value * $durationHours;
+                $total += $energy;
+                if ($value > 0) {
+                    $positive += $energy;
+                } elseif ($value < 0) {
+                    $negative += $energy;
+                }
+            }
+            
+            // No more entries to process after this
+            $startIndex = count($sorted); // Set to count so loop doesn't execute
         }
-        
-        // Continue from the next entry
-        $startIndex = $activeIndex + 1;
     } else {
         // No active entry found, start from first entry after start time
-        $startIndex = 0;
+        $startIndex = count($sorted); // Default: no entries to process
         for ($i = 0; $i < count($sorted); $i++) {
             $entryTime = $sorted[$i]['time'] ?? '';
             $entryMinutes = timeToMinutesForCalculate($entryTime);

@@ -51,6 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add new event listener - calls unified refresh function
         refreshBtn.addEventListener('click', async () => {
+            // Hide button for 1 second (same as auto-refresh)
+            if (typeof indicateAutoRefresh === 'function') {
+                indicateAutoRefresh();
+            }
+            
             refreshBtn.disabled = true;
             refreshBtn.style.opacity = '0.5';
 

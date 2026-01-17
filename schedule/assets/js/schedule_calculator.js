@@ -150,31 +150,51 @@ function calculateSumsFromTime(resolved, startTime) {
     }
     
     let startIndex;
-    // If we found an active entry, calculate from start time to next entry
-    if (activeEntry !== null && activeIndex < sorted.length - 1) {
+    // If we found an active entry, calculate from start time to next entry (or end of day)
+    if (activeEntry !== null) {
         let value = activeEntry.value ?? 0;
         // Resolve netzero values to numeric equivalents
         value = resolveNetzeroValue(value);
         
-        const nextTime = sorted[activeIndex + 1].time || '';
-        const nextMinutes = timeToMinutes(nextTime);
-        const durationHours = (nextMinutes - startMinutes) / 60.0;
-        
-        if (durationHours > 0) {
-            const energy = value * durationHours;
-            total += energy;
-            if (value > 0) {
-                positive += energy;
-            } else if (value < 0) {
-                negative += energy;
+        if (activeIndex < sorted.length - 1) {
+            // There's a next entry, calculate from start time to next entry
+            const nextTime = sorted[activeIndex + 1].time || '';
+            const nextMinutes = timeToMinutes(nextTime);
+            const durationHours = (nextMinutes - startMinutes) / 60.0;
+            
+            if (durationHours > 0) {
+                const energy = value * durationHours;
+                total += energy;
+                if (value > 0) {
+                    positive += energy;
+                } else if (value < 0) {
+                    negative += energy;
+                }
             }
+            
+            // Continue from the next entry
+            startIndex = activeIndex + 1;
+        } else {
+            // This is the last entry, calculate from start time to end of day (24:00)
+            const endOfDayMinutes = 24 * 60; // 24:00 = 1440 minutes
+            const durationHours = (endOfDayMinutes - startMinutes) / 60.0;
+            
+            if (durationHours > 0) {
+                const energy = value * durationHours;
+                total += energy;
+                if (value > 0) {
+                    positive += energy;
+                } else if (value < 0) {
+                    negative += energy;
+                }
+            }
+            
+            // No more entries to process after this
+            startIndex = sorted.length; // Set to length so loop doesn't execute
         }
-        
-        // Continue from the next entry
-        startIndex = activeIndex + 1;
     } else {
         // No active entry found, start from first entry after start time
-        startIndex = 0;
+        startIndex = sorted.length; // Default: no entries to process
         for (let i = 0; i < sorted.length; i++) {
             const entryTime = sorted[i].time || '';
             const entryMinutes = timeToMinutes(entryTime);

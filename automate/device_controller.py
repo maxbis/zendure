@@ -22,13 +22,11 @@ import requests
 # GLOBAL CONSTANTS
 # ============================================================================
 
-TEST_MODE = False  # Global test mode flag - if True, operations are simulated but not applied
+TEST_MODE = True  # Global test mode flag - if True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
 MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
 MAX_CHARGE_POWER = 1200        # Maximum allowed power feed in watts
-
-
 
 
 @dataclass
@@ -1025,17 +1023,14 @@ class DeviceDataReader(BaseDeviceController):
     
     # Config keys
     CONFIG_KEY_P1_METER_IP = "p1MeterIp"
+    CONFIG_KEY_P1_METER = "p1Meter"
     CONFIG_KEY_DEVICE_IP = "deviceIp"
     
     # API endpoints
     API_ENDPOINT_PROPERTIES_REPORT = "/properties/report"
     
     # Data field names
-    FIELD_DEVICE_ID = "deviceId"
     FIELD_TOTAL_POWER = "total_power"
-    FIELD_A_APRT_POWER = "a_aprt_power"
-    FIELD_B_APRT_POWER = "b_aprt_power"
-    FIELD_C_APRT_POWER = "c_aprt_power"
     FIELD_TIMESTAMP = "timestamp"
     FIELD_PROPERTIES = "properties"
     FIELD_PACK_DATA = "packData"
@@ -1053,7 +1048,20 @@ class DeviceDataReader(BaseDeviceController):
             ValueError: If config is invalid or missing required keys
         """
         super().__init__(config_path)
-        self.p1_meter_ip = self.config.get(self.CONFIG_KEY_P1_METER_IP)
+        
+        # Load P1 meter config (new structure with ip/endpoint/path)
+        p1_meter_config = self.config.get(self.CONFIG_KEY_P1_METER, {})
+        if p1_meter_config and "ip" in p1_meter_config:
+            # New config structure: p1Meter object with ip, endpoint, totalPowerPath
+            self.p1_meter_ip = p1_meter_config.get("ip")
+            self.p1_meter_endpoint = p1_meter_config.get("endpoint", self.API_ENDPOINT_PROPERTIES_REPORT)
+            self.p1_total_power_path = p1_meter_config.get("totalPowerPath", self.FIELD_TOTAL_POWER)
+        else:
+            # Backward compatibility: old config structure with p1MeterIp at top level
+            self.p1_meter_ip = self.config.get(self.CONFIG_KEY_P1_METER_IP)
+            self.p1_meter_endpoint = self.API_ENDPOINT_PROPERTIES_REPORT
+            self.p1_total_power_path = self.FIELD_TOTAL_POWER
+        
         self.device_ip = self.config.get(self.CONFIG_KEY_DEVICE_IP)
     
     def _store_data_via_api(
@@ -1099,6 +1107,42 @@ class DeviceDataReader(BaseDeviceController):
             self.log('warning', f"Failed to store {data_type} via API: {e}")
             return False
     
+    def _get_json_value(self, data: dict, path: str):
+        """
+        Navigate nested JSON structure using dot notation.
+        
+        Args:
+            data: JSON dictionary to navigate
+            path: Dot-separated path (e.g., "data.total_power" or "total_power")
+        
+        Returns:
+            Value at path, or None if path doesn't exist
+        """
+        keys = path.split('.')
+        value = data
+        for key in keys:
+            if isinstance(value, dict):
+                value = value.get(key)
+            else:
+                return None
+            if value is None:
+                return None
+        return value
+    
+    def _get_p1_api_url(self) -> Optional[str]:
+        """
+        Get the P1 meter API URL from config.
+        
+        Supports both new config structure (p1Meter object) and old structure (p1MeterIp).
+        
+        Returns:
+            Full API URL string, or None if not configured
+        """
+        if not self.p1_meter_ip:
+            return None
+        
+        return f"http://{self.p1_meter_ip}{self.p1_meter_endpoint}"
+    
     def read_p1_meter(self, update_json: bool = True) -> Optional[dict]:
         """
         Read data from P1 meter device via API call.
@@ -1109,37 +1153,30 @@ class DeviceDataReader(BaseDeviceController):
         Returns:
             dict: Raw P1 meter data from device, or None on error
         """
-        if not self.p1_meter_ip:
-            self.log('error', f"{self.CONFIG_KEY_P1_METER_IP} not found in config.json")
+        url = self._get_p1_api_url()
+        if not url:
+            self.log('error', "P1 meter configuration not found in config.json (check p1Meter or p1MeterIp)")
             return None
-        
-        # Read from P1 meter device
-        url = f"http://{self.p1_meter_ip}{self.API_ENDPOINT_PROPERTIES_REPORT}"
         
         try:
             response = requests.get(url, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             
-            # Extract P1 meter data fields
-            device_id = data.get(self.FIELD_DEVICE_ID)
-            total_power = data.get(self.FIELD_TOTAL_POWER)
-            phase_a = data.get(self.FIELD_A_APRT_POWER)
-            phase_b = data.get(self.FIELD_B_APRT_POWER)
-            phase_c = data.get(self.FIELD_C_APRT_POWER)
-            meter_timestamp = data.get(self.FIELD_TIMESTAMP)
+            # Extract total_power using configured JSON path
+            total_power = self._get_json_value(data, self.p1_total_power_path)
+            
+            # Debug: log if extraction fails
+            if total_power is None:
+                self.log('warning', f"Failed to extract total_power using path '{self.p1_total_power_path}'. "
+                          f"Available keys in response: {list(data.keys())[:10]}")  # Show first 10 keys
             
             # Store via API if requested
             if update_json:
                 # Prepare reading data with timestamp
                 reading_data = {
                     self.FIELD_TIMESTAMP: datetime.now().isoformat(),
-                    self.FIELD_DEVICE_ID: device_id,
                     self.FIELD_TOTAL_POWER: total_power,
-                    self.FIELD_A_APRT_POWER: phase_a,
-                    self.FIELD_B_APRT_POWER: phase_b,
-                    self.FIELD_C_APRT_POWER: phase_c,
-                    "meter_timestamp": meter_timestamp,
                 }
                 
                 # Store via data_api.php endpoint (non-fatal)
@@ -1157,11 +1194,14 @@ class DeviceDataReader(BaseDeviceController):
                 
                 self._store_data_via_api(api_url, reading_data, "P1 meter data")
             
-            # Return the raw device data (not the stored format)
-            return data
+            # Add total_power to returned data for use by accumulation code
+            # Return the raw device data with total_power added
+            result = data.copy()
+            result[self.FIELD_TOTAL_POWER] = total_power
+            return result
         
         except requests.exceptions.RequestException as e:
-            self.log('error', f"Error reading from P1 meter at {self.p1_meter_ip}: {e}")
+            self.log('error', f"Error reading from P1 meter at {url}: {e}")
             return None
         except (json.JSONDecodeError, KeyError) as e:
             self.log('error', f"Error parsing P1 response: {e}")
