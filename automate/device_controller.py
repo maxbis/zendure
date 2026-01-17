@@ -228,11 +228,98 @@ class PowerAccumulator:
             'last_hour': None,            # Last hour (0-23)
             'last_date': None,            # Last date
         }
+        
+        # P1 hourly energy tracking (for total_power_import_kwh and total_power_export_kwh)
+        self.p1_hourly_reference: Optional[Dict[str, float]] = None  # Reference values: {'import_kwh': X, 'export_kwh': Y}
+        self.p1_hourly_last_reset_hour: Optional[int] = None  # Last hour when reference was reset (0-23)
+        # JSON file path for hourly energy data (in data/ directory)
+        script_dir = Path(__file__).parent
+        data_dir = script_dir.parent / "data"
+        self.p1_hourly_json_path = data_dir / "p1_hourly_energy.json"
+        self.p1_hourly_data: Dict[str, Dict[str, Dict[str, float]]] = {}  # {date: {hour: {import_delta_kwh, export_delta_kwh}}}
+        
+        # Load persisted data on initialization
+        self._load_p1_hourly_data()
     
     def _log(self, level: str, message: str):
         """Helper method to log messages using the logger if available."""
         if self.logger:
             self.logger.log(level, message, file_path=self.log_file_path)
+    
+    def _load_p1_hourly_data(self) -> None:
+        """
+        Load P1 hourly reference values and JSON data from file on startup.
+        
+        Loads reference values and hourly data from JSON file if it exists.
+        If file doesn't exist or is invalid, starts with empty state.
+        """
+        if not self.p1_hourly_json_path.exists():
+            # File doesn't exist yet, start fresh
+            return
+        
+        try:
+            with open(self.p1_hourly_json_path, 'r') as f:
+                data = json.load(f)
+            
+            # Load reference values from _metadata key if present
+            metadata = data.get('_metadata', {})
+            if metadata:
+                ref_import = metadata.get('reference_import_kwh')
+                ref_export = metadata.get('reference_export_kwh')
+                last_reset_hour = metadata.get('last_reset_hour')
+                
+                if ref_import is not None and ref_export is not None:
+                    self.p1_hourly_reference = {
+                        'import_kwh': float(ref_import),
+                        'export_kwh': float(ref_export)
+                    }
+                if last_reset_hour is not None:
+                    self.p1_hourly_last_reset_hour = int(last_reset_hour)
+            
+            # Load hourly data (exclude _metadata key)
+            self.p1_hourly_data = {
+                date_str: hour_data
+                for date_str, hour_data in data.items()
+                if date_str != '_metadata'
+            }
+            
+            self._log('info', f"Loaded P1 hourly data from {self.p1_hourly_json_path}")
+        except (json.JSONDecodeError, KeyError, ValueError, OSError) as e:
+            # File exists but is invalid, start fresh
+            self._log('warning', f"Failed to load P1 hourly data from {self.p1_hourly_json_path}: {e}. Starting fresh.")
+            self.p1_hourly_data = {}
+            self.p1_hourly_reference = None
+            self.p1_hourly_last_reset_hour = None
+    
+    def _save_p1_hourly_data(self) -> None:
+        """
+        Save P1 hourly reference values and JSON data to file.
+        
+        Creates data directory if it doesn't exist and saves both
+        reference values (in _metadata) and hourly data.
+        """
+        try:
+            # Create data directory if it doesn't exist
+            self.p1_hourly_json_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Prepare data structure with metadata and hourly data
+            data_to_save = {
+                '_metadata': {
+                    'reference_import_kwh': self.p1_hourly_reference.get('import_kwh') if self.p1_hourly_reference else None,
+                    'reference_export_kwh': self.p1_hourly_reference.get('export_kwh') if self.p1_hourly_reference else None,
+                    'last_reset_hour': self.p1_hourly_last_reset_hour
+                }
+            }
+            # Add hourly data
+            data_to_save.update(self.p1_hourly_data)
+            
+            # Write to file
+            with open(self.p1_hourly_json_path, 'w') as f:
+                json.dump(data_to_save, f, indent=2)
+            
+        except (OSError, json.JSONEncodeError) as e:
+            # Log error but don't crash
+            self._log('warning', f"Failed to save P1 hourly data to {self.p1_hourly_json_path}: {e}")
     
     def _accumulate_with_boundary(
         self,
@@ -454,6 +541,109 @@ class PowerAccumulator:
             p1_power,
             'P1 meter'
         )
+    
+    def accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float) -> None:
+        """
+        Accumulate P1 meter hourly energy deltas from cumulative kWh readings.
+        
+        Tracks hourly energy changes (deltas) from P1 meter cumulative readings
+        (total_power_import_kwh and total_power_export_kwh). Maintains reference
+        values that reset at the start of each hour and stores hourly delta
+        measurements in a JSON file organized by date.
+        
+        Args:
+            import_kwh: Cumulative import energy in kWh from P1 meter
+            export_kwh: Cumulative export energy in kWh from P1 meter
+        """
+        # Get current time in Europe/Amsterdam timezone
+        tz = ZoneInfo('Europe/Amsterdam')
+        now = datetime.now(tz=tz)
+        current_hour = now.hour
+        current_date_str = now.strftime('%Y-%m-%d')
+        current_hour_str = now.strftime('%H')
+        
+        # Initialize reference if needed (first call or reference is None/0)
+        if (self.p1_hourly_reference is None or 
+            self.p1_hourly_reference.get('import_kwh', 0) == 0 or 
+            self.p1_hourly_reference.get('export_kwh', 0) == 0):
+            # Set first measurement as reference
+            self.p1_hourly_reference = {
+                'import_kwh': float(import_kwh),
+                'export_kwh': float(export_kwh)
+            }
+            self.p1_hourly_last_reset_hour = current_hour
+            self._log('info', f"P1 hourly reference set: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
+            # Save initial state
+            self._save_p1_hourly_data()
+            return
+        
+        # Calculate deltas from reference
+        import_delta = float(import_kwh) - self.p1_hourly_reference['import_kwh']
+        export_delta = float(export_kwh) - self.p1_hourly_reference['export_kwh']
+        
+        # Log deltas
+        self._log('info', f"P1 hourly deltas: import_delta={import_delta:.3f} kWh, export_delta={export_delta:.3f} kWh")
+        
+        # Detect hour boundary: check if we're at or past a new hour
+        # Only reset once per hour - if last_reset_hour differs from current_hour, we need to reset
+        should_reset = False
+        if self.p1_hourly_last_reset_hour is None:
+            # First time tracking, reset now
+            should_reset = True
+        elif self.p1_hourly_last_reset_hour != current_hour:
+            # Different hour - we're at or past a new hour, reset now
+            should_reset = True
+        
+        if should_reset:
+            # Store last hour's measurement (delta values) before resetting reference
+            # Calculate what the last hour's delta was (before reset)
+            last_hour_delta_import = float(import_kwh) - self.p1_hourly_reference['import_kwh']
+            last_hour_delta_export = float(export_kwh) - self.p1_hourly_reference['export_kwh']
+            
+            # Determine which date/hour to store this measurement in
+            # If we just crossed the hour boundary, store in the previous hour
+            # But if last_reset_hour is None, this is the first reset, so store in current hour
+            if self.p1_hourly_last_reset_hour is not None:
+                # We crossed an hour boundary - store in the previous hour
+                # Calculate previous hour and potentially previous date
+                prev_hour = self.p1_hourly_last_reset_hour
+                store_date_str = current_date_str
+                # Handle date boundary (if we went from 23 to 0)
+                if current_hour == 0 and self.p1_hourly_last_reset_hour == 23:
+                    # Went back a day
+                    store_date_str = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+                store_hour_str = f"{prev_hour:02d}"
+            else:
+                # First reset ever, store in current hour (though this is unusual)
+                store_date_str = current_date_str
+                store_hour_str = current_hour_str
+            
+            # Initialize date entry if needed
+            if store_date_str not in self.p1_hourly_data:
+                self.p1_hourly_data[store_date_str] = {}
+            
+            # Store the last hour's delta values
+            self.p1_hourly_data[store_date_str][store_hour_str] = {
+                'import_delta_kwh': last_hour_delta_import,
+                'export_delta_kwh': last_hour_delta_export
+            }
+            
+            self._log('info', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
+                    f"import_delta={last_hour_delta_import:+.3f} kWh, export_delta={last_hour_delta_export:+.3f} kWh")
+            
+            # Reset reference values to current values
+            self.p1_hourly_reference = {
+                'import_kwh': float(import_kwh),
+                'export_kwh': float(export_kwh)
+            }
+            self.p1_hourly_last_reset_hour = current_hour
+            
+            self._log('info', f"P1 hourly reference reset at {current_hour:02d}:00 - "
+                    f"new reference: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
+            
+            # Save data after reset
+            self._save_p1_hourly_data()
+        # Note: We don't save on every call, only when reference resets to avoid excessive I/O
     
     def print_accumulators(self) -> None:
         """

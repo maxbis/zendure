@@ -479,7 +479,9 @@ class AutomationApp:
             reader = DeviceDataReader(config_path=self.controller.config_path)
             p1_data = reader.read_p1_meter(update_json=True)
             if p1_data and p1_data.get("total_power") is not None:
+                # self.logger.info(f"P1 power: {p1_data['total_power']}, p1_data: {p1_data['total_power_import_kwh']}, p1_data: {p1_data['total_power_export_kwh']}")
                 self.controller.accumulator.accumulate_p1_reading(p1_data["total_power"])
+                self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"])
         except Exception as e:
             self.logger.warning(f"Failed to read P1 for accumulation: {e}")
         return p1_data
@@ -583,6 +585,11 @@ class AutomationApp:
         """Sleep with interrupt for input/shutdown."""
         sleep_remaining = LOOP_INTERVAL_SECONDS
         while sleep_remaining > 0 and not self.shutdown_requested:
+            # Skip sleep if it's the first second of the minute
+            now = time.localtime().tm_sec
+            if now in (0, 20, 40) and sleep_remaining < LOOP_INTERVAL_SECONDS:
+                return
+            
             # Check input
             if not self._handle_user_input():
                 break
