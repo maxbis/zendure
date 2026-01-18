@@ -1123,6 +1123,8 @@ class DeviceDataReader(BaseDeviceController):
             # Extract properties and pack data
             props = data.get(self.FIELD_PROPERTIES, {})
             packs = data.get(self.FIELD_PACK_DATA, [])
+
+            self.last_zendure_data = data
             
             # Store via API if requested
             if update_json:
