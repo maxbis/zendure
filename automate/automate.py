@@ -18,7 +18,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
 
-from device_controller import AutomateController, ScheduleController, BaseDeviceController, DeviceDataReader
+from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 
 # ============================================================================
 # CONFIGURATION PARAMETERS
@@ -290,7 +290,7 @@ class CommandHandler:
                 self.logger.info(f"Battery limit state: {self.controller.limit_state} (1=max, -1=min, 0=ok)")
                 
                 try:
-                    reader = DeviceDataReader(config_path=self.controller.config_path)
+                    reader = get_reader(self.controller.config_path)
                     zendure_data = reader.read_zendure(update_json=False)
                     if zendure_data:
                         props = zendure_data.get("properties", {})
@@ -420,6 +420,9 @@ class AutomationApp:
             # Initialize controllers
             self.controller = AutomateController()
             self.schedule_controller = ScheduleController()
+
+            # Initialize shared DeviceDataReader early (fail fast on config issues)
+            get_reader(self.controller.config_path)
             
             # Initialize logger
             self.logger = Logger(self.controller)
@@ -483,7 +486,7 @@ class AutomationApp:
         """Read P1 meter and accumulate data."""
         p1_data = None
         try:
-            reader = DeviceDataReader(config_path=self.controller.config_path)
+            reader = get_reader(self.controller.config_path)
             p1_data = reader.read_p1_meter(update_json=True)
             if p1_data and p1_data.get("total_power") is not None:
                 # self.logger.info(f"P1 power: {p1_data['total_power']}, p1_data: {p1_data['total_power_import_kwh']}, p1_data: {p1_data['total_power_export_kwh']}")

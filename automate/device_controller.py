@@ -29,6 +29,43 @@ MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
 MAX_CHARGE_POWER = 1200        # Maximum allowed power feed in watts
 
 
+# ============================================================================
+# SHARED READER (SINGLETON)
+# ============================================================================
+_SHARED_DEVICE_DATA_READER = None
+_SHARED_DEVICE_DATA_READER_CONFIG_PATH: Optional[Path] = None
+
+
+def get_reader(config_path: Optional[Path] = None) -> "DeviceDataReader":
+    """
+    Return a shared, long-lived DeviceDataReader instance.
+
+    This avoids re-loading/parsing config.json and recreating readers on every loop.
+    Since config hot-reload is not desired, we guard against callers requesting a
+    different config path after the reader has been created.
+    """
+    global _SHARED_DEVICE_DATA_READER, _SHARED_DEVICE_DATA_READER_CONFIG_PATH
+
+    if _SHARED_DEVICE_DATA_READER is None:
+        if config_path is None:
+            _SHARED_DEVICE_DATA_READER = DeviceDataReader()
+            _SHARED_DEVICE_DATA_READER_CONFIG_PATH = _SHARED_DEVICE_DATA_READER.config_path.resolve()
+        else:
+            _SHARED_DEVICE_DATA_READER = DeviceDataReader(config_path=config_path)
+            _SHARED_DEVICE_DATA_READER_CONFIG_PATH = Path(config_path).resolve()
+        return _SHARED_DEVICE_DATA_READER
+
+    if config_path is not None and _SHARED_DEVICE_DATA_READER_CONFIG_PATH is not None:
+        requested = Path(config_path).resolve()
+        if requested != _SHARED_DEVICE_DATA_READER_CONFIG_PATH:
+            raise ValueError(
+                "Shared DeviceDataReader already initialized with a different config path. "
+                f"existing={_SHARED_DEVICE_DATA_READER_CONFIG_PATH}, requested={requested}"
+            )
+
+    return _SHARED_DEVICE_DATA_READER
+
+
 @dataclass
 class PowerResult:
     """Result of a power setting operation."""
@@ -507,7 +544,7 @@ class AutomateController(BaseDeviceController):
              1: Battery at or above MAX_CHARGE_LEVEL (charge not allowed)
         """
         # Read Zendure data to get battery level
-        reader = DeviceDataReader(config_path=self.config_path)
+        reader = get_reader(self.config_path)
         zendure_data = reader.read_zendure(update_json=True)
         
         if not zendure_data:
@@ -712,7 +749,7 @@ class AutomateController(BaseDeviceController):
             requests.exceptions.RequestException: On network errors
         """
         # Use DeviceDataReader to get current data
-        reader = DeviceDataReader(config_path=self.config_path)
+        reader = get_reader(self.config_path)
         
         # Read P1 meter data if not provided
         if p1_data is None:
