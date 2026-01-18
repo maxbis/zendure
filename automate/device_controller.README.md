@@ -69,13 +69,13 @@ A standalone class that handles accumulation and persistence of power/energy rel
 -   **Arguments**:
     -   `power_feed` (int): Power feed value in watts (signed: positive=charge, negative=discharge).
 
-### `accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float, total_power: int) -> None`
+### `accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float) -> Tuple[float, float]`
 
 -   **Description**: Tracks hourly energy deltas from the P1 meter using cumulative kWh readings (import/export). Maintains a reference that resets at the start of each hour and stores hourly deltas in `data/p1_hourly_energy.json`.
 -   **Arguments**:
     -   `import_kwh` (float): Cumulative import energy in kWh from the P1 meter.
     -   `export_kwh` (float): Cumulative export energy in kWh from the P1 meter.
-    -   `total_power` (int): Current P1 total power in W (used for logging context).
+-   **Returns**: A tuple of `(import_delta_kwh, export_delta_kwh)` for the current hour.
 
 ---
 
