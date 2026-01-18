@@ -199,36 +199,6 @@ class PowerAccumulator:
         self.logger = logger
         self.log_file_path = log_file_path
         
-        # Power feed accumulation state
-        self.power_feed_accumulators: Dict[str, float] = {
-            'quarter': 0.0,  # Quarter-hour accumulator (resets at 0, 15, 30, 45 min)
-            'hour': 0.0,     # Hourly accumulator (resets at full hour)
-            'day': 0.0,      # Daily accumulator (resets at midnight)
-            'manual': 0.0,   # Manual accumulator (only resets when set to 0)
-        }
-        self.power_feed_tracking: Dict[str, Any] = {
-            'last_power_feed': None,      # Last power_feed value sent
-            'last_update_time': None,     # Timestamp of last update
-            'last_quarter': None,         # Last quarter-hour period (0, 15, 30, 45)
-            'last_hour': None,            # Last hour (0-23)
-            'last_date': None,            # Last date
-        }
-        
-        # P1 meter accumulation state
-        self.p1_accumulators: Dict[str, float] = {
-            'quarter': 0.0,  # Quarter-hour accumulator (resets at 0, 15, 30, 45 min)
-            'hour': 0.0,     # Hourly accumulator (resets at full hour)
-            'day': 0.0,      # Daily accumulator (resets at midnight)
-            'manual': 0.0,   # Manual accumulator (only resets when set to 0)
-        }
-        self.p1_tracking: Dict[str, Any] = {
-            'last_p1_power': None,        # Last P1 power value read
-            'last_update_time': None,     # Timestamp of last update
-            'last_quarter': None,         # Last quarter-hour period (0, 15, 30, 45)
-            'last_hour': None,            # Last hour (0-23)
-            'last_date': None,            # Last date
-        }
-        
         # P1 hourly energy tracking (for total_power_import_kwh and total_power_export_kwh)
         self.p1_hourly_reference: Optional[Dict[str, float]] = None  # Reference values: {'import_kwh': X, 'export_kwh': Y}
         self.p1_hourly_last_reset_hour: Optional[int] = None  # Last hour when reference was reset (0-23)
@@ -283,10 +253,8 @@ class PowerAccumulator:
                 if date_str != '_metadata'
             }
             
-            self._log('info', f"Loaded P1 hourly data from {self.p1_hourly_json_path}")
         except (json.JSONDecodeError, KeyError, ValueError, OSError) as e:
             # File exists but is invalid, start fresh
-            self._log('warning', f"Failed to load P1 hourly data from {self.p1_hourly_json_path}: {e}. Starting fresh.")
             self.p1_hourly_data = {}
             self.p1_hourly_reference = None
             self.p1_hourly_last_reset_hour = None
@@ -317,231 +285,10 @@ class PowerAccumulator:
             with open(self.p1_hourly_json_path, 'w') as f:
                 json.dump(data_to_save, f, indent=2)
             
-        except (OSError, json.JSONEncodeError) as e:
-            # Log error but don't crash
-            self._log('warning', f"Failed to save P1 hourly data to {self.p1_hourly_json_path}: {e}")
-    
-    def _accumulate_with_boundary(
-        self,
-        accumulators: Dict[str, float],
-        tracking: Dict[str, Any],
-        value_key: str,
-        accumulator_key: str,
-        last_period_key: str,
-        current_period: Union[int, date],
-        boundary_time_func,
-        total_time_delta: float,
-        period_name: str
-        ) -> Union[int, date]:
-        """
-        Accumulate energy handling period boundary crossing.
-        
-        Args:
-            accumulators: Dictionary of accumulator values
-            tracking: Dictionary of tracking state
-            value_key: Key in tracking dict for the last value (e.g., 'last_power_feed' or 'last_p1_power')
-            accumulator_key: Key in accumulators dict (e.g., 'quarter', 'hour', 'day')
-            last_period_key: Key in tracking dict for last period (e.g., 'last_quarter')
-            current_period: Current period value
-            boundary_time_func: Function to calculate next boundary time
-            total_time_delta: Time delta in hours since last update
-            period_name: Name of the period for logging (e.g., 'hour')
-        
-        Returns:
-            Updated period value
-        """
-        last_period = tracking[last_period_key]
-        if last_period is None:
-            # First time, just accumulate and update period
-            energy_wh = tracking[value_key] * total_time_delta
-            accumulators[accumulator_key] += energy_wh
-            return current_period
-        
-        if last_period != current_period:
-            # Boundary crossed - split accumulation
-            boundary_time = boundary_time_func(tracking['last_update_time'])
-            time_to_boundary = (boundary_time - tracking['last_update_time']).total_seconds() / 3600.0
-            
-            # Accumulate up to boundary for old period
-            energy_to_boundary = tracking[value_key] * time_to_boundary
-            accumulators[accumulator_key] += energy_to_boundary
-            
-            # For hour boundary, log the accumulated power for the last hour before reset
-            if accumulator_key == 'hour':
-                accumulated_wh = accumulators[accumulator_key]
-                value_type = "power feed" if value_key == 'last_power_feed' else "P1 meter"
-                self._log(
-                    'info',
-                    f"Hour boundary crossed. Accumulated {value_type} for last hour: {accumulated_wh:+.2f} Wh"
-                )
-            
-            # Reset for new period
-            accumulators[accumulator_key] = 0.0
-            
-            # Accumulate remaining time in new period
-            remaining_time = total_time_delta - time_to_boundary
-            if remaining_time > 0:
-                energy_remaining = tracking[value_key] * remaining_time
-                accumulators[accumulator_key] += energy_remaining
-            
-            return current_period
-        else:
-            # No boundary crossed, accumulate normally
-            energy_wh = tracking[value_key] * total_time_delta
-            accumulators[accumulator_key] += energy_wh
-            return last_period
-    
-    def _accumulate_value(
-        self,
-        accumulators: Dict[str, float],
-        tracking: Dict[str, Any],
-        value_key: str,
-        value: int,
-        label: str
-        ) -> None:
-        """
-        Generic method to accumulate power values over time periods.
-        
-        Args:
-            accumulators: Dictionary of accumulator values (quarter, hour, day, manual)
-            tracking: Dictionary of tracking state (last_update_time, last_quarter, etc.)
-            value_key: Key name for the last value in tracking (e.g., 'last_power_feed')
-            value: Current power value in watts
-            label: Label for logging (e.g., 'Power feed' or 'P1 meter')
-        """
-        # Get current time in Europe/Amsterdam timezone
-        tz = ZoneInfo('Europe/Amsterdam')
-        now = datetime.now(tz=tz)
-        current_quarter = (now.minute // 15) * 15  # 0, 15, 30, or 45
-        current_hour = now.hour
-        current_date = now.date()
-        
-        # First call - initialize timestamps and don't accumulate
-        if tracking['last_update_time'] is None:
-            tracking[value_key] = value
-            tracking['last_update_time'] = now
-            tracking['last_quarter'] = current_quarter
-            tracking['last_hour'] = current_hour
-            tracking['last_date'] = current_date
-            # Log first call
-            self._log(
-                'info',
-                f"{label} accumulation started. Initial power: {value} W"
-            )
-            return
-        
-        # Calculate total time delta in hours
-        total_time_delta = (now - tracking['last_update_time']).total_seconds() / 3600.0
-        
-        # Handle quarter-hour boundary
-        def quarter_boundary_time(last_time):
-            """Calculate next quarter-hour boundary time."""
-            last_minute = last_time.minute
-            last_quarter = (last_minute // 15) * 15
-            if last_quarter == 45:
-                # Next boundary is at next hour
-                return (last_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
-            else:
-                # Next boundary is at next quarter
-                return last_time.replace(minute=last_quarter + 15, second=0, microsecond=0)
-        
-        tracking['last_quarter'] = self._accumulate_with_boundary(
-            accumulators,
-            tracking,
-            value_key,
-            'quarter',
-            'last_quarter',
-            current_quarter,
-            quarter_boundary_time,
-            total_time_delta,
-            "quarter"
-        )
-        
-        # Handle hourly boundary
-        def hour_boundary_time(last_time):
-            """Calculate next hour boundary time."""
-            return (last_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
-        
-        tracking['last_hour'] = self._accumulate_with_boundary(
-            accumulators,
-            tracking,
-            value_key,
-            'hour',
-            'last_hour',
-            current_hour,
-            hour_boundary_time,
-            total_time_delta,
-            "hour"
-        )
-        
-        # Handle daily boundary
-        def day_boundary_time(last_time):
-            """Calculate next day boundary (midnight) time."""
-            midnight = last_time.replace(hour=0, minute=0, second=0, microsecond=0)
-            return midnight + timedelta(days=1)
-        
-        tracking['last_date'] = self._accumulate_with_boundary(
-            accumulators,
-            tracking,
-            value_key,
-            'day',
-            'last_date',
-            current_date,
-            day_boundary_time,
-            total_time_delta,
-            "day"
-        )
-        
-        # Manual accumulator always accumulates full time delta (never resets automatically)
-        energy_wh = tracking[value_key] * total_time_delta
-        accumulators['manual'] += energy_wh
-        
-        # Update tracking variables
-        tracking[value_key] = value
-        tracking['last_update_time'] = now
-    
-    def accumulate_power_feed(self, power_feed: int) -> None:
-        """
-        Accumulate power feed energy over time into four separate accumulators.
-        
-        Tracks energy (watt-hours) accumulated over:
-        - Quarter-hour periods (resets at 0, 15, 30, 45 minutes)
-        - Hourly periods (resets at full hour)
-        - Daily periods (resets at midnight)
-        - Manual accumulator (only resets when explicitly set to 0)
-        
-        Args:
-            power_feed: Power feed value in watts (signed: positive=charge, negative=discharge)
-        """
-        self._accumulate_value(
-            self.power_feed_accumulators,
-            self.power_feed_tracking,
-            'last_power_feed',
-            power_feed,
-            'Power feed'
-        )
-    
-    def accumulate_p1_reading(self, p1_power: int) -> None:
-        """
-        Accumulate P1 meter power readings over time into four separate accumulators.
-        
-        Tracks energy (watt-hours) accumulated over:
-        - Quarter-hour periods (resets at 0, 15, 30, 45 minutes)
-        - Hourly periods (resets at full hour)
-        - Daily periods (resets at midnight)
-        - Manual accumulator (only resets when explicitly set to 0)
-        
-        Args:
-            p1_power: P1 meter power value in watts (signed: positive=consumption, negative=production)
-        """
-        self._accumulate_value(
-            self.p1_accumulators,
-            self.p1_tracking,
-            'last_p1_power',
-            p1_power,
-            'P1 meter'
-        )
-    
+        except (OSError, json.JSONEncodeError):
+            # Don't crash if persistence fails
+            pass
+     
     def accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float, total_power: int) -> None:
         """
         Accumulate P1 meter hourly energy deltas from cumulative kWh readings.
@@ -645,81 +392,6 @@ class PowerAccumulator:
             self._save_p1_hourly_data()
         # Note: We don't save on every call, only when reference resets to avoid excessive I/O
     
-    def print_accumulators(self) -> None:
-        """
-        Debug method to log accumulator values and tracking information in a readable format.
-        Displays both power feed and P1 meter accumulators.
-        """
-        if self.logger:
-            self.logger.log('info', "=" * 60)
-            self.logger.log('info', "Power Feed Accumulators Debug Information")
-            self.logger.log('info', "=" * 60)
-            
-            # Log power feed accumulator values
-            self.logger.log('info', "Power Feed Accumulators (Wh):")
-            self.logger.log('info', f"  Quarter-hour: {self.power_feed_accumulators['quarter']:+.2f} Wh")
-            self.logger.log('info', f"  Hour:         {self.power_feed_accumulators['hour']:+.2f} Wh")
-            self.logger.log('info', f"  Day:          {self.power_feed_accumulators['day']:+.2f} Wh")
-            self.logger.log('info', f"  Manual:       {self.power_feed_accumulators['manual']:+.2f} Wh")
-            
-            # Log power feed tracking information
-            self.logger.log('info', "")
-            self.logger.log('info', "Power Feed Tracking State:")
-            last_power = self.power_feed_tracking['last_power_feed']
-            last_time = self.power_feed_tracking['last_update_time']
-            last_quarter = self.power_feed_tracking['last_quarter']
-            last_hour = self.power_feed_tracking['last_hour']
-            last_date = self.power_feed_tracking['last_date']
-            
-            self.logger.log('info', f"  Last power feed:  {last_power} W" if last_power is not None else "  Last power feed:  None")
-            
-            if last_time is not None:
-                time_str = last_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-                self.logger.log('info', f"  Last update time: {time_str}")
-            else:
-                self.logger.log('info', "  Last update time: None")
-            
-            self.logger.log('info', f"  Last quarter:     {last_quarter}" if last_quarter is not None else "  Last quarter:     None")
-            self.logger.log('info', f"  Last hour:        {last_hour:02d}" if last_hour is not None else "  Last hour:        None")
-            self.logger.log('info', f"  Last date:        {last_date}" if last_date is not None else "  Last date:        None")
-            
-            # P1 meter accumulators section
-            self.logger.log('info', "")
-            self.logger.log('info', "=" * 60)
-            self.logger.log('info', "P1 Meter Accumulators Debug Information")
-            self.logger.log('info', "=" * 60)
-            
-            # Log P1 accumulator values
-            self.logger.log('info', "P1 Meter Accumulators (Wh):")
-            self.logger.log('info', f"  Quarter-hour: {self.p1_accumulators['quarter']:+.2f} Wh")
-            self.logger.log('info', f"  Hour:         {self.p1_accumulators['hour']:+.2f} Wh")
-            self.logger.log('info', f"  Day:          {self.p1_accumulators['day']:+.2f} Wh")
-            self.logger.log('info', f"  Manual:       {self.p1_accumulators['manual']:+.2f} Wh")
-            
-            # Log P1 tracking information
-            self.logger.log('info', "")
-            self.logger.log('info', "P1 Meter Tracking State:")
-            last_p1 = self.p1_tracking['last_p1_power']
-            last_p1_time = self.p1_tracking['last_update_time']
-            last_p1_quarter = self.p1_tracking['last_quarter']
-            last_p1_hour = self.p1_tracking['last_hour']
-            last_p1_date = self.p1_tracking['last_date']
-            
-            self.logger.log('info', f"  Last P1 power:     {last_p1} W" if last_p1 is not None else "  Last P1 power:     None")
-            
-            if last_p1_time is not None:
-                time_str = last_p1_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-                self.logger.log('info', f"  Last update time: {time_str}")
-            else:
-                self.logger.log('info', "  Last update time: None")
-            
-            self.logger.log('info', f"  Last quarter:     {last_p1_quarter}" if last_p1_quarter is not None else "  Last quarter:     None")
-            self.logger.log('info', f"  Last hour:        {last_p1_hour:02d}" if last_p1_hour is not None else "  Last hour:        None")
-            self.logger.log('info', f"  Last date:        {last_p1_date}" if last_p1_date is not None else "  Last date:        None")
-            
-            self.logger.log('info', "=" * 60)
-
-
 class AutomateController(BaseDeviceController):
     """
     Controller class for automating Zendure battery power settings.
@@ -896,7 +568,6 @@ class AutomateController(BaseDeviceController):
         if self.previous_power is not None and power_feed == self.previous_power:
             self.log('info', f"Power value unchanged ({power_feed} W), skipping device update")
             # Still accumulate since power is being maintained (operation is successful)
-            self.accumulator.accumulate_power_feed(power_feed)
             return (True, None, power_feed)
         
         url = f"http://{self.device_ip}/properties/write"
@@ -930,19 +601,12 @@ class AutomateController(BaseDeviceController):
             # Update previous power only on successful send (in internal convention)
             self.previous_power = power_feed
             
-            # Accumulate power feed energy over time
-            self.accumulator.accumulate_power_feed(power_feed)
-            
             return (True, None, power_feed)
         
         except requests.exceptions.RequestException as e:
             return (False, str(e), original_power)
         except Exception as e:
             return (False, str(e), original_power)
-    
-    def print_accumulators(self) -> None:
-        """Debug method to log accumulator values. Delegates to PowerAccumulator."""
-        self.accumulator.print_accumulators()
     
     def _calculate_new_settings(
         self,

@@ -300,7 +300,7 @@ class CommandHandler:
                     self.logger.warning(f"Could not read Zendure data: {e}")
             
             elif cmd in ['a', 'accumulators']:
-                self.controller.print_accumulators()
+                self.logger.info("Accumulator debug output has been removed.")
             
             elif cmd in ['r', 'refresh']:
                 self.logger.info("Forcing schedule refresh...")
@@ -413,6 +413,7 @@ class AutomationApp:
         self.value = 0
         self.zero_count = 0
 
+
     def initialize(self) -> bool:
         """Initialize controllers and components."""
         try:
@@ -447,7 +448,10 @@ class AutomationApp:
             # Set up signal handlers
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
-            
+
+            # Generate steps, f.e. [0, 20, 40] for LOOP_INTERVAL_SECONDS = 20
+            self.steps = self._generate_steps(LOOP_INTERVAL_SECONDS, 59)
+
             return True
             
         except FileNotFoundError as e:
@@ -461,6 +465,9 @@ class AutomationApp:
         except Exception as e:
             print(f"Failed to initialize controllers: {e}")
             return False
+
+    def _generate_steps(self, step, max_value):
+        return sorted(set(range(0, max_value + 1, step)) | {0})
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -480,7 +487,6 @@ class AutomationApp:
             p1_data = reader.read_p1_meter(update_json=True)
             if p1_data and p1_data.get("total_power") is not None:
                 # self.logger.info(f"P1 power: {p1_data['total_power']}, p1_data: {p1_data['total_power_import_kwh']}, p1_data: {p1_data['total_power_export_kwh']}")
-                self.controller.accumulator.accumulate_p1_reading(p1_data["total_power"])
                 if p1_data["total_power_import_kwh"] is not None and p1_data["total_power_export_kwh"] is not None:
                     self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"], p1_data["total_power"])
         except Exception as e:
@@ -498,14 +504,7 @@ class AutomationApp:
                 self.last_api_refresh_time = current_time
                 self.logger.info("Schedule data refreshed from API")
                 
-                # Update accumulators and print status
-                try:
-                    current_power = self.controller.previous_power if self.controller.previous_power is not None else 0
-                    self.controller.accumulator.accumulate_power_feed(current_power)
-                except Exception as e:
-                    self.logger.warning(f"Failed to accumulate power feed before printing: {e}")
-                
-                self.controller.print_accumulators()
+                # (print_accumulators removed)
                 self.status_api.post_update('Rescan', None, None)
             except Exception as e:
                 self.logger.error(f"Failed to refresh schedule: {e}")
@@ -588,7 +587,7 @@ class AutomationApp:
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
             now = time.localtime().tm_sec
-            if now in (0, 20, 40) and sleep_remaining < LOOP_INTERVAL_SECONDS:
+            if now in (self.steps) and sleep_remaining < LOOP_INTERVAL_SECONDS:
                 return
             
             # Check input

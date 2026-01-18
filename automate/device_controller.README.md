@@ -54,11 +54,11 @@ This is the foundational class that provides common functionality to all other c
 
 ## `PowerAccumulator`
 
-A standalone class that handles accumulation of power values over time periods. Tracks energy (watt-hours) for both power feed and P1 meter readings across multiple time periods: quarter-hour, hour, day, and manual.
+A standalone class that handles accumulation and persistence of power/energy related values.\n+\n+- Accumulates **power feed** energy (watt-hours) over quarter-hour, hour, day, and manual periods.\n+- Tracks **P1 hourly energy deltas** based on P1 meter cumulative kWh readings and stores hourly values in `data/p1_hourly_energy.json`.
 
 ### `__init__(self, logger=None, log_file_path=None)`
 
--   **Description**: Initializes the PowerAccumulator with separate accumulators for power feed and P1 meter readings.
+-   **Description**: Initializes the PowerAccumulator for power feed accumulation and P1 hourly energy delta tracking.
 -   **Arguments**:
     -   `logger`: Optional logger object with `log()` method (for logging accumulation events).
     -   `log_file_path`: Optional path to log file for accumulation logs.
@@ -69,15 +69,13 @@ A standalone class that handles accumulation of power values over time periods. 
 -   **Arguments**:
     -   `power_feed` (int): Power feed value in watts (signed: positive=charge, negative=discharge).
 
-### `accumulate_p1_reading(self, p1_power: int) -> None`
+### `accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float, total_power: int) -> None`
 
--   **Description**: Accumulates P1 meter power readings over time into four separate accumulators. Tracks energy (watt-hours) with the same period structure as power feed accumulation.
+-   **Description**: Tracks hourly energy deltas from the P1 meter using cumulative kWh readings (import/export). Maintains a reference that resets at the start of each hour and stores hourly deltas in `data/p1_hourly_energy.json`.
 -   **Arguments**:
-    -   `p1_power` (int): P1 meter power value in watts (signed: positive=consumption, negative=production).
-
-### `print_accumulators(self) -> None`
-
--   **Description**: Debug method that logs accumulator values and tracking information in a readable format. Displays both power feed and P1 meter accumulators, including current values for quarter-hour, hour, day, and manual periods, as well as tracking state information.
+    -   `import_kwh` (float): Cumulative import energy in kWh from the P1 meter.
+    -   `export_kwh` (float): Cumulative export energy in kWh from the P1 meter.
+    -   `total_power` (int): Current P1 total power in W (used for logging context).
 
 ---
 
@@ -101,10 +99,6 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 ### `check_battery_limits(self) -> None`
 
 -   **Description**: Reads the current battery level from the Zendure device and updates the internal `limit_state` property. This state is used to prevent charging a full battery or discharging an empty one. Sets `limit_state` to `-1` (MIN), `0` (OK), or `1` (MAX).
-
-### `print_accumulators(self) -> None`
-
--   **Description**: A debug method that logs the current values of all power accumulators in a human-readable format. Delegates to the `PowerAccumulator.print_accumulators()` method.
 
 ### `_send_power_feed(self, power_feed: int) -> Tuple[bool, Optional[str], int]`
 
