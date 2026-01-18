@@ -481,7 +481,8 @@ class AutomationApp:
             if p1_data and p1_data.get("total_power") is not None:
                 # self.logger.info(f"P1 power: {p1_data['total_power']}, p1_data: {p1_data['total_power_import_kwh']}, p1_data: {p1_data['total_power_export_kwh']}")
                 self.controller.accumulator.accumulate_p1_reading(p1_data["total_power"])
-                self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"])
+                if p1_data["total_power_import_kwh"] is not None and p1_data["total_power_export_kwh"] is not None:
+                    self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"], p1_data["total_power"])
         except Exception as e:
             self.logger.warning(f"Failed to read P1 for accumulation: {e}")
         return p1_data

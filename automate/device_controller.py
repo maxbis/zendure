@@ -542,7 +542,7 @@ class PowerAccumulator:
             'P1 meter'
         )
     
-    def accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float) -> None:
+    def accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float, total_power: int) -> None:
         """
         Accumulate P1 meter hourly energy deltas from cumulative kWh readings.
         
@@ -582,7 +582,7 @@ class PowerAccumulator:
         export_delta = float(export_kwh) - self.p1_hourly_reference['export_kwh']
         
         # Log deltas
-        self._log('info', f"P1 hourly deltas: import_delta={import_delta:.3f} kWh, export_delta={export_delta:.3f} kWh")
+        self._log('info', f"P1 hourly deltas: import_delta={import_delta:.3f} kWh, export_delta={export_delta:.3f} kWh, actual_power={total_power} W")
         
         # Detect hour boundary: check if we're at or past a new hour
         # Only reset once per hour - if last_reset_hour differs from current_hour, we need to reset
