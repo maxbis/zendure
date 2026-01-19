@@ -4,7 +4,7 @@ This file provides a set of Python classes designed to interact with and control
 
 ## Global Constants
 
--   `TEST_MODE` (bool): If `True`, control operations are simulated (logged to the console) but not actually sent to the device. Defaults to `False`.
+-   `TEST_MODE` (bool): Loaded from `config.json` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
 -   `MIN_CHARGE_LEVEL` (int): The battery percentage below which the system will stop discharging. Defaults to `20`.
 -   `MAX_CHARGE_LEVEL` (int): The battery percentage above which the system will stop charging. Defaults to `95`.
 -   `MAX_DISCHARGE_POWER` (int): Maximum allowed power feed in watts for discharge. Defaults to `800`.
@@ -132,7 +132,7 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
     -   `p1_data` (Optional[Dict[str, Any]]): Optional pre-read P1 meter data. If provided and `value` is netzero/netzero+, will be used instead of reading P1 meter again.
 -   **Returns**: A `PowerResult` object indicating the outcome.
 -   **Raises**: `ValueError` if `value` is invalid.
--   **Note**: Test mode is controlled by the global `TEST_MODE` constant. When `TEST_MODE` is `True`, operations are simulated but not applied.
+-   **Note**: Test mode is controlled by `config.json` key `"TEST_MODE"`. When enabled, operations are simulated but not applied.
 
 ### `set_standby_mode(self) -> PowerResult`
 
