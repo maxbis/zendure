@@ -22,7 +22,10 @@ import requests
 # GLOBAL CONSTANTS
 # ============================================================================
 
-TEST_MODE = True               # Global test mode flag - if True, operations are simulated but not applied
+# NOTE: TEST_MODE is now configurable via config.json (key: "TEST_MODE").
+# This global remains for backward compatibility, but is overridden at runtime
+# when BaseDeviceController loads the config.
+TEST_MODE = False               # If True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
 MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
@@ -98,6 +101,12 @@ class BaseDeviceController:
         """
         self.config_path = config_path or self._find_config_file()
         self.config = self._load_config(self.config_path)
+
+        # Apply config-driven test mode once at initialization.
+        # We keep both an instance attribute and the legacy global for existing code paths.
+        global TEST_MODE
+        self.test_mode = bool(self.config.get("TEST_MODE", TEST_MODE))
+        TEST_MODE = self.test_mode
         
     def _find_config_file(self) -> Path:
         """
@@ -615,7 +624,7 @@ class AutomateController(BaseDeviceController):
         properties = self._build_device_properties(power_feed)
         payload = {"sn": self.device_sn, "properties": properties}
         
-        if TEST_MODE:
+        if self.test_mode:
             self.log('info', f"TEST MODE: Would set power feed to {power_feed} W")
             return (True, None, power_feed)
         
@@ -833,8 +842,8 @@ class AutomateController(BaseDeviceController):
             Exception: On device communication errors
         
         Note:
-            Test mode is controlled by the global TEST_MODE constant.
-            When TEST_MODE is True, operations are simulated but not applied.
+            Test mode is controlled by config.json key "TEST_MODE".
+            When enabled, operations are simulated but not applied.
         """
         # Handle specific power feed (int), charge is positive, discharge is negative
         if isinstance(value, int): 
@@ -862,7 +871,7 @@ class AutomateController(BaseDeviceController):
                 calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)   
                 
                 # If test mode, just return the calculated value without applying
-                if TEST_MODE:
+                if self.test_mode:
                     return PowerResult(success=True, power=calculated_power)
                 
                 # Apply the calculated power
