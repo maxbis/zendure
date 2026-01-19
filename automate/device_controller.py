@@ -22,7 +22,7 @@ import requests
 # GLOBAL CONSTANTS
 # ============================================================================
 
-TEST_MODE = True               # Global test mode flag - if True, operations are simulated but not applied
+TEST_MODE = False               # Global test mode flag - if True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
 MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
 MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
