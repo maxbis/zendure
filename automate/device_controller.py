@@ -253,6 +253,7 @@ class PowerAccumulator:
         data_dir = script_dir.parent / "data"
         self.p1_hourly_json_path = data_dir / "p1_hourly_energy.json"
         self.p1_hourly_data: Dict[str, Dict[str, Dict[str, float]]] = {}  # {date: {hour: {import_delta_kwh, export_delta_kwh}}}
+        self.last_zendure_data: Optional[dict] = None
         
         # Load persisted data on initialization
         self._load_p1_hourly_data()
@@ -321,7 +322,7 @@ class PowerAccumulator:
                 '_metadata': {
                     'reference_import_kwh': self.p1_hourly_reference.get('import_kwh') if self.p1_hourly_reference else None,
                     'reference_export_kwh': self.p1_hourly_reference.get('export_kwh') if self.p1_hourly_reference else None,
-                    'last_reset_hour': self.p1_hourly_last_reset_hour
+                    'last_reset_hour': self.p1_hourly_last_reset_hour,
                 }
             }
             # Add hourly data
@@ -415,10 +416,16 @@ class PowerAccumulator:
             if store_date_str not in self.p1_hourly_data:
                 self.p1_hourly_data[store_date_str] = {}
             
+            electric_level = None
+            if self.last_zendure_data:
+                props = self.last_zendure_data.get("properties", {})
+                electric_level = props.get("electricLevel")
+
             # Store the last hour's delta values
             self.p1_hourly_data[store_date_str][store_hour_str] = {
                 'import_delta_kwh': last_hour_delta_import,
-                'export_delta_kwh': last_hour_delta_export
+                'export_delta_kwh': last_hour_delta_export,
+                'electric_level': electric_level,
             }
             
             self._log('info', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
@@ -562,6 +569,8 @@ class AutomateController(BaseDeviceController):
             self.log('warning', "Failed to read Zendure data for battery limit check, assuming OK")
             self.limit_state = 0
             return
+        
+        self.accumulator.last_zendure_data = zendure_data
         
         # Extract battery level from properties
         props = zendure_data.get("properties", {})
@@ -781,6 +790,8 @@ class AutomateController(BaseDeviceController):
         zendure_data = reader.read_zendure(update_json=True)
         if not zendure_data:
             raise ValueError("Failed to read Zendure device data")
+        
+        self.accumulator.last_zendure_data = zendure_data
         
         props = zendure_data.get("properties", {})
         current_input = props.get("inputLimit")
