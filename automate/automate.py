@@ -638,6 +638,12 @@ class AutomationApp:
         self.status_api.post_update('start')
         
         self.logger.info("🚀 Starting charge schedule automation script (OOP version with keyboard commands)")
+        # Show test mode prominently on startup (controlled via config.json key: TEST_MODE).
+        if getattr(self.controller, "test_mode", False):
+            self.logger.warning("TEST MODE: ON (no commands wil be send to the Zendure device)")
+        else:
+            self.logger.info("TEST MODE: OFF")
+
         self.logger.info(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
         self.logger.info(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
         self.logger.info("   Type 'h' or 'help' for available keyboard commands")
