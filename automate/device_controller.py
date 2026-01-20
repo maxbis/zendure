@@ -306,13 +306,6 @@ class PowerAccumulator:
                 # Preferred (new) format: values stored in kWh
                 ref_import = metadata.get('reference_import_kwh')
                 ref_export = metadata.get('reference_export_kwh')
-
-                # Backward compatibility: older files stored Wh as integers
-                if ref_import is None and metadata.get('reference_import_wh') is not None:
-                    ref_import = float(metadata.get('reference_import_wh')) / 1000.0
-                if ref_export is None and metadata.get('reference_export_wh') is not None:
-                    ref_export = float(metadata.get('reference_export_wh')) / 1000.0
-                last_reset_hour = metadata.get('last_reset_hour')
                 
                 if ref_import is not None and ref_export is not None:
                     self.p1_hourly_reference = {
@@ -357,7 +350,7 @@ class PowerAccumulator:
             }
             # Add hourly data
             data_to_save.update(self.p1_hourly_data)
-            
+            accumulate_p1_reading_hourly
             # Write to file
             with open(self.p1_hourly_json_path, 'w') as f:
                 json.dump(data_to_save, f, indent=2)
