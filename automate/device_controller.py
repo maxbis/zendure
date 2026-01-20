@@ -26,8 +26,8 @@ import requests
 # This global remains for backward compatibility, but is overridden at runtime
 # when BaseDeviceController loads the config.
 TEST_MODE = False               # If True, operations are simulated but not applied
-MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
-MAX_CHARGE_LEVEL = 95          # Maximum battery level (%) - stop charging above this
+MIN_CHARGE_LEVEL = 20          # Legacy default min SoC (%) (config key: MIN_CHARGE_LEVEL)
+MAX_CHARGE_LEVEL = 90          # Legacy default max SoC (%) (config key: MAX_CHARGE_LEVEL)
 MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
 MAX_CHARGE_POWER = 1200        # Maximum allowed power feed in watts
 
@@ -107,6 +107,28 @@ class BaseDeviceController:
         global TEST_MODE
         self.test_mode = bool(self.config.get("TEST_MODE", TEST_MODE))
         TEST_MODE = self.test_mode
+
+        # Battery SoC limits (single source of truth: config.json)
+        # Fallbacks are the legacy defaults (20/90) when keys are missing.
+        def _parse_soc(key: str, default: int) -> int:
+            try:
+                return int(self.config.get(key, default))
+            except (TypeError, ValueError):
+                return int(default)
+
+        min_soc = _parse_soc("MIN_CHARGE_LEVEL", MIN_CHARGE_LEVEL)
+        max_soc = _parse_soc("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
+
+        # Clamp to [0, 100]
+        min_soc = max(0, min(100, min_soc))
+        max_soc = max(0, min(100, max_soc))
+
+        # Normalize to avoid nonsensical configs
+        if min_soc > max_soc:
+            max_soc = min_soc
+
+        self.min_charge_level = min_soc
+        self.max_charge_level = max_soc
         
     def _find_config_file(self) -> Path:
         """
@@ -281,8 +303,15 @@ class PowerAccumulator:
             # Load reference values from _metadata key if present
             metadata = data.get('_metadata', {})
             if metadata:
+                # Preferred (new) format: values stored in kWh
                 ref_import = metadata.get('reference_import_kwh')
                 ref_export = metadata.get('reference_export_kwh')
+
+                # Backward compatibility: older files stored Wh as integers
+                if ref_import is None and metadata.get('reference_import_wh') is not None:
+                    ref_import = float(metadata.get('reference_import_wh')) / 1000.0
+                if ref_export is None and metadata.get('reference_export_wh') is not None:
+                    ref_export = float(metadata.get('reference_export_wh')) / 1000.0
                 last_reset_hour = metadata.get('last_reset_hour')
                 
                 if ref_import is not None and ref_export is not None:
@@ -320,8 +349,9 @@ class PowerAccumulator:
             # Prepare data structure with metadata and hourly data
             data_to_save = {
                 '_metadata': {
-                    'reference_import_kwh': self.p1_hourly_reference.get('import_kwh') if self.p1_hourly_reference else None,
-                    'reference_export_kwh': self.p1_hourly_reference.get('export_kwh') if self.p1_hourly_reference else None,
+                    # Store reference values in kWh (preferred format; matches loader expectations)
+                    'reference_import_kwh': float(self.p1_hourly_reference.get('import_kwh')) if self.p1_hourly_reference else None,
+                    'reference_export_kwh': float(self.p1_hourly_reference.get('export_kwh')) if self.p1_hourly_reference else None,
                     'last_reset_hour': self.p1_hourly_last_reset_hour,
                 }
             }
@@ -423,13 +453,13 @@ class PowerAccumulator:
 
             # Store the last hour's delta values
             self.p1_hourly_data[store_date_str][store_hour_str] = {
-                'import_delta_kwh': last_hour_delta_import,
-                'export_delta_kwh': last_hour_delta_export,
+                'import_delta_wh': int(last_hour_delta_import*1000),
+                'export_delta_wh': int(last_hour_delta_export*1000),
                 'electric_level': electric_level,
             }
             
             self._log('info', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
-                    f"import_delta={last_hour_delta_import:+.3f} kWh, export_delta={last_hour_delta_export:+.3f} kWh")
+                    f"import_delta={int(last_hour_delta_import*1000)} Wh, export_delta={int(last_hour_delta_export*1000)} Wh")
             
             # Reset reference values to current values
             self.p1_hourly_reference = {
@@ -462,8 +492,6 @@ class AutomateController(BaseDeviceController):
     # Thresholds and battery limits
     POWER_FEED_MIN_THRESHOLD = 30  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
     POWER_FEED_MIN_DELTA = 50      # Minimum change (W) to actually adjust limits - if |delta| < threshold, keep current
-    MIN_CHARGE_LEVEL = 20          # Minimum battery level (%) - stop discharging below this
-    MAX_CHARGE_LEVEL = 90          # Maximum battery level (%) - stop charging above this
     
     # Power accumulation log file path (relative to script directory)
     POWER_LOG_FILE = Path(__file__).parent / "log" / "power.log"
@@ -481,6 +509,21 @@ class AutomateController(BaseDeviceController):
             ValueError: If config is invalid or missing required keys
         """
         super().__init__(config_path)
+
+        # Thresholds (configurable)
+        # Fallback to legacy defaults when missing/invalid.
+        try:
+            self.power_feed_min_threshold = int(self.config.get("POWER_FEED_MIN_THRESHOLD", self.POWER_FEED_MIN_THRESHOLD))
+        except (TypeError, ValueError):
+            self.power_feed_min_threshold = int(self.POWER_FEED_MIN_THRESHOLD)
+        try:
+            self.power_feed_min_delta = int(self.config.get("POWER_FEED_MIN_DELTA", self.POWER_FEED_MIN_DELTA))
+        except (TypeError, ValueError):
+            self.power_feed_min_delta = int(self.POWER_FEED_MIN_DELTA)
+
+        # Normalize to sane non-negative values
+        self.power_feed_min_threshold = max(0, self.power_feed_min_threshold)
+        self.power_feed_min_delta = max(0, self.power_feed_min_delta)
         
         # Validate required keys for AutomateController
         device_ip = self.config.get("deviceIp")
@@ -557,9 +600,9 @@ class AutomateController(BaseDeviceController):
         Reads battery level from Zendure device via read_zendure() method.
         
         Sets limit_state:
-            -1: Battery at or below MIN_CHARGE_LEVEL (discharge not allowed)
+            -1: Battery at or below min_charge_level (discharge not allowed)
              0: Battery within acceptable range (no limits) or if read fails
-             1: Battery at or above MAX_CHARGE_LEVEL (charge not allowed)
+             1: Battery at or above max_charge_level (charge not allowed)
         """
         # Read Zendure data to get battery level
         reader = get_reader(self.config_path)
@@ -582,9 +625,9 @@ class AutomateController(BaseDeviceController):
             return
         
         # Check limits
-        if battery_level <= MIN_CHARGE_LEVEL:
+        if battery_level <= self.min_charge_level:
             self.limit_state = -1
-        elif battery_level >= MAX_CHARGE_LEVEL:
+        elif battery_level >= self.max_charge_level:
             self.limit_state = 1
         else:
             self.limit_state = 0
@@ -606,12 +649,12 @@ class AutomateController(BaseDeviceController):
         # Check battery limits before processing
         # If charging (power_feed > 0) and at MAX_CHARGE_LEVEL, prevent charge
         if power_feed > 0 and self.limit_state == 1:
-            self.log('warning', f"Battery at MAX_CHARGE_LEVEL ({MAX_CHARGE_LEVEL}%), preventing charge")
+            self.log('warning', f"Battery at max_charge_level ({self.max_charge_level}%), preventing charge")
             power_feed = 0
         
         # If discharging (power_feed < 0) and at MIN_CHARGE_LEVEL, prevent discharge
         if power_feed < 0 and self.limit_state == -1:
-            self.log('warning', f"Battery at MIN_CHARGE_LEVEL ({MIN_CHARGE_LEVEL}%), preventing discharge")
+            self.log('warning', f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge")
             power_feed = 0
 
         if power_feed < -MAX_DISCHARGE_POWER:
@@ -710,26 +753,26 @@ class AutomateController(BaseDeviceController):
         # Battery constraints applied on desired feed
         if electric_level is not None:
             # Too full to charge
-            if electric_level > self.MAX_CHARGE_LEVEL and effective_desired < 0:
+            if electric_level >= self.max_charge_level and effective_desired < 0:
                 effective_desired = 0
-                self.log('warning', f"Charge level above {self.MAX_CHARGE_LEVEL}%, preventing charge")
+                self.log('warning', f"Charge level at/above {self.max_charge_level}%, preventing charge")
             # Too empty to discharge
-            if electric_level < self.MIN_CHARGE_LEVEL and effective_desired > 0:
+            if electric_level <= self.min_charge_level and effective_desired > 0:
                 effective_desired = 0
-                self.log('warning', f"Charge level below {self.MIN_CHARGE_LEVEL}%, preventing discharge")
+                self.log('warning', f"Charge level at/below {self.min_charge_level}%, preventing discharge")
 
         # Clamp effective desired feed
         effective_desired = max(self.POWER_FEED_MIN, min(self.POWER_FEED_MAX, effective_desired))
 
         # Apply minimum absolute threshold on resulting feed:
         # if the resulting discharge/charge is very small, turn it off.
-        if abs(effective_desired) < self.POWER_FEED_MIN_THRESHOLD:
+        if abs(effective_desired) < self.power_feed_min_threshold:
             effective_desired = 0  # Set to 0 to stop, will return 1 in calculate_netzero_power() to avoid standby
 
         # Apply minimum delta threshold on the CHANGE:
         # if the change is too small, keep current settings to avoid unnecessary adjustments
         effective_delta = effective_desired - effective_current
-        if abs(effective_delta) < self.POWER_FEED_MIN_DELTA:
+        if abs(effective_delta) < self.power_feed_min_delta:
             effective_desired = effective_current
 
         # Reconstruct input/output from clamped effective power:

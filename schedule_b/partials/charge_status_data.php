@@ -20,34 +20,25 @@ $charge_status_data_initialized = true;
 require_once __DIR__ . '/../includes/formatters.php';
 require_once __DIR__ . '/../includes/colors.php';
 
+// Ensure ConfigLoader is available (reuse implementation from schedule/)
+if (!class_exists('ConfigLoader')) {
+    require_once __DIR__ . '/../../schedule/includes/config_loader.php';
+}
+
 // Fetch Zendure data from API
 $zendureData = null;
 $p1Data = null;
 $chargeStatusError = null;
 $lastUpdate = null;
 
-// Load API URLs from config file
+// Load API URLs from centralized config loader
+$baseUrl = ConfigLoader::getWithLocation('dataApiUrl');
 $dataApiUrl = null;
 $p1ApiUrl = null;
-$configPath = __DIR__ . '/../../config/config.json';
-if (file_exists($configPath)) {
-    $configJson = file_get_contents($configPath);
-    if ($configJson !== false) {
-        $config = json_decode($configJson, true);
-        if ($config !== null) {
-            $location = $config['location'] ?? 'remote';
-            if ($location === 'local') {
-                $baseUrl = $config['dataApiUrl-local'] ?? null;
-            } else {
-                $baseUrl = $config['dataApiUrl'] ?? null;
-            }
 
-            if ($baseUrl) {
-                $dataApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure';
-                $p1ApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure_p1';
-            }
-        }
-    }
+if ($baseUrl) {
+    $dataApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure';
+    $p1ApiUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=zendure_p1';
 }
 
 // Fallback to dynamic construction if config not available
@@ -66,8 +57,13 @@ if ($dataApiUrl === null) {
 }
 
 // Charge level constants (available throughout the partials)
-$MIN_CHARGE_LEVEL = 20; // Minimum charge level (percent)
-$MAX_CHARGE_LEVEL = 90; // Maximum charge level (percent)
+$MIN_CHARGE_LEVEL = (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 20);
+$MAX_CHARGE_LEVEL = (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 90);
+$MIN_CHARGE_LEVEL = max(0, min(100, $MIN_CHARGE_LEVEL));
+$MAX_CHARGE_LEVEL = max(0, min(100, $MAX_CHARGE_LEVEL));
+if ($MIN_CHARGE_LEVEL > $MAX_CHARGE_LEVEL) {
+    $MAX_CHARGE_LEVEL = $MIN_CHARGE_LEVEL;
+}
 $TOTAL_CAPACITY_KWH = 5.76; // Total battery capacity in kWh (57600 Wh / 1000)
 
 // Store API URLs for JavaScript
@@ -76,6 +72,8 @@ echo 'const CHARGE_STATUS_ZENDURE_API_URL = ' . json_encode($dataApiUrl, JSON_UN
 if ($p1ApiUrl) {
     echo 'const CHARGE_STATUS_P1_API_URL = ' . json_encode($p1ApiUrl, JSON_UNESCAPED_SLASHES) . ';';
 }
+echo 'const CHARGE_STATUS_MIN_CHARGE_LEVEL = ' . json_encode($MIN_CHARGE_LEVEL) . ';';
+echo 'const CHARGE_STATUS_MAX_CHARGE_LEVEL = ' . json_encode($MAX_CHARGE_LEVEL) . ';';
 echo '</script>';
 
 try {

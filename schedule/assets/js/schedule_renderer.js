@@ -500,8 +500,14 @@ function renderChargeStatus(zendureData, p1Data = null) {
     }
 
     // Calculate power display and time estimate
-    const MIN_CHARGE_LEVEL = 20;
-    const MAX_CHARGE_LEVEL = 90;
+    const MIN_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
+        : 20;
+    const MAX_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
+        : 90;
+    const MIN_CHARGE_LEVEL = Math.max(0, Math.min(100, MIN_CHARGE_LEVEL_RAW));
+    const MAX_CHARGE_LEVEL = Math.max(MIN_CHARGE_LEVEL, Math.min(100, MAX_CHARGE_LEVEL_RAW));
     const TOTAL_CAPACITY_KWH = 5.76;
 
     let powerDisplay = '0 W';
@@ -806,8 +812,14 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Constants
-    const MIN_CHARGE_LEVEL = 20;
-    const MAX_CHARGE_LEVEL = 90;
+    const MIN_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
+        : 20;
+    const MAX_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
+        : 90;
+    const MIN_CHARGE_LEVEL = Math.max(0, Math.min(100, MIN_CHARGE_LEVEL_RAW));
+    const MAX_CHARGE_LEVEL = Math.max(MIN_CHARGE_LEVEL, Math.min(100, MAX_CHARGE_LEVEL_RAW));
     const TOTAL_CAPACITY_KWH = 5.76;
     const minTemp = -10;
     const maxTemp = 40;

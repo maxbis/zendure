@@ -491,7 +491,7 @@ class AutomationApp:
             if p1_data:
                 if p1_data["total_power_import_kwh"] is not None and p1_data["total_power_export_kwh"] is not None:
                     import_delta, export_delta = self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"])
-                    self.logger.info(f"P1 deltas: import_delta={import_delta:.3f} kWh, export_delta={export_delta:.3f} kWh, actual power={p1_data['total_power']} W")
+                    self.logger.info(f"P1 deltas: import_delta={int(import_delta*1000)} Wh, export_delta={int(export_delta*1000)} Wh, actual power={p1_data['total_power']} W")
         except Exception as e:
             self.logger.warning(f"Failed to read P1 for accumulation: {e}")
         return p1_data

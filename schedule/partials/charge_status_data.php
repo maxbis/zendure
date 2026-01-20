@@ -57,8 +57,13 @@ if ($dataApiUrl === null) {
 }
 
 // Charge level constants (available throughout the partials)
-$MIN_CHARGE_LEVEL = 20; // Minimum charge level (percent)
-$MAX_CHARGE_LEVEL = 90; // Maximum charge level (percent)
+$MIN_CHARGE_LEVEL = (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 20);
+$MAX_CHARGE_LEVEL = (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 90);
+$MIN_CHARGE_LEVEL = max(0, min(100, $MIN_CHARGE_LEVEL));
+$MAX_CHARGE_LEVEL = max(0, min(100, $MAX_CHARGE_LEVEL));
+if ($MIN_CHARGE_LEVEL > $MAX_CHARGE_LEVEL) {
+    $MAX_CHARGE_LEVEL = $MIN_CHARGE_LEVEL;
+}
 $TOTAL_CAPACITY_KWH = 5.76; // Total battery capacity in kWh (57600 Wh / 1000)
 
 // Store API URLs for JavaScript
@@ -67,6 +72,8 @@ echo 'const CHARGE_STATUS_ZENDURE_API_URL = ' . json_encode($dataApiUrl, JSON_UN
 if ($p1ApiUrl) {
     echo 'const CHARGE_STATUS_P1_API_URL = ' . json_encode($p1ApiUrl, JSON_UNESCAPED_SLASHES) . ';';
 }
+echo 'const CHARGE_STATUS_MIN_CHARGE_LEVEL = ' . json_encode($MIN_CHARGE_LEVEL) . ';';
+echo 'const CHARGE_STATUS_MAX_CHARGE_LEVEL = ' . json_encode($MAX_CHARGE_LEVEL) . ';';
 echo '</script>';
 
 try {
