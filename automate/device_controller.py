@@ -276,6 +276,9 @@ class PowerAccumulator:
         self.p1_hourly_json_path = data_dir / "p1_hourly_energy.json"
         self.p1_hourly_data: Dict[str, Dict[str, Dict[str, float]]] = {}  # {date: {hour: {import_delta_kwh, export_delta_kwh}}}
         self.last_zendure_data: Optional[dict] = None
+        # Snapshot of the active schedule entry copied in from the automation loop.
+        # Expected shape: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
+        self.last_schedule_entry: Optional[Dict[str, Any]] = None
         
         # Load persisted data on initialization
         self._load_p1_hourly_data()
@@ -306,6 +309,7 @@ class PowerAccumulator:
                 # Preferred (new) format: values stored in kWh
                 ref_import = metadata.get('reference_import_kwh')
                 ref_export = metadata.get('reference_export_kwh')
+                last_reset_hour = metadata.get('last_reset_hour')
                 
                 if ref_import is not None and ref_export is not None:
                     self.p1_hourly_reference = {
@@ -350,12 +354,11 @@ class PowerAccumulator:
             }
             # Add hourly data
             data_to_save.update(self.p1_hourly_data)
-            accumulate_p1_reading_hourly
             # Write to file
             with open(self.p1_hourly_json_path, 'w') as f:
                 json.dump(data_to_save, f, indent=2)
             
-        except (OSError, json.JSONEncodeError):
+        except (OSError, TypeError, ValueError):
             # Don't crash if persistence fails
             pass
      
@@ -444,11 +447,19 @@ class PowerAccumulator:
                 props = self.last_zendure_data.get("properties", {})
                 electric_level = props.get("electricLevel")
 
+            schedule_entry = self.last_schedule_entry if isinstance(self.last_schedule_entry, dict) else None
+            schedule_time = schedule_entry.get('time') if schedule_entry else None
+            schedule_value = schedule_entry.get('value') if schedule_entry else None
+            schedule_key = schedule_entry.get('key') if schedule_entry else None
+
             # Store the last hour's delta values
             self.p1_hourly_data[store_date_str][store_hour_str] = {
                 'import_delta_wh': int(last_hour_delta_import*1000),
                 'export_delta_wh': int(last_hour_delta_export*1000),
                 'electric_level': electric_level,
+                'schedule_time': schedule_time,
+                'schedule_value': schedule_value,
+                'schedule_key': schedule_key,
             }
             
             self._log('info', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
@@ -1251,6 +1262,9 @@ class ScheduleController(BaseDeviceController):
         super().__init__(config_path)
         self.schedule_data: Optional[List[Dict[str, Any]]] = None
         self.schedule_date: Optional[date] = None
+        # Snapshot of the active resolved schedule entry at the last lookup.
+        # Expected shape from the schedule API: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
+        self.last_schedule_entry: Optional[Dict[str, Any]] = None
     
     def _get_current_time_str(self) -> str:
         """
@@ -1342,7 +1356,7 @@ class ScheduleController(BaseDeviceController):
             # Filter entries where time <= current_time
             valid_entries = [
                 entry for entry in resolved
-                if 'time' in entry and isinstance(entry['time'], (str, int))
+                if isinstance(entry, dict) and 'time' in entry and isinstance(entry['time'], (str, int))
             ]
             
             # Convert time to int for comparison
@@ -1357,11 +1371,18 @@ class ScheduleController(BaseDeviceController):
             
             if not valid_entries_with_int_time:
                 self.log('warning', f"No valid entries found for current time {current_time}")
+                self.last_schedule_entry = None
                 return None
             
             # Find the entry with the maximum time (closest but not exceeding)
             max_time, matching_entry = max(valid_entries_with_int_time, key=lambda x: x[0])
-            
+            # Store a compact snapshot of the matching entry for other components (e.g. PowerAccumulator).
+            self.last_schedule_entry = {
+                'time': matching_entry.get('time'),
+                'value': matching_entry.get('value'),
+                'key': matching_entry.get('key'),
+            }
+
             return matching_entry.get('value')
             
         except ValueError as e:

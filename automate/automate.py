@@ -516,12 +516,23 @@ class AutomationApp:
         """Get desired power from schedule."""
         try:
             desired_power = self.schedule_controller.get_desired_power(refresh=False)
+            # Share the active schedule entry with the accumulator for hourly persistence/logging.
+            try:
+                self.controller.accumulator.last_schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
+            except Exception:
+                # Non-fatal: schedule entry persistence should not break automation.
+                pass
+
             if desired_power is None:
                 self.logger.info("Schedule value is None, setting desired power to 0")
                 return 0
             return desired_power
         except Exception as e:
             self.logger.error(f"Error getting desired power from schedule: {e}")
+            try:
+                self.controller.accumulator.last_schedule_entry = None
+            except Exception:
+                pass
             return 0
 
     def _check_battery_limits(self, desired_power: any) -> any:
