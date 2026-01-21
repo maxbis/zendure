@@ -21,7 +21,7 @@ from typing import Optional
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 
 # ============================================================================
-# CONFIGURATION PARAMETERS
+# CONFIGURATION PARAMETERS - default values, can be overridden in config.json
 # ============================================================================
 
 # Time to pause between loop iterations (seconds)
@@ -637,7 +637,7 @@ class AutomationApp:
             
         self.status_api.post_update('start')
         
-        self.logger.info("🚀 Starting charge schedule automation script (OOP version with keyboard commands)")
+        self.logger.info("🚀 Starting charge schedule automation script")
         # Show test mode prominently on startup (controlled via config.json key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning("TEST MODE: ON (no commands wil be send to the Zendure device)")
