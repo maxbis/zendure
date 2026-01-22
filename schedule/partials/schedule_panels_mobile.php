@@ -31,10 +31,7 @@ function getValueLabel($val)
         <!-- Today's Schedule (Left) -->
         <div class="schedule-day">
             <div class="schedule-day-header">
-                <h3>Today</h3>
-                <div class="helper-text" style="font-size: 0.75rem; color: var(--text-tertiary);">
-                    <?php echo htmlspecialchars($today); ?>
-                </div>
+                <h3>Today <?php echo substr($today, -2); ?></h3>
             </div>
             <div class="schedule-list" id="today-schedule-grid">
                 <?php
@@ -94,10 +91,7 @@ function getValueLabel($val)
         <!-- Tomorrow's Schedule (Right) -->
         <div class="schedule-day">
             <div class="schedule-day-header">
-                <h3>Tomorrow</h3>
-                <div class="helper-text" style="font-size: 0.75rem; color: var(--text-tertiary);">
-                    <?php echo htmlspecialchars($tomorrow); ?>
-                </div>
+                <h3>Tomorrow <?php echo substr($tomorrow, -2); ?></h3>
             </div>
             <div class="schedule-list" id="tomorrow-schedule-grid">
                 <?php

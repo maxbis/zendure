@@ -225,7 +225,7 @@ body.mobile-dark {
     min-width: 0;
     font-weight: 600;
     font-size: 0.75rem;
-    margin-left: 4px;
+    margin-left: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -949,7 +949,7 @@ code {
     
     .schedule-item-value {
         font-size: 0.7rem;
-        margin-left: 3px;
+        margin-left: 10px;
     }
     
     .schedule-days-container {
