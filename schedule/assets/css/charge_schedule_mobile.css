@@ -197,13 +197,14 @@ body.mobile-dark {
 .schedule-item {
     display: flex;
     align-items: center;
-    padding: 10px 12px;
+    padding: 5px 6px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     transition: all 0.2s;
     margin-bottom: 2px;
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    min-width: 0;
 }
 
 .schedule-item:hover {
@@ -212,17 +213,22 @@ body.mobile-dark {
 }
 
 .schedule-item-time {
-    min-width: 60px;
+    min-width: 35px;
+    flex-shrink: 0;
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
 }
 
 .schedule-item-value {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     font-weight: 600;
-    font-size: 1rem;
-    margin-left: 8px;
+    font-size: 0.75rem;
+    margin-left: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Ensure schedule item values are readable in dark mode */
@@ -257,33 +263,25 @@ body.mobile-dark {
 /* Schedule Days Container - Side by Side Layout */
 .schedule-days-container {
     display: flex;
-    gap: 12px;
+    flex-direction: row;
+    gap: 4px;
     width: 100%;
+    min-width: 0;
 }
 
 .schedule-day {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 0; /* Allow flex items to shrink below content size */
-}
-
-/* On very small screens, stack vertically */
-@media (max-width: 480px) {
-    .schedule-days-container {
-        flex-direction: column;
-    }
-    
-    .schedule-day {
-        width: 100%;
-    }
+    max-width: 50%; /* Ensure they stay side by side */
 }
 
 .schedule-day-header {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .schedule-day-header h3 {
-    font-size: 0.95rem;
-    margin-bottom: 4px;
+    font-size: 0.8rem;
+    margin-bottom: 3px;
     color: var(--text-primary);
     font-weight: 600;
 }
@@ -941,16 +939,25 @@ code {
     }
     
     .schedule-item {
-        padding: 8px 10px;
+        padding: 6px 8px;
     }
     
     .schedule-item-time {
-        min-width: 50px;
-        font-size: 0.85rem;
+        min-width: 32px;
+        font-size: 0.7rem;
     }
     
     .schedule-item-value {
-        font-size: 0.9rem;
+        font-size: 0.7rem;
+        margin-left: 3px;
+    }
+    
+    .schedule-days-container {
+        gap: 3px;
+    }
+    
+    .schedule-day {
+        max-width: calc(50% - 2px);
     }
     
     #schedule-table th,
