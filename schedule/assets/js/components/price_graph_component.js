@@ -129,7 +129,7 @@ class PriceGraphComponent extends Component {
             if (todayPrices[hourKey] !== null && todayPrices[hourKey] !== undefined) {
                 allPrices.push(todayPrices[hourKey]);
             }
-            if (tomorrowPrices[hourKey] !== null && tomorrowPrices[hourKey] !== undefined) {
+            if (tomorrowPrices !== null && tomorrowPrices !== undefined && tomorrowPrices[hourKey] !== null && tomorrowPrices[hourKey] !== undefined) {
                 allPrices.push(tomorrowPrices[hourKey]);
             }
         }
