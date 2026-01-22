@@ -108,6 +108,7 @@ function getValueLabel($val)
                         <th style="width: 40px;">#</th>
                         <th>Key</th>
                         <th>Value</th>
+                        <th>Value</th>
                     </tr>
                 </thead>
                 <tbody>

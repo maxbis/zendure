@@ -24,19 +24,29 @@ function initMobileOptimizations() {
     // Initialize price statistics simplification
     initPriceStatisticsSimplification();
     
-    // Hide tomorrow price graph
+    // Note: Tomorrow price graph visibility is now handled by price_overview_bar.js
+    // based on data availability, not time. This function only affects desktop version.
+    // Mobile version uses price-graph-tomorrow-mobile which is controlled separately.
     hideTomorrowPriceGraph();
 }
 
 /**
- * Hide tomorrow price graph on mobile
+ * Hide tomorrow price graph on mobile (desktop version only)
+ * Note: Mobile version (price-graph-tomorrow-mobile) visibility is controlled
+ * by price_overview_bar.js based on data availability
  */
 function hideTomorrowPriceGraph() {
+    // Only hide desktop version, not mobile version
     const tomorrowContainer = document.getElementById('price-graph-tomorrow');
     if (tomorrowContainer) {
         const tomorrowCard = tomorrowContainer.closest('.card');
         if (tomorrowCard) {
-            tomorrowCard.style.display = 'none';
+            // Only hide if it's the desktop version (not mobile)
+            // Mobile version uses price-graph-tomorrow-mobile which is handled separately
+            const mobileContainer = document.getElementById('price-graph-tomorrow-mobile');
+            if (!mobileContainer || !tomorrowCard.contains(mobileContainer)) {
+                tomorrowCard.style.display = 'none';
+            }
         }
     }
 }

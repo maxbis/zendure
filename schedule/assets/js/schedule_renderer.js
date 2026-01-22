@@ -807,7 +807,7 @@ function findElementByLabel(container, labelText) {
 function renderChargeStatusDetails(zendureData, p1Data = null) {
     const detailsContainer = document.getElementById('charge-status-details-content');
     if (!detailsContainer) {
-        console.warn('Charge status details container not found');
+        // Container not found - this is expected in mobile version where details section is not included
         return;
     }
 

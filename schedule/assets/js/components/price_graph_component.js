@@ -62,6 +62,7 @@ class PriceGraphComponent extends Component {
     _renderEmpty() {
         const todayContainer = this.$('#price-graph-today');
         const tomorrowContainer = this.$('#price-graph-tomorrow');
+        const tomorrowContainerMobile = this.$('#price-graph-tomorrow-mobile');
         
         if (todayContainer) {
             todayContainer.innerHTML = '<div class="empty-state">No price data available</div>';
@@ -69,11 +70,15 @@ class PriceGraphComponent extends Component {
         if (tomorrowContainer) {
             tomorrowContainer.innerHTML = '';
         }
+        if (tomorrowContainerMobile) {
+            tomorrowContainerMobile.innerHTML = '';
+        }
     }
     
     _renderPriceGraph(priceData, scheduleEntries, currentHour) {
         const todayContainer = this.$('#price-graph-today');
         const tomorrowContainer = this.$('#price-graph-tomorrow');
+        const tomorrowContainerMobile = this.$('#price-graph-tomorrow-mobile');
         
         if (!todayContainer) return;
         
@@ -85,7 +90,19 @@ class PriceGraphComponent extends Component {
             });
         }
         
-        // Handle tomorrow container visibility
+        // Extract price data
+        const todayPrices = priceData.today || {};
+        const tomorrowPrices = priceData.tomorrow || null;
+        
+        // Check if tomorrow's data is available (not null and has data)
+        // Handle both null and empty object cases
+        const tomorrowAvailable = tomorrowPrices !== null && 
+                                  tomorrowPrices !== undefined && 
+                                  typeof tomorrowPrices === 'object' &&
+                                  Object.keys(tomorrowPrices).length > 0 &&
+                                  Object.values(tomorrowPrices).some(price => price !== null && price !== undefined && !isNaN(price));
+        
+        // Handle tomorrow container visibility (desktop - time-based)
         if (tomorrowContainer) {
             const tomorrowCard = tomorrowContainer.closest('.card');
             if (tomorrowCard) {
@@ -93,9 +110,17 @@ class PriceGraphComponent extends Component {
             }
         }
         
-        // Extract price data
-        const todayPrices = priceData.today || {};
-        const tomorrowPrices = priceData.tomorrow || {};
+        // Handle tomorrow container visibility (mobile - data-based)
+        if (tomorrowContainerMobile) {
+            const tomorrowCardMobile = document.getElementById('tomorrow-price-card-mobile');
+            if (tomorrowCardMobile) {
+                if (tomorrowAvailable) {
+                    tomorrowCardMobile.style.display = '';
+                } else {
+                    tomorrowCardMobile.style.display = 'none';
+                }
+            }
+        }
         
         // Calculate min/max prices
         const allPrices = [];
@@ -133,10 +158,19 @@ class PriceGraphComponent extends Component {
             this._renderPriceRow(todayPrices, currentDate, todayContainer, true, minPrice, maxPrice, scheduleMap, currentHour);
         }
         
-        // Render tomorrow
-        if (tomorrowContainer && currentHour >= 15) {
-            const tomorrowDate = formatDateYYYYMMDD(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+        // Calculate tomorrow's date string
+        const tomorrowDate = formatDateYYYYMMDD(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+        
+        // Render tomorrow in desktop container if available and current hour >= 15
+        if (tomorrowContainer && currentHour >= 15 && tomorrowAvailable) {
             this._renderPriceRow(tomorrowPrices, tomorrowDate, tomorrowContainer, false, minPrice, maxPrice, scheduleMap, currentHour);
+        }
+        
+        // Render tomorrow in mobile container if available (data-based, not time-based)
+        if (tomorrowContainerMobile && tomorrowAvailable) {
+            // Use tomorrowPrices (already checked for availability above)
+            const pricesToRender = tomorrowPrices || {};
+            this._renderPriceRow(pricesToRender, tomorrowDate, tomorrowContainerMobile, false, minPrice, maxPrice, scheduleMap, currentHour);
         }
     }
     

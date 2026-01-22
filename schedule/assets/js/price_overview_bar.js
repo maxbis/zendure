@@ -82,6 +82,7 @@ function formatPriceCents(price) {
 function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const todayContainer = document.getElementById('price-graph-today');
     const tomorrowContainer = document.getElementById('price-graph-tomorrow');
+    const tomorrowContainerMobile = document.getElementById('price-graph-tomorrow-mobile');
     
     if (!todayContainer) return;
     
@@ -93,7 +94,19 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         });
     }
     
-    // Handle tomorrow container visibility
+    // Extract price data
+    const todayPrices = priceData?.today || {};
+    const tomorrowPrices = priceData?.tomorrow || null;
+    
+    // Check if tomorrow's data is available (not null and has data)
+    // Handle both null and empty object cases
+    const tomorrowAvailable = tomorrowPrices !== null && 
+                              tomorrowPrices !== undefined && 
+                              typeof tomorrowPrices === 'object' &&
+                              Object.keys(tomorrowPrices).length > 0 &&
+                              Object.values(tomorrowPrices).some(price => price !== null && price !== undefined && !isNaN(price));
+    
+    // Handle tomorrow container visibility (desktop - time-based)
     if (tomorrowContainer) {
         const tomorrowCard = tomorrowContainer.closest('.card');
         if (currentHour < 15) {
@@ -107,9 +120,17 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         }
     }
     
-    // Extract price data
-    const todayPrices = priceData?.today || {};
-    const tomorrowPrices = priceData?.tomorrow || {};
+    // Handle tomorrow container visibility (mobile - data-based)
+    if (tomorrowContainerMobile) {
+        const tomorrowCardMobile = document.getElementById('tomorrow-price-card-mobile');
+        if (tomorrowCardMobile) {
+            if (tomorrowAvailable) {
+                tomorrowCardMobile.style.display = '';
+            } else {
+                tomorrowCardMobile.style.display = 'none';
+            }
+        }
+    }
     
     // Collect all prices to calculate min/max
     const allPrices = [];
@@ -230,14 +251,23 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     // Render today
     renderPriceRow(todayPrices, currentDate, todayContainer, true);
     
-    // Render tomorrow if available and current hour >= 15
-    if (currentHour >= 15 && tomorrowContainer) {
-        const tomorrowDate = new Date(now);
-        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-        const tomorrowDateStr = tomorrowDate.getFullYear().toString() +
-            String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
-            String(tomorrowDate.getDate()).padStart(2, '0');
+    // Calculate tomorrow's date string
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowDateStr = tomorrowDate.getFullYear().toString() +
+        String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
+        String(tomorrowDate.getDate()).padStart(2, '0');
+    
+    // Render tomorrow in desktop container if available and current hour >= 15
+    if (currentHour >= 15 && tomorrowContainer && tomorrowAvailable) {
         renderPriceRow(tomorrowPrices, tomorrowDateStr, tomorrowContainer, false);
+    }
+    
+    // Render tomorrow in mobile container if available (data-based, not time-based)
+    if (tomorrowContainerMobile && tomorrowAvailable) {
+        // Use tomorrowPrices (already checked for availability above)
+        const pricesToRender = tomorrowPrices || {};
+        renderPriceRow(pricesToRender, tomorrowDateStr, tomorrowContainerMobile, false);
     }
     
     // Auto-scroll to current time (center it)
