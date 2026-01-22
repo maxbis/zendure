@@ -251,6 +251,65 @@ body.mobile-dark {
     color: var(--text-tertiary);
     font-family: monospace;
     margin-left: 8px;
+    display: none; /* Hide key column in mobile */
+}
+
+/* Schedule Days Container - Side by Side Layout */
+.schedule-days-container {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+}
+
+.schedule-day {
+    flex: 1;
+    min-width: 0; /* Allow flex items to shrink below content size */
+}
+
+/* On very small screens, stack vertically */
+@media (max-width: 480px) {
+    .schedule-days-container {
+        flex-direction: column;
+    }
+    
+    .schedule-day {
+        width: 100%;
+    }
+}
+
+.schedule-day-header {
+    margin-bottom: 8px;
+}
+
+.schedule-day-header h3 {
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.schedule-day .schedule-list {
+    max-height: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 2px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 /* Time-based background colors - Dark Mode (Improved for readability) */

@@ -29,7 +29,9 @@ $zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 // Initial Server-Side Render Data
 $schedule = loadSchedule($dataFile);
 $today = isset($_GET['initial_date']) ? $_GET['initial_date'] : date('Ymd');
+$tomorrow = date('Ymd', strtotime($today . ' +1 day'));
 $resolvedToday = resolveScheduleForDate($schedule, $today);
+$resolvedTomorrow = resolveScheduleForDate($schedule, $tomorrow);
 $currentHour = date('H') . '00';
 $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 

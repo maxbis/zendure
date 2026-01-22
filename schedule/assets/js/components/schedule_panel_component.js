@@ -8,6 +8,7 @@ class SchedulePanelComponent extends Component {
         this.data = {
             entries: [],
             resolved: [],
+            resolvedTomorrow: [],
             currentTime: null,
             currentHour: null
         };
@@ -31,7 +32,21 @@ class SchedulePanelComponent extends Component {
         // Subscribe to schedule data changes
         this.subscribeToStateKey('schedule', (newState, prevState) => {
             if (newState.schedule !== prevState.schedule) {
-                this.update(newState.schedule);
+                // Include tomorrow's schedule if available in state
+                const updateData = { ...newState.schedule };
+                if (newState.scheduleTomorrow && newState.scheduleTomorrow.resolved) {
+                    updateData.resolvedTomorrow = newState.scheduleTomorrow.resolved;
+                }
+                this.update(updateData);
+            }
+        });
+        
+        // Also subscribe to scheduleTomorrow changes
+        this.subscribeToStateKey('scheduleTomorrow', (newState, prevState) => {
+            if (newState.scheduleTomorrow !== prevState.scheduleTomorrow && this.data) {
+                // Update tomorrow's data without full re-render if today hasn't changed
+                this.data.resolvedTomorrow = newState.scheduleTomorrow.resolved || [];
+                this._renderTomorrow();
             }
         });
     }
@@ -41,11 +56,21 @@ class SchedulePanelComponent extends Component {
      * @param {Object} scheduleData - Schedule data object
      */
     update(scheduleData) {
-        if (!scheduleData) return;
+        if (!scheduleData) {
+            console.warn('SchedulePanelComponent: update called with no data');
+            return;
+        }
+        
+        console.log('SchedulePanelComponent: Updating with data', {
+            entriesCount: scheduleData.entries?.length || 0,
+            resolvedCount: scheduleData.resolved?.length || 0,
+            resolvedTomorrowCount: scheduleData.resolvedTomorrow?.length || 0
+        });
         
         this.data = {
             entries: scheduleData.entries || [],
             resolved: scheduleData.resolved || [],
+            resolvedTomorrow: scheduleData.resolvedTomorrow || [],
             currentTime: scheduleData.currentTime || scheduleData.currentHour || this._getCurrentTime(),
             currentHour: scheduleData.currentHour || this._getCurrentHour()
         };
@@ -59,6 +84,7 @@ class SchedulePanelComponent extends Component {
         }
         
         this._renderToday();
+        this._renderTomorrow();
         this._renderEntries();
     }
     
@@ -115,10 +141,58 @@ class SchedulePanelComponent extends Component {
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
+            // Don't render key column in mobile (it's hidden via CSS anyway)
+            const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
             div.innerHTML = `
                 <div class="schedule-item-time">${formatTime(time)}</div>
                 <div class="schedule-item-value ${valClass}">${valDisplay}</div>
-                ${slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
+                ${!isMobile && slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
+            `;
+            container.appendChild(div);
+        });
+    }
+    
+    _renderTomorrow() {
+        const container = this.$('#tomorrow-schedule-grid');
+        if (!container) return; // Tomorrow grid might not exist in desktop view
+        
+        container.innerHTML = '';
+        
+        const { resolvedTomorrow } = this.data;
+        if (!resolvedTomorrow || resolvedTomorrow.length === 0) {
+            container.innerHTML = '<div class="empty-state">No schedule data available</div>';
+            return;
+        }
+        
+        let prevVal = null;
+        const displayedSlots = [];
+        
+        // First pass: collect displayed slots
+        resolvedTomorrow.forEach(slot => {
+            const val = slot.value;
+            if (prevVal !== null && val === prevVal) {
+                return;
+            }
+            prevVal = val;
+            displayedSlots.push(slot);
+        });
+        
+        // Render slots (no current time highlighting for tomorrow)
+        displayedSlots.forEach(slot => {
+            const time = String(slot.time);
+            const h = parseInt(time.substring(0, 2));
+            
+            const bgClass = getTimeClass(h);
+            const valDisplay = getValueLabel(slot.value);
+            const valClass = getValueClass(slot.value);
+            
+            const div = document.createElement('div');
+            div.className = `schedule-item ${bgClass}`;
+            // Don't render key column in mobile
+            const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
+            div.innerHTML = `
+                <div class="schedule-item-time">${formatTime(time)}</div>
+                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
             `;
             container.appendChild(div);
         });
@@ -126,13 +200,25 @@ class SchedulePanelComponent extends Component {
     
     _renderEntries() {
         const tbody = this.$('#schedule-table tbody');
-        if (!tbody) return;
+        if (!tbody) {
+            console.warn('SchedulePanelComponent: tbody not found for rendering entries');
+            return;
+        }
+        
+        console.log('SchedulePanelComponent: Rendering entries', {
+            entriesCount: this.data.entries?.length || 0
+        });
         
         tbody.innerHTML = '';
         
         const { entries } = this.data;
         if (!entries || entries.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No schedule entries</td></tr>';
+            // Update status bar
+            const statusBar = this.$('#status-bar');
+            if (statusBar) {
+                statusBar.innerHTML = '<span>0 entries loaded.</span>';
+            }
             return;
         }
         
@@ -165,6 +251,8 @@ class SchedulePanelComponent extends Component {
         if (statusBar) {
             statusBar.innerHTML = `<span>${entries.length} entries loaded.</span>`;
         }
+        
+        console.log('SchedulePanelComponent: Entries rendered successfully');
     }
     
     /**
