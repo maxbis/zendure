@@ -76,13 +76,7 @@ function formatPriceCents(price) {
 let priceGraphPopup = null;
 let priceGraphPopupActiveBar = null;
 let priceGraphPopupActiveContainer = null;
-let priceGraphPopupSuppressClickUntil = 0;
-let priceGraphPopupLastTouchBar = null;
 const priceGraphPopupBoundContainers = new WeakSet();
-
-function isTouchDevice() {
-    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-}
 
 function formatHourRange(hourValue) {
     const hour = Number.isFinite(hourValue) ? hourValue : NaN;
@@ -104,13 +98,6 @@ function ensurePriceGraphPopup() {
     `;
     document.body.appendChild(popup);
 
-    const hideOnOutsideTouch = (event) => {
-        if (!priceGraphPopup) return;
-        if (event.target.closest('.price-graph-bar')) return;
-        hidePriceGraphPopup();
-    };
-
-    document.addEventListener('touchstart', hideOnOutsideTouch, { passive: true });
     window.addEventListener('scroll', hidePriceGraphPopup, true);
     window.addEventListener('resize', hidePriceGraphPopup);
 
@@ -450,38 +437,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.appendChild(priceLabel);
             
             const showPopup = () => showPriceGraphPopup(barDiv, container);
-            const hidePopup = () => {
-                if (!isTouchDevice()) {
-                    hidePriceGraphPopup();
-                }
-            };
+            const hidePopup = () => hidePriceGraphPopup();
 
             barDiv.addEventListener('mouseenter', showPopup);
             barDiv.addEventListener('mouseleave', hidePopup);
             barDiv.addEventListener('focus', showPopup);
             barDiv.addEventListener('blur', hidePopup);
-            barDiv.addEventListener('touchstart', () => {
-                if (!isTouchDevice()) return;
-                if (priceGraphPopupActiveBar === barDiv) {
-                    hidePriceGraphPopup();
-                    priceGraphPopupSuppressClickUntil = Date.now() + 600;
-                    priceGraphPopupLastTouchBar = barDiv;
-                    return;
-                }
-                showPopup();
-                priceGraphPopupSuppressClickUntil = Date.now() + 600;
-                priceGraphPopupLastTouchBar = barDiv;
-            }, { passive: true });
-
             // Add click handler (same as schedule overview bars)
-            barDiv.addEventListener('click', (event) => {
-                if (isTouchDevice() &&
-                    priceGraphPopupLastTouchBar === barDiv &&
-                    Date.now() < priceGraphPopupSuppressClickUntil) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return;
-                }
+            barDiv.addEventListener('click', () => {
                 if (editModal) {
                     // Check if entry exists
                     const existingValue = scheduleMap[key];
