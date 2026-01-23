@@ -73,6 +73,114 @@ function formatPriceCents(price) {
     return Math.round(price * 100).toString();
 }
 
+let priceGraphPopup = null;
+let priceGraphPopupActiveBar = null;
+let priceGraphPopupActiveContainer = null;
+let priceGraphPopupSuppressClickUntil = 0;
+let priceGraphPopupLastTouchBar = null;
+const priceGraphPopupBoundContainers = new WeakSet();
+
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+function formatHourRange(hourValue) {
+    const hour = Number.isFinite(hourValue) ? hourValue : NaN;
+    if (Number.isNaN(hour)) return '';
+    const startHour = String(hour).padStart(2, '0');
+    const endHour = String((hour + 1) % 24).padStart(2, '0');
+    return `${startHour}:00 - ${endHour}:00`;
+}
+
+function ensurePriceGraphPopup() {
+    if (priceGraphPopup) return priceGraphPopup;
+
+    const popup = document.createElement('div');
+    popup.className = 'price-graph-popup';
+    popup.innerHTML = `
+        <div class="price-graph-popup-time"></div>
+        <div class="price-graph-popup-price"></div>
+        <div class="price-graph-popup-schedule"></div>
+    `;
+    document.body.appendChild(popup);
+
+    const hideOnOutsideTouch = (event) => {
+        if (!priceGraphPopup) return;
+        if (event.target.closest('.price-graph-bar')) return;
+        hidePriceGraphPopup();
+    };
+
+    document.addEventListener('touchstart', hideOnOutsideTouch, { passive: true });
+    window.addEventListener('scroll', hidePriceGraphPopup, true);
+    window.addEventListener('resize', hidePriceGraphPopup);
+
+    priceGraphPopup = popup;
+    return popup;
+}
+
+function hidePriceGraphPopup() {
+    if (!priceGraphPopup) return;
+    priceGraphPopup.style.display = 'none';
+    priceGraphPopup.style.visibility = 'hidden';
+    priceGraphPopupActiveBar = null;
+    priceGraphPopupActiveContainer = null;
+}
+
+function bindPopupContainer(container) {
+    if (!container || priceGraphPopupBoundContainers.has(container)) return;
+    container.addEventListener('scroll', hidePriceGraphPopup, { passive: true });
+    priceGraphPopupBoundContainers.add(container);
+}
+
+function showPriceGraphPopup(bar, container) {
+    const popup = ensurePriceGraphPopup();
+    if (!bar || !container || !popup) return;
+
+    const timeEl = popup.querySelector('.price-graph-popup-time');
+    const priceEl = popup.querySelector('.price-graph-popup-price');
+    const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+
+    const hourValue = parseInt(bar.dataset.hour, 10);
+    const timeRange = formatHourRange(hourValue);
+
+    const rawPrice = bar.dataset.price;
+    const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
+    const priceDisplay = priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue);
+
+    const scheduleValue = bar.dataset.scheduleValue;
+    const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
+
+    timeEl.textContent = timeRange || '—';
+    priceEl.textContent = priceDisplay;
+    scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+
+    popup.style.display = 'block';
+    popup.style.visibility = 'hidden';
+
+    const barRect = bar.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+        const popupRect = popup.getBoundingClientRect();
+        let left = barRect.left + barRect.width / 2 - popupRect.width / 2;
+        const minLeft = containerRect.left + 4;
+        const maxLeft = containerRect.right - popupRect.width - 4;
+        left = Math.max(minLeft, Math.min(left, maxLeft));
+
+        let top = barRect.top - popupRect.height - 8;
+        if (top < containerRect.top + 4) {
+            top = barRect.bottom + 8;
+        }
+
+        popup.style.left = `${Math.round(left)}px`;
+        popup.style.top = `${Math.round(top)}px`;
+        popup.style.visibility = 'visible';
+    });
+
+    priceGraphPopupActiveBar = bar;
+    priceGraphPopupActiveContainer = container;
+}
+
 /**
  * Renders the price graph for today and tomorrow
  * @param {Object} priceData - Price data from API
@@ -274,6 +382,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     // Helper function to render a row of price bars
     const renderPriceRow = (prices, dateStr, container, isToday) => {
         container.innerHTML = '';
+        bindPopupContainer(container);
         
         for (let h = 0; h < 24; h++) {
             const hourKey = String(h).padStart(2, '0');
@@ -320,7 +429,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 barDiv.dataset.scheduleType = scheduleType;
                 barDiv.dataset.scheduleValue = scheduledValue;
             }
-            barDiv.title = `${hourKey}:00 - ${priceDisplay}`;
+            barDiv.setAttribute('aria-label', `${hourKey}:00 - ${priceDisplay}`);
             
             const barInner = document.createElement('div');
             barInner.className = `price-graph-bar-inner ${price === null ? 'price-null' : ''}`;
@@ -340,8 +449,39 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.appendChild(barLabel);
             barDiv.appendChild(priceLabel);
             
+            const showPopup = () => showPriceGraphPopup(barDiv, container);
+            const hidePopup = () => {
+                if (!isTouchDevice()) {
+                    hidePriceGraphPopup();
+                }
+            };
+
+            barDiv.addEventListener('mouseenter', showPopup);
+            barDiv.addEventListener('mouseleave', hidePopup);
+            barDiv.addEventListener('focus', showPopup);
+            barDiv.addEventListener('blur', hidePopup);
+            barDiv.addEventListener('touchstart', () => {
+                if (!isTouchDevice()) return;
+                if (priceGraphPopupActiveBar === barDiv) {
+                    hidePriceGraphPopup();
+                    priceGraphPopupSuppressClickUntil = Date.now() + 600;
+                    priceGraphPopupLastTouchBar = barDiv;
+                    return;
+                }
+                showPopup();
+                priceGraphPopupSuppressClickUntil = Date.now() + 600;
+                priceGraphPopupLastTouchBar = barDiv;
+            }, { passive: true });
+
             // Add click handler (same as schedule overview bars)
-            barDiv.addEventListener('click', () => {
+            barDiv.addEventListener('click', (event) => {
+                if (isTouchDevice() &&
+                    priceGraphPopupLastTouchBar === barDiv &&
+                    Date.now() < priceGraphPopupSuppressClickUntil) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 if (editModal) {
                     // Check if entry exists
                     const existingValue = scheduleMap[key];

@@ -935,6 +935,24 @@ code {
     margin-bottom: 12px;
 }
 
+/* Price Graph Custom Popup (Mobile) */
+.price-graph-popup {
+    max-width: 90vw;
+    padding: 10px 12px;
+}
+
+.price-graph-popup-time {
+    font-size: 0.75rem;
+}
+
+.price-graph-popup-price {
+    font-size: 1.1rem;
+}
+
+.price-graph-popup-schedule {
+    font-size: 0.75rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
     body.mobile-dark {
