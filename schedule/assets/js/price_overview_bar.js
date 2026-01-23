@@ -46,6 +46,7 @@ function getPriceColor(price, minPrice, maxPrice) {
     // Green: rgb(76, 175, 80) = #4CAF50
     // Red: rgb(244, 67, 54) = #F44336
     return interpolateColor(76, 175, 80, 244, 67, 54, normalized);
+
 }
 
 /**
@@ -76,7 +77,7 @@ function formatPriceCents(price) {
  * Renders the price graph for today and tomorrow
  * @param {Object} priceData - Price data from API
  * @param {number} currentHour - Current hour (0-23)
- * @param {Array} scheduleEntries - Array of schedule entries for lookup
+ * @param {Array|Object} scheduleEntries - Array of schedule entries or schedule context
  * @param {Object} editModal - Edit modal instance for click handlers
  */
 function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
@@ -86,14 +87,122 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     
     if (!todayContainer) return;
     
+    const scheduleContext = Array.isArray(scheduleEntries) ? null : scheduleEntries;
+    const scheduleEntryList = Array.isArray(scheduleEntries) ? scheduleEntries : (scheduleContext?.entries || []);
+    const resolvedToday = scheduleContext?.resolvedToday || [];
+    const resolvedTomorrow = scheduleContext?.resolvedTomorrow || [];
+
+    const buildExpandedHourMap = (resolved) => {
+        if (!Array.isArray(resolved) || resolved.length === 0) return null;
+        const baseMap = typeof buildHourMap === 'function' ? buildHourMap(resolved) : null;
+        if (!baseMap) return null;
+        const expanded = {};
+        let lastValue;
+        for (let h = 0; h < 24; h++) {
+            if (baseMap[h] !== undefined) {
+                lastValue = baseMap[h];
+            }
+            if (lastValue !== undefined) {
+                expanded[h] = lastValue;
+            }
+        }
+        return expanded;
+    };
+
+    const scheduleHourMapByDate = {};
+
     // Build a map of schedule entries for quick lookup
     const scheduleMap = {};
-    if (scheduleEntries) {
-        scheduleEntries.forEach(entry => {
+    if (scheduleEntryList) {
+        scheduleEntryList.forEach(entry => {
             scheduleMap[entry.key] = entry.value;
         });
     }
     
+    const getScheduleType = (value) => {
+        if (value === 'netzero') {
+            return 'discharge';
+        }
+        if (value === 'netzero+') {
+            return 'charge';
+        }
+        if (value === null || value === undefined || value === '') {
+            return '';
+        }
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (trimmed === '') return '';
+            const normalized = trimmed
+                .toLowerCase()
+                .replace(/[^a-z0-9+.\- ]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (normalized === 'net zero' || normalized === 'netzero') {
+                return 'discharge';
+            }
+            if (normalized === 'netzero+' || normalized === 'solar charge') {
+                return 'charge';
+            }
+            if (normalized.includes('only')) {
+                return 'charge';
+            }
+            const match = trimmed.match(/[-+]?\d+(?:\.\d+)?/);
+            if (match) {
+                const parsed = Number(match[0]);
+                if (!Number.isNaN(parsed)) {
+                    if (parsed > 0) return 'charge';
+                    if (parsed < 0) return 'discharge';
+                    return '';
+                }
+            }
+        }
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        if (!Number.isNaN(numericValue)) {
+            if (numericValue > 0) return 'charge';
+            if (numericValue < 0) return 'discharge';
+            return '';
+        }
+        return '';
+    };
+
+    const scheduleByDate = {};
+    if (scheduleEntryList) {
+        scheduleEntryList.forEach((entry) => {
+            if (!entry || !entry.key) return;
+            const dateKey = entry.key.slice(0, 8);
+            if (!scheduleByDate[dateKey]) {
+                scheduleByDate[dateKey] = [];
+            }
+            scheduleByDate[dateKey].push({
+                key: entry.key,
+                value: entry.value
+            });
+        });
+        Object.values(scheduleByDate).forEach((entries) => {
+            entries.sort((a, b) => a.key.localeCompare(b.key));
+        });
+    }
+
+    const getActiveScheduleValue = (dateStr, hourKey) => {
+        const hourMap = scheduleHourMapByDate[dateStr];
+        if (hourMap) {
+            const hourIndex = parseInt(hourKey, 10);
+            return hourMap[hourIndex];
+        }
+        const entries = scheduleByDate[dateStr];
+        if (!entries || entries.length === 0) return undefined;
+        let activeValue;
+        for (const entry of entries) {
+            const entryHour = entry.key.slice(8, 10);
+            if (entryHour <= hourKey) {
+                activeValue = entry.value;
+            } else {
+                break;
+            }
+        }
+        return activeValue;
+    };
+
     // Extract price data
     const todayPrices = priceData?.today || {};
     const tomorrowPrices = priceData?.tomorrow || null;
@@ -158,9 +267,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     
     // Get current date
     const now = new Date();
-    const currentDate = now.getFullYear().toString() +
+    const currentDate = (scheduleContext?.todayDate || (now.getFullYear().toString() +
         String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0');
+        String(now.getDate()).padStart(2, '0')));
     
     // Helper function to render a row of price bars
     const renderPriceRow = (prices, dateStr, container, isToday) => {
@@ -195,6 +304,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hourTime = hourKey + '00';
             const key = dateStr + hourTime;
             
+            const scheduledValue = getActiveScheduleValue(dateStr, hourKey);
+
             // Create bar element
             const barDiv = document.createElement('div');
             barDiv.className = `price-graph-bar ${isCurrentHour ? 'price-current' : ''}`;
@@ -203,6 +314,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.dataset.time = hourTime;
             barDiv.dataset.key = key;
             barDiv.dataset.price = price !== null ? price : '';
+            const scheduleType = scheduledValue !== undefined ? getScheduleType(scheduledValue) : '';
+            if (scheduleType) {
+                barDiv.classList.add('has-schedule');
+                barDiv.dataset.scheduleType = scheduleType;
+                barDiv.dataset.scheduleValue = scheduledValue;
+            }
             barDiv.title = `${hourKey}:00 - ${priceDisplay}`;
             
             const barInner = document.createElement('div');
@@ -242,15 +359,26 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         }
     };
     
+    // Calculate tomorrow's date string
+    const tomorrowDateStr = scheduleContext?.tomorrowDate || (() => {
+        const tomorrowDate = new Date(now);
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        return tomorrowDate.getFullYear().toString() +
+            String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
+            String(tomorrowDate.getDate()).padStart(2, '0');
+    })();
+
+    const todayHourMap = buildExpandedHourMap(resolvedToday);
+    const tomorrowHourMap = buildExpandedHourMap(resolvedTomorrow);
+    if (todayHourMap) {
+        scheduleHourMapByDate[currentDate] = todayHourMap;
+    }
+    if (tomorrowHourMap) {
+        scheduleHourMapByDate[tomorrowDateStr] = tomorrowHourMap;
+    }
+    
     // Render today
     renderPriceRow(todayPrices, currentDate, todayContainer, true);
-    
-    // Calculate tomorrow's date string
-    const tomorrowDate = new Date(now);
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowDateStr = tomorrowDate.getFullYear().toString() +
-        String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
-        String(tomorrowDate.getDate()).padStart(2, '0');
     
     // Render tomorrow in desktop container if available (data-based, not time-based)
     if (tomorrowContainer && tomorrowAvailable) {

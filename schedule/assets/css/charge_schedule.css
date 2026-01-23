@@ -631,6 +631,28 @@ body {
     padding: 0;
 }
 
+.price-graph-bar.has-schedule::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9e9e9e;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+    z-index: 5;
+}
+
+.price-graph-bar.has-schedule[data-schedule-type="charge"]::after {
+    background: #4caf50;
+}
+
+.price-graph-bar.has-schedule[data-schedule-type="discharge"]::after {
+    background: #f44336;
+}
+
 .chart-bar:hover,
 .bar-graph-bar:hover,
 .price-graph-bar:hover {

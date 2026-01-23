@@ -118,7 +118,13 @@ async function _refreshDataInternal() {
 
             // Fetch and render price data (if available)
             if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
-                fetchAndRenderPrices(PRICE_API_URL, todayData.entries || [], editModal);
+                fetchAndRenderPrices(PRICE_API_URL, {
+                    entries: todayData.entries || [],
+                    resolvedToday: todayData.resolved || [],
+                    resolvedTomorrow: tomorrowData.resolved || [],
+                    todayDate: today,
+                    tomorrowDate: tomorrow
+                }, editModal);
             }
 
             // Update schedule calculator with today's and tomorrow's data (if available)
