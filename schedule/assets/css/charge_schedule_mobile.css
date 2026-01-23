@@ -676,8 +676,8 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar-price {
-    font-size: 0.55rem;
-    color: var(--text-tertiary);
+    font-size: 0.6rem;
+    color: #bfc280;
     margin-top: 2px;
     font-weight: 400;
     white-space: nowrap;

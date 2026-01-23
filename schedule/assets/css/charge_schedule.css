@@ -708,7 +708,7 @@ body {
 
 /* Price label styling - shows price in cents under the hour number */
 .price-graph-bar-price {
-    font-size: 0.6rem;
+    font-size: 0.7rem;
     color: #888;
     margin-top: 2px;
     font-weight: 400;
