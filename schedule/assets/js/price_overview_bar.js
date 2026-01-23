@@ -106,17 +106,11 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                               Object.keys(tomorrowPrices).length > 0 &&
                               Object.values(tomorrowPrices).some(price => price !== null && price !== undefined && !isNaN(price));
     
-    // Handle tomorrow container visibility (desktop - time-based)
+    // Handle tomorrow container visibility (desktop - data-based: show only if data exists)
     if (tomorrowContainer) {
         const tomorrowCard = tomorrowContainer.closest('.card');
-        if (currentHour < 15) {
-            if (tomorrowCard) {
-                tomorrowCard.style.display = 'none';
-            }
-        } else {
-            if (tomorrowCard) {
-                tomorrowCard.style.display = '';
-            }
+        if (tomorrowCard) {
+            tomorrowCard.style.display = tomorrowAvailable ? '' : 'none';
         }
     }
     
@@ -258,9 +252,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         String(tomorrowDate.getMonth() + 1).padStart(2, '0') +
         String(tomorrowDate.getDate()).padStart(2, '0');
     
-    // Render tomorrow in desktop container if available and current hour >= 15
-    if (currentHour >= 15 && tomorrowContainer && tomorrowAvailable) {
+    // Render tomorrow in desktop container if available (data-based, not time-based)
+    if (tomorrowContainer && tomorrowAvailable) {
         renderPriceRow(tomorrowPrices, tomorrowDateStr, tomorrowContainer, false);
+    } else if (tomorrowContainer) {
+        // Clear desktop container when tomorrow is not available
+        tomorrowContainer.innerHTML = '';
     }
     
     // Render tomorrow in mobile container if available (data-based, not time-based)
@@ -268,6 +265,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         // Use tomorrowPrices (already checked for availability above)
         const pricesToRender = tomorrowPrices || {};
         renderPriceRow(pricesToRender, tomorrowDateStr, tomorrowContainerMobile, false);
+    } else if (tomorrowContainerMobile) {
+        // Clear mobile container when tomorrow is not available
+        tomorrowContainerMobile.innerHTML = '';
     }
     
     // Auto-scroll to current time (center it)

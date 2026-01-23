@@ -102,11 +102,11 @@ class PriceGraphComponent extends Component {
                                   Object.keys(tomorrowPrices).length > 0 &&
                                   Object.values(tomorrowPrices).some(price => price !== null && price !== undefined && !isNaN(price));
         
-        // Handle tomorrow container visibility (desktop - time-based)
+        // Handle tomorrow container visibility (desktop - data-based: show only if data exists)
         if (tomorrowContainer) {
             const tomorrowCard = tomorrowContainer.closest('.card');
             if (tomorrowCard) {
-                tomorrowCard.style.display = currentHour < 15 ? 'none' : '';
+                tomorrowCard.style.display = tomorrowAvailable ? '' : 'none';
             }
         }
         
@@ -161,9 +161,12 @@ class PriceGraphComponent extends Component {
         // Calculate tomorrow's date string
         const tomorrowDate = formatDateYYYYMMDD(new Date(now.getTime() + 24 * 60 * 60 * 1000));
         
-        // Render tomorrow in desktop container if available and current hour >= 15
-        if (tomorrowContainer && currentHour >= 15 && tomorrowAvailable) {
+        // Render tomorrow in desktop container if available (data-based, not time-based)
+        if (tomorrowContainer && tomorrowAvailable) {
             this._renderPriceRow(tomorrowPrices, tomorrowDate, tomorrowContainer, false, minPrice, maxPrice, scheduleMap, currentHour);
+        } else if (tomorrowContainer) {
+            // Clear desktop container when tomorrow is not available
+            tomorrowContainer.innerHTML = '';
         }
         
         // Render tomorrow in mobile container if available (data-based, not time-based)
@@ -171,6 +174,9 @@ class PriceGraphComponent extends Component {
             // Use tomorrowPrices (already checked for availability above)
             const pricesToRender = tomorrowPrices || {};
             this._renderPriceRow(pricesToRender, tomorrowDate, tomorrowContainerMobile, false, minPrice, maxPrice, scheduleMap, currentHour);
+        } else if (tomorrowContainerMobile) {
+            // Clear mobile container when tomorrow is not available
+            tomorrowContainerMobile.innerHTML = '';
         }
     }
     

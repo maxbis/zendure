@@ -22,17 +22,12 @@
             </h2>
             <div class="price-graph-row" id="price-graph-today"></div>
         </div>
-        <?php 
-        $currentHourInt = (int)date('H');
-        if ($currentHourInt >= 15): 
-        ?>
-        <div class="card">
+        <div class="card" id="tomorrow-price-card-desktop" style="display: none;">
             <h2>Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
                     <?= htmlspecialchars($tomorrow_modified); ?>
                 )</span>
             </h2>
             <div class="price-graph-row" id="price-graph-tomorrow"></div>
         </div>
-        <?php endif; ?>
     </div>
 </div>
