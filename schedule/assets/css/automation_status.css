@@ -1,5 +1,45 @@
 /* Automation Status Styles */
 
+/* Reload Overlay */
+.reload-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.reload-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.reload-overlay-content {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 500;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    animation: reloadPulse 1s ease-in-out infinite;
+}
+
+@keyframes reloadPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
 /* Automation Status - Full Width */
 .automation-status-wrapper {
     width: 100%;
@@ -81,6 +121,58 @@
 
 .automation-refresh-btn .refresh-text {
     font-weight: 500;
+}
+
+/* Long-press visual feedback */
+.automation-refresh-btn.long-pressing {
+    position: relative;
+    background: #e3f2fd;
+    border-color: #64b5f6;
+    color: #1976d2;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.3);
+    transition: all 0.1s ease;
+    --progress: 0%;
+}
+
+.automation-refresh-btn.long-pressing::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #64b5f6 0%,
+        #64b5f6 var(--progress),
+        transparent var(--progress),
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+.automation-refresh-btn.long-pressing::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    background: #e3f2fd;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Ensure text and icon are above progress ring */
+.automation-refresh-btn.long-pressing .refresh-icon,
+.automation-refresh-btn.long-pressing .refresh-text {
+    position: relative;
+    z-index: 3;
 }
 
 /* Spin animation for refresh icon */
