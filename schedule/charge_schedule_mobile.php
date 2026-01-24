@@ -20,9 +20,19 @@ $dataFile = __DIR__ . '/../data/charge_schedule.json';
 
 // Load API URLs from centralized config loader
 $apiUrl = ConfigLoader::get('scheduleApiUrl', 'api/charge_schedule_api.php');
-// Check for get_price (singular) first, then get_prices (plural) for backward compatibility
-$priceApiUrl = ConfigLoader::get('priceUrls.get_price') 
-            ?? ConfigLoader::get('priceUrls.get_prices');
+// Get price URL based on location (local vs remote)
+$location = ConfigLoader::get('location', 'remote');
+if ($location === 'local') {
+    // Use get_prices-local for local
+    $priceApiUrl = ConfigLoader::get('priceUrls.get_prices-local');
+} else {
+    // Use get_prices for remote
+    $priceApiUrl = ConfigLoader::get('priceUrls.get_prices');
+}
+// Fallback to get_price (singular) for backward compatibility
+if (!$priceApiUrl) {
+    $priceApiUrl = ConfigLoader::get('priceUrls.get_price');
+}
 $calculateScheduleApiUrl = ConfigLoader::get('calculate_schedule_apiUrl');
 $zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 

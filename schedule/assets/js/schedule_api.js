@@ -35,8 +35,17 @@ let getApiClient = (baseUrl) => {
  */
 async function fetchScheduleData(apiUrl, date) {
     try {
-        const client = getApiClient(apiUrl.split('?')[0]); // Remove query params for base URL
-        return await client.get('', { date: date });
+        // Parse existing query params from URL and merge with date
+        const urlParts = apiUrl.split('?');
+        const baseUrl = urlParts[0];
+        const existingParamsStr = urlParts[1] || '';
+        const existingParams = existingParamsStr ? Object.fromEntries(new URLSearchParams(existingParamsStr)) : {};
+        
+        // Merge existing params with date (date takes precedence if it exists in URL)
+        const params = { ...existingParams, date: date };
+        
+        const client = getApiClient(baseUrl);
+        return await client.get('', params);
     } catch (error) {
         // Fallback to original implementation if ApiClient not available
         if (typeof ApiClient === 'undefined') {
