@@ -260,8 +260,8 @@ function clearOldEntries($schedule, $simulate = true)
                 $keysToDelete[] = $keyStr;
             }
         } else {
-            // For exact dates, check if date < yesterday
-            if ($datePart < $yesterdayDate) {
+            // For exact dates, check if date < =yesterday
+            if ($datePart <= $yesterdayDate) {
                 $keysToDelete[] = $keyStr;
             }
         }

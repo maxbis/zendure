@@ -197,13 +197,14 @@ body.mobile-dark {
 .schedule-item {
     display: flex;
     align-items: center;
-    padding: 10px 12px;
+    padding: 5px 6px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     transition: all 0.2s;
     margin-bottom: 2px;
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    min-width: 0;
 }
 
 .schedule-item:hover {
@@ -212,17 +213,22 @@ body.mobile-dark {
 }
 
 .schedule-item-time {
-    min-width: 60px;
+    min-width: 35px;
+    flex-shrink: 0;
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
 }
 
 .schedule-item-value {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     font-weight: 600;
-    font-size: 1rem;
-    margin-left: 8px;
+    font-size: 0.75rem;
+    margin-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Ensure schedule item values are readable in dark mode */
@@ -251,6 +257,57 @@ body.mobile-dark {
     color: var(--text-tertiary);
     font-family: monospace;
     margin-left: 8px;
+    display: none; /* Hide key column in mobile */
+}
+
+/* Schedule Days Container - Side by Side Layout */
+.schedule-days-container {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+}
+
+.schedule-day {
+    flex: 1 1 0;
+    min-width: 0; /* Allow flex items to shrink below content size */
+    max-width: 50%; /* Ensure they stay side by side */
+}
+
+.schedule-day-header {
+    margin-bottom: 6px;
+}
+
+.schedule-day-header h3 {
+    font-size: 0.8rem;
+    margin-bottom: 3px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.schedule-day .schedule-list {
+    max-height: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 2px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+.schedule-day .schedule-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 /* Time-based background colors - Dark Mode (Improved for readability) */
@@ -562,6 +619,28 @@ body.mobile-dark {
     padding: 0;
 }
 
+.price-graph-row-mobile .price-graph-bar.has-schedule::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9e9e9e;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+}
+
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="charge"]::after {
+    background: #4caf50;
+}
+
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="discharge"]::after {
+    background: #f44336;
+}
+
 .price-graph-row-mobile .price-graph-bar:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-2px);
@@ -597,8 +676,8 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar-price {
-    font-size: 0.55rem;
-    color: var(--text-tertiary);
+    font-size: 0.6rem;
+    color: #bfc280;
     margin-top: 2px;
     font-weight: 400;
     white-space: nowrap;
@@ -856,6 +935,24 @@ code {
     margin-bottom: 12px;
 }
 
+/* Price Graph Custom Popup (Mobile) */
+.price-graph-popup {
+    max-width: 90vw;
+    padding: 10px 12px;
+}
+
+.price-graph-popup-time {
+    font-size: 0.75rem;
+}
+
+.price-graph-popup-price {
+    font-size: 1.1rem;
+}
+
+.price-graph-popup-schedule {
+    font-size: 0.75rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
     body.mobile-dark {
@@ -882,16 +979,25 @@ code {
     }
     
     .schedule-item {
-        padding: 8px 10px;
+        padding: 6px 8px;
     }
     
     .schedule-item-time {
-        min-width: 50px;
-        font-size: 0.85rem;
+        min-width: 32px;
+        font-size: 0.7rem;
     }
     
     .schedule-item-value {
-        font-size: 0.9rem;
+        font-size: 0.7rem;
+        margin-left: 10px;
+    }
+    
+    .schedule-days-container {
+        gap: 3px;
+    }
+    
+    .schedule-day {
+        max-width: calc(50% - 2px);
     }
     
     #schedule-table th,

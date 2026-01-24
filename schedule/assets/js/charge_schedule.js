@@ -31,6 +31,7 @@ let priceGraphComponent = null;
  */
 async function _refreshDataInternal() {
     try {
+        console.log('Refreshing schedule data...');
         // Get today and tomorrow dates in YYYYMMDD format
         const now = new Date();
         const today = formatDateYYYYMMDD(now);
@@ -45,21 +46,32 @@ async function _refreshDataInternal() {
         }
 
         // Always fetch fresh data directly
+        console.log('Fetching schedule data for today:', today);
         const todayData = await fetchScheduleData(API_URL, today);
+        console.log('Fetching schedule data for tomorrow:', tomorrow);
         const tomorrowData = await fetchScheduleData(API_URL, tomorrow);
+
+        console.log('Schedule data fetched:', { 
+            today: todayData.success, 
+            tomorrow: tomorrowData.success,
+            entriesCount: todayData.entries?.length || 0 
+        });
 
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
 
+            const scheduleData = {
+                entries: todayData.entries || [],
+                resolved: todayData.resolved || [],
+                currentTime: currentTime,
+                currentHour: todayData.currentHour
+            };
+
             // Update state
             if (appState) {
+                console.log('Updating app state...');
                 appState.setState({
-                    schedule: {
-                        entries: todayData.entries || [],
-                        resolved: todayData.resolved || [],
-                        currentTime: currentTime,
-                        currentHour: todayData.currentHour
-                    },
+                    schedule: scheduleData,
                     scheduleTomorrow: {
                         resolved: tomorrowData.resolved || []
                     },
@@ -69,21 +81,25 @@ async function _refreshDataInternal() {
 
             // Update components if using component architecture
             if (schedulePanelComponent) {
+                console.log('Updating schedule panel component...');
                 schedulePanelComponent.update({
-                    entries: todayData.entries || [],
-                    resolved: todayData.resolved || [],
-                    currentTime: currentTime,
-                    currentHour: todayData.currentHour
+                    ...scheduleData,
+                    resolvedTomorrow: tomorrowData.resolved || []
                 });
             } else {
+                console.log('Using fallback rendering...');
                 // Fallback to direct rendering
-                renderEntries(todayData.entries);
-                renderToday(todayData.resolved, todayData.currentHour, currentTime);
-                renderMiniTimeline(todayData.resolved, currentTime);
+                const entries = todayData.entries || [];
+                renderEntries(entries);
+                renderToday(todayData.resolved || [], todayData.currentHour, currentTime);
+                if (typeof renderTomorrow === 'function') {
+                    renderTomorrow(tomorrowData.resolved || []);
+                }
+                renderMiniTimeline(todayData.resolved || [], currentTime);
 
                 const statusBar = document.getElementById('status-bar');
                 if (statusBar) {
-                    statusBar.innerHTML = `<span>${todayData.entries.length} entries loaded.</span>`;
+                    statusBar.innerHTML = `<span>${entries.length} entries loaded.</span>`;
                 }
             }
 
@@ -102,7 +118,13 @@ async function _refreshDataInternal() {
 
             // Fetch and render price data (if available)
             if (typeof PRICE_API_URL !== 'undefined' && PRICE_API_URL && typeof fetchAndRenderPrices === 'function') {
-                fetchAndRenderPrices(PRICE_API_URL, todayData.entries || [], editModal);
+                fetchAndRenderPrices(PRICE_API_URL, {
+                    entries: todayData.entries || [],
+                    resolvedToday: todayData.resolved || [],
+                    resolvedTomorrow: tomorrowData.resolved || [],
+                    todayDate: today,
+                    tomorrowDate: tomorrow
+                }, editModal);
             }
 
             // Update schedule calculator with today's and tomorrow's data (if available)
@@ -113,6 +135,9 @@ async function _refreshDataInternal() {
                     currentTime
                 );
             }
+            console.log('Schedule data refresh completed successfully');
+        } else {
+            throw new Error(todayData.error || 'Failed to fetch schedule data');
         }
     } catch (e) {
         console.error('Error refreshing data:', e);
@@ -127,6 +152,7 @@ async function _refreshDataInternal() {
         } else {
             alert('Connection failed: ' + e.message);
         }
+        throw e; // Re-throw so caller knows it failed
     }
 }
 
@@ -144,6 +170,9 @@ const refreshData = debounce(async function() {
 async function refreshDataImmediate() {
     await _refreshDataInternal();
 }
+
+// Make refreshDataImmediate globally accessible
+window.refreshDataImmediate = refreshDataImmediate;
 
 /**
  * Handle clear button click

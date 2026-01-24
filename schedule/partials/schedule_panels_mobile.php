@@ -23,67 +23,118 @@ function getValueLabel($val)
     return $val . ' W';
 }
 ?>
-<!-- Today's Schedule -->
+<div class="layout">
+<!-- Today's and Tomorrow's Schedule Side by Side -->
 <div class="card">
-    <h2>Today's Schedule</h2>
-    <div class="helper-text" style="margin-bottom: 8px;">
-        <?php echo htmlspecialchars($today); ?>
-    </div>
-    <div class="schedule-list" id="today-schedule-grid">
-        <?php
-        $prevVal = null;
-        // First pass: collect displayed slots to find the active one
-        $displayedSlots = [];
-        foreach ($resolvedToday as $slot) {
-            $val = $slot['value'];
-            // Filter logic: Only show changes or first item
-            if ($prevVal !== null && $val === $prevVal) {
-                continue;
-            }
-            $prevVal = $val;
-            $displayedSlots[] = $slot;
-        }
-
-        // Find the current active entry from displayed slots (closest to current time but not larger)
-        $currentActiveTime = null;
-        foreach ($displayedSlots as $slot) {
-            $time = $slot['time'];
-            if ($time <= $currentTime) {
-                if ($currentActiveTime === null || $time > $currentActiveTime) {
-                    $currentActiveTime = $time;
-                }
-            }
-        }
-
-        // Second pass: render the displayed slots
-        foreach ($displayedSlots as $slot):
-            $val = $slot['value'];
-            $time = $slot['time'];
-            $h = intval(substr($time, 0, 2));
-            $isCurrent = ($time === $currentActiveTime);
-            $bgClass = getTimeClass($h);
-
-            $valDisplay = getValueLabel($val);
-            $catClass = 'neutral';
-            if ($val === 'netzero') {
-                $catClass = 'netzero';
-            } elseif ($val === 'netzero+') {
-                $catClass = 'netzero-plus';
-            } elseif (is_numeric($val)) {
-                $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
-            }
-            ?>
-            <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isCurrent ? 'slot-current' : ''; ?>">
-                <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
-                </div>
-                <div class="schedule-item-value <?php echo $catClass; ?>">
-                    <?php echo htmlspecialchars($valDisplay); ?>
-                </div>
-                <?php if ($slot['key']): ?>
-                    <div class="schedule-item-key"><?php echo htmlspecialchars($slot['key']); ?></div>
-                <?php endif; ?>
+    <h2>Schedule</h2>
+    <div class="schedule-days-container">
+        <!-- Today's Schedule (Left) -->
+        <div class="schedule-day">
+            <div class="schedule-day-header">
+                <h3>Today <?php echo substr($today, -2); ?></h3>
             </div>
-        <?php endforeach; ?>
+            <div class="schedule-list" id="today-schedule-grid">
+                <?php
+                $prevVal = null;
+                // First pass: collect displayed slots to find the active one
+                $displayedSlots = [];
+                foreach ($resolvedToday as $slot) {
+                    $val = $slot['value'];
+                    // Filter logic: Only show changes or first item
+                    if ($prevVal !== null && $val === $prevVal) {
+                        continue;
+                    }
+                    $prevVal = $val;
+                    $displayedSlots[] = $slot;
+                }
+
+                // Find the current active entry from displayed slots (closest to current time but not larger)
+                $currentActiveTime = null;
+                foreach ($displayedSlots as $slot) {
+                    $time = $slot['time'];
+                    if ($time <= $currentTime) {
+                        if ($currentActiveTime === null || $time > $currentActiveTime) {
+                            $currentActiveTime = $time;
+                        }
+                    }
+                }
+
+                // Second pass: render the displayed slots
+                foreach ($displayedSlots as $slot):
+                    $val = $slot['value'];
+                    $time = $slot['time'];
+                    $h = intval(substr($time, 0, 2));
+                    $isCurrent = ($time === $currentActiveTime);
+                    $bgClass = getTimeClass($h);
+
+                    $valDisplay = getValueLabel($val);
+                    $catClass = 'neutral';
+                    if ($val === 'netzero') {
+                        $catClass = 'netzero';
+                    } elseif ($val === 'netzero+') {
+                        $catClass = 'netzero-plus';
+                    } elseif (is_numeric($val)) {
+                        $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
+                    }
+                    ?>
+                    <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isCurrent ? 'slot-current' : ''; ?>">
+                        <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                        </div>
+                        <div class="schedule-item-value <?php echo $catClass; ?>">
+                            <?php echo htmlspecialchars($valDisplay); ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <!-- Tomorrow's Schedule (Right) -->
+        <div class="schedule-day">
+            <div class="schedule-day-header">
+                <h3>Tomorrow <?php echo substr($tomorrow, -2); ?></h3>
+            </div>
+            <div class="schedule-list" id="tomorrow-schedule-grid">
+                <?php
+                $prevVal = null;
+                // First pass: collect displayed slots
+                $displayedSlots = [];
+                foreach ($resolvedTomorrow as $slot) {
+                    $val = $slot['value'];
+                    // Filter logic: Only show changes or first item
+                    if ($prevVal !== null && $val === $prevVal) {
+                        continue;
+                    }
+                    $prevVal = $val;
+                    $displayedSlots[] = $slot;
+                }
+
+                // Second pass: render the displayed slots (no current time for tomorrow)
+                foreach ($displayedSlots as $slot):
+                    $val = $slot['value'];
+                    $time = $slot['time'];
+                    $h = intval(substr($time, 0, 2));
+                    $bgClass = getTimeClass($h);
+
+                    $valDisplay = getValueLabel($val);
+                    $catClass = 'neutral';
+                    if ($val === 'netzero') {
+                        $catClass = 'netzero';
+                    } elseif ($val === 'netzero+') {
+                        $catClass = 'netzero-plus';
+                    } elseif (is_numeric($val)) {
+                        $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
+                    }
+                    ?>
+                    <div class="schedule-item <?php echo $bgClass; ?>">
+                        <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                        </div>
+                        <div class="schedule-item-value <?php echo $catClass; ?>">
+                            <?php echo htmlspecialchars($valDisplay); ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -103,6 +154,7 @@ function getValueLabel($val)
                     <th style="width: 30px;">#</th>
                     <th>Key</th>
                     <th>Value</th>
+                    <th>Type</th>
                 </tr>
             </thead>
             <tbody>
@@ -135,3 +187,4 @@ function getValueLabel($val)
         </table>
     </div>
 </div>
+</div><!-- /.layout -->

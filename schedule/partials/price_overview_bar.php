@@ -1,11 +1,17 @@
 <!-- Price Overview Bar Graph Section - Full Width -->
  <?php
-    $today_modified = $today;
-    if(strlen($today_modified) > 6) { 
-        $today_modified = substr($today_modified, 0, 4) . '-' . substr($today_modified, 4, 2) . '-' . substr($today_modified, 6); 
-    } elseif(strlen($today_modified) > 4) { 
-        $today_modified = substr($today_modified, 0, 4) . '-' . substr($today_modified, 4); 
+    $tz = new DateTimeZone(date_default_timezone_get() ?: 'Europe/Amsterdam');
+    $todayDigits = preg_replace('/\D/', '', (string)($today ?? ''));
+    $todayDt = null;
+    if (strlen($todayDigits) === 8) {
+        $todayDt = DateTimeImmutable::createFromFormat('Ymd', $todayDigits, $tz) ?: null;
     }
+    if (!$todayDt) {
+        $todayDt = new DateTimeImmutable('today', $tz);
+    }
+
+    $today_modified = $todayDt->format('Y-m-d');
+    $tomorrow_modified = $todayDt->modify('+1 day')->format('Y-m-d');
 ?>
 <div class="price-graph-wrapper" style="margin-top: 20px;">
     <div class="price-graph-layout">
@@ -16,17 +22,12 @@
             </h2>
             <div class="price-graph-row" id="price-graph-today"></div>
         </div>
-        <?php 
-        $currentHourInt = (int)date('H');
-        if ($currentHourInt >= 15): 
-        ?>
-        <div class="card">
+        <div class="card" id="tomorrow-price-card-desktop" style="display: none;">
             <h2>Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
-                    <?= htmlspecialchars($today_modified); ?>
+                    <?= htmlspecialchars($tomorrow_modified); ?>
                 )</span>
             </h2>
             <div class="price-graph-row" id="price-graph-tomorrow"></div>
         </div>
-        <?php endif; ?>
     </div>
 </div>

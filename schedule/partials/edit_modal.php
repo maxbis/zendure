@@ -8,11 +8,11 @@
         <div class="modal-body">
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <div class="form-group">
-                    <label>Date Pattern (YYYYMMDD)</label>
+                    <label>Date (YYYYMMDD)</label>
                     <input type="text" id="inp-date" maxlength="8" placeholder="20251222">
                 </div>
                 <div class="form-group">
-                    <label>Time Pattern (HHmm)</label>
+                    <label>Time (HHmm)</label>
                     <input type="text" id="inp-time" maxlength="4" placeholder="0800">
                 </div>
             </div>

@@ -29,7 +29,9 @@ $zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 // Initial Server-Side Render Data
 $schedule = loadSchedule($dataFile);
 $today = isset($_GET['initial_date']) ? $_GET['initial_date'] : date('Ymd');
+$tomorrow = date('Ymd', strtotime($today . ' +1 day'));
 $resolvedToday = resolveScheduleForDate($schedule, $today);
+$resolvedTomorrow = resolveScheduleForDate($schedule, $tomorrow);
 $currentHour = date('H') . '00';
 $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
@@ -40,6 +42,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Schedule</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -116,19 +119,20 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script>
             // Function to scroll price graph to current time
             function scrollPriceGraphToCurrent() {
-                const container = document.querySelector('.price-graph-row-mobile');
-                if (!container) return;
+                // Target today's container specifically (not tomorrow's)
+                const todayContainer = document.getElementById('price-graph-today');
+                if (!todayContainer) return;
                 
-                // Try to find current hour bar
-                const currentBar = container.querySelector('.price-graph-bar.price-current');
+                // Try to find current hour bar in today's container
+                const currentBar = todayContainer.querySelector('.price-graph-bar.price-current');
                 if (currentBar) {
-                    const containerWidth = container.clientWidth;
+                    const containerWidth = todayContainer.clientWidth;
                     const barLeft = currentBar.offsetLeft;
                     const barWidth = currentBar.clientWidth;
                     
                     // Calculate scroll position to center the bar, or scroll to show more of the right side
                     const scrollPos = barLeft - (containerWidth / 2) + (barWidth / 2);
-                    container.scrollTo({
+                    todayContainer.scrollTo({
                         left: Math.max(0, scrollPos),
                         behavior: 'smooth'
                     });
@@ -139,8 +143,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                     const currentHour = now.getHours();
                     // Each bar is approximately 18px + 2px gap = 20px
                     const barWidth = 20;
-                    const scrollPos = (currentHour * barWidth) - (container.clientWidth / 2);
-                    container.scrollTo({
+                    const scrollPos = (currentHour * barWidth) - (todayContainer.clientWidth / 2);
+                    todayContainer.scrollTo({
                         left: Math.max(0, scrollPos),
                         behavior: 'smooth'
                     });

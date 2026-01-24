@@ -27,13 +27,16 @@ class EditModal {
             r.onclick = () => this.handleModeChange(r.value);
         });
 
-        // Row click to edit
-        document.querySelector('#schedule-table tbody').addEventListener('click', (e) => {
-            const tr = e.target.closest('tr');
-            if (tr && tr.dataset.key) {
-                this.open(tr.dataset.key, tr.dataset.value);
-            }
-        });
+        // Row click to edit - use event delegation on the table wrapper
+        const scheduleTable = document.querySelector('#schedule-table');
+        if (scheduleTable) {
+            scheduleTable.addEventListener('click', (e) => {
+                const tr = e.target.closest('tr');
+                if (tr && tr.dataset.key) {
+                    this.open(tr.dataset.key, tr.dataset.value);
+                }
+            });
+        }
 
         // Delete handler
         document.getElementById('btn-delete').onclick = () => this.handleDelete();
@@ -246,14 +249,30 @@ class EditModal {
             }
             
             const json = await res.json();
+            console.log('Delete response:', json);
             if (json.success) {
                 this.close();
+                console.log('Delete successful, refreshing data...');
                 // Call refreshData immediately without debounce to ensure UI updates
-                if (typeof refreshDataImmediate !== 'undefined') {
-                    await refreshDataImmediate();
+                if (typeof window.refreshDataImmediate === 'function') {
+                    try {
+                        await window.refreshDataImmediate();
+                        console.log('Data refreshed successfully');
+                    } catch (refreshError) {
+                        console.error('Error refreshing data after delete:', refreshError);
+                        // Fallback to callback if immediate refresh fails
+                        if (this.onSaveCallback) {
+                            this.onSaveCallback();
+                        }
+                    }
                 } else if (this.onSaveCallback) {
+                    console.log('Using callback to refresh data');
                     // Fallback to callback if immediate refresh not available
                     this.onSaveCallback();
+                } else {
+                    // Last resort: reload the page
+                    console.warn('No refresh method available, reloading page');
+                    window.location.reload();
                 }
             } else {
                 alert(json.error || 'Delete failed');
@@ -326,20 +345,36 @@ class EditModal {
             }
             
             const json = await res.json();
+            console.log('Save response:', json);
             if (json.success) {
                 this.close();
+                console.log('Save successful, refreshing data...');
                 // Call refreshData immediately without debounce to ensure UI updates
-                if (typeof refreshDataImmediate !== 'undefined') {
-                    await refreshDataImmediate();
+                if (typeof window.refreshDataImmediate === 'function') {
+                    try {
+                        await window.refreshDataImmediate();
+                        console.log('Data refreshed successfully');
+                    } catch (refreshError) {
+                        console.error('Error refreshing data after save:', refreshError);
+                        // Fallback to callback if immediate refresh fails
+                        if (this.onSaveCallback) {
+                            this.onSaveCallback();
+                        }
+                    }
                 } else if (this.onSaveCallback) {
+                    console.log('Using callback to refresh data');
                     // Fallback to callback if immediate refresh not available
                     this.onSaveCallback();
+                } else {
+                    // Last resort: reload the page
+                    console.warn('No refresh method available, reloading page');
+                    window.location.reload();
                 }
             } else {
                 alert(json.error || 'Save failed');
             }
         } catch (e) {
-            console.error(e);
+            console.error('Save error:', e);
             alert('Save failed: ' + e.message);
         }
     }

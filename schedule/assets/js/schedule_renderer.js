@@ -77,6 +77,48 @@ function renderToday(resolved, currentHour, currentTime) {
 }
 
 /**
+ * Render tomorrow's schedule list (no current-time highlight)
+ * @param {Array} resolved - Resolved schedule slots for tomorrow
+ */
+function renderTomorrow(resolved) {
+    const container = document.getElementById('tomorrow-schedule-grid');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!resolved || resolved.length === 0) {
+        container.innerHTML = '<div class="empty-state">No schedule data available</div>';
+        return;
+    }
+
+    let prevVal = null;
+    const displayedSlots = [];
+
+    resolved.forEach(slot => {
+        const val = slot.value;
+        if (prevVal !== null && val === prevVal) return;
+        prevVal = val;
+        displayedSlots.push(slot);
+    });
+
+    displayedSlots.forEach(slot => {
+        const time = String(slot.time);
+        const h = parseInt(time.substring(0, 2), 10);
+        const bgClass = getTimeClass(h);
+        const valDisplay = getValueLabel(slot.value);
+        const valClass = getValueClass(slot.value);
+
+        const div = document.createElement('div');
+        div.className = `schedule-item ${bgClass}`;
+        div.innerHTML = `
+            <div class="schedule-item-time">${formatTime(time)}</div>
+            <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+/**
  * Renders the schedule entries table
  * @param {Array} entries - Array of schedule entries
  */
@@ -807,7 +849,7 @@ function findElementByLabel(container, labelText) {
 function renderChargeStatusDetails(zendureData, p1Data = null) {
     const detailsContainer = document.getElementById('charge-status-details-content');
     if (!detailsContainer) {
-        console.warn('Charge status details container not found');
+        // Container not found - this is expected in mobile version where details section is not included
         return;
     }
 
