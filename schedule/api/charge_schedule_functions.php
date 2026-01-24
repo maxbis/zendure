@@ -150,7 +150,7 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
         }
 
         $result[] = [
-            'time' => $slotTime,
+            'time' => (string) $slotTime,
             'value' => $selected ? $selected['value'] : null, // or 0? Spec doesn't strictly say default. Null is safer.
             'key' => $selected ? $selected['key'] : null
         ];

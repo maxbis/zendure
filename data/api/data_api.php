@@ -138,6 +138,11 @@ try {
                     
                     // Resolve schedule for the date
                     $resolved = resolveScheduleForDate($schedule, $date);
+                
+                    // PHP's json_encode() converts numeric-looking strings like "1000" to integers
+                    // but preserves "0900" (with leading zero) as a string
+                    // For consistency, we don't modify here - the frontend should handle both types
+                    // Or alternatively, we could prefix/suffix the time value
                     
                     // Format UI entries (sorted key-value pairs)
                     $uiEntries = [];
@@ -590,5 +595,5 @@ try {
     $response = ['success' => false, 'error' => $e->getMessage()];
 }
 
-echo json_encode($response);
+echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
