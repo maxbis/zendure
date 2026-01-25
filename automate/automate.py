@@ -457,10 +457,10 @@ class AutomationApp:
 
             # Max delta for power step changes (configurable)
             try:
-                max_delta = int(self.controller.config.get("MAX_DELTA", 2400))
+                power_feed_max_delta = int(self.controller.config.get("POWER_FEED_MAX_DELTA", 2400))
             except (TypeError, ValueError):
-                max_delta = 2400
-            self.max_delta = max(0, max_delta)
+                power_feed_max_delta = 2400
+            self.power_feed_max_delta = max(0, power_feed_max_delta)
 
             return True
             
@@ -677,11 +677,13 @@ class AutomationApp:
                 # 4b. Max delta step limiting
                 if isinstance(desired_power, int) and isinstance(self.old_value, int):
                     delta = desired_power - self.old_value
-                    if abs(delta) > self.max_delta:
-                        limited_power = self.old_value + (self.max_delta if delta > 0 else -self.max_delta)
+                    if abs(delta) > self.power_feed_max_delta:
+                        limited_power = self.old_value + (
+                            self.power_feed_max_delta if delta > 0 else -self.power_feed_max_delta
+                        )
                         self.logger.warning(
                             f"Max delta limit hit: old={self.old_value}, desired={desired_power}, "
-                            f"max_delta={self.max_delta}, limited={limited_power}"
+                            f"power_feed_max_delta={self.power_feed_max_delta}, limited={limited_power}"
                         )
                         desired_power = limited_power
                 
