@@ -678,7 +678,12 @@ class AutomationApp:
                 if isinstance(desired_power, int) and isinstance(self.old_value, int):
                     delta = desired_power - self.old_value
                     if abs(delta) > self.max_delta:
-                        desired_power = self.old_value + (self.max_delta if delta > 0 else -self.max_delta)
+                        limited_power = self.old_value + (self.max_delta if delta > 0 else -self.max_delta)
+                        self.logger.warning(
+                            f"Max delta limit hit: old={self.old_value}, desired={desired_power}, "
+                            f"max_delta={self.max_delta}, limited={limited_power}"
+                        )
+                        desired_power = limited_power
                 
                 # 5. Apply Settings
                 self._apply_power_settings(desired_power, p1_data)
