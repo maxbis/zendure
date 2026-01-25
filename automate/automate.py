@@ -457,7 +457,7 @@ class AutomationApp:
 
             # Max delta for power step changes (configurable)
             try:
-                max_delta = int(self.controller.config.get("max_delta", 2400))
+                max_delta = int(self.controller.config.get("MAX_DELTA", 2400))
             except (TypeError, ValueError):
                 max_delta = 2400
             self.max_delta = max(0, max_delta)
