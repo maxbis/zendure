@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hourly Import/Export (Last 2 Days)</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1>Hourly Import/Export</h1>
+        <p class="subtitle">Navigate through available days</p>
+        <div class="controls">
+          <button id="prevDays" type="button">← Prev</button>
+          <div id="rangeLabel" class="range">Loading…</div>
+          <button id="nextDays" type="button">Next →</button>
+        </div>
+      </header>
+      <section class="card">
+        <canvas id="energyChart" height="120"></canvas>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

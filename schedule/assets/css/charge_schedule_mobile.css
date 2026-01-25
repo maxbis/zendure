@@ -818,6 +818,14 @@ body.mobile-dark .automation-entry-badge,
     color: var(--text-primary);
     padding: 4px 10px;
     font-size: 0.75rem;
+    /* Prevent text selection on iOS */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .automation-refresh-btn:hover:not(:disabled) {

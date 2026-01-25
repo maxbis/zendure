@@ -161,9 +161,20 @@ function setupMobileLongPressHandler(button) {
             textElement.textContent = originalText;
         }
         
-        // Prevent context menu and default touch behavior
+        // Prevent context menu, text selection, and default touch behavior
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Prevent iOS text selection
+        if (e.type === 'touchstart') {
+            // Disable text selection on the button
+            button.style.webkitUserSelect = 'none';
+            button.style.userSelect = 'none';
+            
+            // Prevent iOS callout menu
+            document.body.style.webkitTouchCallout = 'none';
+        }
         
         // Add visual feedback class immediately
         button.classList.add('long-pressing');
@@ -211,6 +222,10 @@ function setupMobileLongPressHandler(button) {
     function handleLongPressEnd(e) {
         const touchDuration = Date.now() - touchStartTime;
         
+        // Prevent default to stop iOS context menu
+        e.preventDefault();
+        e.stopPropagation();
+        
         // Clear timer and progress interval
         if (longPressTimer) {
             clearTimeout(longPressTimer);
@@ -231,12 +246,15 @@ function setupMobileLongPressHandler(button) {
         button.classList.remove('long-pressing');
         button.style.removeProperty('--progress');
         
+        // Restore iOS callout (if we disabled it)
+        if (e.type === 'touchend' || e.type === 'touchcancel') {
+            document.body.style.webkitTouchCallout = '';
+        }
+        
         // If long-press was triggered, prevent normal click
         if (hasLongPressTriggered) {
             shouldPreventClick = true;
             hasLongPressTriggered = false;
-            e.preventDefault();
-            e.stopPropagation();
             return;
         }
         
@@ -275,6 +293,9 @@ function setupMobileLongPressHandler(button) {
     button.addEventListener('touchend', handleLongPressEnd, { passive: false, capture: true });
     button.addEventListener('touchcancel', handleLongPressEnd, { passive: false, capture: true });
     button.addEventListener('touchmove', (e) => {
+        // Prevent default to stop iOS text selection
+        e.preventDefault();
+        
         // Cancel if user moves finger significantly
         if (longPressTimer) {
             clearTimeout(longPressTimer);
@@ -292,6 +313,9 @@ function setupMobileLongPressHandler(button) {
         hasLongPressTriggered = false;
         shouldPreventClick = false;
         textChanged = false;
+        
+        // Restore iOS callout
+        document.body.style.webkitTouchCallout = '';
     }, { passive: false, capture: true });
     
     // Also support mouse events for testing on desktop browsers (only on mobile page)

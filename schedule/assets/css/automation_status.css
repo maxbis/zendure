@@ -91,6 +91,14 @@
     color: #666;
     transition: all 0.2s ease;
     font-family: inherit;
+    /* Prevent text selection on iOS */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .automation-refresh-btn:hover:not(:disabled) {
