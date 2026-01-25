@@ -592,8 +592,8 @@ function renderChargeStatus(zendureData, p1Data = null) {
     }
 
     // Calculate battery capacity
-    const totalCapacityLeftKwh = (electricLevel / 100) * TOTAL_CAPACITY_KWH;
-    const usableCapacityAboveMinKwh = Math.max(0, ((electricLevel - MIN_CHARGE_LEVEL) / 100) * TOTAL_CAPACITY_KWH);
+    const usableNetKwh = Math.max(0, ((electricLevel - MIN_CHARGE_LEVEL) / 100) * TOTAL_CAPACITY_KWH);
+    const roomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - electricLevel) / 100) * TOTAL_CAPACITY_KWH);
 
     // Build content HTML
     const contentEl = document.createElement('div');
@@ -632,7 +632,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
             <div class="charge-battery-label-value">
                 <span class="charge-battery-label">Battery Level:</span>
                 <span class="charge-battery-value">
-                    ${electricLevel}% (${totalCapacityLeftKwh.toFixed(2)} kWh/${usableCapacityAboveMinKwh.toFixed(2)} kWh)
+                    ${electricLevel}% (${usableNetKwh.toFixed(2)} kWh - ${roomToChargeKwh.toFixed(2)} kWh)
                 </span>
             </div>
             <div class="charge-battery-bar">
@@ -981,14 +981,14 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     const battery1LevelDisplay = findElementByLabel(detailsContainer, 'Battery 1 Level:');
     if (battery1LevelDisplay) {
         const pack1Soc = packData[0]?.socLevel ?? 0;
-        const pack1TotalCapacityLeftKwh = (pack1Soc / 100) * packCapacityKwh;
-        const pack1UsableCapacityAboveMinKwh = Math.max(0, ((pack1Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+        const pack1UsableNetKwh = Math.max(0, ((pack1Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+        const pack1RoomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - pack1Soc) / 100) * packCapacityKwh);
 
         const battery1Value = battery1LevelDisplay.querySelector('.charge-battery-value');
         const battery1BarFill = battery1LevelDisplay.querySelector('.charge-battery-bar-fill');
         
         if (battery1Value) {
-            battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1TotalCapacityLeftKwh.toFixed(2)} kWh/${pack1UsableCapacityAboveMinKwh.toFixed(2)} kWh)`;
+            battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1UsableNetKwh.toFixed(2)} kWh - ${pack1RoomToChargeKwh.toFixed(2)} kWh)`;
         }
         if (battery1BarFill) {
             battery1BarFill.style.width = `${Math.min(100, Math.max(0, pack1Soc))}%`;
@@ -1022,14 +1022,14 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     const battery2LevelDisplay = findElementByLabel(detailsContainer, 'Battery 2 Level:');
     if (battery2LevelDisplay) {
         const pack2Soc = packData[1]?.socLevel ?? 0;
-        const pack2TotalCapacityLeftKwh = (pack2Soc / 100) * packCapacityKwh;
-        const pack2UsableCapacityAboveMinKwh = Math.max(0, ((pack2Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+        const pack2UsableNetKwh = Math.max(0, ((pack2Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
+        const pack2RoomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - pack2Soc) / 100) * packCapacityKwh);
 
         const battery2Value = battery2LevelDisplay.querySelector('.charge-battery-value');
         const battery2BarFill = battery2LevelDisplay.querySelector('.charge-battery-bar-fill');
         
         if (battery2Value) {
-            battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2TotalCapacityLeftKwh.toFixed(2)} kWh/${pack2UsableCapacityAboveMinKwh.toFixed(2)} kWh)`;
+            battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2UsableNetKwh.toFixed(2)} kWh - ${pack2RoomToChargeKwh.toFixed(2)} kWh)`;
         }
         if (battery2BarFill) {
             battery2BarFill.style.width = `${Math.min(100, Math.max(0, pack2Soc))}%`;

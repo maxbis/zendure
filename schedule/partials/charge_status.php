@@ -178,9 +178,9 @@ require_once __DIR__ . '/charge_status_data.php';
                         <span class="charge-battery-value">
                             <?php 
                             // Calculate capacity values
-                            $totalCapacityLeftKwh = ($electricLevel / 100) * $TOTAL_CAPACITY_KWH;
-                            $usableCapacityAboveMinKwh = max(0, (($electricLevel - $MIN_CHARGE_LEVEL) / 100) * $TOTAL_CAPACITY_KWH);
-                            echo number_format($electricLevel) . '% (' . number_format($totalCapacityLeftKwh, 2) . ' kWh/' . number_format($usableCapacityAboveMinKwh, 2) . ' kWh)';
+                            $usableNetKwh = max(0, (($electricLevel - $MIN_CHARGE_LEVEL) / 100) * $TOTAL_CAPACITY_KWH);
+                            $roomToChargeKwh = max(0, (($MAX_CHARGE_LEVEL - $electricLevel) / 100) * $TOTAL_CAPACITY_KWH);
+                            echo number_format($electricLevel) . '% (' . number_format($usableNetKwh, 2) . ' kWh - ' . number_format($roomToChargeKwh, 2) . ' kWh)';
                             ?>
                         </span>
                     </div>

@@ -394,19 +394,21 @@
 .charge-battery-bar-marker {
     position: absolute;
     top: 0;
-    width: 2px;
+    width: 3px;
     height: 100%;
     background: #666;
     z-index: 2;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .charge-battery-bar-marker.min {
-    background: #ff9800; /* Orange for minimum */
+    background: #2d74ae; /* Orange for minimum */
+    opacity: 0.6;
 }
 
 .charge-battery-bar-marker.max {
-    background: #2196f3; /* Blue for maximum */
+    background: #2d74ae; /* Blue for maximum */
+    opacity: 0.6;
 }
 
 /* Responsive design for charge status */
