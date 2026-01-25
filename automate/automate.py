@@ -455,6 +455,13 @@ class AutomationApp:
             # Generate steps, f.e. [0, 20, 40] for LOOP_INTERVAL_SECONDS = 20
             self.steps = self._generate_steps(LOOP_INTERVAL_SECONDS, 59)
 
+            # Max delta for power step changes (configurable)
+            try:
+                max_delta = int(self.controller.config.get("max_delta", 2400))
+            except (TypeError, ValueError):
+                max_delta = 2400
+            self.max_delta = max(0, max_delta)
+
             return True
             
         except FileNotFoundError as e:
@@ -666,6 +673,12 @@ class AutomationApp:
                 
                 # 4. Battery Limits
                 desired_power = self._check_battery_limits(desired_power)
+
+                # 4b. Max delta step limiting
+                if isinstance(desired_power, int) and isinstance(self.old_value, int):
+                    delta = desired_power - self.old_value
+                    if abs(delta) > self.max_delta:
+                        desired_power = self.old_value + (self.max_delta if delta > 0 else -self.max_delta)
                 
                 # 5. Apply Settings
                 self._apply_power_settings(desired_power, p1_data)
