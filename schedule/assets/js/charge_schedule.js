@@ -27,9 +27,9 @@ let schedulePanelComponent = null;
 let priceGraphComponent = null;
 
 /**
- * Internal refresh function that does the actual work
+ * Internal refresh function that does the actual work (schedule + prices)
  */
-async function _refreshDataInternal() {
+async function _refreshScheduleAndPricesInternal() {
     try {
         console.log('Refreshing schedule data...');
         // Get today and tomorrow dates in YYYYMMDD format
@@ -157,22 +157,21 @@ async function _refreshDataInternal() {
 }
 
 /**
- * Refresh all schedule data and update UI
- * Uses debouncing and state management for better performance
+ * Refresh schedule and prices (debounced). Use for initial load.
  */
-const refreshData = debounce(async function() {
-    await _refreshDataInternal();
+const refreshScheduleAndPrices = debounce(async function() {
+    await _refreshScheduleAndPricesInternal();
 }, 300); // Debounce for 300ms
 
 /**
- * Refresh data immediately without debounce (for use after delete/save operations)
+ * Refresh schedule and prices immediately (no debounce). Use after save/delete/Clear/Auto or when tab becomes visible.
  */
-async function refreshDataImmediate() {
-    await _refreshDataInternal();
+async function refreshScheduleAndPricesImmediate() {
+    await _refreshScheduleAndPricesInternal();
 }
 
-// Make refreshDataImmediate globally accessible
-window.refreshDataImmediate = refreshDataImmediate;
+// Make globally accessible for edit_modal and visibility-triggered refresh
+window.refreshScheduleAndPricesImmediate = refreshScheduleAndPricesImmediate;
 
 /**
  * Handle clear button click
@@ -232,7 +231,7 @@ async function handleClearClick() {
             }
 
             // Refresh data immediately to show updated entries
-            await refreshDataImmediate();
+            await refreshScheduleAndPricesImmediate();
         }
     } catch (error) {
         console.error('Error in clear button handler:', error);
@@ -314,7 +313,7 @@ async function handleAutoClick() {
             }
 
             // Refresh data immediately to show updated entries
-            await refreshDataImmediate();
+            await refreshScheduleAndPricesImmediate();
         }
     } catch (error) {
         console.error('Error in auto button handler:', error);
@@ -353,8 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize edit modal with callback to refresh data after save/delete
-    editModal = new EditModal(API_URL, refreshData);
+    // Initialize edit modal (uses window.refreshScheduleAndPricesImmediate after save/delete)
+    editModal = new EditModal(API_URL);
 
     // Initialize confirm dialog
     confirmDialog = new ConfirmDialog();
@@ -421,5 +420,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial data load
-    refreshData();
+    refreshScheduleAndPrices();
+
+    // Refresh schedule and prices when tab/page becomes visible (e.g. user returns from another app)
+    let wasSchedulePageHidden = document.hidden;
+    document.addEventListener('visibilitychange', () => {
+        const isHidden = document.hidden;
+        if (isHidden) {
+            wasSchedulePageHidden = true;
+        } else {
+            if (wasSchedulePageHidden) {
+                wasSchedulePageHidden = false;
+                refreshScheduleAndPricesImmediate();
+            }
+        }
+    });
 });

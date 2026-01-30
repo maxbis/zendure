@@ -61,12 +61,6 @@ class SchedulePanelComponent extends Component {
             return;
         }
         
-        console.log('SchedulePanelComponent: Updating with data', {
-            entriesCount: scheduleData.entries?.length || 0,
-            resolvedCount: scheduleData.resolved?.length || 0,
-            resolvedTomorrowCount: scheduleData.resolvedTomorrow?.length || 0
-        });
-        
         // Update data
         this.data = {
             entries: scheduleData.entries || [],
@@ -89,11 +83,6 @@ class SchedulePanelComponent extends Component {
         this._renderToday();
         this._renderTomorrow();
         this._renderEntries();
-        
-        console.log('SchedulePanelComponent: Render completed', {
-            entriesCount: this.data.entries?.length || 0,
-            resolvedCount: this.data.resolved?.length || 0
-        });
     }
     
     _renderInitial() {
@@ -223,10 +212,6 @@ class SchedulePanelComponent extends Component {
     }
     
     _renderEntriesToTbody(tbody) {
-        console.log('SchedulePanelComponent: Rendering entries', {
-            entriesCount: this.data.entries?.length || 0
-        });
-        
         tbody.innerHTML = '';
         
         const { entries } = this.data;
@@ -269,10 +254,6 @@ class SchedulePanelComponent extends Component {
         if (statusBar) {
             statusBar.innerHTML = `<span>${entries.length} entries loaded.</span>`;
         }
-        
-        console.log('SchedulePanelComponent: Entries rendered successfully', {
-            renderedCount: sortedEntries.length
-        });
     }
     
     /**

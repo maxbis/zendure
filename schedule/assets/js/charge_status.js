@@ -94,7 +94,7 @@ function updateGraphTimeIndicators() {
  * Refresh all status sections (Automation Status, Charge/Discharge, and System & Grid)
  * This unified function updates all three sections in one go
  */
-async function refreshAllStatus(isAutoRefresh = false) {
+async function refreshStatus(isAutoRefresh = false) {
     // Log refresh operation
     if (DEBUG_MODE) {
         console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
@@ -197,35 +197,6 @@ async function refreshAllStatus(isAutoRefresh = false) {
 }
 
 /**
- * Refresh charge status from API
- */
-async function refreshChargeStatus() {
-    if (typeof CHARGE_STATUS_ZENDURE_API_URL === 'undefined' || !CHARGE_STATUS_ZENDURE_API_URL) {
-        console.error('CHARGE_STATUS_ZENDURE_API_URL is not defined');
-        return;
-    }
-
-    try {
-        const p1ApiUrl = (typeof CHARGE_STATUS_P1_API_URL !== 'undefined') ? CHARGE_STATUS_P1_API_URL : null;
-        const { zendureData, p1Data } = await fetchChargeStatus(CHARGE_STATUS_ZENDURE_API_URL, p1ApiUrl);
-        renderChargeStatus(zendureData, p1Data);
-
-        // Also render the details section (System & Grid) if the render function exists
-        if (typeof renderChargeStatusDetails === 'function') {
-            renderChargeStatusDetails(zendureData, p1Data);
-        }
-    } catch (error) {
-        console.error('Failed to refresh charge status:', error);
-
-        // Render error state
-        renderChargeStatus({
-            success: false,
-            error: error.message || 'Failed to load charge status'
-        });
-    }
-}
-
-/**
  * Toggle the collapsible section in charge status details
  * Shows/hides rows 2-3 (Battery 1 & 2 levels and temps)
  */
@@ -256,7 +227,7 @@ function toggleChargeStatusDetails() {
 }
 
 // Charge/Discharge refresh button removed - use Automation Status refresh button instead
-// which calls refreshAllStatus() to update all sections
+// which calls refreshStatus() to update all sections
 
 /**
  * Start auto-refresh interval (if page is visible)
@@ -271,20 +242,20 @@ function startAutoRefresh() {
     // Only start interval if page is visible
     if (!document.hidden) {
         // Do immediate refresh first
-        if (typeof refreshAllStatus === 'function') {
+        if (typeof refreshStatus === 'function') {
             indicateAutoRefresh();
-            refreshAllStatus(true);
+            refreshStatus(true);
         }
         
         // Then set up interval for periodic refresh
         autoRefreshIntervalId = setInterval(() => {
             // Double-check page is still visible before refreshing
-            if (!document.hidden && typeof refreshAllStatus === 'function') {
+            if (!document.hidden && typeof refreshStatus === 'function') {
                 if (DEBUG_MODE) {
                     console.log('⏰ Auto-refresh interval triggered');
                 }
                 indicateAutoRefresh();
-                refreshAllStatus(true);
+                refreshStatus(true);
             } else if (document.hidden) {
                 if (DEBUG_MODE) {
                     console.log('⏰ Auto-refresh skipped (page hidden)');

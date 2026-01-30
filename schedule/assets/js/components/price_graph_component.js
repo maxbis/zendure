@@ -228,46 +228,6 @@ class PriceGraphComponent extends Component {
             container.appendChild(bar);
         }
     }
-    
-    /**
-     * Refresh price data
-     */
-    async refresh() {
-        if (!this.apiClient || !this.config.priceApiUrl) {
-            console.warn('PriceGraphComponent: No API client or price API URL available');
-            return;
-        }
-        
-        this.showLoading('Loading prices...');
-        
-        try {
-            // Fetch price data (implementation depends on price API structure)
-            // This is a placeholder - adjust based on actual price API
-            const today = formatDateYYYYMMDD(new Date());
-            const tomorrow = formatDateYYYYMMDD(new Date(Date.now() + 24 * 60 * 60 * 1000));
-            
-            // Assuming price API returns data in expected format
-            // Adjust this based on actual API implementation
-            const priceData = {
-                today: {},
-                tomorrow: {}
-            };
-            
-            this.update({ prices: priceData });
-            
-            if (window.notifications) {
-                window.notifications.success('Prices refreshed');
-            }
-        } catch (error) {
-            console.error('PriceGraphComponent: Refresh error:', error);
-            this.showError('Failed to load prices: ' + error.message);
-            if (window.notifications) {
-                window.notifications.error('Failed to refresh prices');
-            }
-        } finally {
-            this.hideLoading();
-        }
-    }
 }
 
 // Export for use in modules

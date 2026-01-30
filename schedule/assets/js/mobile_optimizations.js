@@ -231,12 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Also initialize after schedule data loads
-if (typeof refreshData === 'function') {
-    const originalRefreshData = refreshData;
-    refreshData = function(...args) {
-        const result = originalRefreshData.apply(this, args);
-        // Re-initialize mobile optimizations after data refresh
+// Re-initialize mobile optimizations after schedule/prices refresh
+if (typeof refreshScheduleAndPrices === 'function') {
+    const originalRefreshScheduleAndPrices = refreshScheduleAndPrices;
+    refreshScheduleAndPrices = function(...args) {
+        const result = originalRefreshScheduleAndPrices.apply(this, args);
         setTimeout(() => {
             if (window.innerWidth <= 768) {
                 initScheduleSimplification();
