@@ -157,6 +157,13 @@ krsort($whPerDay, SORT_STRING); // most recent first
         (function() {
             var data = window.energyWhData || [];
             var values = data.map(function(d) { return d.wh; });
+            // Green for charging (positive), red for discharging (negative) – match schedule_renderer.js
+            var barColors = values.map(function(v) {
+                return v >= 0 ? 'rgba(102, 187, 106, 0.7)' : 'rgba(239, 83, 80, 0.7)';
+            });
+            var barBorderColors = values.map(function(v) {
+                return v >= 0 ? 'rgba(102, 187, 106, 1)' : 'rgba(239, 83, 80, 1)';
+            });
             // Short labels: date at 00:00, "02:00", "04:00" etc every 2h, blank at odd hours
             var displayLabels = data.map(function(d) {
                 var label = d.hourLabel;
@@ -179,8 +186,8 @@ krsort($whPerDay, SORT_STRING); // most recent first
                     datasets: [{
                         label: 'Watt-hours',
                         data: values,
-                        backgroundColor: 'rgba(25, 118, 210, 0.7)',
-                        borderColor: 'rgba(25, 118, 210, 1)',
+                        backgroundColor: barColors,
+                        borderColor: barBorderColors,
                         borderWidth: 1
                     }]
                 },
