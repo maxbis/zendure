@@ -46,6 +46,22 @@
     font-size: 0.9rem !important;
 }
 
+.energy-graph-daily{
+    padding: 2px 0 !important;
+    font-size: 0.8rem !important;
+    color: #555555 !important;
+    font-weight: 500 !important;
+    border: none !important;
+}
+.energy-graph-daily table {
+    border: none !important;
+    border-collapse: collapse !important;
+}
+.energy-graph-daily table th {
+    font-weight: 600 !important;
+    color: #333333 !important;
+}
+
 /* Fallback for smaller screens - use auto-fit for responsive behavior */
 @media (max-width: 1000px) {
     .calculate-grid {

@@ -8,9 +8,10 @@ date_default_timezone_set('Europe/Amsterdam');
 require_once __DIR__ . '/../../login/validate.php';
 
 $dataFile = __DIR__ . '/../../data/automation_status.json';
-$retentionDays = 3;
+$retentionDays = 4;
 $retentionSeconds = $retentionDays * 24 * 60 * 60;
 $baseWh = 5760; // 5.76 kWh – base for daily percentage
+$baseKwh = $baseWh / 1000;
 
 // Load automation status data
 $entries = [];
@@ -91,11 +92,17 @@ $whPerDay = [];
 foreach ($whPerHour as $row) {
     $date = substr($row['hourLabel'], 0, 10);
     if (!isset($whPerDay[$date])) {
-        $whPerDay[$date] = 0;
+        $whPerDay[$date] = ['pos' => 0, 'neg' => 0];
     }
-    $whPerDay[$date] += $row['wh'];
+    $wh = $row['wh'];
+    if ($wh >= 0) {
+        $whPerDay[$date]['pos'] += $wh;
+    } else {
+        $whPerDay[$date]['neg'] += $wh;
+    }
 }
-krsort($whPerDay, SORT_STRING); // most recent first
+# krsort($whPerDay, SORT_STRING); // most recent first
+# ksort($whPerDay, SORT_STRING); // oldest first
 ?>
 
 <style>
@@ -103,17 +110,15 @@ krsort($whPerDay, SORT_STRING); // most recent first
     .energy-graph-card h2 { margin: 0 0 4px 0; font-size: 1.25rem; }
     .energy-graph-subtitle { margin: 0 0 14px 0; color: #666; font-size: 0.9rem; }
     .energy-graph-content { display: flex; gap: 20px; align-items: stretch; }
-    .energy-graph-chart { flex: 0 0 60%; min-width: 0; }
+    .energy-graph-chart { flex: 0 0 70%; min-width: 0; }
     .energy-graph-table { flex: 1; min-width: 0; }
     .energy-graph-canvas { height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
     .energy-graph-daily { border-left: 1px solid #eee; padding-left: 16px; }
     .energy-graph-daily h3 { margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; }
     .energy-graph-daily table { border-collapse: collapse; width: 100%; max-width: 380px; border-spacing: 0; }
-    .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; border: 1px solid #ddd; }
-    .energy-graph-daily th { font-weight: 600; color: #333; }
-    .energy-graph-daily th:nth-child(2), .energy-graph-daily th:nth-child(3),
-    .energy-graph-daily td:nth-child(2), .energy-graph-daily td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
+    .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; }
+
     @media (max-width: 900px) {
         .energy-graph-content { flex-direction: column; }
         .energy-graph-chart { flex-basis: auto; }
@@ -136,11 +141,26 @@ krsort($whPerDay, SORT_STRING); // most recent first
                     <h3>Daily totals</h3>
                     <table>
                         <thead>
-                            <tr><th>Date</th><th>Wh</th><th>% of 5.76 kWh</th></tr>
+                        <tr>
+                            <th>Date</th>
+                            <th>Wh+</th>
+                            <th>Wh-</th>
+                            <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (net)'); ?>">%</th>
+                        </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($whPerDay as $date => $wh) : ?>
-                                <tr><td><?php echo htmlspecialchars($date); ?></td><td><?php echo number_format(round($wh, 0)); ?></td><td><?php echo number_format(($wh / $baseWh) * 100, 2); ?>%</td></tr>
+                        <?php foreach ($whPerDay as $date => $totals) : ?>
+                            <?php
+                                $pos = $totals['pos'];
+                                $neg = $totals['neg'];
+                                $net = $pos + $neg;
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($date); ?></td>
+                                <td style="color: #007321;">+<?php echo number_format(round($pos, 0)); ?></td>
+                                <td style="color: #e53935;">-<?php echo number_format(round($neg, 0)); ?></td>
+                                <td><?php echo number_format(($net / $baseWh) * 100, 2); ?>%</td>
+                            </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
