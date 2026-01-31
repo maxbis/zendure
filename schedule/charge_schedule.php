@@ -63,6 +63,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="stylesheet" href="assets/css/charge_status_defines.css">
     <link rel="stylesheet" href="assets/css/charge_status.css">
     <link rel="stylesheet" href="assets/css/schedule_calculator.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -88,6 +89,9 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
         <!-- Schedule Calculator Section -->
         <?php include __DIR__ . '/partials/calculate.php'; ?>
+
+        <!-- Energy Graph Section -->
+        <?php include __DIR__ . '/partials/energy_graph.php'; ?>
 
         <!-- Automation Status Section - Full Width -->
         <div class="automation-status-wrapper" style="margin-top: 20px;">

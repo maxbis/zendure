@@ -18,6 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $dataFile = __DIR__ . '/../../data/automation_status.json';
 $retentionDays = 3;
 $retentionSeconds = $retentionDays * 24 * 60 * 60;
+/** Number of most recent entries to keep when compressing (entries with oldValue/newValue 0 or null are removed only from older part). */
+define('AUTOMATION_STATUS_COMPRESS_KEEP_LAST', 3);
 
 // --- Helper Functions ---
 
@@ -78,6 +80,31 @@ function cleanupOldEntries($entries, $retentionSeconds) {
         $entryTime = isset($entry['timestamp']) ? (int)$entry['timestamp'] : 0;
         return ($now - $entryTime) <= $retentionSeconds;
     });
+}
+
+/**
+ * Remove entries where both oldValue and newValue are 0 or null (older entries only).
+ * Last AUTOMATION_STATUS_COMPRESS_KEEP_LAST entries are always kept unchanged.
+ *
+ * @param array $entries
+ * @param int|null $keepLast Number to keep (default: AUTOMATION_STATUS_COMPRESS_KEEP_LAST)
+ * @return array
+ */
+function compressEntries($entries, $keepLast = null) {
+    $keepLast = $keepLast ?? AUTOMATION_STATUS_COMPRESS_KEEP_LAST;
+    $n = count($entries);
+    if ($n <= $keepLast) {
+        return $entries;
+    }
+    $older = array_slice($entries, 0, -$keepLast);
+    $lastN = array_slice($entries, -$keepLast);
+    $filteredOlder = array_filter($older, function ($entry) {
+        $ov = $entry['oldValue'] ?? null;
+        $nv = $entry['newValue'] ?? null;
+        $bothNullOrZero = ($ov === null || $ov === 0) && ($nv === null || $nv === 0);
+        return !$bothNullOrZero;
+    });
+    return array_merge(array_values($filteredOlder), $lastN);
 }
 
 function calculateRunningTime($entries) {
@@ -227,6 +254,9 @@ try {
         
         // Cleanup old entries (keep last 3 days)
         $data['entries'] = array_values(cleanupOldEntries($data['entries'], $retentionSeconds));
+        
+        // Compress: remove entries where oldValue and newValue are 0 or null (keep last N)
+        $data['entries'] = compressEntries($data['entries']);
         
         // Update last update timestamp
         $data['lastUpdate'] = time();
