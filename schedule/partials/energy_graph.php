@@ -14,7 +14,7 @@ require_once __DIR__ . '/energy_graph_data.php';
     .energy-graph-content { display: flex; gap: 20px; align-items: stretch; }
     .energy-graph-chart { flex: 0 0 65%; min-width: 0; }
     .energy-graph-table { flex: 1; min-width: 0; }
-    .energy-graph-canvas { height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
+    .energy-graph-canvas { height: 220px; max-height: 180px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
     .energy-graph-daily { border-left: 1px solid #eee; padding-left: 16px; }
     .energy-graph-daily h3 { margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; }
@@ -84,16 +84,32 @@ require_once __DIR__ . '/energy_graph_data.php';
         var borderColors = values.map(function(v) {
             return v >= 0 ? 'rgba(76, 175, 80, 1)' : 'rgba(229, 57, 53, 1)';
         });
-        // Short labels: date at 00:00, "02:00", "04:00" etc every 2h, blank at odd hours
+        // Short labels: date at 00:00 (DD-MM), 06:00, 12:00, 18:00 only
         var displayLabels = data.map(function(d) {
             var label = d.hourLabel;
             if (!label || typeof label !== 'string') return '';
             var parts = label.split(' ');
             var timePart = parts[1] || '00:00';
             var hour = parseInt(timePart.split(':')[0], 10) || 0;
-            if (hour === 0) return parts[0] || '';
-            if (hour % 2 === 0) return ('0' + hour).slice(-2) + ':00';
-            return ' '; // odd hours: minimal label
+            if (hour === 0) {
+                var datePart = parts[0] || '';
+                if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                    var p = datePart.split('-');
+                    return p[2] + '-' + p[1];
+                }
+                return datePart;
+            }
+            if (hour === 6) return '06:00';
+            if (hour === 12) return '12:00';
+            if (hour === 18) return '18:00';
+            return '';
+        });
+        var isDateLabel = data.map(function(d) {
+            var label = d.hourLabel;
+            if (!label || typeof label !== 'string') return false;
+            var parts = label.split(' ');
+            var hour = parseInt((parts[1] || '00:00').split(':')[0], 10) || 0;
+            return hour === 0;
         });
 
         var ctx = document.getElementById('energyChart');
@@ -150,7 +166,9 @@ require_once __DIR__ . '/energy_graph_data.php';
                             autoSkip: false,
                             maxRotation: 45,
                             minRotation: 45,
-                            color: '#333',
+                            color: function(context) {
+                                return isDateLabel[context.index] ? '#1976d2' : '#333';
+                            },
                             font: { size: 11 }
                         }
                     }
