@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Configuration
 $dataFile = __DIR__ . '/../../data/automation_status.json';
-$retentionDays = 3;
+$retentionDays = 4;
 $retentionSeconds = $retentionDays * 24 * 60 * 60;
 /** Number of most recent entries to keep when compressing (entries with oldValue/newValue 0 or null are removed only from older part). */
 define('AUTOMATION_STATUS_COMPRESS_KEEP_LAST', 3);
