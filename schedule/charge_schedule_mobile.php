@@ -62,6 +62,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="stylesheet" href="assets/css/automation_status.css">
     <link rel="stylesheet" href="assets/css/charge_status_defines.css">
     <link rel="stylesheet" href="assets/css/charge_status.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
 <body class="mobile-dark">
@@ -85,6 +86,12 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
+
+        <!-- Energy Graph (Wh per hour) -->
+        <div class="energy-graph-wrapper-mobile">
+        <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
+        </div>
+
 
         <!-- 5. Automation Status -->
         <div class="automation-status-wrapper">
