@@ -19,7 +19,7 @@ $dataFile = __DIR__ . '/../../data/automation_status.json';
 $retentionDays = 5;
 $retentionSeconds = $retentionDays * 24 * 60 * 60;
 /** Number of most recent entries to keep when compressing (entries with oldValue/newValue 0 or null are removed only from older part). */
-define('AUTOMATION_STATUS_COMPRESS_KEEP_LAST', 3);
+define('AUTOMATION_STATUS_COMPRESS_KEEP_LAST', 4);
 
 // --- Helper Functions ---
 
@@ -83,7 +83,7 @@ function cleanupOldEntries($entries, $retentionSeconds) {
 }
 
 /**
- * Remove entries where both oldValue and newValue are 0 or null (older entries only).
+ * Remove entries where oldValue and newValue are the same (including both 0/null), for entries outside the last N.
  * Last AUTOMATION_STATUS_COMPRESS_KEEP_LAST entries are always kept unchanged.
  *
  * @param array $entries
@@ -101,8 +101,7 @@ function compressEntries($entries, $keepLast = null) {
     $filteredOlder = array_filter($older, function ($entry) {
         $ov = $entry['oldValue'] ?? null;
         $nv = $entry['newValue'] ?? null;
-        $bothNullOrZero = ($ov === null || $ov === 0) && ($nv === null || $nv === 0);
-        return !$bothNullOrZero;
+        return $ov !== $nv;
     });
     return array_merge(array_values($filteredOlder), $lastN);
 }
