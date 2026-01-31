@@ -243,7 +243,7 @@ foreach ($whPerHour as $row) {
                     },
                     x: {
                         type: 'category',
-                        title: { display: true, text: 'Hour' },
+                        title: { display: false, text: 'Hour' },
                         ticks: {
                             autoSkip: false,
                             maxRotation: 45,
