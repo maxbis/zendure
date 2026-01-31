@@ -158,7 +158,7 @@ foreach ($whPerHour as $row) {
                             <tr>
                                 <td><?php echo htmlspecialchars($date); ?></td>
                                 <td style="color: #007321;font-weight: 500;">+<?php echo number_format(round($pos, 0)); ?></td>
-                                <td style="color: #e53935;font-weight: 500;">-<?php echo number_format(round($neg, 0)); ?></td>
+                                <td style="color: #e53935;font-weight: 500;"><?php echo number_format(round($neg, 0)); ?></td>
                                 <td><?php echo number_format(($net / $baseWh) * 100, 2); ?>%</td>
                             </tr>
                             <?php endforeach; ?>
