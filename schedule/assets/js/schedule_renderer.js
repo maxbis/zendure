@@ -388,7 +388,11 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
 }
 
 /**
- * Render automation status section
+ * Render automation status section.
+ * Injects content into the Automation Status card (error, empty, or entries list).
+ * PHP shell: schedule/partials/automation_status.php (outputs header + AUTOMATION_STATUS_API_URL; no list).
+ * Called from: schedule/assets/js/charge_status.js — refreshStatus()
+ *
  * @param {Object} data - Automation status data from API
  */
 function renderAutomationStatus(data) {
@@ -401,6 +405,7 @@ function renderAutomationStatus(data) {
     if (emptyDiv) emptyDiv.remove();
     if (wrapperDiv) wrapperDiv.remove();
 
+    // Injection target: .metric-section inside partials/automation_status.php
     const container = document.querySelector('.automation-status-wrapper .metric-section');
     if (!container) return;
 
