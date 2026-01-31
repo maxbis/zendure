@@ -61,12 +61,7 @@ class SchedulePanelComponent extends Component {
             return;
         }
         
-        console.log('SchedulePanelComponent: Updating with data', {
-            entriesCount: scheduleData.entries?.length || 0,
-            resolvedCount: scheduleData.resolved?.length || 0,
-            resolvedTomorrowCount: scheduleData.resolvedTomorrow?.length || 0
-        });
-        
+        // Update data
         this.data = {
             entries: scheduleData.entries || [],
             resolved: scheduleData.resolved || [],
@@ -75,6 +70,7 @@ class SchedulePanelComponent extends Component {
             currentHour: scheduleData.currentHour || this._getCurrentHour()
         };
         
+        // Force render to ensure UI updates
         this.render();
     }
     
@@ -83,6 +79,7 @@ class SchedulePanelComponent extends Component {
             this._renderInitial();
         }
         
+        // Always render all sections to ensure UI stays in sync
         this._renderToday();
         this._renderTomorrow();
         this._renderEntries();
@@ -199,23 +196,29 @@ class SchedulePanelComponent extends Component {
     }
     
     _renderEntries() {
-        const tbody = this.$('#schedule-table tbody');
+        // Try to find tbody in container first, then fall back to document-wide search
+        let tbody = this.$('#schedule-table tbody');
         if (!tbody) {
-            console.warn('SchedulePanelComponent: tbody not found for rendering entries');
+            // Fallback: search document-wide (table might be outside container)
+            tbody = document.querySelector('#schedule-table tbody');
+        }
+        
+        if (!tbody) {
+            console.error('SchedulePanelComponent: tbody not found for rendering entries');
             return;
         }
         
-        console.log('SchedulePanelComponent: Rendering entries', {
-            entriesCount: this.data.entries?.length || 0
-        });
-        
+        this._renderEntriesToTbody(tbody);
+    }
+    
+    _renderEntriesToTbody(tbody) {
         tbody.innerHTML = '';
         
         const { entries } = this.data;
         if (!entries || entries.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No schedule entries</td></tr>';
             // Update status bar
-            const statusBar = this.$('#status-bar');
+            const statusBar = this.$('#status-bar') || document.querySelector('#status-bar');
             if (statusBar) {
                 statusBar.innerHTML = '<span>0 entries loaded.</span>';
             }
@@ -247,12 +250,10 @@ class SchedulePanelComponent extends Component {
         });
         
         // Update status bar
-        const statusBar = this.$('#status-bar');
+        const statusBar = this.$('#status-bar') || document.querySelector('#status-bar');
         if (statusBar) {
             statusBar.innerHTML = `<span>${entries.length} entries loaded.</span>`;
         }
-        
-        console.log('SchedulePanelComponent: Entries rendered successfully');
     }
     
     /**

@@ -19,30 +19,7 @@ window.toggleAutomationEntries = function () {
 };
 
 /**
- * Refresh automation status from API
- */
-async function refreshAutomationStatus() {
-    if (typeof AUTOMATION_STATUS_API_URL === 'undefined' || !AUTOMATION_STATUS_API_URL) {
-        console.error('AUTOMATION_STATUS_API_URL is not defined');
-        return;
-    }
-
-    try {
-        const data = await fetchAutomationStatus(AUTOMATION_STATUS_API_URL);
-        renderAutomationStatus(data);
-    } catch (error) {
-        console.error('Failed to refresh automation status:', error);
-
-        // Render error state
-        renderAutomationStatus({
-            success: false,
-            error: error.message || 'Failed to load automation status'
-        });
-    }
-}
-
-/**
- * Perform normal refresh (partial refresh)
+ * Perform normal refresh (Automation Status + Charge/Discharge + System & Grid)
  */
 async function performNormalRefresh() {
     const refreshBtn = document.getElementById('automation-refresh-btn');
@@ -57,11 +34,8 @@ async function performNormalRefresh() {
     refreshBtn.style.opacity = '0.5';
 
     // Refresh all sections (Automation Status, Charge/Discharge, and System & Grid)
-    if (typeof refreshAllStatus === 'function') {
-        await refreshAllStatus();
-    } else {
-        // Fallback to just automation status if unified function not available
-        await refreshAutomationStatus();
+    if (typeof refreshStatus === 'function') {
+        await refreshStatus();
     }
 
     refreshBtn.disabled = false;

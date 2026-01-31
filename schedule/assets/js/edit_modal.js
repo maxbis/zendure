@@ -3,9 +3,8 @@
  * Handles the edit/add dialog for schedule entries
  */
 class EditModal {
-    constructor(apiUrl, onSaveCallback) {
+    constructor(apiUrl) {
         this.apiUrl = apiUrl;
-        this.onSaveCallback = onSaveCallback;
         this.currentOriginalKey = null;
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
@@ -253,25 +252,11 @@ class EditModal {
             if (json.success) {
                 this.close();
                 console.log('Delete successful, refreshing data...');
-                // Call refreshData immediately without debounce to ensure UI updates
-                if (typeof window.refreshDataImmediate === 'function') {
-                    try {
-                        await window.refreshDataImmediate();
-                        console.log('Data refreshed successfully');
-                    } catch (refreshError) {
-                        console.error('Error refreshing data after delete:', refreshError);
-                        // Fallback to callback if immediate refresh fails
-                        if (this.onSaveCallback) {
-                            this.onSaveCallback();
-                        }
-                    }
-                } else if (this.onSaveCallback) {
-                    console.log('Using callback to refresh data');
-                    // Fallback to callback if immediate refresh not available
-                    this.onSaveCallback();
+                if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
+                    await window.refreshScheduleAndPricesImmediate();
+                    console.log('Data refreshed successfully');
                 } else {
-                    // Last resort: reload the page
-                    console.warn('No refresh method available, reloading page');
+                    console.warn('refreshScheduleAndPricesImmediate not available, reloading page');
                     window.location.reload();
                 }
             } else {
@@ -349,25 +334,11 @@ class EditModal {
             if (json.success) {
                 this.close();
                 console.log('Save successful, refreshing data...');
-                // Call refreshData immediately without debounce to ensure UI updates
-                if (typeof window.refreshDataImmediate === 'function') {
-                    try {
-                        await window.refreshDataImmediate();
-                        console.log('Data refreshed successfully');
-                    } catch (refreshError) {
-                        console.error('Error refreshing data after save:', refreshError);
-                        // Fallback to callback if immediate refresh fails
-                        if (this.onSaveCallback) {
-                            this.onSaveCallback();
-                        }
-                    }
-                } else if (this.onSaveCallback) {
-                    console.log('Using callback to refresh data');
-                    // Fallback to callback if immediate refresh not available
-                    this.onSaveCallback();
+                if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
+                    await window.refreshScheduleAndPricesImmediate();
+                    console.log('Data refreshed successfully');
                 } else {
-                    // Last resort: reload the page
-                    console.warn('No refresh method available, reloading page');
+                    console.warn('refreshScheduleAndPricesImmediate not available, reloading page');
                     window.location.reload();
                 }
             } else {
