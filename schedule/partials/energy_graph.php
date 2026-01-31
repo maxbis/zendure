@@ -128,7 +128,7 @@ require_once __DIR__ . '/energy_graph_data.php';
                     backgroundColor: barColors,
                     borderColor: borderColors,
                         borderWidth: 1,
-                        minBarLength: 2,
+                        minBarLength: 0,
                         barPercentage: 0.9,
                         categoryPercentage: 0.9
                 }]

@@ -83,7 +83,7 @@ $whPerHourMobile = array_values($whPerHourMobile);
                     backgroundColor: barColors,
                     borderColor: borderColors,
                     borderWidth: 1,
-                    minBarLength: 2,
+                    minBarLength: 0,
                     barPercentage: 0.9,
                     categoryPercentage: 0.9
                 }]
