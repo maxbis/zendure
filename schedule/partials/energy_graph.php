@@ -110,7 +110,7 @@ foreach ($whPerHour as $row) {
     .energy-graph-card h2 { margin: 0 0 4px 0; font-size: 1.25rem; }
     .energy-graph-subtitle { margin: 0 0 14px 0; color: #666; font-size: 0.9rem; }
     .energy-graph-content { display: flex; gap: 20px; align-items: stretch; }
-    .energy-graph-chart { flex: 0 0 70%; min-width: 0; }
+    .energy-graph-chart { flex: 0 0 65%; min-width: 0; }
     .energy-graph-table { flex: 1; min-width: 0; }
     .energy-graph-canvas { height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
