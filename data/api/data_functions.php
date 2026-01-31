@@ -22,7 +22,9 @@ function getDataFilePath($type, $params) {
             if (!$date || !preg_match('/^\d{8}$/', $date)) {
                 return null;
             }
-            return $dataDir . '/price' . $date . '.json';
+            // New nested structure: data/price/YYYYMM/priceYYYYMMDD.json
+            $yearMonth = substr($date, 0, 6); // Extract YYYYMM
+            return $dataDir . '/price/' . $yearMonth . '/price' . $date . '.json';
             
         case 'zendure':
             return $dataDir . '/zendure_data.json';
@@ -164,6 +166,11 @@ function validatePriceData($data) {
 function listDataFiles($pattern = null) {
     $dataDir = __DIR__ . '/..';
     
+    // Special handling for price files: scan nested structure
+    if ($pattern === 'price*.json') {
+        return listNestedPriceFiles($dataDir);
+    }
+    
     if (!is_dir($dataDir)) {
         return [];
     }
@@ -199,6 +206,42 @@ function listDataFiles($pattern = null) {
         }
         
         $files[] = $item;
+    }
+    
+    sort($files);
+    return $files;
+}
+
+/**
+ * Lists all price files in the nested directory structure
+ * Scans data/price/YYYYMM/price*.json
+ * 
+ * @param string $dataDir Data directory path
+ * @return array Array of filenames (just the filename, not full path)
+ */
+function listNestedPriceFiles($dataDir) {
+    $priceDir = $dataDir . '/price';
+    $files = [];
+    
+    if (!is_dir($priceDir)) {
+        return [];
+    }
+    
+    // Scan all year/month directories
+    $yearMonthDirs = glob($priceDir . '/*', GLOB_ONLYDIR);
+    
+    if ($yearMonthDirs === false) {
+        return [];
+    }
+    
+    foreach ($yearMonthDirs as $dir) {
+        $priceFiles = glob($dir . '/price*.json');
+        if ($priceFiles !== false) {
+            foreach ($priceFiles as $filePath) {
+                // Return just the filename (e.g., "price20260127.json")
+                $files[] = basename($filePath);
+            }
+        }
     }
     
     sort($files);
@@ -270,8 +313,25 @@ function cleanupOldPriceFiles($retentionDays = 4, $dataDir = null, $archiveDir =
         return $stats;
     }
     
-    // Get all price files
-    $priceFiles = listDataFiles('price*.json');
+    // Get all price files from nested structure
+    $priceDir = $dataDir . '/price';
+    $priceFiles = [];
+    
+    if (is_dir($priceDir)) {
+        // Scan all year/month directories
+        $yearMonthDirs = glob($priceDir . '/*', GLOB_ONLYDIR);
+        
+        if ($yearMonthDirs !== false) {
+            foreach ($yearMonthDirs as $dir) {
+                $files = glob($dir . '/price*.json');
+                if ($files !== false) {
+                    foreach ($files as $filePath) {
+                        $priceFiles[] = $filePath; // Store full path for nested structure
+                    }
+                }
+            }
+        }
+    }
     
     if (empty($priceFiles)) {
         return $stats;
@@ -281,13 +341,13 @@ function cleanupOldPriceFiles($retentionDays = 4, $dataDir = null, $archiveDir =
     $cutoffTime = time() - ($retentionDays * 24 * 60 * 60);
     $cutoffDate = date('Ymd', $cutoffTime);
     
-    foreach ($priceFiles as $filename) {
-        $filePath = $dataDir . '/' . $filename;
-        
+    foreach ($priceFiles as $filePath) {
         // Skip if not a regular file
         if (!is_file($filePath)) {
             continue;
         }
+        
+        $filename = basename($filePath);
         
         // Extract date from filename (priceYYYYMMDD.json)
         if (!preg_match('/^price(\d{8})\.json$/', $filename, $matches)) {

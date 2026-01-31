@@ -73,7 +73,7 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 **Data Source**:
 - API: Configured via `config.json` → `priceUrls.get_price` or `priceUrls.get_prices`
 - Fetched client-side by `price_overview_bar.js`
-- Price files stored in `/data/price_YYYYMMDD.json` format
+- Price files stored in `/data/price/YYYYMM/priceYYYYMMDD.json` format (organized by year-month)
 - Retrieved via `data/api/data_api.php?type=price&date=YYYYMMDD`
 
 ---

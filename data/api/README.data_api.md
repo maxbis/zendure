@@ -10,6 +10,7 @@ The `type` parameter in the query string determines which file or logic is acces
 
 ### 1. Price Data (`type=price`)
 * **Filename Pattern:** `priceYYYYMMDD.json` (e.g., `price20241222.json`)
+* **Storage Location:** `data/price/YYYYMM/priceYYYYMMDD.json` (organized by year-month)
 * **Operations:**
     * `GET`: Read prices for a specific date (requires `&date=YYYYMMDD`).
     * `POST`: Write/Update prices for a specific date.
