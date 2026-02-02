@@ -658,6 +658,9 @@ class AutomationApp:
         
         try:
             while not self.shutdown_requested:
+                 # 0. Sleep
+                self._sleep_interrupted()
+
                 # 1. Accumulate Data
                 p1_data = self._accumulate_p1_data()
                 
@@ -692,9 +695,6 @@ class AutomationApp:
                 
                 # 6. Standby Check
                 self._handle_standby_check()
-                
-                # 7. Sleep
-                self._sleep_interrupted()
                 
         except KeyboardInterrupt:
             self.shutdown_requested = True
