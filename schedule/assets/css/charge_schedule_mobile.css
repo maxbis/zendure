@@ -833,12 +833,12 @@ body.mobile-dark {
 }
 
 .energy-graph-mobile-daily-table .col-date {
-    width: 100px;
+    width: 90px;
 }
 
 .energy-graph-mobile-daily-table .col-wh,
 .energy-graph-mobile-daily-table .col-pct {
-    width: 80px;
+    width: 70px;
 }
 
 .energy-graph-mobile-daily-table .col-fill {
