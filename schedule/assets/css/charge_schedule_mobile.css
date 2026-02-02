@@ -821,6 +821,7 @@ body.mobile-dark {
     overflow-y: auto;
     max-height: 100%;
     -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
 }
 
 .energy-graph-mobile-daily-table table {
@@ -828,15 +829,16 @@ body.mobile-dark {
     table-layout: fixed;
     border-collapse: collapse;
     font-size: 0.8rem;
+    margin-left: 10px;
 }
 
 .energy-graph-mobile-daily-table .col-date {
-    width: 90px;
+    width: 100px;
 }
 
 .energy-graph-mobile-daily-table .col-wh,
 .energy-graph-mobile-daily-table .col-pct {
-    width: 56px;
+    width: 80px;
 }
 
 .energy-graph-mobile-daily-table .col-fill {
