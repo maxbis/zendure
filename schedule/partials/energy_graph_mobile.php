@@ -1,8 +1,8 @@
 <?php
 /**
  * Energy Graph Partial - Mobile Version
- * Graph-only (no daily totals), dark mode styling.
- * Shows only the last 3 days to save horizontal space.
+ * Tabs: Graph (Wh per hour) and Daily totals. Dark mode styling.
+ * Shows only the last 3 days in the graph to save horizontal space.
  */
 require_once __DIR__ . '/energy_graph_data.php';
 
@@ -19,8 +19,57 @@ $whPerHourMobile = array_values($whPerHourMobile);
 ?>
 <div class="card energy-graph-mobile">
     <h2>Watt-hours per hour <span class="energy-unit">(Wh)</span></h2>
-    <div class="energy-graph-canvas-mobile">
-        <canvas id="energyChartMobile"></canvas>
+    <div class="energy-graph-mobile-tabs" role="tablist">
+        <button type="button" class="energy-graph-mobile-tab active" data-tab="graph" role="tab" aria-selected="true">Graph</button>
+        <button type="button" class="energy-graph-mobile-tab" data-tab="daily" role="tab" aria-selected="false">Daily totals</button>
+    </div>
+    <div class="energy-graph-mobile-tab-panels">
+        <div class="energy-graph-mobile-tab-panel active" data-tab="graph" role="tabpanel" aria-hidden="false">
+            <div class="energy-graph-canvas-mobile">
+                <canvas id="energyChartMobile"></canvas>
+            </div>
+        </div>
+        <div class="energy-graph-mobile-tab-panel" data-tab="daily" role="tabpanel" aria-hidden="true">
+            <h3 class="energy-graph-mobile-daily-title">Daily totals</h3>
+            <div class="energy-graph-mobile-daily-table">
+                <?php if (!empty($whPerDay)) : ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Wh+</th>
+                            <th>Wh-</th>
+                            <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (gained)'); ?>">%+</th>
+                            <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (lost)'); ?>">%-</th>
+                            <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (net)'); ?>">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($whPerDay as $date => $totals) : ?>
+                            <?php
+                                $pos = $totals['pos'];
+                                $neg = $totals['neg'];
+                                $net = $pos + $neg;
+                                $pctPos = ($pos / $baseWh) * 100;
+                                $pctNeg = ($neg / $baseWh) * 100;
+                                $pctNet = ($net / $baseWh) * 100;
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($date); ?></td>
+                                <td class="wh-pos">+<?php echo number_format(round($pos, 0)); ?></td>
+                                <td class="wh-neg"><?php echo number_format(round($neg, 0)); ?></td>
+                                <td class="wh-pos"><?php echo number_format($pctPos, 2); ?>%</td>
+                                <td class="wh-neg"><?php echo number_format($pctNeg, 2); ?>%</td>
+                                <td><?php echo number_format($pctNet, 2); ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php else : ?>
+                <p class="energy-graph-mobile-no-data">No data</p>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
 <script>
@@ -73,7 +122,7 @@ $whPerHourMobile = array_values($whPerHourMobile);
         var dateLabelColor = '#64b5f6';
         var gridColor = '#404040';
 
-        new Chart(ctx, {
+        var chart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: displayLabels,
@@ -127,6 +176,29 @@ $whPerHourMobile = array_values($whPerHourMobile);
                     }
                 }
             }
+        });
+        window.energyChartMobile = chart;
+    })();
+
+    (function() {
+        var tabs = document.querySelectorAll('.energy-graph-mobile-tab');
+        var panels = document.querySelectorAll('.energy-graph-mobile-tab-panel');
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                var targetTab = this.getAttribute('data-tab');
+                tabs.forEach(function(t) {
+                    t.classList.toggle('active', t.getAttribute('data-tab') === targetTab);
+                    t.setAttribute('aria-selected', t.getAttribute('data-tab') === targetTab ? 'true' : 'false');
+                });
+                panels.forEach(function(panel) {
+                    var isActive = panel.getAttribute('data-tab') === targetTab;
+                    panel.classList.toggle('active', isActive);
+                    panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+                });
+                if (targetTab === 'graph' && window.energyChartMobile) {
+                    window.energyChartMobile.resize();
+                }
+            });
         });
     })();
 </script>

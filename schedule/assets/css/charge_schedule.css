@@ -814,6 +814,14 @@ body {
    Specific Schedule Panels Styles (Moved from schedule_panels.css)
    --------------------------------------------------------------------------
 */
+.schedule-panels-wrapper {
+    margin-top: 20px;
+}
+
+.schedule-panels-wrapper .card {
+    padding-top: 24px;
+}
+
 .schedule-list {
     display: flex;
     flex-direction: column;

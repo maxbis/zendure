@@ -755,6 +755,108 @@ body.mobile-dark {
     height: 100%;
 }
 
+/* Energy Graph Mobile - Tabs */
+.energy-graph-mobile-tabs {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+}
+
+.energy-graph-mobile-tab {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: inherit;
+}
+
+.energy-graph-mobile-tab:hover {
+    color: var(--text-primary);
+}
+
+.energy-graph-mobile-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-color, #64b5f6);
+}
+
+.energy-graph-mobile-tab-panels {
+    height: 180px;
+    position: relative;
+}
+
+.energy-graph-mobile-tab-panel {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.energy-graph-mobile-tab-panel.active {
+    display: block;
+    position: relative;
+}
+
+.energy-graph-mobile-tab-panel .energy-graph-canvas-mobile {
+    height: 100%;
+    max-height: none;
+}
+
+.energy-graph-mobile-daily-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--text-primary);
+}
+
+.energy-graph-mobile-daily-table {
+    overflow-y: auto;
+    max-height: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.energy-graph-mobile-daily-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.energy-graph-mobile-daily-table th,
+.energy-graph-mobile-daily-table td {
+    text-align: left;
+    padding: 4px 8px 4px 0;
+}
+
+.energy-graph-mobile-daily-table th {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.energy-graph-mobile-daily-table .wh-pos {
+    color: #81c784;
+    font-weight: 500;
+}
+
+.energy-graph-mobile-daily-table .wh-neg {
+    color: #e57373;
+    font-weight: 500;
+}
+
+.energy-graph-mobile-no-data {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
 /* Charge Status - Three Boxes Layout */
 .charge-status-mobile {
     display: flex;

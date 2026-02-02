@@ -23,6 +23,7 @@ function getValueLabel($val)
     return $val . ' W';
 }
 ?>
+<div class="schedule-panels-wrapper">
 <div class="layout">
     <!-- Left Panel: Today's Schedule -->
     <div class="card">
@@ -145,4 +146,5 @@ function getValueLabel($val)
             </table>
         </div>
     </div>
+</div>
 </div>
