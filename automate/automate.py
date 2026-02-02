@@ -25,7 +25,7 @@ from device_controller import AutomateController, ScheduleController, BaseDevice
 # ============================================================================
 
 # Time to pause between loop iterations (seconds)
-LOOP_INTERVAL_SECONDS = 20
+LOOP_INTERVAL_SECONDS = 29
 
 # Time between schedule API refreshes (seconds) - 5 minutes
 API_REFRESH_INTERVAL_SECONDS = 300
