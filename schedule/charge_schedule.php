@@ -73,6 +73,22 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p>
         </div>
 
+        <!-- Charge/Discharge Status Section - Full Width -->
+        <div class="charge-status-wrapper" style="margin-top: 20px;">
+            <?php include __DIR__ . '/partials/charge_status.php'; ?>
+        </div>
+
+        <div class="charge-status-wrapper" style="margin-top: 20px;">
+            <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
+        </div>
+
+
+        <!-- Price Overview Bar Graph Section - Full Width -->
+        <?php include __DIR__ . '/partials/price_overview_bar.php'; ?>
+
+        <!-- Energy Graph Section -->
+        <?php include __DIR__ . '/partials/energy_graph.php'; ?>
+
         <!-- Schedule Panels: Today's Schedule and Schedule Entries -->
         <?php include __DIR__ . '/partials/schedule_panels.php'; ?>
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
@@ -81,8 +97,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Bar Graph Section - Full Width -->
         <?php include __DIR__ . '/partials/schedule_overview_bar.php'; ?>
 
-        <!-- Price Overview Bar Graph Section - Full Width -->
-        <?php include __DIR__ . '/partials/price_overview_bar.php'; ?>
+ 
 
         <!-- Price Statistics Section -->
         <?php include __DIR__ . '/partials/price_statistics.php'; ?>
@@ -90,22 +105,15 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Schedule Calculator Section -->
         <?php include __DIR__ . '/partials/calculate.php'; ?>
 
-        <!-- Energy Graph Section -->
-        <?php include __DIR__ . '/partials/energy_graph.php'; ?>
 
         <!-- Automation Status Section - Full Width -->
         <div class="automation-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
 
-        <!-- Charge/Discharge Status Section - Full Width -->
-        <div class="charge-status-wrapper" style="margin-top: 20px;">
-            <?php include __DIR__ . '/partials/charge_status.php'; ?>
-        </div>
+
         
-        <div class="charge-status-wrapper" style="margin-top: 20px;">
-            <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
-        </div>
+
 
         <script>
             // Inject API URL from PHP config
