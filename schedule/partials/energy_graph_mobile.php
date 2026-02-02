@@ -34,6 +34,11 @@ $whPerHourMobile = array_values($whPerHourMobile);
             <div class="energy-graph-mobile-daily-table">
                 <?php if (!empty($whPerDay)) : ?>
                 <table>
+                    <colgroup>
+                        <col class="col-date">
+                        <col class="col-wh"><col class="col-wh"><col class="col-pct"><col class="col-pct"><col class="col-pct">
+                        <col class="col-fill">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -42,6 +47,7 @@ $whPerHourMobile = array_values($whPerHourMobile);
                             <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (gained)'); ?>">%+</th>
                             <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (lost)'); ?>">%-</th>
                             <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (net)'); ?>">%</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -58,9 +64,10 @@ $whPerHourMobile = array_values($whPerHourMobile);
                                 <td><?php echo htmlspecialchars($date); ?></td>
                                 <td class="wh-pos">+<?php echo number_format(round($pos, 0)); ?></td>
                                 <td class="wh-neg"><?php echo number_format(round($neg, 0)); ?></td>
-                                <td class="wh-pos"><?php echo number_format($pctPos, 2); ?>%</td>
-                                <td class="wh-neg"><?php echo number_format($pctNeg, 2); ?>%</td>
-                                <td><?php echo number_format($pctNet, 2); ?>%</td>
+                                <td class="wh-pos"><?php echo number_format($pctPos, 1); ?>%</td>
+                                <td class="wh-neg"><?php echo number_format($pctNeg, 1); ?>%</td>
+                                <td><?php echo number_format($pctNet, 1); ?>%</td>
+                                <td></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
