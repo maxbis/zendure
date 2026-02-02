@@ -872,7 +872,8 @@ class AutomateController(BaseDeviceController):
                 return -new_output
             elif new_input > 0:
                 # Charging: return positive value
-                return new_input
+                # return new_input, for now netzero mode is not allowed to charge
+                return 0
             else:
                 return 0
     
