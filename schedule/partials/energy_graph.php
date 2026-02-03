@@ -9,7 +9,7 @@ require_once __DIR__ . '/energy_graph_data.php';
 
 <style>
     .energy-graph-wrapper { margin-top: 20px; }
-    .energy-graph-card h2 { margin: 0 0 4px 0; font-size: 1.25rem; }
+    .energy-graph-card h2 { margin: 0 0 4px 0; }
     .energy-graph-subtitle { margin: 0 0 16px 0; color: #666; font-size: 0.9rem; }
     .energy-graph-header { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
     .energy-graph-heading { flex: 1 1 420px; min-width: 320px; }
@@ -18,7 +18,7 @@ require_once __DIR__ . '/energy_graph_data.php';
     .energy-graph-canvas { height: 220px; max-height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
     .energy-graph-daily { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; background: #fff; }
-    .energy-graph-daily h3 { margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; }
+    .energy-graph-daily h3 { margin: 0 0 8px 0; font-weight: 700; }
     .energy-graph-daily table { border-collapse: collapse; width: 100%; max-width: 380px; border-spacing: 0; }
     .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; }
 
@@ -45,7 +45,7 @@ require_once __DIR__ . '/energy_graph_data.php';
             </div>
             <?php if (!empty($whPerDay)) : ?>
                 <div class="energy-graph-table energy-graph-daily">
-                    <h3>Daily totals</h3>
+                    <h2>Daily totals</h2>
                     <table>
                         <thead>
                         <tr>

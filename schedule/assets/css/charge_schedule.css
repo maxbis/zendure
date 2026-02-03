@@ -90,9 +90,7 @@ body {
 }
 
 .card h2 {
-    font-size: 1.3rem;
     margin-bottom: 16px;
-    color: #333;
 }
 
 
@@ -382,9 +380,7 @@ body {
 }
 
 .metric-section h3 {
-    color: #333;
     margin-bottom: 10px;
-    font-size: 1.3rem;
     border-bottom: 1px solid #cdcdcd;
     padding-bottom: 8px;
 }

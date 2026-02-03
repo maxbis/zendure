@@ -29,7 +29,6 @@
 }
 
 .calculate-grid .card h2 {
-    font-size: 1.1rem;
     margin-bottom: 4px;
 }
 
@@ -76,9 +75,5 @@
     
     .calculate-grid .card {
         padding: 10px;
-    }
-    
-    .calculate-grid .card h2 {
-        font-size: 1rem;
     }
 }
