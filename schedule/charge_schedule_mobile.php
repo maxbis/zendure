@@ -81,16 +81,16 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <?php include __DIR__ . '/partials/price_overview_bar_mobile.php'; ?>
         </div>
 
+        <!-- Energy Graph (Wh per hour) -->
+        <div class="energy-graph-wrapper-mobile">
+        <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
+        </div>
+
         <!-- 3. Today's Schedule -->
         <!-- 4. Schedule Entries (only Add button) -->
         <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
-
-        <!-- Energy Graph (Wh per hour) -->
-        <div class="energy-graph-wrapper-mobile">
-        <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
-        </div>
 
 
         <!-- 5. Automation Status -->

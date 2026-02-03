@@ -31,7 +31,7 @@ LOOP_INTERVAL_SECONDS = 30
 API_REFRESH_INTERVAL_SECONDS = 300
 
 # Number of consecutive 0-power iterations before setting device to standby
-ZERO_COUNT_THRESHOLD = 21
+ZERO_COUNT_THRESHOLD_STANDBY = 21
 
 # ============================================================================
 # LOGGER CLASS
@@ -452,8 +452,15 @@ class AutomationApp:
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
 
-            # Generate steps, f.e. [0, 20, 40] for LOOP_INTERVAL_SECONDS = 20
-            self.steps = self._generate_steps(LOOP_INTERVAL_SECONDS, 59)
+            # Loop interval (default from module constant, overridable in config.json)
+            try:
+                loop_interval = int(self.controller.config.get("LOOP_INTERVAL_SECONDS", LOOP_INTERVAL_SECONDS))
+            except (TypeError, ValueError):
+                loop_interval = LOOP_INTERVAL_SECONDS
+            self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
+
+            # Generate steps, f.e. [0, 20, 40] for loop_interval_seconds = 20
+            self.steps = self._generate_steps(self.loop_interval_seconds, 59)
 
             # Max delta for power step changes (configurable)
             try:
@@ -461,6 +468,20 @@ class AutomationApp:
             except (TypeError, ValueError):
                 power_feed_max_delta = 2400
             self.power_feed_max_delta = max(0, power_feed_max_delta)
+
+            # API refresh interval (default from module constant, overridable in config.json)
+            try:
+                api_refresh = int(self.controller.config.get("API_REFRESH_INTERVAL_SECONDS", API_REFRESH_INTERVAL_SECONDS))
+            except (TypeError, ValueError):
+                api_refresh = API_REFRESH_INTERVAL_SECONDS
+            self.api_refresh_interval_seconds = max(60, min(api_refresh, 3600))  # clamp 1–60 minutes
+
+            # Zero-count threshold for standby (default from module constant, overridable in config.json)
+            try:
+                zero_threshold = int(self.controller.config.get("ZERO_COUNT_THRESHOLD_STANDBY", ZERO_COUNT_THRESHOLD_STANDBY))
+            except (TypeError, ValueError):
+                zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
+            self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
             return True
             
@@ -508,7 +529,7 @@ class AutomationApp:
         current_time = time.time()
         time_since_last_refresh = current_time - self.last_api_refresh_time
         
-        if time_since_last_refresh >= API_REFRESH_INTERVAL_SECONDS:
+        if time_since_last_refresh >= self.api_refresh_interval_seconds:
             try:
                 self.schedule_controller.fetch_schedule()
                 self.last_api_refresh_time = current_time
@@ -588,8 +609,8 @@ class AutomationApp:
         else:
             self.zero_count = 0
             
-        if self.zero_count == ZERO_COUNT_THRESHOLD:
-            self.logger.info(f"0 power for {ZERO_COUNT_THRESHOLD} consecutive iterations, setting device in standby mode")
+        if self.zero_count == self.zero_count_threshold_standby:
+            self.logger.info(f"0 power for {self.zero_count_threshold_standby} consecutive iterations, setting device in standby mode")
             self.controller.set_standby_mode()
 
     def _handle_user_input(self) -> bool:
@@ -604,11 +625,11 @@ class AutomationApp:
 
     def _sleep_interrupted(self):
         """Sleep with interrupt for input/shutdown."""
-        sleep_remaining = LOOP_INTERVAL_SECONDS
+        sleep_remaining = self.loop_interval_seconds
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
             now = time.localtime().tm_sec
-            if now in (self.steps) and sleep_remaining < LOOP_INTERVAL_SECONDS:
+            if now in (self.steps) and sleep_remaining < self.loop_interval_seconds:
                 return
             
             # Check input
@@ -651,8 +672,8 @@ class AutomationApp:
         else:
             self.logger.info("TEST MODE: OFF")
 
-        self.logger.info(f"   Loop interval: {LOOP_INTERVAL_SECONDS} seconds")
-        self.logger.info(f"   API refresh interval: {API_REFRESH_INTERVAL_SECONDS} seconds ({API_REFRESH_INTERVAL_SECONDS // 60} minutes)")
+        self.logger.info(f"   Loop interval: {self.loop_interval_seconds} seconds")
+        self.logger.info(f"   API refresh interval: {self.api_refresh_interval_seconds} seconds ({self.api_refresh_interval_seconds // 60} minutes)")
         self.logger.info("   Type 'h' or 'help' for available keyboard commands")
         print()
         
