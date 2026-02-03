@@ -1,20 +1,5 @@
 /* Mobile Dark Mode Schedule Page Styles */
 
-:root {
-    --bg-primary: #121212;
-    --bg-secondary: #1e1e1e;
-    --bg-tertiary: #2d2d2d;
-    --text-primary: #909090;
-    --text-secondary: #b0b0b0;
-    --text-tertiary: #888;
-    --border-color: #404040;
-    --charge-color: #4caf50;
-    --discharge-color: #f44336;
-    --neutral-color: #757575;
-    --netzero-color: #2196f3;
-    --netzero-plus-color: #bac302;
-}
-
 /* Reload Overlay */
 .reload-overlay {
     position: fixed;
@@ -68,55 +53,6 @@ body.mobile-dark {
     padding: 12px;
     color: var(--text-primary);
     min-height: 100vh;
-}
-
-.container {
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-/* Header - Compact */
-.header {
-    text-align: center;
-    margin-bottom: 16px;
-}
-
-.header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-/* Cards - Dark Mode */
-.card {
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    padding: 16px;
-    margin-bottom: 12px;
-    border: 1px solid var(--border-color);
-}
-
-.card h2 {
-    font-size: 1.1rem;
-    margin-bottom: 12px;
-    color: var(--text-primary);
-}
-
-.card h3 {
-    font-size: 1rem;
-    margin-bottom: 10px;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 6px;
-}
-
-/* Layout - Single Column for Mobile */
-.layout {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
 }
 
 /* Color Classes */
@@ -315,17 +251,6 @@ body.mobile-dark {
     max-width: 50%; /* Ensure they stay side by side */
 }
 
-.schedule-day-header {
-    margin-bottom: 6px;
-}
-
-.schedule-day-header h3 {
-    font-size: 0.8rem;
-    margin-bottom: 3px;
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
 .schedule-day .schedule-list {
     max-height: 400px;
     overflow-y: auto;
@@ -516,18 +441,6 @@ body.mobile-dark {
 .modal-backdrop.active .modal-dialog {
     transform: scale(1) translateY(0);
     opacity: 1;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-
-.modal-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
 }
 
 .modal-close {
@@ -810,13 +723,6 @@ body.mobile-dark {
     max-height: none;
 }
 
-.energy-graph-mobile-daily-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    margin: 0 0 8px 0;
-    color: var(--text-primary);
-}
-
 .energy-graph-mobile-daily-table {
     overflow-y: auto;
     max-height: 100%;
@@ -936,13 +842,6 @@ body.mobile-dark {
     max-height: 50vh;
 }
 
-.schedule-mobile-card .schedule-entries-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--text-primary);
-}
-
 /* Charge Status - Three Boxes Layout */
 .charge-status-mobile {
     display: flex;
@@ -955,13 +854,6 @@ body.mobile-dark {
     border-radius: 8px;
     border: 1px solid var(--border-color);
     padding: 12px;
-}
-
-.charge-status-box-title {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-    font-weight: 500;
 }
 
 .charge-status-box-content {
@@ -1150,10 +1042,6 @@ body.mobile-dark .charge-status-indicator.standby,
     background: var(--bg-tertiary) !important;
 }
 
-.charge-status-title {
-    color: var(--text-secondary) !important;
-}
-
 .charge-battery-level {
     color: var(--text-secondary) !important;
 }
@@ -1203,19 +1091,9 @@ body.mobile-dark .charge-battery-display,
     margin-bottom: 0;
 }
 
-.metric-section h3 {
-    color: var(--text-primary);
-    border-bottom-color: var(--border-color);
-}
-
 /* Additional compact styling */
 .charge-status-mobile .charge-status-box {
     padding: 10px;
-}
-
-.charge-status-mobile .charge-status-box-title {
-    font-size: 0.8rem;
-    margin-bottom: 6px;
 }
 
 .charge-status-mobile .charge-status-box-content {
@@ -1271,25 +1149,6 @@ code {
 @media (max-width: 600px) {
     body.mobile-dark {
         padding: 8px;
-    }
-    
-    .header h1 {
-        font-size: 1.3rem;
-    }
-    
-    .card {
-        padding: 10px;
-        margin-bottom: 8px;
-    }
-    
-    .card h2 {
-        font-size: 0.95rem;
-        margin-bottom: 10px;
-    }
-    
-    .card h3 {
-        font-size: 0.9rem;
-        margin-bottom: 8px;
     }
     
     .schedule-item {

@@ -9,7 +9,7 @@ require_once __DIR__ . '/charge_status_data.php';
 <!-- Charge/Discharge Status Section - Mobile (Three Boxes) -->
 <div class="card">
     <div class="metric-section">
-        <h3>🔋 Charge/Discharge</h3>
+        <h3 class="card-header">🔋 Charge/Discharge</h3>
         <?php
         if ($chargeStatusError):
         ?>

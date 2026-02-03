@@ -379,7 +379,8 @@ body {
     margin-bottom: 30px;
 }
 
-.metric-section .section-title {
+.metric-section .section-title,
+.metric-section .card-header {
     margin-bottom: 10px;
     border-bottom: 1px solid #cdcdcd;
     padding-bottom: 8px;

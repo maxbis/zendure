@@ -17,8 +17,8 @@ $whPerHourMobile = array_filter($whPerHour, function ($row) use ($lastDates) {
 });
 $whPerHourMobile = array_values($whPerHourMobile);
 ?>
-<div class="card energy-graph-mobile" style="max-width: 415px;">
-    <h2>Watt-hours per hour <span class="energy-unit">(Wh)</span></h2>
+<div class="card energy-graph-mobile">
+    <h3 class="card-header">Watt-hours per hour <span class="energy-unit">(Wh)</span></h3>
     <div class="energy-graph-mobile-tabs" role="tablist">
         <button type="button" class="energy-graph-mobile-tab active" data-tab="graph" role="tab" aria-selected="true">Graph</button>
         <button type="button" class="energy-graph-mobile-tab" data-tab="daily" role="tab" aria-selected="false">Daily totals</button>
@@ -30,7 +30,7 @@ $whPerHourMobile = array_values($whPerHourMobile);
             </div>
         </div>
         <div class="energy-graph-mobile-tab-panel" data-tab="daily" role="tabpanel" aria-hidden="true">
-            <h3 class="energy-graph-mobile-daily-title">Daily totals</h3>
+            <h3 class="card-header">Daily totals</h3>
             <div class="energy-graph-mobile-daily-table">
                 <?php if (!empty($whPerDay)) : ?>
                 <table>

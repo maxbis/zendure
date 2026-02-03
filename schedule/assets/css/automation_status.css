@@ -43,13 +43,6 @@
 /* Automation Status - Full Width */
 .automation-status-wrapper {
     width: 100%;
-    margin-top: 20px;
-}
-
-.automation-status-wrapper .card {
-    width: 100%;
-    max-width: 100%;
-    padding-bottom: 12px;
 }
 
 .automation-status-wrapper .card .metric-section {

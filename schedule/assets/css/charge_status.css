@@ -1,16 +1,6 @@
 /* Charge/Discharge Status Styles */
 
-/* Charge Status - Full Width */
-.charge-status-wrapper {
-    width: 100%;
-    margin-top: 20px;
-}
 
-.charge-status-wrapper .card {
-    width: 100%;
-    max-width: 100%;
-    padding-bottom: 12px;
-}
 
 .charge-status-wrapper .card .metric-section {
     margin-bottom: 0;

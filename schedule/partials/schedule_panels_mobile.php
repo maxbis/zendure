@@ -25,7 +25,7 @@ function getValueLabel($val)
 ?>
 <div class="layout">
 <div class="card schedule-mobile-card">
-    <h2>Schedule</h2>
+    <h3 class="card-header">Schedule</h3>
     <div class="schedule-mobile-tabs" role="tablist">
         <button type="button" class="schedule-mobile-tab active" data-tab="schedule" role="tab" aria-selected="true">Schedule</button>
         <button type="button" class="schedule-mobile-tab" data-tab="entries" role="tab" aria-selected="false">Schedule entries</button>
@@ -37,7 +37,7 @@ function getValueLabel($val)
                 <!-- Today's Schedule (Left) -->
                 <div class="schedule-day">
                     <div class="schedule-day-header">
-                        <h3>Today <?php echo substr($today, -2); ?></h3>
+                        <h3 class="card-header">Today <?php echo substr($today, -2); ?></h3>
                     </div>
                     <div class="schedule-list" id="today-schedule-grid">
                         <?php
@@ -97,7 +97,7 @@ function getValueLabel($val)
                 <!-- Tomorrow's Schedule (Right) -->
                 <div class="schedule-day">
                     <div class="schedule-day-header">
-                        <h3>Tomorrow <?php echo substr($tomorrow, -2); ?></h3>
+                        <h3 class="card-header">Tomorrow <?php echo substr($tomorrow, -2); ?></h3>
                     </div>
                     <div class="schedule-list" id="tomorrow-schedule-grid">
                         <?php
@@ -147,7 +147,7 @@ function getValueLabel($val)
         <!-- Tab 2: Schedule Entries -->
         <div class="schedule-mobile-tab-panel" data-tab="entries" role="tabpanel" aria-hidden="true">
             <div class="schedule-entries-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 class="schedule-entries-title">Schedule Entries</h3>
+                <h3 class="card-header">Schedule Entries</h3>
                 <button class="btn btn-add" id="add-entry-btn">Add</button>
             </div>
             <div class="status-bar" id="status-bar" style="margin-top:6px; font-size:0.75rem; color:var(--text-tertiary);">

@@ -5,3 +5,9 @@
     font-size: 20px;
     color: #333333;
 }
+
+/* Card header (shared partials e.g. automation_status) */
+.card-header {
+    font-size: 20px;
+    color: #333333;
+}

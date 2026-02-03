@@ -1,0 +1,112 @@
+/* Common styles for schedule mobile – section and page headers */
+
+:root {
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1e;
+    --bg-tertiary: #2d2d2d;
+    --text-primary: #909090;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #888;
+    --border-color: #404040;
+    --charge-color: #4caf50;
+    --discharge-color: #f44336;
+    --neutral-color: #757575;
+    --netzero-color: #2196f3;
+    --netzero-plus-color: #bac302;
+}
+
+/* Page header */
+.header {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+    max-width: 900px;
+}
+
+.layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Card headers – single class and format */
+.card-header {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+}
+
+/* Schedule day header wrapper (spacing only) */
+.schedule-day-header {
+    margin-bottom: 6px;
+}
+
+/* Modal header */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Charge status titles */
+.charge-status-box-title {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.charge-status-mobile .charge-status-box-title {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+}
+
+.charge-status-title {
+    color: var(--text-secondary) !important;
+}
+
+/* Responsive – header adjustments */
+@media (max-width: 600px) {
+    .header h1 {
+        font-size: 1.3rem;
+    }
+
+    .card {
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+
+    .card-header {
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+    }
+}

@@ -58,6 +58,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="stylesheet" href="assets/css/general_mobile.css">
     <link rel="stylesheet" href="assets/css/charge_schedule_mobile.css">
     <link rel="stylesheet" href="assets/css/automation_status.css">
     <link rel="stylesheet" href="assets/css/charge_status_defines.css">
@@ -67,8 +68,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
 <body class="mobile-dark">
     <div class="container">
-        <div class="header">
-            <h1>Schedule</h1>
+        <div class="header" style="max-width: 900px;">
+            <h1>Zendure Energy Manager</h1>
         </div>
 
         <!-- 1. Charge/Discharge Status (three boxes) -->
@@ -86,10 +87,12 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
         </div>
 
-        <!-- 3. Today's Schedule -->
-        <!-- 4. Schedule Entries (only Add button) -->
+        <!-- Schedule Panels -->
         <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
+
+        <!-- Edit Modal -->
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
+        <!-- Confirm Dialog -->
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
 
 
