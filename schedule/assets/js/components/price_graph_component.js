@@ -1,7 +1,10 @@
 /**
  * Price Graph Component
  * Manages the price overview bar graph display
+ * Uses same proxy value as price_overview_bar.js (0.24) but local name to avoid duplicate global.
  */
+const PRICE_PROXY_CENTS = 0.24;
+
 class PriceGraphComponent extends Component {
     constructor(container, options = {}) {
         super(container, options);
@@ -122,15 +125,23 @@ class PriceGraphComponent extends Component {
             }
         }
         
-        // Calculate min/max prices
+        // Calculate min/max prices (use proxy when missing so scale is sensible)
         const allPrices = [];
         for (let h = 0; h < 24; h++) {
             const hourKey = String(h).padStart(2, '0');
-            if (todayPrices[hourKey] !== null && todayPrices[hourKey] !== undefined) {
-                allPrices.push(todayPrices[hourKey]);
+            const todayVal = todayPrices[hourKey];
+            const tomorrowVal = tomorrowPrices !== null && tomorrowPrices !== undefined ? tomorrowPrices[hourKey] : undefined;
+            if (todayVal !== null && todayVal !== undefined && !isNaN(todayVal)) {
+                allPrices.push(todayVal);
+            } else {
+                allPrices.push(PRICE_PROXY_CENTS);
             }
-            if (tomorrowPrices !== null && tomorrowPrices !== undefined && tomorrowPrices[hourKey] !== null && tomorrowPrices[hourKey] !== undefined) {
-                allPrices.push(tomorrowPrices[hourKey]);
+            if (tomorrowPrices !== null && tomorrowPrices !== undefined) {
+                if (tomorrowVal !== null && tomorrowVal !== undefined && !isNaN(tomorrowVal)) {
+                    allPrices.push(tomorrowVal);
+                } else {
+                    allPrices.push(PRICE_PROXY_CENTS);
+                }
             }
         }
         
@@ -189,21 +200,21 @@ class PriceGraphComponent extends Component {
         for (let h = 0; h < 24; h++) {
             const hourKey = String(h).padStart(2, '0');
             const price = prices[hourKey] !== undefined ? prices[hourKey] : null;
+            const hasRealPrice = price !== null && price !== undefined && !isNaN(price);
+            const priceForHeight = hasRealPrice ? price : PRICE_PROXY_CENTS;
             const isCurrentHour = isToday && (h === now.getHours()) && (dateStr === currentDate);
             
-            // Calculate bar height
+            // Calculate bar height (use proxy for missing data)
+            const priceRange = maxPrice - minPrice;
             let barHeight = '4px';
-            if (price !== null && price !== undefined && !isNaN(price)) {
-                const priceRange = maxPrice - minPrice;
-                if (priceRange > 0) {
-                    const normalized = (price - minPrice) / priceRange;
-                    barHeight = Math.max(4, normalized * 100) + '%';
-                } else {
-                    barHeight = '50%';
-                }
+            if (priceRange > 0) {
+                const normalized = (priceForHeight - minPrice) / priceRange;
+                barHeight = Math.max(4, normalized * 100) + '%';
+            } else {
+                barHeight = '50%';
             }
             
-            // Get color
+            // Get color (grey when no real data)
             const barColor = getPriceColor(price, minPrice, maxPrice);
             
             // Check for schedule entry
@@ -215,7 +226,7 @@ class PriceGraphComponent extends Component {
             bar.className = `price-bar ${isCurrentHour ? 'price-bar-current' : ''} ${hasSchedule ? 'price-bar-scheduled' : ''}`;
             bar.style.height = barHeight;
             bar.style.backgroundColor = barColor;
-            bar.title = `${hourKey}:00 - ${price !== null ? formatPrice(price) : 'N/A'}`;
+            bar.title = `${hourKey}:00 - ${hasRealPrice ? formatPrice(price) : 'No price data available'}`;
             
             // Add click handler if editModal is available
             if (this.config.editModal) {

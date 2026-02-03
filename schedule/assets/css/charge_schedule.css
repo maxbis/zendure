@@ -597,6 +597,16 @@ body {
     min-width: 0; 
 }
 
+.price-graph-api-error {
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    color: #c62828;
+    background: rgba(198, 40, 40, 0.08);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
 /* 3. Common Graph Row (Scrollable Container) */
 .chart-row,
 .bar-graph-row,

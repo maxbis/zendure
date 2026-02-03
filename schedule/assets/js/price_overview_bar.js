@@ -3,6 +3,9 @@
  * Renders the bar graph visualization for today and tomorrow's electricity prices
  */
 
+/** 24 cent – used for bar height when no price data; bars stay grey and tooltip says no data */
+const PRICE_PROXY_NO_DATA = 0.24;
+
 /**
  * Interpolates between two RGB colors
  * @param {number} r1 - Red component of first color (0-255)
@@ -131,8 +134,9 @@ function showPriceGraphPopup(bar, container) {
     const timeRange = formatHourRange(hourValue);
 
     const rawPrice = bar.dataset.price;
+    const isProxy = bar.dataset.proxy === 'true';
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
-    const priceDisplay = priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue);
+    const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
@@ -300,45 +304,41 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
 
     // Extract price data
     const todayPrices = priceData?.today || {};
-    const tomorrowPrices = priceData?.tomorrow || null;
+    // Always treat tomorrow prices as an object; when empty we will render proxy (grey) bars
+    const tomorrowPrices = priceData?.tomorrow || {};
     
-    // Check if tomorrow's data is available (not null and has data)
-    // Handle both null and empty object cases
-    const tomorrowAvailable = tomorrowPrices !== null && 
-                              tomorrowPrices !== undefined && 
-                              typeof tomorrowPrices === 'object' &&
-                              Object.keys(tomorrowPrices).length > 0 &&
-                              Object.values(tomorrowPrices).some(price => price !== null && price !== undefined && !isNaN(price));
-    
-    // Handle tomorrow container visibility (desktop - data-based: show only if data exists)
+    // Always show the tomorrow cards; when there is no real data the graph will use proxy prices
     if (tomorrowContainer) {
         const tomorrowCard = tomorrowContainer.closest('.card');
         if (tomorrowCard) {
-            tomorrowCard.style.display = tomorrowAvailable ? '' : 'none';
+            tomorrowCard.style.display = '';
         }
     }
     
-    // Handle tomorrow container visibility (mobile - data-based)
     if (tomorrowContainerMobile) {
         const tomorrowCardMobile = document.getElementById('tomorrow-price-card-mobile');
         if (tomorrowCardMobile) {
-            if (tomorrowAvailable) {
-                tomorrowCardMobile.style.display = '';
-            } else {
-                tomorrowCardMobile.style.display = 'none';
-            }
+            tomorrowCardMobile.style.display = '';
         }
     }
     
-    // Collect all prices to calculate min/max
+    // Collect all prices to calculate min/max (use proxy when missing so scale is sensible)
     const allPrices = [];
     for (let h = 0; h < 24; h++) {
         const hourKey = String(h).padStart(2, '0');
-        if (todayPrices[hourKey] !== null && todayPrices[hourKey] !== undefined) {
-            allPrices.push(todayPrices[hourKey]);
+        const todayVal = todayPrices[hourKey];
+        const tomorrowVal = tomorrowPrices !== null && tomorrowPrices !== undefined ? tomorrowPrices[hourKey] : undefined;
+        if (todayVal !== null && todayVal !== undefined && !isNaN(todayVal)) {
+            allPrices.push(todayVal);
+        } else {
+            allPrices.push(PRICE_PROXY_NO_DATA);
         }
-        if (tomorrowPrices !== null && tomorrowPrices !== undefined && tomorrowPrices[hourKey] !== null && tomorrowPrices[hourKey] !== undefined) {
-            allPrices.push(tomorrowPrices[hourKey]);
+        if (tomorrowPrices !== null && tomorrowPrices !== undefined) {
+            if (tomorrowVal !== null && tomorrowVal !== undefined && !isNaN(tomorrowVal)) {
+                allPrices.push(tomorrowVal);
+            } else {
+                allPrices.push(PRICE_PROXY_NO_DATA);
+            }
         }
     }
     
@@ -374,23 +374,23 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         for (let h = 0; h < 24; h++) {
             const hourKey = String(h).padStart(2, '0');
             const price = prices[hourKey] !== undefined ? prices[hourKey] : null;
+            const hasRealPrice = price !== null && price !== undefined && !isNaN(price);
+            const priceForHeight = hasRealPrice ? price : PRICE_PROXY_NO_DATA;
             
             // Determine if this is the current hour
             const isCurrentHour = isToday && (h === now.getHours()) && (dateStr === currentDate);
             
-            // Calculate bar height (based on price relative to min/max)
+            // Calculate bar height (based on price relative to min/max; use proxy for missing data)
             let barHeight = '4px'; // Minimum height
-            if (price !== null && price !== undefined && !isNaN(price)) {
-                const priceRange = maxPrice - minPrice;
-                if (priceRange > 0) {
-                    const normalized = (price - minPrice) / priceRange;
-                    barHeight = Math.max(4, normalized * 100) + '%';
-                } else {
-                    barHeight = '50%'; // Middle height if all prices are same
-                }
+            const priceRange = maxPrice - minPrice;
+            if (priceRange > 0) {
+                const normalized = (priceForHeight - minPrice) / priceRange;
+                barHeight = Math.max(4, normalized * 100) + '%';
+            } else {
+                barHeight = '50%'; // Middle height if all prices are same
             }
             
-            // Get color for price
+            // Get color for price (grey when no real data)
             const barColor = getPriceColor(price, minPrice, maxPrice);
             
             // Format display text
@@ -409,17 +409,18 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.dataset.hour = h;
             barDiv.dataset.time = hourTime;
             barDiv.dataset.key = key;
-            barDiv.dataset.price = price !== null ? price : '';
+            barDiv.dataset.price = hasRealPrice ? price : '';
+            barDiv.dataset.proxy = hasRealPrice ? '' : 'true';
             const scheduleType = scheduledValue !== undefined ? getScheduleType(scheduledValue) : '';
             if (scheduleType) {
                 barDiv.classList.add('has-schedule');
                 barDiv.dataset.scheduleType = scheduleType;
                 barDiv.dataset.scheduleValue = scheduledValue;
             }
-            barDiv.setAttribute('aria-label', `${hourKey}:00 - ${priceDisplay}`);
+            barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             
             const barInner = document.createElement('div');
-            barInner.className = `price-graph-bar-inner ${price === null ? 'price-null' : ''}`;
+            barInner.className = `price-graph-bar-inner ${!hasRealPrice ? 'price-null' : ''}`;
             barInner.style.height = barHeight;
             barInner.style.backgroundColor = barColor;
             
@@ -482,23 +483,22 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     
     // Render today
     renderPriceRow(todayPrices, currentDate, todayContainer, true);
-    
-    // Render tomorrow in desktop container if available (data-based, not time-based)
-    if (tomorrowContainer && tomorrowAvailable) {
-        renderPriceRow(tomorrowPrices, tomorrowDateStr, tomorrowContainer, false);
-    } else if (tomorrowContainer) {
-        // Clear desktop container when tomorrow is not available
-        tomorrowContainer.innerHTML = '';
+    if (priceData && priceData.error) {
+        const errEl = document.createElement('div');
+        errEl.className = 'price-graph-api-error';
+        errEl.textContent = priceData.error;
+        todayContainer.prepend(errEl);
     }
     
-    // Render tomorrow in mobile container if available (data-based, not time-based)
-    if (tomorrowContainerMobile && tomorrowAvailable) {
-        // Use tomorrowPrices (already checked for availability above)
+    // Render tomorrow in desktop container (will use proxy prices when no real data)
+    if (tomorrowContainer) {
+        renderPriceRow(tomorrowPrices, tomorrowDateStr, tomorrowContainer, false);
+    }
+    
+    // Render tomorrow in mobile container (will use proxy prices when no real data)
+    if (tomorrowContainerMobile) {
         const pricesToRender = tomorrowPrices || {};
         renderPriceRow(pricesToRender, tomorrowDateStr, tomorrowContainerMobile, false);
-    } else if (tomorrowContainerMobile) {
-        // Clear mobile container when tomorrow is not available
-        tomorrowContainerMobile.innerHTML = '';
     }
     
     // Auto-scroll to current time (center it)
@@ -550,9 +550,9 @@ async function fetchAndRenderPrices(priceApiUrl, scheduleEntries, editModal) {
         renderPriceGraph(priceData, currentHour, scheduleEntries, editModal);
     } catch (e) {
         console.error('Failed to fetch prices:', e);
-        // Render with null values on error
+        const errorMessage = e && (e.message || String(e));
         const now = new Date();
         const currentHour = now.getHours();
-        renderPriceGraph({ today: {}, tomorrow: {} }, currentHour, scheduleEntries, editModal);
+        renderPriceGraph({ today: {}, tomorrow: {}, error: errorMessage }, currentHour, scheduleEntries, editModal);
     }
 }
