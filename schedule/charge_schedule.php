@@ -51,7 +51,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Charge Schedule Manager</title>
+    <title>⚡Zendure Energy Manager</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -70,7 +70,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 <body>
     <div class="container">
         <div class="header">
-            <h1><span class="title-desktop">⚡ Charge Schedule Manager</span><span class="title-mobile">⚡ Schedule</span></h1>
+            <h1><span class="title-desktop">⚡Zendure Energy Manager</span><span class="title-mobile">⚡ Schedule</span></h1>
             <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p>
         </div>
 

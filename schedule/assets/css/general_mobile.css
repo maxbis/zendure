@@ -13,12 +13,13 @@
     --neutral-color: #757575;
     --netzero-color: #2196f3;
     --netzero-plus-color: #bac302;
+    --card-gap: 12px;
 }
 
 /* Page header */
 .header {
     text-align: center;
-    margin-bottom: 16px;
+    margin-bottom: var(--card-gap);
 }
 
 .header h1 {
@@ -38,7 +39,7 @@
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     padding: 16px;
-    margin-bottom: 12px;
+    margin-bottom: var(--card-gap);
     border: 1px solid var(--border-color);
     max-width: 900px;
 }
@@ -96,13 +97,16 @@
 
 /* Responsive – header adjustments */
 @media (max-width: 600px) {
+    :root {
+        --card-gap: 8px;
+    }
+
     .header h1 {
         font-size: 1.3rem;
     }
 
     .card {
         padding: 10px;
-        margin-bottom: 8px;
     }
 
     .card-header {

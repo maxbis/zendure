@@ -53,7 +53,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Schedule</title>
+    <title>⚡Zendure Energy Manager</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -69,7 +69,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 <body class="mobile-dark">
     <div class="container">
         <div class="header" style="max-width: 900px;">
-            <h1>Zendure Energy Manager</h1>
+            <h1>⚡Zendure Energy Manager</h1>
         </div>
 
         <!-- 1. Charge/Discharge Status (three boxes) -->

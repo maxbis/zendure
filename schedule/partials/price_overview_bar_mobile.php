@@ -22,14 +22,16 @@ $tomorrow_modified = $todayDt->modify('+1 day')->format('Y-m-d');
 <style>
     .price-cards {
         display: flex;
-        justify-content: flex-start;
-        gap: 16px;
         flex-wrap: wrap;
+        gap: 16px;
     }
 
     .price-cards .card {
-        flex: 1 1 500px;
-        max-width: 415px;
+        flex: 1 1 400px;
+        flex-wrap: wrap;          /* keep cards side-by-side */
+        overflow-x: auto;           /* horizontal scroll */
+        -webkit-overflow-scrolling: touch;
+        max-width: 600px;
     }
 </style>
 

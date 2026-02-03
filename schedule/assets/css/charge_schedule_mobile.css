@@ -518,7 +518,7 @@ body.mobile-dark {
 /* Price Graph - Mobile with Scrollbar */
 .price-graph-wrapper-mobile {
     width: 100%;
-    margin-bottom: 12px;
+    margin-bottom: 0;
 }
 
 .price-graph-wrapper-mobile .card {
@@ -645,7 +645,7 @@ body.mobile-dark {
 /* Energy Graph - Mobile (dark mode, graph only) */
 .energy-graph-wrapper-mobile {
     width: 100%;
-    margin-bottom: 12px;
+    margin-bottom: 0;
 }
 
 .energy-graph-mobile .energy-unit {
@@ -863,7 +863,7 @@ body.mobile-dark {
 /* Automation Status - Dark Mode */
 .automation-status-wrapper {
     width: 100%;
-    margin-top: 12px;
+    margin-top: 0;
 }
 
 .automation-status-wrapper .card {
