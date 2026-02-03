@@ -857,7 +857,7 @@ class AutomateController(BaseDeviceController):
         )
 
         # if charging and requested to discharge or when netzero and requested to charge, we might have a lag in measurements
-        if (mode == 'netzero+' and new_output > 0) or (mode == 'netzero' and new_input > 0):
+        if  (mode == 'netzero' and new_input > 0):
             self.log('warning', f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, we might have a lag in measurements")
             self.log('warning', f"  we'll return the previous power ({self.previous_power}) to avoid oscilating")
             # return old value to avoid oscilating
