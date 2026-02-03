@@ -9,7 +9,7 @@
 <!-- Price Statistics Section -->
 <div class="card" style="margin-top: 12px; padding-bottom: 12px;">
     <div class="metric-section">
-        <h3>⚡ Price Statistics</h3>
+        <h2 class="section-title">⚡ Price Statistics</h2>
         <div id="price-statistics-grid" class="price-statistics-grid">
             <!-- Cards will be populated by JavaScript -->
             <div class="price-stat-card">

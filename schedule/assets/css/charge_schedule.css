@@ -379,7 +379,7 @@ body {
     margin-bottom: 30px;
 }
 
-.metric-section h3 {
+.metric-section .section-title {
     margin-bottom: 10px;
     border-bottom: 1px solid #cdcdcd;
     padding-bottom: 8px;

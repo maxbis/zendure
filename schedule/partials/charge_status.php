@@ -18,7 +18,7 @@ require_once __DIR__ . '/charge_status_data.php';
 <div class="card">
     <div class="metric-section">
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3>🔋 Charge/Discharge</h3>
+        <h2 class="section-title">🔋 Charge/Discharge</h2>
     </div>
     <?php
     if ($chargeStatusError):

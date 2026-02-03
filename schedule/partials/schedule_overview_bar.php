@@ -18,14 +18,14 @@
 <div class="bar-graph-wrapper" style="margin-top: 20px;">
     <div class="bar-graph-layout">
         <div class="card">
-            <h2>Today <span style="font-size: 1rem; color: #d0d0d0;">(
+            <h2 class="section-title">Today <span style="font-size: 1rem; color: #d0d0d0;">(
                         <?= htmlspecialchars($today_modified); ?>
                     )</span>
             </h2>
             <div class="bar-graph-row" id="bar-graph-today"></div>
         </div>
         <div class="card">
-            <h2>Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
+            <h2 class="section-title">Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
                     <?= htmlspecialchars($tomorrow_modified); ?>
                 )</span>
             </h2>

@@ -16,14 +16,14 @@
 <div class="price-graph-wrapper" style="margin-top: 20px;">
     <div class="price-graph-layout">
         <div class="card">
-            <h2>Today <span style="font-size: 1rem; color: #d0d0d0;">(
+            <h2 class="section-title">Today <span style="font-size: 1rem; color: #d0d0d0;">(
                     <?= htmlspecialchars($today_modified); ?>
                 )</span>
             </h2>
             <div class="price-graph-row" id="price-graph-today"></div>
         </div>
         <div class="card" id="tomorrow-price-card-desktop" style="display: none;">
-            <h2>Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
+            <h2 class="section-title">Tomorrow <span style="font-size: 1rem; color: #d0d0d0;">(
                     <?= htmlspecialchars($tomorrow_modified); ?>
                 )</span>
             </h2>

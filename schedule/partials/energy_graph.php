@@ -18,7 +18,7 @@ require_once __DIR__ . '/energy_graph_data.php';
     .energy-graph-canvas { height: 220px; max-height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
     .energy-graph-daily { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; background: #fff; }
-    .energy-graph-daily h3 { margin: 0 0 8px 0; font-weight: 700; }
+    .energy-graph-daily .section-title { margin: 0 0 8px 0; font-weight: 700; }
     .energy-graph-daily table { border-collapse: collapse; width: 100%; max-width: 380px; border-spacing: 0; }
     .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; }
 
@@ -35,7 +35,7 @@ require_once __DIR__ . '/energy_graph_data.php';
     <div class="card energy-graph-card">
         <div class="energy-graph-header">
             <div class="energy-graph-heading">
-                <h2>Watt-hours per hour</h2>
+                <h2 class="section-title">Watt-hours per hour</h2>
                 <p class="energy-graph-subtitle">Data from automation status (last <?php echo $retentionDays; ?> days).</p>
                 <div class="energy-graph-chart">
                     <div class="energy-graph-canvas">
@@ -45,7 +45,7 @@ require_once __DIR__ . '/energy_graph_data.php';
             </div>
             <?php if (!empty($whPerDay)) : ?>
                 <div class="energy-graph-table energy-graph-daily">
-                    <h2>Daily totals</h2>
+                    <h2 class="section-title">Daily totals</h2>
                     <table>
                         <thead>
                         <tr>

@@ -322,7 +322,7 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
 <!-- Schedule Calculator Section -->
 <div class="card" style="margin-top: 12px; padding-bottom: 12px;">
     <div class="metric-section">
-        <h3>⚡ Schedule Calculator</h3>
+        <h2 class="section-title">⚡ Schedule Calculator</h2>
         <div class="automation-last-update">
             <span id="calculator-current-time">Current Time: <?php echo date('Y-m-d H:i:s'); ?> (<?php echo $calculateCurrentTime; ?>)</span>
         </div>
@@ -342,7 +342,7 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
         <div class="calculate-grid">
             <!-- Today - Full Day -->
             <div class="card">
-                <h2 style="margin-bottom:0px">Today - Full Day</h2>
+                <h2 class="section-title" style="margin-bottom:0px">Today - Full Day</h2>
                 <small>(<?php echo substr($calculateToday, 0, 4) . '-' . substr($calculateToday, 4, 2) . '-' . substr($calculateToday, 6, 2); ?>)</small>
                 
                 <table style="width: 100%; margin-top: 8px; border-collapse: collapse;">
@@ -371,7 +371,7 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
 
             <!-- Today - From Current Time -->
             <div class="card">
-                <h2 style="margin-bottom:0px">Today - From <?php echo substr($calculateCurrentTime, 0, 2) . ':' . substr($calculateCurrentTime, 2, 2); ?></h2>
+                <h2 class="section-title" style="margin-bottom:0px">Today - From <?php echo substr($calculateCurrentTime, 0, 2) . ':' . substr($calculateCurrentTime, 2, 2); ?></h2>
                 <small> (<?php echo substr($calculateToday, 0, 4) . '-' . substr($calculateToday, 4, 2) . '-' . substr($calculateToday, 6, 2); ?>)</small>
                 
                 <table style="width: 100%; margin-top: 8px; border-collapse: collapse;">
@@ -400,7 +400,7 @@ if ($calculateTomorrowData['success'] && isset($calculateTomorrowData['resolved'
 
             <!-- Tomorrow - Full Day -->
             <div class="card">
-                <h2 style="margin-bottom:0px">Tomorrow  - Full Day</h2>
+                <h2 class="section-title" style="margin-bottom:0px">Tomorrow  - Full Day</h2>
                 <small>(<?php echo substr($calculateTomorrow, 0, 4) . '-' . substr($calculateTomorrow, 4, 2) . '-' . substr($calculateTomorrow, 6, 2); ?>)</small>
                 
                 <table style="width: 100%; margin-top: 8px; border-collapse: collapse;">

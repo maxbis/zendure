@@ -1,11 +1,7 @@
 /* Common styles for schedule pages */
 
 /* Section headers (partial titles) - single definition */
-.container .card h2,
-.container .metric-section h3,
-.container .energy-graph-card h2,
-.container .energy-graph-daily h3,
-.container .calculate-grid .card h2 {
-    font-size: 21px;
+.section-title {
+    font-size: 20px;
     color: #333333;
 }

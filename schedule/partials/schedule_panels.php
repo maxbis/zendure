@@ -27,7 +27,7 @@ function getValueLabel($val)
 <div class="layout">
     <!-- Left Panel: Today's Schedule -->
     <div class="card">
-        <h2>Today's Schedule</h2>
+        <h2 class="section-title">Today's Schedule</h2>
         <div class="helper-text" style="margin-bottom: 10px;">
         <?php echo htmlspecialchars($today); ?>
         </div>
@@ -92,7 +92,7 @@ function getValueLabel($val)
     <!-- Right Panel: Schedule Entries -->
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>Schedule Entries</h2>
+            <h2 class="section-title">Schedule Entries</h2>
             <div style="display:flex; gap:8px; width:150px;">
                 <button class="btn btn-clear" id="clear-entry-btn" style="flex:1;">Clear</button>
                 <button class="btn btn-auto" id="auto-entry-btn" style="flex:1;">Auto</button>
