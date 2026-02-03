@@ -10,32 +10,37 @@ require_once __DIR__ . '/energy_graph_data.php';
 <style>
     .energy-graph-wrapper { margin-top: 20px; }
     .energy-graph-card h2 { margin: 0 0 4px 0; font-size: 1.25rem; }
-    .energy-graph-subtitle { margin: 0 0 14px 0; color: #666; font-size: 0.9rem; }
-    .energy-graph-content { display: flex; gap: 20px; align-items: stretch; }
-    .energy-graph-chart { flex: 0 0 65%; min-width: 0; }
-    .energy-graph-table { flex: 1; min-width: 0; }
-    .energy-graph-canvas { height: 220px; max-height: 180px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
+    .energy-graph-subtitle { margin: 0 0 16px 0; color: #666; font-size: 0.9rem; }
+    .energy-graph-header { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+    .energy-graph-heading { flex: 1 1 420px; min-width: 320px; }
+    .energy-graph-chart { width: 100%; min-width: 0; margin-top: 8px; }
+    .energy-graph-table { flex: 0 0 320px; min-width: 280px; }
+    .energy-graph-canvas { height: 220px; max-height: 220px; background: #f8fafc; border-radius: 10px; padding: 8px 10px 4px; }
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
-    .energy-graph-daily { border-left: 1px solid #eee; padding-left: 16px; }
+    .energy-graph-daily { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; background: #fff; }
     .energy-graph-daily h3 { margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; }
     .energy-graph-daily table { border-collapse: collapse; width: 100%; max-width: 380px; border-spacing: 0; }
     .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; }
 
     @media (max-width: 900px) {
-        .energy-graph-content { flex-direction: column; }
-        .energy-graph-chart { flex-basis: auto; }
-        .energy-graph-daily { border-left: none; border-top: 1px solid #e0e0e0; padding-left: 0; padding-top: 12px; }
+        .energy-graph-header { flex-direction: column; }
+        .energy-graph-heading,
+        .energy-graph-table { width: 100%; min-width: 0; }
+        .energy-graph-chart { margin-top: 16px; }
+        .energy-graph-daily { padding: 12px; }
     }
 </style>
 
 <div class="energy-graph-wrapper">
     <div class="card energy-graph-card">
-        <h2>Watt-hours per hour</h2>
-        <p class="energy-graph-subtitle">Data from automation status (last <?php echo $retentionDays; ?> days).</p>
-        <div class="energy-graph-content">
-            <div class="energy-graph-chart">
-                <div class="energy-graph-canvas">
-                    <canvas id="energyChart"></canvas>
+        <div class="energy-graph-header">
+            <div class="energy-graph-heading">
+                <h2>Watt-hours per hour</h2>
+                <p class="energy-graph-subtitle">Data from automation status (last <?php echo $retentionDays; ?> days).</p>
+                <div class="energy-graph-chart">
+                    <div class="energy-graph-canvas">
+                        <canvas id="energyChart"></canvas>
+                    </div>
                 </div>
             </div>
             <?php if (!empty($whPerDay)) : ?>
