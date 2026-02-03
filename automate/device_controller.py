@@ -848,34 +848,55 @@ class AutomateController(BaseDeviceController):
         if current_input is None or current_output is None:
             raise ValueError("Zendure data missing inputLimit or outputLimit")
         
-        # Calculate new settings
+        # Calculate new settings new_output=discharge, new_input=charge
         new_input, new_output = self._calculate_new_settings(
             p1_power=p1_power,
             current_input=current_input,
             current_output=current_output,
             electric_level=electric_level,
         )
+
+        # if charging and requested to discharge or when netzero and requested to charge, we might have a lag in measurements
+        if (mode == 'netzero+' and new_output > 0) or (mode == 'netzero' and new_input > 0):
+            self.log('warning', f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, we might have a lag in measurements")
+            self.log('warning', f"  we'll return the previous power ({self.previous_power}) to avoid oscilating")
+            # return old value to avoid oscilating
+            return self.previous_power
+            
         
         # Convert to CLI convention (positive=charge, negative=discharge)
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
             # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
-            if new_output > 0:
-                return 0
+            if new_input > 0: # Charging is requested?
+                return new_input
             else:
-                # Charging or stopped - if stopped (0), return 1 to avoid standby
-                return new_input if new_input > 0 else 0
+                return 0
+
+            # if new_output > 0: # Discharging is requested?
+            #     return 0 # Netzero+ doesn't discharge, return 0
+            # else:
+            #     # Charging or stopped - if stopped (0), return 1 to avoid standby
+            #     return new_input if new_input > 0 else 0
+
         else:
-            # Regular netzero mode
+            # if netzero mode, return the discharge (output) value as neagtive value
             if new_output > 0:
-                # Discharging: return negative value
                 return -new_output
-            elif new_input > 0:
-                # Charging: return positive value
-                # return new_input, for now netzero mode is not allowed to charge
-                return 0
             else:
                 return 0
+
+            # # Regular netzero mode
+            # if new_output > 0: # Discharging is requested?
+            #     # Discharging: return negative value
+            #     return -new_output
+            # elif new_input > 0: # Charging is requested?
+            #     # If this is the case we might be starting oscilating due to readings lagging behind....
+            #     # Charging: return positive value
+            #     # return new_input, for now netzero mode is not allowed to charge
+            #     return 0
+            # else:
+            #     return 0
     
     def set_power(
             self,
