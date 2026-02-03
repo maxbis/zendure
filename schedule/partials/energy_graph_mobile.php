@@ -17,7 +17,7 @@ $whPerHourMobile = array_filter($whPerHour, function ($row) use ($lastDates) {
 });
 $whPerHourMobile = array_values($whPerHourMobile);
 ?>
-<div class="card energy-graph-mobile">
+<div class="card energy-graph-mobile" style="max-width: 415px;">
     <h2>Watt-hours per hour <span class="energy-unit">(Wh)</span></h2>
     <div class="energy-graph-mobile-tabs" role="tablist">
         <button type="button" class="energy-graph-mobile-tab active" data-tab="graph" role="tab" aria-selected="true">Graph</button>

@@ -885,6 +885,64 @@ body.mobile-dark {
     font-style: italic;
 }
 
+/* Schedule Mobile Card - Tabs (Schedule | Schedule entries) */
+.schedule-mobile-card .schedule-mobile-tabs {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+}
+
+.schedule-mobile-card .schedule-mobile-tab {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: inherit;
+}
+
+.schedule-mobile-card .schedule-mobile-tab:hover {
+    color: var(--text-primary);
+}
+
+.schedule-mobile-card .schedule-mobile-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-color, #64b5f6);
+}
+
+.schedule-mobile-card .schedule-mobile-tab-panels {
+    min-height: 200px;
+    position: relative;
+}
+
+.schedule-mobile-card .schedule-mobile-tab-panel {
+    display: none;
+    width: 100%;
+}
+
+.schedule-mobile-card .schedule-mobile-tab-panel.active {
+    display: block;
+}
+
+.schedule-mobile-card .schedule-mobile-tab-panel[data-tab="entries"] .table-wrapper {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: 50vh;
+}
+
+.schedule-mobile-card .schedule-entries-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
 /* Charge Status - Three Boxes Layout */
 .charge-status-mobile {
     display: flex;
