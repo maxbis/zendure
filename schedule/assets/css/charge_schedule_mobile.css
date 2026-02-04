@@ -1212,9 +1212,9 @@ code {
 
 .price-graph-mobile-popup-dialog {
     background: var(--bg-secondary);
-    border-radius: 8px;
-    width: 54%;
-    max-width: 204px;
+    border-radius: 10px;
+    width: 65%;
+    max-width: 260px;
     padding: 0;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
     border: 1px solid var(--border-color);
@@ -1232,42 +1232,43 @@ code {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 10px;
+    padding: 9px 12px;
     border-bottom: 1px solid var(--border-color);
 }
 
 .price-graph-mobile-popup-title {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
     line-height: 1.2;
 }
 
 .price-graph-mobile-popup-body {
-    padding: 10px;
+    padding: 12px;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-price {
-    font-size: 0.95rem;
+    font-size: 1.2rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #a6c400;
+    /* color: var(--text-primary); */
     margin-bottom: 4px;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-schedule {
-    font-size: 0.65rem;
+    font-size: 0.9rem;
     color: var(--text-secondary);
 }
 
 .price-graph-mobile-popup-footer {
-    padding: 7px 10px;
+    padding: 9px 12px;
     border-top: 1px solid var(--border-color);
 }
 
 .price-graph-mobile-popup-footer .btn {
     width: 100%;
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    padding: 7px 12px;
+    font-size: 0.96rem;
 }
 
 /* Responsive adjustments */
