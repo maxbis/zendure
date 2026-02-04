@@ -122,6 +122,120 @@ function bindPopupContainer(container) {
     priceGraphPopupBoundContainers.add(container);
 }
 
+/**
+ * Returns true when the price graph is shown in mobile context (mobile page or narrow viewport).
+ */
+function isPriceGraphMobile() {
+    return document.body.classList.contains('mobile-dark') || window.innerWidth <= 768;
+}
+
+let priceGraphMobilePopup = null;
+let priceGraphMobilePopupEscapeHandler = null;
+let priceGraphMobilePopupResizeHandler = null;
+
+function ensurePriceGraphMobilePopup() {
+    if (priceGraphMobilePopup) return priceGraphMobilePopup;
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'price-graph-mobile-popup';
+    backdrop.setAttribute('id', 'price-graph-mobile-popup');
+    backdrop.innerHTML = `
+        <div class="price-graph-mobile-popup-dialog">
+            <div class="price-graph-mobile-popup-header">
+                <span class="price-graph-mobile-popup-title"></span>
+                <button type="button" class="modal-close price-graph-mobile-popup-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="price-graph-mobile-popup-body">
+                <div class="price-graph-popup-price"></div>
+                <div class="price-graph-popup-schedule"></div>
+            </div>
+            <div class="price-graph-mobile-popup-footer">
+                <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    priceGraphMobilePopup = backdrop;
+    return backdrop;
+}
+
+function hidePriceGraphMobilePopup() {
+    if (!priceGraphMobilePopup) return;
+    priceGraphMobilePopup.classList.remove('active');
+    if (priceGraphMobilePopupEscapeHandler) {
+        document.removeEventListener('keydown', priceGraphMobilePopupEscapeHandler);
+        priceGraphMobilePopupEscapeHandler = null;
+    }
+    if (priceGraphMobilePopupResizeHandler) {
+        window.removeEventListener('resize', priceGraphMobilePopupResizeHandler);
+        priceGraphMobilePopupResizeHandler = null;
+    }
+}
+
+function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
+    const popup = ensurePriceGraphMobilePopup();
+    if (!bar || !popup) return;
+
+    const titleEl = popup.querySelector('.price-graph-mobile-popup-title');
+    const priceEl = popup.querySelector('.price-graph-popup-price');
+    const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+
+    const hourValue = parseInt(bar.dataset.hour, 10);
+    const timeRange = formatHourRange(hourValue);
+
+    const rawPrice = bar.dataset.price;
+    const isProxy = bar.dataset.proxy === 'true';
+    const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
+    const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
+
+    const scheduleValue = bar.dataset.scheduleValue;
+    const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
+
+    titleEl.textContent = `Time slot ${timeRange || '—'}`;
+    priceEl.textContent = priceDisplay;
+    scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+
+    const close = () => {
+        hidePriceGraphMobilePopup();
+    };
+
+    const editBtn = popup.querySelector('.price-graph-mobile-popup-edit');
+    const closeBtn = popup.querySelector('.price-graph-mobile-popup-close');
+
+    editBtn.onclick = () => {
+        close();
+        if (editModal) {
+            const existingValue = scheduleMap[key];
+            if (existingValue !== undefined) {
+                editModal.open(key, existingValue);
+            } else {
+                editModal.open(null, null, key);
+            }
+        }
+    };
+
+    closeBtn.onclick = close;
+
+    popup.onclick = (e) => {
+        if (e.target === popup) close();
+    };
+    const dialog = popup.querySelector('.price-graph-mobile-popup-dialog');
+    if (dialog) {
+        dialog.onclick = (e) => e.stopPropagation();
+    }
+
+    priceGraphMobilePopupEscapeHandler = (e) => {
+        if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', priceGraphMobilePopupEscapeHandler);
+
+    priceGraphMobilePopupResizeHandler = close;
+    window.addEventListener('resize', priceGraphMobilePopupResizeHandler);
+
+    popup.classList.add('active');
+}
+
 function showPriceGraphPopup(bar, container) {
     const popup = ensurePriceGraphPopup();
     if (!bar || !container || !popup) return;
@@ -444,13 +558,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.addEventListener('mouseleave', hidePopup);
             barDiv.addEventListener('focus', showPopup);
             barDiv.addEventListener('blur', hidePopup);
-            // Add click handler (same as schedule overview bars)
+            // Add click handler: on mobile show info popup first; on desktop open edit modal directly
             barDiv.addEventListener('click', () => {
-                if (editModal) {
-                    // Check if entry exists
+                if (isPriceGraphMobile()) {
+                    showPriceGraphMobilePopup(barDiv, editModal, scheduleMap, key);
+                } else if (editModal) {
                     const existingValue = scheduleMap[key];
-                    // If existingValue is undefined, we pass key as the 3rd argument (prefillKey)
-                    // and null as the 1st argument (key) to indicate "Add Mode"
                     if (existingValue !== undefined) {
                         editModal.open(key, existingValue);
                     } else {
