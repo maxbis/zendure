@@ -1,4 +1,10 @@
 <!-- Modal -->
+<style>
+    .form-radio {
+        transform: scale(0.8);
+    }
+</style>
+
 <div class="modal-backdrop" id="edit-modal">
     <div class="modal-dialog">
         <div class="modal-header">
@@ -19,11 +25,11 @@
             <div class="helper-text" style="margin-bottom:15px;">Use <code>*</code> for wildcards.</div>
 
             <div class="form-group">
-                <label>Value Mode</label>
-                <div style="display:flex; gap:15px; margin-top:5px;">
-                    <label><input type="radio" name="val-mode" value="fixed" checked> Fixed Watts (W)</label>
-                    <label><input type="radio" name="val-mode" value="netzero" label="Net Zero"> Net Zero</label>
-                    <label><input type="radio" name="val-mode" value="netzero+" label="☀️ Only">Net Zero+/Solar Only</label>
+                <label>Mode</label>
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <label>Watts&nbsp;(W)</label><input class="form-radio" type="radio" name="val-mode" value="fixed" checked> 
+                    <label>NetZero</label><input class="form-radio" type="radio" name="val-mode" value="netzero" label="Net Zero"> 
+                    <label>NetZero+</label><input class="form-radio" type="radio" name="val-mode" value="netzero+" label="☀️ Only">
                 </div>
             </div>
             <div class="form-group" id="group-watts">

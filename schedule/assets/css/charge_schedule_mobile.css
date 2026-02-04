@@ -758,6 +758,10 @@ body.mobile-dark {
     margin-left: 10px;
 }
 
+.energy-graph-mobile-daily-table .col-day {
+    width: 30px;
+}
+
 .energy-graph-mobile-daily-table .col-date {
     width: 90px;
 }
@@ -777,12 +781,14 @@ body.mobile-dark {
 }
 
 .energy-graph-mobile-daily-table th:first-child,
-.energy-graph-mobile-daily-table td:first-child {
+.energy-graph-mobile-daily-table td:first-child,
+.energy-graph-mobile-daily-table th:nth-child(2),
+.energy-graph-mobile-daily-table td:nth-child(2) {
     text-align: left;
 }
 
-.energy-graph-mobile-daily-table th:not(:first-child),
-.energy-graph-mobile-daily-table td:not(:first-child) {
+.energy-graph-mobile-daily-table th:nth-child(n+3),
+.energy-graph-mobile-daily-table td:nth-child(n+3) {
     text-align: right;
     padding-left: 12px;
     padding-right: 0;
@@ -802,6 +808,12 @@ body.mobile-dark {
 .energy-graph-mobile-daily-table .wh-neg {
     color: #e57373;
     font-weight: 500;
+}
+
+/* Current day row: same orange marker as schedule .slot-current (#ff9800) */
+
+.energy-graph-mobile-daily-table tbody tr.row-current {
+    font-weight: 600;
 }
 
 .energy-graph-mobile-no-data {

@@ -57,7 +57,7 @@ require_once __DIR__ . '/energy_graph_data.php';
         <div class="energy-graph-header">
             <div class="energy-graph-heading">
                 <h2 class="section-title">Watt-hours per hour</h2>
-                <p class="energy-graph-subtitle">Data from automation status (last <?php echo $retentionDays; ?> days).</p>
+                <p class="energy-graph-subtitle">Data from automation status (today and last <?php echo isset($energyGraphDaysBack) ? $energyGraphDaysBack : 3; ?> days).</p>
                 <div class="energy-graph-chart">
                     <div class="energy-graph-canvas">
                         <canvas id="energyChart"></canvas>
@@ -105,13 +105,40 @@ require_once __DIR__ . '/energy_graph_data.php';
 <script>
     (function() {
         var data = window.energyWhData || [];
-        var values = data.map(function(d) { return Number(d.wh || 0); });
-        var barColors = values.map(function(v) {
+        
+        // Non-linear transform functions
+        function transformWh(v) {
+            if (v === 0) return 0;
+            var sign = v < 0 ? -1 : 1;
+            var abs = Math.abs(v);
+            if (abs <= 200) return sign * (abs / 200);
+            if (abs <= 400) return sign * (1 + (abs - 200) / 200);
+            if (abs <= 800) return sign * (2 + (abs - 400) / 400);
+            return sign * 3; // clamped at ±800
+        }
+        
+        function inverseTransformWh(tv) {
+            if (tv === 0) return 0;
+            var sign = tv < 0 ? -1 : 1;
+            var abs = Math.abs(tv);
+            if (abs <= 1) return sign * (abs * 200);
+            if (abs <= 2) return sign * (200 + (abs - 1) * 200);
+            return sign * (400 + (abs - 2) * 400);
+        }
+        
+        // Data preparation
+        var originalValues = data.map(function(d) { return Number(d.wh || 0); });
+        var clippedValues = originalValues.map(function(v) { return Math.max(-800, Math.min(800, v)); });
+        var values = clippedValues.map(transformWh);
+        
+        // Colors based on original sign
+        var barColors = originalValues.map(function(v) {
             return v >= 0 ? 'rgba(76, 175, 80, 0.7)' : 'rgba(229, 57, 53, 0.7)';
         });
-        var borderColors = values.map(function(v) {
+        var borderColors = originalValues.map(function(v) {
             return v >= 0 ? 'rgba(76, 175, 80, 1)' : 'rgba(229, 57, 53, 1)';
         });
+        
         // Short labels: date at 00:00 (DD-MM), 06:00, 12:00, 18:00 only
         var displayLabels = data.map(function(d) {
             var label = d.hourLabel;
@@ -143,27 +170,24 @@ require_once __DIR__ . '/energy_graph_data.php';
         var ctx = document.getElementById('energyChart');
         if (!ctx || typeof Chart === 'undefined') return;
 
-        var maxValue = values.reduce(function(acc, v) { return Math.max(acc, v); }, 0);
-        var suggestedMax = Math.max(10, Math.ceil(maxValue * 1.2));
-
         new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: displayLabels,
-                    datasets: [{
+                datasets: [{
                     label: 'Watt-hours',
                     data: values,
                     backgroundColor: barColors,
                     borderColor: borderColors,
-                        borderWidth: 1,
-                        minBarLength: 0,
-                        barPercentage: 0.9,
-                        categoryPercentage: 0.9
+                    borderWidth: 1,
+                    minBarLength: 0,
+                    barPercentage: 0.9,
+                    categoryPercentage: 0.9
                 }]
             },
             options: {
                 responsive: true,
-                    maintainAspectRatio: false,
+                maintainAspectRatio: false,
                 plugins: {
                     title: {
                         display: false,
@@ -177,19 +201,42 @@ require_once __DIR__ . '/energy_graph_data.php';
                             title: function(context) {
                                 var i = context[0].dataIndex;
                                 return (data[i] && data[i].hourLabel) ? data[i].hourLabel : context[0].label;
+                            },
+                            label: function(context) {
+                                var i = context.dataIndex;
+                                var v = originalValues[i] || 0;
+                                var label = v.toFixed(0) + ' Wh';
+                                if (v > 800) {
+                                    label += ' (clipped at 800)';
+                                } else if (v < -800) {
+                                    label += ' (clipped at -800)';
+                                }
+                                return label;
                             }
                         }
                     }
                 },
                 scales: {
                     y: {
+                        min: -3,
+                        max: 3,
                         beginAtZero: true,
-                            suggestedMax: suggestedMax,
-                            title: { display: true, text: 'Wh' }
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(tickValue) {
+                                return inverseTransformWh(tickValue).toFixed(0);
+                            }
+                        },
+                        title: { display: true, text: 'Wh (non-linear scale)' }
                     },
                     x: {
                         type: 'category',
                         title: { display: false, text: 'Hour' },
+                        grid: {
+                            color: function(context) {
+                                return isDateLabel[context.index] ? '#555' : '#e8e8e8';
+                            }
+                        },
                         ticks: {
                             autoSkip: false,
                             maxRotation: 45,

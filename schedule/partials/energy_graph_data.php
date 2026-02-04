@@ -8,8 +8,12 @@ date_default_timezone_set('Europe/Amsterdam');
 require_once __DIR__ . '/../../login/validate.php';
 
 $dataFile = __DIR__ . '/../../data/automation_status.json';
-$retentionDays = 4;
-$retentionSeconds = $retentionDays * 24 * 60 * 60;
+// Graph: today plus last 3 days (4 calendar days)
+$energyGraphDaysBack = 3;
+// Table: today plus last 7 days (up to 8 lines)
+$energyTableDaysBack = 7;
+$retentionDays = $energyGraphDaysBack + 1; // for subtitle: "today and last N days"
+$retentionSeconds = ($energyTableDaysBack + 1) * 24 * 60 * 60;
 $baseWh = 5760; // 5.76 kWh – base for daily percentage
 $baseKwh = $baseWh / 1000;
 
@@ -85,12 +89,22 @@ function computeWhPerHour(array $entries, $now)
 }
 
 $now = time();
-$whPerHour = computeWhPerHour($entries, $now);
+$whPerHourFull = computeWhPerHour($entries, $now);
 
-// Aggregate Wh per day (date = first 10 chars of hourLabel)
+// Allowed dates for table: today + last 7 days (up to 8 lines)
+$today = date('Y-m-d', $now);
+$tableAllowedDates = [];
+for ($i = 0; $i <= $energyTableDaysBack; $i++) {
+    $tableAllowedDates[] = date('Y-m-d', strtotime("-$i days", $now));
+}
+
+// Aggregate Wh per day from full data, then restrict to table window
 $whPerDay = [];
-foreach ($whPerHour as $row) {
+foreach ($whPerHourFull as $row) {
     $date = substr($row['hourLabel'], 0, 10);
+    if (!in_array($date, $tableAllowedDates, true)) {
+        continue;
+    }
     if (!isset($whPerDay[$date])) {
         $whPerDay[$date] = ['pos' => 0, 'neg' => 0];
     }
@@ -101,3 +115,13 @@ foreach ($whPerHour as $row) {
         $whPerDay[$date]['neg'] += $wh;
     }
 }
+krsort($whPerDay, SORT_STRING); // most recent first
+
+// Restrict graph to today and the last 3 days only
+$graphAllowedDates = [];
+for ($i = 0; $i <= $energyGraphDaysBack; $i++) {
+    $graphAllowedDates[] = date('Y-m-d', strtotime("-$i days", $now));
+}
+$whPerHour = array_values(array_filter($whPerHourFull, function ($row) use ($graphAllowedDates) {
+    return in_array(substr($row['hourLabel'], 0, 10), $graphAllowedDates, true);
+}));

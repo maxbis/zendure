@@ -2,20 +2,9 @@
 /**
  * Energy Graph Partial - Mobile Version
  * Tabs: Graph (Wh per hour) and Daily totals. Dark mode styling.
- * Shows only the last 3 days in the graph to save horizontal space.
+ * Graph: today + 3 days (same as desktop). Table: today + 7 days (8 lines, scroll).
  */
 require_once __DIR__ . '/energy_graph_data.php';
-
-$mobileRetentionDays = 3;
-$dates = array_unique(array_map(function ($row) {
-    return substr($row['hourLabel'], 0, 10);
-}, $whPerHour));
-rsort($dates, SORT_STRING);
-$lastDates = array_slice($dates, 0, $mobileRetentionDays);
-$whPerHourMobile = array_filter($whPerHour, function ($row) use ($lastDates) {
-    return in_array(substr($row['hourLabel'], 0, 10), $lastDates);
-});
-$whPerHourMobile = array_values($whPerHourMobile);
 ?>
 <div class="card energy-graph-mobile">
     <h3 class="card-header">Watt-hours per hour <span class="energy-unit">(Wh)</span></h3>
@@ -36,12 +25,14 @@ $whPerHourMobile = array_values($whPerHourMobile);
                 <table>
                     <colgroup>
                         <col class="col-date">
+                        <col class="col-day">
                         <col class="col-wh"><col class="col-wh"><col class="col-pct"><col class="col-pct"><col class="col-pct">
                         <col class="col-fill">
                     </colgroup>
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Day</th>
                             <th>Wh+</th>
                             <th>Wh-</th>
                             <!-- <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (gained)'); ?>">%+</th> -->
@@ -59,9 +50,11 @@ $whPerHourMobile = array_values($whPerHourMobile);
                                 $pctPos = ($pos / $baseWh) * 100;
                                 $pctNeg = ($neg / $baseWh) * 100;
                                 $pctNet = ($net / $baseWh) * 100;
+                                $isToday = ($date === date('Y-m-d'));
                             ?>
-                            <tr>
+                            <tr<?php echo $isToday ? ' class="row-current"' : ''; ?>>
                                 <td><?php echo htmlspecialchars($date); ?></td>
+                                <td><?php echo htmlspecialchars(strtolower(substr(date('l', strtotime($date)), 0, 2))); ?></td>
                                 <td class="wh-pos">+<?php echo number_format(round($pos, 0)); ?></td>
                                 <td class="wh-neg"><?php echo number_format(round($neg, 0)); ?></td>
                                 <!-- <td class="wh-pos"><?php echo number_format($pctPos, 1); ?>%</td> -->
@@ -80,18 +73,41 @@ $whPerHourMobile = array_values($whPerHourMobile);
     </div>
 </div>
 <script>
-    window.energyWhDataMobile = <?php echo json_encode($whPerHourMobile); ?>;
+    window.energyWhDataMobile = <?php echo json_encode($whPerHour); ?>;
 </script>
 <script>
     (function() {
         var data = window.energyWhDataMobile || [];
-        var values = data.map(function(d) { return Number(d.wh || 0); });
-        var barColors = values.map(function(v) {
+
+        function transformWh(v) {
+            if (v === 0) return 0;
+            var sign = v < 0 ? -1 : 1;
+            var abs = Math.abs(v);
+            if (abs <= 200) return sign * (abs / 200);
+            if (abs <= 400) return sign * (1 + (abs - 200) / 200);
+            if (abs <= 800) return sign * (2 + (abs - 400) / 400);
+            return sign * 3;
+        }
+        function inverseTransformWh(tv) {
+            if (tv === 0) return 0;
+            var sign = tv < 0 ? -1 : 1;
+            var abs = Math.abs(tv);
+            if (abs <= 1) return sign * (abs * 200);
+            if (abs <= 2) return sign * (200 + (abs - 1) * 200);
+            return sign * (400 + (abs - 2) * 400);
+        }
+
+        var originalValues = data.map(function(d) { return Number(d.wh || 0); });
+        var clippedValues = originalValues.map(function(v) { return Math.max(-800, Math.min(800, v)); });
+        var values = clippedValues.map(transformWh);
+
+        var barColors = originalValues.map(function(v) {
             return v >= 0 ? 'rgba(129, 199, 132, 0.7)' : 'rgba(229, 115, 115, 0.7)';
         });
-        var borderColors = values.map(function(v) {
+        var borderColors = originalValues.map(function(v) {
             return v >= 0 ? 'rgba(129, 199, 132, 1)' : 'rgba(229, 115, 115, 1)';
         });
+
         var displayLabels = data.map(function(d) {
             var label = d.hourLabel;
             if (!label || typeof label !== 'string') return '';
@@ -121,9 +137,6 @@ $whPerHourMobile = array_values($whPerHourMobile);
 
         var ctx = document.getElementById('energyChartMobile');
         if (!ctx || typeof Chart === 'undefined') return;
-
-        var maxValue = values.reduce(function(acc, v) { return Math.max(acc, Math.abs(v)); }, 0);
-        var suggestedMax = Math.max(10, Math.ceil(maxValue * 1.2));
 
         var tickColor = '#b0b0b0';
         var dateLabelColor = '#64b5f6';
@@ -155,21 +168,42 @@ $whPerHourMobile = array_values($whPerHourMobile);
                             title: function(context) {
                                 var i = context[0].dataIndex;
                                 return (data[i] && data[i].hourLabel) ? data[i].hourLabel : context[0].label;
+                            },
+                            label: function(context) {
+                                var i = context.dataIndex;
+                                var v = originalValues[i] || 0;
+                                var label = v.toFixed(0) + ' Wh';
+                                if (v > 800) label += ' (clipped at 800)';
+                                else if (v < -800) label += ' (clipped at -800)';
+                                return label;
                             }
                         }
                     }
                 },
                 scales: {
                     y: {
+                        min: -3,
+                        max: 3,
                         beginAtZero: true,
-                        suggestedMax: suggestedMax,
                         title: { display: false },
-                        ticks: { color: tickColor, font: { size: 11 } },
+                        ticks: {
+                            stepSize: 1,
+                            color: tickColor,
+                            font: { size: 11 },
+                            callback: function(tickValue) {
+                                return inverseTransformWh(tickValue).toFixed(0);
+                            }
+                        },
                         grid: { color: gridColor }
                     },
                     x: {
                         type: 'category',
                         title: { display: false },
+                        grid: {
+                            color: function(context) {
+                                return isDateLabel[context.index] ? '#888' : gridColor;
+                            }
+                        },
                         ticks: {
                             autoSkip: false,
                             maxRotation: 45,
@@ -178,8 +212,7 @@ $whPerHourMobile = array_values($whPerHourMobile);
                                 return isDateLabel[context.index] ? dateLabelColor : tickColor;
                             },
                             font: { size: 11 }
-                        },
-                        grid: { color: gridColor }
+                        }
                     }
                 }
             }

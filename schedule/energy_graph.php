@@ -7,8 +7,9 @@ date_default_timezone_set('Europe/Amsterdam');
 require_once __DIR__ . '/../login/validate.php';
 
 $dataFile = __DIR__ . '/../data/automation_status.json';
-$retentionDays = 3;
-$retentionSeconds = $retentionDays * 24 * 60 * 60;
+$energyGraphDaysBack = 3; // graph: today plus 3 days back
+$energyTableDaysBack = 7; // table: today plus 7 days back (up to 8 lines)
+$retentionSeconds = ($energyTableDaysBack + 1) * 24 * 60 * 60;
 $baseWh = 5760; // 5.76 kWh – base for daily percentage
 
 // Load automation status data
@@ -82,18 +83,36 @@ function computeWhPerHour(array $entries, $now) {
 }
 
 $now = time();
-$whPerHour = computeWhPerHour($entries, $now);
+$whPerHourFull = computeWhPerHour($entries, $now);
 
-// Aggregate Wh per day (date = first 10 chars of hourLabel)
+$today = date('Y-m-d', $now);
+
+// Table: today + last 7 days (up to 8 lines)
+$tableAllowedDates = [];
+for ($i = 0; $i <= $energyTableDaysBack; $i++) {
+    $tableAllowedDates[] = date('Y-m-d', strtotime("-$i days", $now));
+}
 $whPerDay = [];
-foreach ($whPerHour as $row) {
+foreach ($whPerHourFull as $row) {
     $date = substr($row['hourLabel'], 0, 10);
+    if (!in_array($date, $tableAllowedDates, true)) {
+        continue;
+    }
     if (!isset($whPerDay[$date])) {
         $whPerDay[$date] = 0;
     }
     $whPerDay[$date] += $row['wh'];
 }
 krsort($whPerDay, SORT_STRING); // most recent first
+
+// Graph: restrict to today and the last 3 days only
+$graphAllowedDates = [];
+for ($i = 0; $i <= $energyGraphDaysBack; $i++) {
+    $graphAllowedDates[] = date('Y-m-d', strtotime("-$i days", $now));
+}
+$whPerHour = array_values(array_filter($whPerHourFull, function ($row) use ($graphAllowedDates) {
+    return in_array(substr($row['hourLabel'], 0, 10), $graphAllowedDates, true);
+}));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -128,7 +147,7 @@ krsort($whPerDay, SORT_STRING); // most recent first
     <main class="page">
         <header class="header">
             <h1>Watt-hours per hour</h1>
-            <p class="subtitle">Data from automation status (last <?php echo $retentionDays; ?> days).</p>
+            <p class="subtitle">Data from automation status (today and last <?php echo $energyGraphDaysBack; ?> days).</p>
         </header>
         <section class="card">
             <canvas id="energyChart" height="120"></canvas>
@@ -156,14 +175,40 @@ krsort($whPerDay, SORT_STRING); // most recent first
     <script>
         (function() {
             var data = window.energyWhData || [];
-            var values = data.map(function(d) { return d.wh; });
-            // Green for charging (positive), red for discharging (negative) – match schedule_renderer.js
-            var barColors = values.map(function(v) {
+            
+            // Non-linear transform functions
+            function transformWh(v) {
+                if (v === 0) return 0;
+                var sign = v < 0 ? -1 : 1;
+                var abs = Math.abs(v);
+                if (abs <= 200) return sign * (abs / 200);
+                if (abs <= 400) return sign * (1 + (abs - 200) / 200);
+                if (abs <= 800) return sign * (2 + (abs - 400) / 400);
+                return sign * 3; // clamped at ±800
+            }
+            
+            function inverseTransformWh(tv) {
+                if (tv === 0) return 0;
+                var sign = tv < 0 ? -1 : 1;
+                var abs = Math.abs(tv);
+                if (abs <= 1) return sign * (abs * 200);
+                if (abs <= 2) return sign * (200 + (abs - 1) * 200);
+                return sign * (400 + (abs - 2) * 400);
+            }
+            
+            // Data preparation
+            var originalValues = data.map(function(d) { return Number(d.wh || 0); });
+            var clippedValues = originalValues.map(function(v) { return Math.max(-800, Math.min(800, v)); });
+            var values = clippedValues.map(transformWh);
+            
+            // Colors based on original sign
+            var barColors = originalValues.map(function(v) {
                 return v >= 0 ? 'rgba(102, 187, 106, 0.7)' : 'rgba(239, 83, 80, 0.7)';
             });
-            var barBorderColors = values.map(function(v) {
+            var barBorderColors = originalValues.map(function(v) {
                 return v >= 0 ? 'rgba(102, 187, 106, 1)' : 'rgba(239, 83, 80, 1)';
             });
+            
             // Short labels: date at 00:00, "02:00", "04:00" etc every 2h, blank at odd hours
             var displayLabels = data.map(function(d) {
                 var label = d.hourLabel;
@@ -174,6 +219,11 @@ krsort($whPerDay, SORT_STRING); // most recent first
                 if (hour === 0) return parts[0] || '';
                 if (hour % 2 === 0) return ('0' + hour).slice(-2) + ':00';
                 return ' '; // odd hours: minimal label
+            });
+            var isDateLabel = data.map(function(d) {
+                var parts = (d.hourLabel || '').split(' ');
+                var hour = parseInt((parts[1] || '00:00').split(':')[0], 10) || 0;
+                return hour === 0;
             });
 
             var ctx = document.getElementById('energyChart');
@@ -204,18 +254,42 @@ krsort($whPerDay, SORT_STRING); // most recent first
                                 title: function(context) {
                                     var i = context[0].dataIndex;
                                     return (data[i] && data[i].hourLabel) ? data[i].hourLabel : context[0].label;
+                                },
+                                label: function(context) {
+                                    var i = context.dataIndex;
+                                    var v = originalValues[i] || 0;
+                                    var label = v.toFixed(0) + ' Wh';
+                                    if (v > 800) {
+                                        label += ' (clipped at 800)';
+                                    } else if (v < -800) {
+                                        label += ' (clipped at -800)';
+                                    }
+                                    return label;
                                 }
                             }
                         }
                     },
                     scales: {
                         y: {
+                            min: -3,
+                            max: 3,
                             beginAtZero: true,
-                            title: { display: true, text: 'Wh' }
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(tickValue) {
+                                    return inverseTransformWh(tickValue).toFixed(0);
+                                }
+                            },
+                            title: { display: true, text: 'Wh (non-linear scale)' }
                         },
                         x: {
                             type: 'category',
                             title: { display: true, text: 'Hour' },
+                            grid: {
+                                color: function(context) {
+                                    return isDateLabel[context.index] ? '#555' : '#e8e8e8';
+                                }
+                            },
                             ticks: {
                                 autoSkip: false,
                                 maxRotation: 45,
