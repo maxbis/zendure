@@ -187,6 +187,7 @@ class EditModal {
                 document.getElementById('inp-watts').value = value || '';
             }
         }
+        document.getElementById('inp-limit-1-hour').checked = true;
         this.modal.classList.add('active');
         
         // Auto-focus on first input for quicker editing
