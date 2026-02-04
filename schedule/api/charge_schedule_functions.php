@@ -51,6 +51,27 @@ function extractTimeFromKey($key)
     return $timePart;
 }
 
+/**
+ * Given a 12-char schedule key (YYYYMMDDHHmm) with no wildcards,
+ * return the key for the next calendar hour, or null if key is invalid.
+ */
+function getNextHourKey($key)
+{
+    if (strlen($key) !== 12 || strpos($key, '*') !== false) {
+        return null;
+    }
+    $datePart = substr($key, 0, 8);
+    $timePart = substr($key, 8, 4);
+    $dateStr = substr($datePart, 0, 4) . '-' . substr($datePart, 4, 2) . '-' . substr($datePart, 6, 2);
+    $timeStr = substr($timePart, 0, 2) . ':' . substr($timePart, 2, 2) . ':00';
+    $ts = strtotime($dateStr . ' ' . $timeStr);
+    if ($ts === false) {
+        return null;
+    }
+    $ts += 3600;
+    return date('Ymd', $ts) . date('H', $ts) . '00';
+}
+
 function matchesAndBeforeTime($entryKey, $datetime, $slotTime)
 {
     $datePart = substr($datetime, 0, 8);

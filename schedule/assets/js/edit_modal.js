@@ -303,6 +303,10 @@ class EditModal {
         const key = d + t;
         const payload = { key, value: val };
 
+        if (document.getElementById('inp-limit-1-hour').checked && key.indexOf('*') === -1) {
+            payload.limit1hour = true;
+        }
+
         // Use PUT for both add and edit (originalKey is optional)
         // POST is still supported on the backend for backward compatibility
         if (this.currentOriginalKey) {

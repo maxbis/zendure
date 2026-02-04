@@ -41,6 +41,33 @@
         background: #1976d2;
         color: #fff !important;
     }
+    #edit-modal #inp-date,
+    #edit-modal #inp-time {
+        width: 80%;
+        max-width: 80%;
+        box-sizing: border-box;
+    }
+    .watts-limit-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 4px;
+    }
+    .watts-limit-row input[type="number"] {
+        width: 30%;
+        max-width: 30%;
+        box-sizing: border-box;
+    }
+    .watts-limit-row .limit-1h-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        margin-left: auto;
+    }
+    .watts-limit-row .limit-1h-row input {
+        width: auto;
+    }
 </style>
 
 <div class="modal-backdrop" id="edit-modal">
@@ -72,7 +99,13 @@
             </div>
             <div class="form-group" id="group-watts">
                 <label>Watts (Positive = Charge, Negative = Discharge)</label>
-                <input type="number" id="inp-watts" placeholder="0">
+                <div class="watts-limit-row">
+                    <input type="number" id="inp-watts" placeholder="0">
+                    <label for="inp-limit-1-hour" class="limit-1h-row">
+                        <span>Limit 1 hour</span>
+                        <input type="checkbox" id="inp-limit-1-hour" checked>
+                    </label>
+                </div>
             </div>
         </div>
         <div class="modal-footer">

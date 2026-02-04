@@ -124,6 +124,13 @@ try {
             // Set the new entry (or update existing one)
             $schedule[$key] = $val;
 
+            if (!empty($input['limit1hour']) && strpos($key, '*') === false) {
+                $nextKey = getNextHourKey($key);
+                if ($nextKey !== null && !isset($schedule[$nextKey])) {
+                    $schedule[$nextKey] = 0;
+                }
+            }
+
             if (writeScheduleAtomic($dataFile, $schedule)) {
                 $response = ['success' => true];
             } else {
