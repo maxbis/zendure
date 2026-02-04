@@ -1,7 +1,45 @@
 <!-- Modal -->
 <style>
-    .form-radio {
-        transform: scale(0.8);
+    .mode-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 5px;
+    }
+    .mode-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        background:#868686;
+        border: 1px solid #bbb;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #202020;
+    }
+    .mode-btn input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .mode-btn:has(input:checked) {
+        background:rgb(245, 255, 155);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    /* Override .form-group label color so button text is dark on grey */
+    .form-group .mode-btn,
+    .form-group .mode-btn span {
+        color: #202020;
+    }
+    /* Readable selection in date/time/number inputs (white on blue) */
+    #edit-modal input::selection {
+        background: #1976d2;
+        color: #fff !important;
+    }
+    #edit-modal input::-moz-selection {
+        background: #1976d2;
+        color: #fff !important;
     }
 </style>
 
@@ -26,10 +64,10 @@
 
             <div class="form-group">
                 <label>Mode</label>
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <label>Watts&nbsp;(W)</label><input class="form-radio" type="radio" name="val-mode" value="fixed" checked> 
-                    <label>NetZero</label><input class="form-radio" type="radio" name="val-mode" value="netzero" label="Net Zero"> 
-                    <label>NetZero+</label><input class="form-radio" type="radio" name="val-mode" value="netzero+" label="☀️ Only">
+                <div class="mode-buttons">
+                    <label class="mode-btn"><input type="radio" name="val-mode" value="fixed" checked><span>Watts (W)</span></label>
+                    <label class="mode-btn"><input type="radio" name="val-mode" value="netzero" label="Net Zero"><span>NetZero</span></label>
+                    <label class="mode-btn"><input type="radio" name="val-mode" value="netzero+" label="☀️ Only"><span>NetZero+</span></label>
                 </div>
             </div>
             <div class="form-group" id="group-watts">
