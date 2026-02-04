@@ -150,7 +150,7 @@ function ensurePriceGraphMobilePopup() {
                 <div class="price-graph-popup-schedule"></div>
             </div>
             <div class="price-graph-mobile-popup-footer">
-                <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit</button>
+                <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
             </div>
         </div>
     `;
