@@ -96,7 +96,8 @@ class StatusApi:
         self.api_url = api_url
         self.logger = logger
     
-    def post_update(self, event_type: str, old_value: any = None, new_value: any = None) -> bool:
+    def post_update(self, event_type: str, old_value: any = None, new_value: any = None,
+                    p1_total_power: Optional[int] = None) -> bool:
         """
         Post a status update to the automation status API.
         
@@ -104,6 +105,7 @@ class StatusApi:
             event_type: Type of event ('start', 'stop', 'change')
             old_value: Previous value (for change events)
             new_value: New value (for change events)
+            p1_total_power: Optional last P1 meter total power (W) to attach to the entry.
         
         Returns:
             True if successful, False otherwise
@@ -120,6 +122,8 @@ class StatusApi:
                 'oldValue': old_value,
                 'newValue': new_value
             }
+            if p1_total_power is not None:
+                payload['p1TotalPower'] = p1_total_power
             
             response = requests.post(self.api_url, json=payload, timeout=5, allow_redirects=False)
             
@@ -412,6 +416,7 @@ class AutomationApp:
         self.old_value = None
         self.value = 0
         self.zero_count = 0
+        self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
 
 
     def initialize(self) -> bool:
@@ -536,7 +541,7 @@ class AutomationApp:
                 self.logger.info("Schedule data refreshed from API")
                 
                 # (print_accumulators removed)
-                self.status_api.post_update('Rescan', None, None)
+                self.status_api.post_update('Rescan', None, None, p1_total_power=self.last_p1_total_power)
             except Exception as e:
                 self.logger.error(f"Failed to refresh schedule: {e}")
 
@@ -591,7 +596,13 @@ class AutomationApp:
             result = self.controller.set_power(desired_power, p1_data=p1_data)
             if result.success:
                 self.logger.info(f"Power: {result.power} (desired: {desired_power})")
-                self.status_api.post_update('change', self.old_value, result.power)
+                p1_w = None
+                if p1_data is not None and p1_data.get('total_power') is not None:
+                    try:
+                        p1_w = int(p1_data['total_power'])
+                    except (TypeError, ValueError):
+                        pass
+                self.status_api.post_update('change', self.old_value, result.power, p1_total_power=p1_w)
                 # Update self.value with the actual power that was set (result.power)
                 # This is important for netzero modes where calculated power may differ from 'netzero'
                 self.value = result.power
@@ -656,7 +667,7 @@ class AutomationApp:
                 self.logger.error(f"   Failed to set power to 0: {result.error}")
             
             if self.status_api:
-                self.status_api.post_update('stop', self.value, None)
+                self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
 
     def run(self):
         """Main execution method."""
@@ -684,6 +695,11 @@ class AutomationApp:
 
                 # 1. Accumulate Data
                 p1_data = self._accumulate_p1_data()
+                if p1_data is not None and p1_data.get('total_power') is not None:
+                    try:
+                        self.last_p1_total_power = int(p1_data['total_power'])
+                    except (TypeError, ValueError):
+                        pass
                 
                 # 2. Check input
                 if not self._handle_user_input():
@@ -722,7 +738,7 @@ class AutomationApp:
         except Exception as e:
             self.logger.error(f"Fatal error in main loop: {e}")
             if self.status_api:
-                self.status_api.post_update('stop', self.value, None)
+                self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
             raise
         finally:
             self._shutdown()

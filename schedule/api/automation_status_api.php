@@ -221,7 +221,8 @@ try {
             'timestamp' => isset($input['timestamp']) ? (int)$input['timestamp'] : time(),
             'type' => $input['type'],
             'oldValue' => isset($input['oldValue']) ? $input['oldValue'] : null,
-            'newValue' => isset($input['newValue']) ? $input['newValue'] : null
+            'newValue' => isset($input['newValue']) ? $input['newValue'] : null,
+            'p1TotalPower' => array_key_exists('p1TotalPower', $input) ? $input['p1TotalPower'] : null
         ];
         
         $data = loadStatusData($dataFile);
@@ -242,6 +243,9 @@ try {
                 $lastNewValue === $entry['newValue']) {
                 // Match found: update timestamp of last entry instead of adding new one
                 $data['entries'][$lastIndex]['timestamp'] = $entry['timestamp'];
+                if (array_key_exists('p1TotalPower', $entry) && $entry['p1TotalPower'] !== null) {
+                    $data['entries'][$lastIndex]['p1TotalPower'] = $entry['p1TotalPower'];
+                }
                 $shouldUpdateTimestamp = true;
             }
         }

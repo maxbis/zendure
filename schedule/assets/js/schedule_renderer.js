@@ -728,7 +728,12 @@ function formatAutomationEntryDetails(entry) {
         parts.push(formatAutomationValue(newValue));
     }
     const details = parts.join(' ');
-    return type.charAt(0).toUpperCase() + type.slice(1) + (details ? ' (' + details + ')' : '');
+    let result = type.charAt(0).toUpperCase() + type.slice(1) + (details ? ' (' + details + ')' : '');
+    if (entry.p1TotalPower != null) {
+        const p1Formatted = Number(entry.p1TotalPower).toLocaleString();
+        result += ' · Grid ' + p1Formatted + ' W';
+    }
+    return result;
 }
 
 function formatAutomationValue(value) {
