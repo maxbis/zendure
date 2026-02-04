@@ -16,7 +16,7 @@
     <div class="metric-section">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3 class="card-header">🤖 Automation Status</h3>
-            <button class="automation-refresh-btn" id="automation-refresh-btn" title="Refresh (hold for full reload)">
+            <button class="automation-refresh-btn no-select" id="automation-refresh-btn" title="Refresh (hold for full reload)">
                 <span class="refresh-icon">↻</span>
                 <span class="refresh-text">Refresh</span>
             </button>
