@@ -537,7 +537,8 @@ body {
 .schedule-list::-webkit-scrollbar,
 .table-wrapper::-webkit-scrollbar,
 .bar-graph-row::-webkit-scrollbar,
-.price-graph-row::-webkit-scrollbar {
+.price-graph-row::-webkit-scrollbar,
+.energy-graph-daily-table-wrapper::-webkit-scrollbar {
     width: 8px; /* For vertical */
     height: 8px; /* For horizontal */
 }
@@ -546,7 +547,8 @@ body {
 .schedule-list::-webkit-scrollbar-track,
 .table-wrapper::-webkit-scrollbar-track,
 .bar-graph-row::-webkit-scrollbar-track,
-.price-graph-row::-webkit-scrollbar-track {
+.price-graph-row::-webkit-scrollbar-track,
+.energy-graph-daily-table-wrapper::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 4px;
 }
@@ -555,7 +557,8 @@ body {
 .schedule-list::-webkit-scrollbar-thumb,
 .table-wrapper::-webkit-scrollbar-thumb,
 .bar-graph-row::-webkit-scrollbar-thumb,
-.price-graph-row::-webkit-scrollbar-thumb {
+.price-graph-row::-webkit-scrollbar-thumb,
+.energy-graph-daily-table-wrapper::-webkit-scrollbar-thumb {
     background: #ccc;
     border-radius: 4px;
 }
@@ -564,7 +567,8 @@ body {
 .schedule-list::-webkit-scrollbar-thumb:hover,
 .table-wrapper::-webkit-scrollbar-thumb:hover,
 .bar-graph-row::-webkit-scrollbar-thumb:hover,
-.price-graph-row::-webkit-scrollbar-thumb:hover {
+.price-graph-row::-webkit-scrollbar-thumb:hover,
+.energy-graph-daily-table-wrapper::-webkit-scrollbar-thumb:hover {
     background: #bbb;
 }
 

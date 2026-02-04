@@ -725,9 +725,29 @@ body.mobile-dark {
 
 .energy-graph-mobile-daily-table {
     overflow-y: auto;
-    max-height: 100%;
-    -webkit-overflow-scrolling: touch;
     overflow-x: hidden;
+    /* Limit visible height to roughly 5 rows (plus header) and enable scrolling */
+    max-height: 8.5em;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.energy-graph-mobile-daily-table::-webkit-scrollbar {
+    width: 6px;
+}
+
+.energy-graph-mobile-daily-table::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 3px;
+}
+
+.energy-graph-mobile-daily-table::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.energy-graph-mobile-daily-table::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .energy-graph-mobile-daily-table table {

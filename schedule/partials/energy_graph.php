@@ -19,6 +19,27 @@ require_once __DIR__ . '/energy_graph_data.php';
     .energy-graph-canvas canvas { display: block; width: 100%; height: 100%; }
     .energy-graph-daily { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; background: #fff; }
     .energy-graph-daily .section-title { margin: 0 0 8px 0; font-weight: 700; }
+    .energy-graph-daily-table-wrapper {
+        max-height: 13em; /* ~8 rows including header */
+        overflow-y: auto;
+        overflow-x: hidden;
+        margin-top: 4px;
+        scrollbar-width: thin;
+    }
+    .energy-graph-daily-table-wrapper::-webkit-scrollbar {
+        width: 8px;
+    }
+    .energy-graph-daily-table-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    .energy-graph-daily-table-wrapper::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+    }
+    .energy-graph-daily-table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #bbb;
+    }
     .energy-graph-daily table { border-collapse: collapse; width: 100%; max-width: 380px; border-spacing: 0; }
     .energy-graph-daily th, .energy-graph-daily td { text-align: left; padding: 4px 8px 4px 0; }
 
@@ -46,31 +67,33 @@ require_once __DIR__ . '/energy_graph_data.php';
             <?php if (!empty($whPerDay)) : ?>
                 <div class="energy-graph-table energy-graph-daily">
                     <h2 class="section-title">Daily totals</h2>
-                    <table>
-                        <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Wh+</th>
-                            <th>Wh-</th>
-                            <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (net)'); ?>">%</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($whPerDay as $date => $totals) : ?>
-                            <?php
-                                $pos = $totals['pos'];
-                                $neg = $totals['neg'];
-                                $net = $pos + $neg;
-                            ?>
+                    <div class="energy-graph-daily-table-wrapper">
+                        <table>
+                            <thead>
                             <tr>
-                                <td><?php echo htmlspecialchars($date); ?></td>
-                                <td style="color: #007321;font-weight: 500;">+<?php echo number_format(round($pos, 0)); ?></td>
-                                <td style="color: #e53935;font-weight: 500;"><?php echo number_format(round($neg, 0)); ?></td>
-                                <td><?php echo number_format(($net / $baseWh) * 100, 2); ?>%</td>
+                                <th>Date</th>
+                                <th>Wh+</th>
+                                <th>Wh-</th>
+                                <th title="<?php echo htmlspecialchars('% of ' . number_format($baseKwh, 2) . ' kWh (net)'); ?>">%</th>
                             </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($whPerDay as $date => $totals) : ?>
+                                <?php
+                                    $pos = $totals['pos'];
+                                    $neg = $totals['neg'];
+                                    $net = $pos + $neg;
+                                ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($date); ?></td>
+                                    <td style="color: #007321;font-weight: 500;">+<?php echo number_format(round($pos, 0)); ?></td>
+                                    <td style="color: #e53935;font-weight: 500;"><?php echo number_format(round($neg, 0)); ?></td>
+                                    <td><?php echo number_format(($net / $baseWh) * 100, 2); ?>%</td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
