@@ -447,7 +447,7 @@ function renderAutomationStatus(data) {
     entries.forEach((entry, index) => {
         const entryType = entry.type || 'unknown';
         const entryTimestamp = entry.timestamp || 0;
-        const entryDetails = formatAutomationEntryDetails(entry);
+        const entryDetailsHtml = formatAutomationEntryDetailsHtml(entry);
         const badgeClass = getAutomationEntryTypeClass(entryType);
         const badgeLabel = getAutomationEntryTypeLabel(entryType);
         const isFirst = index === 0;
@@ -471,7 +471,7 @@ function renderAutomationStatus(data) {
                 <span class="automation-entry-timestamp-full">(${escapeHtml(formatAbsoluteTimeJS(entryTimestamp))})</span>
             </span>
             <span class="automation-entry-details">
-                ${escapeHtml(entryDetails)}
+                ${entryDetailsHtml}
             </span>
             ${isFirst && hasMoreEntries ? '<span class="automation-entry-expand-icon">▼</span>' : ''}
         `;
@@ -480,6 +480,16 @@ function renderAutomationStatus(data) {
     });
 
     wrapperEl.appendChild(listEl);
+
+    if (hasMoreEntries) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'automation-toggle-button';
+        toggleBtn.innerHTML = '<span class="automation-toggle-text">Show all (' + totalEntries + ')</span><span class="automation-toggle-icon">▼</span>';
+        toggleBtn.onclick = toggleAutomationEntries;
+        wrapperEl.appendChild(toggleBtn);
+    }
+
     container.appendChild(wrapperEl);
 }
 
@@ -744,6 +754,43 @@ function formatAutomationValue(value) {
         return value + ' W';
     }
     return String(value);
+}
+
+/**
+ * Returns HTML for a single power value with semantic class for color (charging/discharging/standby).
+ * Used in automation entry details; only numeric/literal content, safe for innerHTML.
+ */
+function formatPowerValueHtml(value) {
+    if (value === null || value === undefined) {
+        return escapeHtml('—');
+    }
+    const num = Number(value);
+    const cls = num > 0 ? 'automation-power charging' : num < 0 ? 'automation-power discharging' : 'automation-power standby';
+    const text = num + ' W';
+    return '<span class="' + cls + '">' + escapeHtml(text) + '</span>';
+}
+
+/**
+ * Returns HTML for the automation entry details cell (power transition + optional grid; colored spans for change type).
+ * For change: only "old W → new W" and optional "· Grid N W"; for other types, short escaped label.
+ */
+function formatAutomationEntryDetailsHtml(entry) {
+    const type = (entry.type || 'unknown').toLowerCase();
+    const oldValue = entry.oldValue;
+    const newValue = entry.newValue;
+
+    if (type === 'change') {
+        let html = formatPowerValueHtml(oldValue) + ' → ' + formatPowerValueHtml(newValue);
+        if (entry.p1TotalPower != null) {
+            const p1Formatted = Number(entry.p1TotalPower).toLocaleString();
+            html += ' · Grid ' + escapeHtml(p1Formatted + ' W');
+        }
+        return html;
+    }
+
+    const labels = { start: 'Started', stop: 'Stopped', heartbeat: 'Heartbeat' };
+    const label = labels[type] || (type.charAt(0).toUpperCase() + type.slice(1));
+    return escapeHtml(label);
 }
 
 function getAutomationEntryTypeClass(type) {

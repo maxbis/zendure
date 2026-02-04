@@ -297,6 +297,22 @@
     font-size: 0.9rem;
 }
 
+.automation-entry-details .automation-power {
+    font-weight: 600;
+}
+
+.automation-entry-details .automation-power.charging {
+    color: var(--charge-status-charging);
+}
+
+.automation-entry-details .automation-power.discharging {
+    color: var(--charge-status-discharging);
+}
+
+.automation-entry-details .automation-power.standby {
+    color: var(--charge-status-standby);
+}
+
 .automation-entry-first {
     position: relative;
 }

@@ -16,6 +16,13 @@ window.toggleAutomationEntries = function () {
         entriesWrapper.classList.add('expanded');
         entriesList.classList.add('expanded');
     }
+
+    const toggleBtn = entriesWrapper.querySelector('.automation-toggle-button');
+    const toggleText = toggleBtn ? toggleBtn.querySelector('.automation-toggle-text') : null;
+    if (toggleText) {
+        const n = entriesList.dataset.totalEntries || entriesList.children.length;
+        toggleText.textContent = entriesWrapper.classList.contains('expanded') ? 'Show less' : 'Show all (' + n + ')';
+    }
 };
 
 /**

@@ -936,6 +936,18 @@ body.mobile-dark .automation-entry-badge,
     padding: 3px 8px;
 }
 
+body.mobile-dark .automation-toggle-button {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+body.mobile-dark .automation-toggle-button:hover {
+    background: var(--border-color) !important;
+    border-color: #555 !important;
+    color: var(--text-primary) !important;
+}
+
 .automation-status-error {
     background: rgba(244, 67, 54, 0.2);
     border-left: 4px solid var(--discharge-color);
