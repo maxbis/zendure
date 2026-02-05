@@ -314,6 +314,32 @@ class EditModal {
             payload.originalKey = this.currentOriginalKey;
         }
 
+        await this.submitPayload(payload);
+    }
+
+    async applyQuickMode(key, mode, options = {}) {
+        if (!key || typeof key !== 'string') return;
+        let val;
+        if (mode === 'netzero') {
+            val = 'netzero';
+        } else if (mode === 'netzero+') {
+            val = 'netzero+';
+        } else {
+            return;
+        }
+
+        const payload = { key, value: val };
+        if (options.limit1hour && key.indexOf('*') === -1) {
+            payload.limit1hour = true;
+        }
+        if (options.originalKey) {
+            payload.originalKey = options.originalKey;
+        }
+
+        await this.submitPayload(payload);
+    }
+
+    async submitPayload(payload) {
         try {
             const res = await fetch(this.apiUrl, {
                 method: 'PUT',
@@ -355,4 +381,3 @@ class EditModal {
         }
     }
 }
-

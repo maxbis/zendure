@@ -150,6 +150,16 @@ function ensurePriceGraphMobilePopup() {
                 <div class="price-graph-popup-schedule"></div>
             </div>
             <div class="price-graph-mobile-popup-footer">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button"
+                            class="btn btn-outline price-graph-mobile-popup-netzero">
+                        🔌 netZero
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline price-graph-mobile-popup-netzero-plus">
+                        ☀️ netZero+
+                    </button>
+                </div>              
                 <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
             </div>
         </div>
@@ -200,13 +210,36 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
         hidePriceGraphMobilePopup();
     };
 
+    const netZeroBtn = popup.querySelector('.price-graph-mobile-popup-netzero');
+    const netZeroPlusBtn = popup.querySelector('.price-graph-mobile-popup-netzero-plus');
     const editBtn = popup.querySelector('.price-graph-mobile-popup-edit');
     const closeBtn = popup.querySelector('.price-graph-mobile-popup-close');
+
+    const hasExistingEntry = scheduleMap && Object.prototype.hasOwnProperty.call(scheduleMap, key);
+    const existingValue = hasExistingEntry ? scheduleMap[key] : undefined;
+
+    const applyQuickMode = async (mode) => {
+        close();
+        if (editModal && typeof editModal.applyQuickMode === 'function') {
+            await editModal.applyQuickMode(key, mode, {
+                limit1hour: true,
+                originalKey: hasExistingEntry ? key : null
+            });
+        } else if (editModal) {
+            if (existingValue !== undefined) {
+                editModal.open(key, existingValue);
+            } else {
+                editModal.open(null, null, key);
+            }
+        }
+    };
+
+    netZeroBtn.onclick = () => applyQuickMode('netzero');
+    netZeroPlusBtn.onclick = () => applyQuickMode('netzero+');
 
     editBtn.onclick = () => {
         close();
         if (editModal) {
-            const existingValue = scheduleMap[key];
             if (existingValue !== undefined) {
                 editModal.open(key, existingValue);
             } else {
