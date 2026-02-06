@@ -5,11 +5,16 @@
 
 // Auto-refresh interval when page becomes visible (20 seconds in milliseconds)
 const AUTO_REFRESH_INTERVAL = 20000;
+
+// Refresh schedule/Wh table & graphs every N auto-refresh ticks
+const SCHEDULE_REFRESH_TICK_INTERVAL = 20;
+
 const DEBUG_MODE = false;
 
 // Track auto-refresh interval
 let autoRefreshIntervalId = null;
 let wasPageHidden = false;
+let scheduleRefreshTickCount = 0;
 
 /**
  * Hide the refresh button temporarily to indicate auto-refresh is happening
@@ -238,6 +243,7 @@ function startAutoRefresh() {
         clearInterval(autoRefreshIntervalId);
         autoRefreshIntervalId = null;
     }
+    scheduleRefreshTickCount = 0;
     
     // Only start interval if page is visible
     if (!document.hidden) {
@@ -256,6 +262,14 @@ function startAutoRefresh() {
                 }
                 indicateAutoRefresh();
                 refreshStatus(true);
+
+                scheduleRefreshTickCount += 1;
+                if (scheduleRefreshTickCount >= SCHEDULE_REFRESH_TICK_INTERVAL) {
+                    scheduleRefreshTickCount = 0;
+                    if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
+                        window.refreshScheduleAndPricesImmediate();
+                    }
+                }
             } else if (document.hidden) {
                 if (DEBUG_MODE) {
                     console.log('⏰ Auto-refresh skipped (page hidden)');
