@@ -243,7 +243,6 @@ function startAutoRefresh() {
         clearInterval(autoRefreshIntervalId);
         autoRefreshIntervalId = null;
     }
-    scheduleRefreshTickCount = 0;
     
     // Only start interval if page is visible
     if (!document.hidden) {
@@ -260,12 +259,14 @@ function startAutoRefresh() {
                 if (DEBUG_MODE) {
                     console.log('⏰ Auto-refresh interval triggered');
                 }
+                console.log('⏱️ Auto-refresh tick ' + (scheduleRefreshTickCount + 1) + '/' + SCHEDULE_REFRESH_TICK_INTERVAL);
                 indicateAutoRefresh();
                 refreshStatus(true);
 
                 scheduleRefreshTickCount += 1;
                 if (scheduleRefreshTickCount >= SCHEDULE_REFRESH_TICK_INTERVAL) {
                     scheduleRefreshTickCount = 0;
+                    console.log('⏱️ Schedule/Wh refresh triggered (every ' + SCHEDULE_REFRESH_TICK_INTERVAL + ' auto-refresh ticks)');
                     if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
                         window.refreshScheduleAndPricesImmediate();
                     }
