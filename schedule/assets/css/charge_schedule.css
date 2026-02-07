@@ -797,6 +797,12 @@ body {
 .price-graph-popup-price {
     font-size: 1.05rem;
     font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.price-graph-popup-spot-price {
+    font-size: 0.8rem;
+    color: #aaa;
     margin-bottom: 4px;
 }
 
