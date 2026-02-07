@@ -71,7 +71,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <div class="container">
         <div class="header">
             <h1><span class="title-desktop">⚡Zendure Energy Manager</span><span class="title-mobile">⚡ Schedule</span></h1>
-            <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p>
+            <!-- <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p> -->
         </div>
 
         <!-- Charge/Discharge Status Section - Full Width -->
@@ -96,15 +96,15 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
 
         <!-- Bar Graph Section - Full Width -->
-        <?php include __DIR__ . '/partials/schedule_overview_bar.php'; ?>
+        <?php #include __DIR__ . '/partials/schedule_overview_bar.php'; ?>
 
  
 
         <!-- Price Statistics Section -->
-        <?php include __DIR__ . '/partials/price_statistics.php'; ?>
+        <?php #include __DIR__ . '/partials/price_statistics.php'; ?>
 
         <!-- Schedule Calculator Section -->
-        <?php include __DIR__ . '/partials/calculate.php'; ?>
+        <?php #include __DIR__ . '/partials/calculate.php'; ?>
 
 
         <!-- Automation Status Section - Full Width -->
