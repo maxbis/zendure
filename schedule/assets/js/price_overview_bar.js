@@ -388,8 +388,11 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     }
     
     const getScheduleType = (value) => {
-        if (value === 'netzero' || value === 'netzero+') {
-            return '';
+        if (value === 'netzero') {
+            return 'netzero';
+        }
+        if (value === 'netzero+') {
+            return 'netzero-plus';
         }
         if (value === null || value === undefined || value === '') {
             return '';
@@ -402,9 +405,11 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 .replace(/[^a-z0-9+.\- ]/g, '')
                 .replace(/\s+/g, ' ')
                 .trim();
-            if (normalized === 'net zero' || normalized === 'netzero' ||
-                normalized === 'netzero+' || normalized === 'solar charge' || normalized.includes('only')) {
-                return '';
+            if (normalized === 'net zero' || normalized === 'netzero') {
+                return 'netzero';
+            }
+            if (normalized === 'netzero+' || normalized === 'solar charge' || normalized.includes('only')) {
+                return 'netzero-plus';
             }
             const match = trimmed.match(/[-+]?\d+(?:\.\d+)?/);
             if (match) {

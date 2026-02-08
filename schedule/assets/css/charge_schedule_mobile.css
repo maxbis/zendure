@@ -586,6 +586,16 @@ body.mobile-dark {
     z-index: 5;
 }
 
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero"]::after {
+    border-radius: 50%;
+    background: #f44336;
+}
+
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-plus"]::after {
+    border-radius: 50%;
+    background: #4caf50;
+}
+
 .price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="charge"]::after {
     background: #4caf50;
 }
