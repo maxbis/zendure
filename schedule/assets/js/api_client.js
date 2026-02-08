@@ -51,7 +51,11 @@ class ApiClient {
         // Build URL with query parameters
         let url = this.baseUrl;
         if (endpoint) {
-            url += (endpoint.startsWith('/') ? '' : '/') + endpoint;
+            if (endpoint.startsWith('?')) {
+                url += endpoint;
+            } else {
+                url += (endpoint.startsWith('/') ? '' : '/') + endpoint;
+            }
         }
         
         if (params && method === 'GET') {

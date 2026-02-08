@@ -77,8 +77,11 @@ async function fetchScheduleData(apiUrl, date) {
  */
 async function clearOldEntries(apiUrl, simulate = true) {
     try {
-        const client = getApiClient(apiUrl.split('?')[0]);
-        return await client.post('', { action: simulate ? 'simulate' : 'delete' });
+        const urlParts = apiUrl.split('?');
+        const baseUrl = urlParts[0];
+        const queryString = urlParts[1] ? '?' + urlParts[1] : '';
+        const client = getApiClient(baseUrl);
+        return await client.post(queryString, { action: simulate ? 'simulate' : 'delete' });
     } catch (error) {
         // Fallback to original implementation if ApiClient not available
         if (typeof ApiClient === 'undefined') {

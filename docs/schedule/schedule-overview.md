@@ -1,6 +1,8 @@
 # Charge Schedule Manager
 
-A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems.
+A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The same schedule JS is used by both the desktop page (`charge_schedule.php`) and the mobile page (`charge_schedule_mobile.php`).
+
+**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [docs/mobile/api-dependencies.md](../mobile/api-dependencies.md) (mobile API usage).
 
 ## Architecture Overview
 

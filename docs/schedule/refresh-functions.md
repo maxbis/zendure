@@ -1,6 +1,6 @@
 # Refresh (JS) Functions
 
-Overview of refresh-related JavaScript: the two main APIs, when they are triggered, and related helpers.
+Overview of refresh-related JavaScript in the schedule app: the two main APIs, when they are triggered, and related helpers. These functions are shared by both the desktop schedule page and the mobile schedule page.
 
 ---
 
@@ -46,7 +46,7 @@ Does **not** touch automation status or charge status.
 - **Page load** — If the tab is visible, `startAutoRefresh()` runs once and calls `refreshStatus(true)`.
 - **Every 20 seconds (auto-refresh)** — `startAutoRefresh()` sets a `setInterval`; each tick calls `refreshStatus(true)` only when `!document.hidden`.
 - **Tab becomes visible again** — `visibilitychange` handler calls `startAutoRefresh()`, which does one immediate `refreshStatus(true)` and then resumes the 20 s interval.
-- **Manual refresh** — Click on Automation “Refresh” button runs `performNormalRefresh()` (in `automation_status.js`), which calls `refreshStatus()`.
+- **Manual refresh** — Click on Automation "Refresh" button runs `performNormalRefresh()` (in `automation_status.js`), which calls `refreshStatus()`.
 
 **Updates:**
 
@@ -63,7 +63,7 @@ Does **not** re-fetch or re-render schedule or price data.
 
 **File:** `schedule/assets/js/automation_status.js`
 
-Handles the Automation “Refresh” button: disables button, shows “refreshing” UX, then calls `refreshStatus()` only.
+Handles the Automation "Refresh" button: disables button, shows "refreshing" UX, then calls `refreshStatus()` only.
 
 **When triggered:** Click on `#automation-refresh-btn` (desktop: normal click; mobile: short tap, not long-press).
 
@@ -73,7 +73,7 @@ Handles the Automation “Refresh” button: disables button, shows “refreshin
 
 **File:** `schedule/assets/js/components/schedule_panel_component.js`
 
-**When triggered:** Click on the schedule panel “Refresh” button (`#refresh-schedule-btn`).
+**When triggered:** Click on the schedule panel "Refresh" button (`#refresh-schedule-btn`).
 
 **Updates:** Schedule panel only (schedule API for today → `update()`). Does **not** update bar graph, price graph, automation, or charge status.
 
@@ -85,7 +85,7 @@ Handles the Automation “Refresh” button: disables button, shows “refreshin
 
 **When triggered:** From `refreshStatus(true)` when `isAutoRefresh === true` (during the 20 s auto-refresh or when the page becomes visible and does an immediate status refresh).
 
-**Updates:** Only the “current hour” highlight on existing price-graph bars and schedule bar-graph bars. No API calls, no re-render of bars or prices.
+**Updates:** Only the "current hour" highlight on existing price-graph bars and schedule bar-graph bars. No API calls, no re-render of bars or prices.
 
 ---
 

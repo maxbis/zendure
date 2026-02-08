@@ -1,10 +1,10 @@
-# 📊 Data API Documentation
+# Data API Documentation
 
 This document describes the API interface for managing JSON data files on the Raspberry Pi storage system.
 
 ---
 
-## 🛠 Supported Data Types
+## Supported Data Types
 
 The `type` parameter in the query string determines which file or logic is accessed.
 
@@ -42,7 +42,7 @@ The `type` parameter in the query string determines which file or logic is acces
 
 ---
 
-## 🔍 Discovery & Listing
+## Discovery & Listing
 
 To see existing files in the `/data/` directory:
 
@@ -53,20 +53,15 @@ To see existing files in the `/data/` directory:
 
 ---
 
-## ⚙️ System Notes (Raspberry Pi 2 / Bookworm)
+## System Notes (Raspberry Pi 2 / Bookworm)
 
 Files are created on the first **Write (POST)** request. Ensure the web server has permission to write to the data directory:
 
 ```bash
 sudo chown -R www-data:www-data /var/www/html/data/
+```
 
-
-####################################################################
-
-# Data API Documentation
-This part describes all functions available in the Data API system.
-
-####################################################################
+---
 
 ## Overview
 

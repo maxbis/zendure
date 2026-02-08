@@ -16,7 +16,7 @@ This module provides object-oriented wrappers for interacting with the Zendure b
     - Set specific charge or discharge power levels.
     - Implement a "net-zero" feed-in mode, where the battery charges or discharges to keep the grid power usage close to zero.
     - Implement "net-zero+" mode, which only charges (never discharges to the grid).
-    - Respect battery charge level limits (e.g., not charging above 95% or discharging below 20%).
+    - Respect battery charge level limits (e.g., not charging above 90% or discharging below 20%).
     - Use `PowerAccumulator` to track and log power usage over time.
     - Put the device into standby mode when appropriate.
 
@@ -27,7 +27,7 @@ This module provides object-oriented wrappers for interacting with the Zendure b
 
 - **`ScheduleController`**: A class responsible for fetching a charge/discharge schedule from a web API. It determines the desired power setting for the current time based on this schedule, with caching support to minimize API calls.
 
-For detailed API documentation, see [`device_controller.README.md`](device_controller.README.md).
+For detailed API documentation, see [device-controller.md](device-controller.md).
 
 ### `automate.py`
 
@@ -125,7 +125,7 @@ In **NetZero** modes, the system dynamically calculates the required power based
 
 ### 3. Charging Limits (Battery Protection)
 
-When the battery reaches its **Maximum Charge Level** (e.g., 95%):
+When the battery reaches its **Maximum Charge Level** (e.g., 90%):
 
 *   **Scenario A: NetZero Mode (Calculated Charge) or NetZero+**:
     *   Logic detects that charging is required but not permitted due to the limit.

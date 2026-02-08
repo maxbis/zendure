@@ -6,7 +6,7 @@ This file provides a set of Python classes designed to interact with and control
 
 -   `TEST_MODE` (bool): Loaded from `config.json` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
 -   `MIN_CHARGE_LEVEL` (int): The battery percentage below which the system will stop discharging. Defaults to `20`.
--   `MAX_CHARGE_LEVEL` (int): The battery percentage above which the system will stop charging. Defaults to `95`.
+-   `MAX_CHARGE_LEVEL` (int): The battery percentage above which the system will stop charging. Defaults to `90`.
 -   `MAX_DISCHARGE_POWER` (int): Maximum allowed power feed in watts for discharge. Defaults to `800`.
 -   `MAX_CHARGE_POWER` (int): Maximum allowed power feed in watts for charge. Defaults to `1200`.
 
@@ -54,7 +54,9 @@ This is the foundational class that provides common functionality to all other c
 
 ## `PowerAccumulator`
 
-A standalone class that handles accumulation and persistence of power/energy related values.\n+\n+- Accumulates **power feed** energy (watt-hours) over quarter-hour, hour, day, and manual periods.\n+- Tracks **P1 hourly energy deltas** based on P1 meter cumulative kWh readings and stores hourly values in `data/p1_hourly_energy.json`.
+A standalone class that handles accumulation and persistence of power/energy related values.
+- Accumulates **power feed** energy (watt-hours) over quarter-hour, hour, day, and manual periods.
+- Tracks **P1 hourly energy deltas** based on P1 meter cumulative kWh readings and stores hourly values in `data/p1_hourly_energy.json`.
 
 ### `__init__(self, logger=None, log_file_path=None)`
 
