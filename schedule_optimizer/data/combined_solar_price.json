@@ -2,6 +2,16 @@
   "timezone": "Europe/Amsterdam",
   "location": "Amsterdam, Europe",
   "description": "Combined: sun elevation (deg), direct radiation (W/m\u00b2), price and spot_price in thousandths (\u20ac/kWh \u00d7 1000, integer) per hour.",
+  "generated_at": "2026-02-08T10:31:51.392889+01:00",
+  "sources": {
+    "sun_height": "astral",
+    "solar_radiation": "https://api.open-meteo.com/v1/forecast?latitude=52.374&longitude=4.8897&hourly=direct_radiation&models=knmi_seamless&timezone=Europe%2FAmsterdam&forecast_days=2",
+    "price_api": "http://localhost/zendure/prices/get_prices_v2.php"
+  },
+  "range": {
+    "start_date": "2026-02-08",
+    "end_date": "2026-02-09"
+  },
   "dates": [
     "2026-02-07",
     "2026-02-08",
@@ -157,145 +167,145 @@
     },
     "2026-02-08": {
       "0": {
-        "sun_degrees": null,
+        "sun_degrees": -51.14,
         "direct_radiation": 0.0,
         "price": 254,
         "spot_price": 130
       },
       "1": {
-        "sun_degrees": null,
+        "sun_degrees": -52.66,
         "direct_radiation": 0.0,
         "price": 250,
         "spot_price": 127
       },
       "2": {
-        "sun_degrees": null,
+        "sun_degrees": -50.47,
         "direct_radiation": 0.0,
         "price": 247,
         "spot_price": 124
       },
       "3": {
-        "sun_degrees": null,
+        "sun_degrees": -45.14,
         "direct_radiation": 0.0,
         "price": 244,
         "spot_price": 122
       },
       "4": {
-        "sun_degrees": null,
+        "sun_degrees": -37.74,
         "direct_radiation": 0.0,
         "price": 242,
         "spot_price": 120
       },
       "5": {
-        "sun_degrees": null,
+        "sun_degrees": -29.18,
         "direct_radiation": 0.0,
         "price": 243,
         "spot_price": 121
       },
       "6": {
-        "sun_degrees": null,
+        "sun_degrees": -20.11,
         "direct_radiation": 0.0,
         "price": 241,
         "spot_price": 120
       },
       "7": {
-        "sun_degrees": null,
+        "sun_degrees": -10.97,
         "direct_radiation": 0.0,
         "price": 246,
         "spot_price": 123
       },
       "8": {
-        "sun_degrees": null,
+        "sun_degrees": -2.06,
         "direct_radiation": 0.0,
         "price": 252,
         "spot_price": 128
       },
       "9": {
-        "sun_degrees": null,
-        "direct_radiation": 3.7,
+        "sun_degrees": 6.03,
+        "direct_radiation": 4.3,
         "price": 252,
         "spot_price": 128
       },
       "10": {
-        "sun_degrees": null,
-        "direct_radiation": 27.4,
+        "sun_degrees": 12.93,
+        "direct_radiation": 53.6,
         "price": 250,
         "spot_price": 126
       },
       "11": {
-        "sun_degrees": null,
-        "direct_radiation": 7.9,
+        "sun_degrees": 18.33,
+        "direct_radiation": 125.1,
         "price": 246,
         "spot_price": 123
       },
       "12": {
-        "sun_degrees": null,
-        "direct_radiation": 82.2,
+        "sun_degrees": 21.72,
+        "direct_radiation": 197.0,
         "price": 243,
         "spot_price": 121
       },
       "13": {
-        "sun_degrees": null,
-        "direct_radiation": 222.5,
+        "sun_degrees": 22.76,
+        "direct_radiation": 227.8,
         "price": 242,
         "spot_price": 120
       },
       "14": {
-        "sun_degrees": null,
-        "direct_radiation": 175.7,
+        "sun_degrees": 21.31,
+        "direct_radiation": 228.5,
         "price": 243,
         "spot_price": 121
       },
       "15": {
-        "sun_degrees": null,
-        "direct_radiation": 167.2,
+        "sun_degrees": 17.55,
+        "direct_radiation": 192.7,
         "price": 252,
         "spot_price": 128
       },
       "16": {
-        "sun_degrees": null,
-        "direct_radiation": 46.1,
+        "sun_degrees": 11.86,
+        "direct_radiation": 120.9,
         "price": 260,
         "spot_price": 135
       },
       "17": {
-        "sun_degrees": null,
-        "direct_radiation": 28.9,
+        "sun_degrees": 4.76,
+        "direct_radiation": 45.1,
         "price": 280,
         "spot_price": 151
       },
       "18": {
-        "sun_degrees": null,
-        "direct_radiation": 0.9,
+        "sun_degrees": -3.54,
+        "direct_radiation": 1.3,
         "price": 290,
         "spot_price": 160
       },
       "19": {
-        "sun_degrees": null,
+        "sun_degrees": -12.47,
         "direct_radiation": 0.0,
         "price": 286,
         "spot_price": 157
       },
       "20": {
-        "sun_degrees": null,
+        "sun_degrees": -21.61,
         "direct_radiation": 0.0,
         "price": 269,
         "spot_price": 142
       },
       "21": {
-        "sun_degrees": null,
+        "sun_degrees": -30.6,
         "direct_radiation": 0.0,
         "price": 260,
         "spot_price": 135
       },
       "22": {
-        "sun_degrees": null,
+        "sun_degrees": -38.98,
         "direct_radiation": 0.0,
         "price": 258,
         "spot_price": 134
       },
       "23": {
-        "sun_degrees": null,
+        "sun_degrees": -46.04,
         "direct_radiation": 0.0,
         "price": 253,
         "spot_price": 129
@@ -303,145 +313,145 @@
     },
     "2026-02-09": {
       "0": {
-        "sun_degrees": null,
+        "sun_degrees": -50.83,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "1": {
-        "sun_degrees": null,
+        "sun_degrees": -52.34,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "2": {
-        "sun_degrees": null,
+        "sun_degrees": -50.16,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "3": {
-        "sun_degrees": null,
+        "sun_degrees": -44.86,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "4": {
-        "sun_degrees": null,
+        "sun_degrees": -37.48,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "5": {
-        "sun_degrees": null,
+        "sun_degrees": -28.94,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "6": {
-        "sun_degrees": null,
+        "sun_degrees": -19.86,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "7": {
-        "sun_degrees": null,
+        "sun_degrees": -10.72,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "8": {
-        "sun_degrees": null,
+        "sun_degrees": -1.78,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "9": {
-        "sun_degrees": null,
-        "direct_radiation": 0.0,
+        "sun_degrees": 6.29,
+        "direct_radiation": 2.1,
         "price": null,
         "spot_price": null
       },
       "10": {
-        "sun_degrees": null,
-        "direct_radiation": 9.1,
+        "sun_degrees": 13.22,
+        "direct_radiation": 11.8,
         "price": null,
         "spot_price": null
       },
       "11": {
-        "sun_degrees": null,
+        "sun_degrees": 18.63,
         "direct_radiation": 30.7,
         "price": null,
         "spot_price": null
       },
       "12": {
-        "sun_degrees": null,
-        "direct_radiation": 111.5,
+        "sun_degrees": 22.04,
+        "direct_radiation": 157.1,
         "price": null,
         "spot_price": null
       },
       "13": {
-        "sun_degrees": null,
-        "direct_radiation": 156.6,
+        "sun_degrees": 23.08,
+        "direct_radiation": 187.5,
         "price": null,
         "spot_price": null
       },
       "14": {
-        "sun_degrees": null,
-        "direct_radiation": 152.3,
+        "sun_degrees": 21.62,
+        "direct_radiation": 216.7,
         "price": null,
         "spot_price": null
       },
       "15": {
-        "sun_degrees": null,
-        "direct_radiation": 119.1,
+        "sun_degrees": 17.85,
+        "direct_radiation": 192.9,
         "price": null,
         "spot_price": null
       },
       "16": {
-        "sun_degrees": null,
-        "direct_radiation": 53.2,
+        "sun_degrees": 12.15,
+        "direct_radiation": 91.5,
         "price": null,
         "spot_price": null
       },
       "17": {
-        "sun_degrees": null,
-        "direct_radiation": 27.1,
+        "sun_degrees": 5.03,
+        "direct_radiation": 25.6,
         "price": null,
         "spot_price": null
       },
       "18": {
-        "sun_degrees": null,
-        "direct_radiation": 1.1,
+        "sun_degrees": -3.28,
+        "direct_radiation": 1.4,
         "price": null,
         "spot_price": null
       },
       "19": {
-        "sun_degrees": null,
+        "sun_degrees": -12.22,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "20": {
-        "sun_degrees": null,
+        "sun_degrees": -21.35,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "21": {
-        "sun_degrees": null,
+        "sun_degrees": -30.34,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "22": {
-        "sun_degrees": null,
+        "sun_degrees": -38.7,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
       },
       "23": {
-        "sun_degrees": null,
+        "sun_degrees": -45.74,
         "direct_radiation": 0.0,
         "price": null,
         "spot_price": null
