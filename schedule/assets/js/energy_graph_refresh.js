@@ -212,6 +212,7 @@
     }
 
     async function refreshEnergyGraph() {
+        console.log('[energy_graph_refresh] refreshEnergyGraph() called');
         if (!API_URL) return;
         try {
             var res = await fetch(API_URL);
