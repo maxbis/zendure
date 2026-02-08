@@ -106,6 +106,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
+            const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_api.php', JSON_UNESCAPED_SLASHES); ?>;
         </script>
 
         <!-- Core modules (must load first) -->
@@ -131,6 +132,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/price_overview_bar.js"></script>
         <script src="assets/js/automation_status.js"></script>
         <script src="assets/js/charge_status.js"></script>
+        <script src="assets/js/energy_graph_refresh.js"></script>
 
         <!-- Main application (must load last) -->
         <script src="assets/js/charge_schedule.js"></script>

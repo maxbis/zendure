@@ -30,6 +30,7 @@ Overview of refresh-related JavaScript in the schedule app: the two main APIs, w
 - Bar graph (today + tomorrow)
 - Price graph (via `fetchAndRenderPrices`)
 - Schedule calculator
+- Watt-hours per hour partial (chart + daily table), via `refreshEnergyGraph()` when this refresh runs (including on the 20×20 interval)
 
 Does **not** touch automation status or charge status.
 
@@ -79,7 +80,19 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ---
 
-## 5. Helper (no fetch, UI only)
+## 5. Energy graph refresh
+
+**File:** `schedule/assets/js/energy_graph_refresh.js`
+
+**API:** **`refreshEnergyGraph()`** (exposed as `window.refreshEnergyGraph`)
+
+**When triggered:** From `_refreshScheduleAndPricesInternal()` in `charge_schedule.js` (and thus whenever the schedule/prices refresh runs: 20×20 auto-refresh tick, after save/delete, Clear, Auto, or when the tab becomes visible).
+
+**Updates:** Watt-hours per hour chart(s) (desktop and/or mobile) and daily totals table(s) from `api/energy_graph_api.php`. No other partials.
+
+---
+
+## 6. Helper (no fetch, UI only)
 
 **`updateGraphTimeIndicators`** (`charge_status.js`)
 
@@ -89,7 +102,7 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ---
 
-## 6. DataService (internal)
+## 7. DataService (internal)
 
 **`DataService._refreshInBackground`** (`schedule/assets/js/data_service.js`)
 
@@ -99,14 +112,34 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ---
 
+## What updates every 20 seconds vs every 20×20 seconds
+
+**Every 20 seconds** (each auto-refresh tick, via `refreshStatus(true)`):
+
+- Automation status partial
+- Charge status (Zendure + P1)
+- Charge status details (System & Grid)
+- Current-hour indicators on price graph and schedule bar graph only (no data re-fetch)
+
+**Every 20×20 seconds** (every 20th tick, when `refreshScheduleAndPricesImmediate()` runs):
+
+- Schedule data (today + tomorrow)
+- Schedule panel
+- Bar graph (today + tomorrow)
+- Price graph
+- Schedule calculator
+- Watt-hours per hour partial (chart + daily totals table)
+
+---
+
 ## Summary Table
 
-| Function | Schedule | Bar graph | Price graph | Automation | Charge status |
-|----------|----------|-----------|-------------|------------|---------------|
-| `refreshScheduleAndPrices` / `refreshScheduleAndPricesImmediate` | ✓ | ✓ | ✓ | ✗ | ✗ |
-| `refreshStatus` | ✗ | indicators only | indicators only | ✓ | ✓ |
-| `performNormalRefresh` | ✗ | ✗ | ✗ | ✓ (calls `refreshStatus`) | ✓ |
-| `SchedulePanelComponent.refresh` | ✓ (panel only) | ✗ | ✗ | ✗ | ✗ |
-| `updateGraphTimeIndicators` | ✗ | indicators only | indicators only | ✗ | ✗ |
+| Function | Schedule | Bar graph | Price graph | Wh per hour | Automation | Charge status |
+|----------|----------|-----------|-------------|-------------|------------|---------------|
+| `refreshScheduleAndPrices` / `refreshScheduleAndPricesImmediate` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| `refreshStatus` | ✗ | indicators only | indicators only | ✗ | ✓ | ✓ |
+| `performNormalRefresh` | ✗ | ✗ | ✗ | ✗ | ✓ (calls `refreshStatus`) | ✓ |
+| `SchedulePanelComponent.refresh` | ✓ (panel only) | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `updateGraphTimeIndicators` | ✗ | indicators only | indicators only | ✗ | ✗ | ✗ |
 
-Two main refresh flows: **schedule and prices** (debounced + immediate + on visibility) and **status** (20 s interval + visibility + manual button).
+Two main refresh flows: **schedule and prices** (debounced + immediate + on visibility, including Wh per hour) and **status** (20 s interval + visibility + manual button).

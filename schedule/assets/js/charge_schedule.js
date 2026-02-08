@@ -135,6 +135,10 @@ async function _refreshScheduleAndPricesInternal() {
                     currentTime
                 );
             }
+            // Refresh Watt-hours per hour partial (chart + daily table)
+            if (typeof window.refreshEnergyGraph === 'function') {
+                await window.refreshEnergyGraph();
+            }
             console.log('Schedule data refresh completed successfully');
         } else {
             throw new Error(todayData.error || 'Failed to fetch schedule data');

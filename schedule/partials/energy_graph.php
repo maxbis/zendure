@@ -170,7 +170,7 @@ require_once __DIR__ . '/energy_graph_data.php';
         var ctx = document.getElementById('energyChart');
         if (!ctx || typeof Chart === 'undefined') return;
 
-        new Chart(ctx, {
+        var chart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: displayLabels,
@@ -250,5 +250,6 @@ require_once __DIR__ . '/energy_graph_data.php';
                 }
             }
         });
+        window.energyChart = chart;
     })();
 </script>
