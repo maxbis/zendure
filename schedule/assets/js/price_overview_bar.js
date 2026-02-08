@@ -76,6 +76,16 @@ function formatPriceCents(price) {
     return Math.round(price * 100).toString();
 }
 
+/**
+ * Spot price (excl. tax) from price incl. 21% VAT: P_excl = (P_incl / 1.21) − 0.10880
+ * @param {number|null} pIncl - Price incl. tax (€/kWh) or null
+ * @returns {number|null} Spot price or null
+ */
+function spotPriceFromIncl(pIncl) {
+    if (pIncl == null || typeof pIncl !== 'number' || Number.isNaN(pIncl)) return null;
+    return (pIncl / 1.21) - 0.09;
+}
+
 let priceGraphPopup = null;
 let priceGraphPopupActiveBar = null;
 let priceGraphPopupActiveContainer = null;
@@ -97,6 +107,7 @@ function ensurePriceGraphPopup() {
     popup.innerHTML = `
         <div class="price-graph-popup-time"></div>
         <div class="price-graph-popup-price"></div>
+        <div class="price-graph-popup-spot-price"></div>
         <div class="price-graph-popup-schedule"></div>
     `;
     document.body.appendChild(popup);
@@ -147,6 +158,7 @@ function ensurePriceGraphMobilePopup() {
             </div>
             <div class="price-graph-mobile-popup-body">
                 <div class="price-graph-popup-price"></div>
+                <div class="price-graph-popup-spot-price"></div>
                 <div class="price-graph-popup-schedule"></div>
             </div>
             <div class="price-graph-mobile-popup-footer">
@@ -189,6 +201,7 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
 
     const titleEl = popup.querySelector('.price-graph-mobile-popup-title');
     const priceEl = popup.querySelector('.price-graph-popup-price');
+    const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
@@ -199,11 +212,15 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
+    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
+
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
 
     titleEl.textContent = `Time slot ${timeRange || '—'}`;
     priceEl.textContent = priceDisplay;
+    spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
 
     const close = () => {
@@ -275,6 +292,7 @@ function showPriceGraphPopup(bar, container) {
 
     const timeEl = popup.querySelector('.price-graph-popup-time');
     const priceEl = popup.querySelector('.price-graph-popup-price');
+    const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
@@ -285,11 +303,15 @@ function showPriceGraphPopup(bar, container) {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
+    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
+
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
 
     timeEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
+    spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
 
     popup.style.display = 'block';
