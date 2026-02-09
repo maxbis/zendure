@@ -1,4 +1,10 @@
 <?php
+// When set to true, the login validator will expose detailed
+// reasons for access being denied. Leave this false in production.
+if (!defined('LOGIN_VALIDATION_DEBUG')) {
+    define('LOGIN_VALIDATION_DEBUG', true);
+}
+
 /**
  * Validation function for checking user access
  * Validates the validation cookie against validkeys.txt
@@ -6,15 +12,24 @@
  * @return bool True if validation cookie exists and matches a key in validkeys.txt, false otherwise
  */
 function validateUser() {
+    // Clear previous debug reason
+    $GLOBALS['validationDebugReason'] = null;
+
     // Check if validation cookie exists
     if (!isset($_COOKIE['validation'])) {
+        if (LOGIN_VALIDATION_DEBUG) {
+            $GLOBALS['validationDebugReason'] = 'Validation cookie is not set.';
+        }
         return false;
     }
-    
+ 
     $cookieValue = trim($_COOKIE['validation']);
     
     // If cookie value is empty, return false
     if (empty($cookieValue)) {
+        if (LOGIN_VALIDATION_DEBUG) {
+            $GLOBALS['validationDebugReason'] = 'Validation cookie is empty.';
+        }
         return false;
     }
     
@@ -23,12 +38,18 @@ function validateUser() {
     
     // Check if file exists
     if (!file_exists($validKeysFile)) {
+        if (LOGIN_VALIDATION_DEBUG) {
+            $GLOBALS['validationDebugReason'] = 'The valid keys file (validkeys.txt) was not found.';
+        }
         return false;
     }
     
     // Read the file
     $fileContent = file_get_contents($validKeysFile);
     if ($fileContent === false) {
+        if (LOGIN_VALIDATION_DEBUG) {
+            $GLOBALS['validationDebugReason'] = 'The valid keys file (validkeys.txt) could not be read.';
+        }
         return false;
     }
     
@@ -44,16 +65,25 @@ function validateUser() {
         
         // Compare cookie value with line (case-sensitive)
         if ($cookieValue === $line) {
+            // Successful validation clears any previous error
+            $GLOBALS['validationDebugReason'] = null;
             return true;
         }
     }
     
     // No match found
+    if (LOGIN_VALIDATION_DEBUG) {
+        $GLOBALS['validationDebugReason'] = 'Validation cookie did not match any allowed keys.';
+    }
     return false;
 }
 
-
 if (!validateUser()) {
+    // Capture debug reason (if enabled) before outputting HTML
+    $debugReason = (LOGIN_VALIDATION_DEBUG && !empty($GLOBALS['validationDebugReason']))
+        ? $GLOBALS['validationDebugReason']
+        : null;
+
     http_response_code(403);
     ?>
     <!DOCTYPE html>
@@ -113,6 +143,11 @@ if (!validateUser()) {
         <div class="error-container">
             <h1>Access Denied</h1>
             <p>Network and/or workstation not authorized to access this page.</p>
+            <?php if (!empty($debugReason)) : ?>
+                <p style="margin-top: 12px; font-size: 0.9rem; color: #999;">
+                    Debug: <?php echo htmlspecialchars($debugReason, ENT_QUOTES, 'UTF-8'); ?>
+                </p>
+            <?php endif; ?>
         </div>
     </body>
     </html>
