@@ -89,21 +89,32 @@ def fetch_json(url: str, timeout: int = 15) -> dict:
         return json.loads(resp.read().decode())
 
 
-def build_open_meteo_url(forecast_days: int) -> str:
-    params = {
+def build_open_meteo_url(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    *,
+    forecast_days: int | None = None,
+) -> str:
+    """Build Open-Meteo URL. Prefer start_date/end_date so 'today' and 'tomorrow' are explicit."""
+    params: dict[str, str | int] = {
         "latitude": LATITUDE,
         "longitude": LONGITUDE,
         "hourly": "direct_radiation",
         "models": OPEN_METEO_MODEL,
         "timezone": TIMEZONE.replace("/", "%2F"),
-        "forecast_days": forecast_days,
     }
+    if start_date and end_date:
+        params["start_date"] = start_date
+        params["end_date"] = end_date
+    else:
+        params["forecast_days"] = forecast_days if forecast_days is not None else 2
     qs = "&".join(f"{k}={v}" for k, v in params.items())
     return f"{OPEN_METEO_BASE_URL}?{qs}"
 
 
 def fetch_direct_radiation(target_dates: list[str]) -> dict:
-    url = build_open_meteo_url(forecast_days=2)
+    start_date, end_date = target_dates[0], target_dates[-1]
+    url = build_open_meteo_url(start_date=start_date, end_date=end_date)
     api_data = fetch_json(url)
     times = api_data["hourly"]["time"]
     values = api_data["hourly"]["direct_radiation"]
@@ -251,7 +262,9 @@ def main() -> None:
         "generated_at": datetime.now(tz).isoformat(),
         "sources": {
             "sun_height": "astral",
-            "solar_radiation": build_open_meteo_url(forecast_days=2),
+            "solar_radiation": build_open_meteo_url(
+            start_date=target_dates[0], end_date=target_dates[-1]
+        ),
             "price_api": price_api_url,
         },
         "range": {"start_date": target_dates[0], "end_date": target_dates[-1]},
