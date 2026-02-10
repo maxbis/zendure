@@ -242,7 +242,7 @@ class SchedulePanelComponent extends Component {
             
             tr.innerHTML = `
                 <td style="color:#888;">${idx + 1}</td>
-                <td style="font-family:monospace;">${keyStr}</td>
+                <td style="font-family:monospace;">${formatScheduleKeyForDisplay(keyStr)}</td>
                 <td class="${valClass}" style="font-weight:500;">${displayVal}</td>
                 <td><span class="badge ${isWild ? 'badge-wildcard' : 'badge-exact'}">${isWild ? 'Wildcard' : 'Exact'}</span></td>
             `;

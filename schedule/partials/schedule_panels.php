@@ -22,6 +22,21 @@ function getValueLabel($val)
         return ($val > 0 ? '+' : '') . intval($val) . ' W';
     return $val . ' W';
 }
+
+/**
+ * Format schedule key for display: MMDD (positions 4-7) in a span for blue styling.
+ * Key format is YYYYMMDDHHmm; if length < 8, return escaped key as-is.
+ */
+function formatScheduleKeyWithBlueDate($key)
+{
+    $s = (string) $key;
+    if (strlen($s) < 8) {
+        return htmlspecialchars($s);
+    }
+    return htmlspecialchars(substr($s, 0, 4))
+        . '<span class="schedule-key-date">' . htmlspecialchars(substr($s, 4, 4)) . '</span>'
+        . htmlspecialchars(substr($s, 8));
+}
 ?>
 <div class="schedule-panels-wrapper">
 <div class="layout">
@@ -132,7 +147,7 @@ function getValueLabel($val)
                         <tr data-key="<?php echo htmlspecialchars($k); ?>"
                             data-value="<?php echo htmlspecialchars($v); ?>">
                             <td style="color:#888;"><?php echo $idx; ?></td>
-                            <td style="font-family:monospace;"><?php echo htmlspecialchars($k); ?></td>
+                            <td style="font-family:monospace;"><?php echo formatScheduleKeyWithBlueDate($k); ?></td>
                             <td class="<?php echo $valClass; ?>" style="font-weight:500;">
                                 <?php echo htmlspecialchars($displayVal); ?>
                             </td>

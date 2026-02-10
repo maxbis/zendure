@@ -145,7 +145,7 @@ function renderEntries(entries) {
 
         tr.innerHTML = `
             <td style="color:#888;">${idx + 1}</td>
-            <td style="font-family:monospace; background-color:${keyBgColor};">${keyStr}</td>
+            <td style="font-family:monospace; background-color:${keyBgColor};">${formatScheduleKeyForDisplay(keyStr)}</td>
             <td class="${valClass}" style="font-weight:500;">${displayVal}</td>
         `;
         tbody.appendChild(tr);

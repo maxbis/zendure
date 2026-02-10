@@ -948,6 +948,17 @@ body {
     background-color: #f5f5f5;
 }
 
+#schedule-table td .schedule-key-date {
+    color: #001aff;
+    margin-left: 2px;
+    margin-right: 2px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    font-weight: 500;
+    font-family: monospace;
+    display: inline-block;
+}
+
 /* 
    --------------------------------------------------------------------------
    Specific Graph Colors (Moved from partials)

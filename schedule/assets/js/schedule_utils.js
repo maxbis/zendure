@@ -73,6 +73,33 @@ function formatTime(time) {
 }
 
 /**
+ * HTML-escape a string for safe use in innerHTML
+ * @param {string} s - Raw string
+ * @returns {string} - Escaped string
+ */
+function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+/**
+ * Format schedule key for display: MMDD (positions 4-7) wrapped in span for blue styling.
+ * Key format is YYYYMMDDHHmm; if length < 8, returns escaped key as-is.
+ * @param {string} keyStr - Schedule key (12 chars)
+ * @returns {string} - HTML string for key cell
+ */
+function formatScheduleKeyForDisplay(keyStr) {
+    const s = String(keyStr);
+    if (s.length < 8) {
+        return escapeHtml(s);
+    }
+    return escapeHtml(s.slice(0, 4))
+        + '<span class="schedule-key-date">' + escapeHtml(s.slice(4, 8)) + '</span>'
+        + escapeHtml(s.slice(8));
+}
+
+/**
  * Build a map of hour -> value from resolved schedule
  * @param {Array} resolved - Resolved schedule slots
  * @returns {Object} - Map of hour (0-23) to value
