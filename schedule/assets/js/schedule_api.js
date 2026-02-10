@@ -70,48 +70,6 @@ async function fetchScheduleData(apiUrl, date) {
 }
 
 /**
- * Clear old schedule entries
- * @param {string} apiUrl - The API URL
- * @param {boolean} simulate - If true, only simulate deletion (returns count)
- * @returns {Promise<Object>} - Promise resolving to result object
- */
-async function clearOldEntries(apiUrl, simulate = true) {
-    try {
-        const urlParts = apiUrl.split('?');
-        const baseUrl = urlParts[0];
-        const queryString = urlParts[1] ? '?' + urlParts[1] : '';
-        const client = getApiClient(baseUrl);
-        return await client.post(queryString, { action: simulate ? 'simulate' : 'delete' });
-    } catch (error) {
-        // Fallback to original implementation if ApiClient not available
-        if (typeof ApiClient === 'undefined') {
-            const action = simulate ? 'simulate' : 'delete';
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ action: action })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Non-JSON response:', text.substring(0, 200));
-                throw new Error('Server returned non-JSON response. Check console for details.');
-            }
-
-            return await response.json();
-        }
-        throw error;
-    }
-}
-
-/**
  * Calculate schedule automatically
  * @param {string} apiUrl - The calculate schedule API URL
  * @param {boolean} simulate - If true, only simulate calculation (returns count)

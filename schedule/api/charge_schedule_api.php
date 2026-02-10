@@ -55,40 +55,7 @@ try {
         ];
     } elseif ($method === 'PUT' || $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
-        
-        // Check if this is a clear action (has action parameter)
-        if (isset($input['action']) && ($input['action'] === 'simulate' || $input['action'] === 'delete')) {
-            $action = $input['action'];
-            $simulate = ($action === 'simulate');
-            
-            // Get the keys to delete
-            $result = clearOldEntries($schedule, $simulate);
-            
-            if ($simulate) {
-                // Return count and list of keys that would be deleted
-                $response = [
-                    'success' => true,
-                    'count' => $result['count'],
-                    'entries' => $result['entries']
-                ];
-            } else {
-                // Actually delete the entries
-                foreach ($result['entries'] as $key) {
-                    if (isset($schedule[$key])) {
-                        unset($schedule[$key]);
-                    }
-                }
-                
-                if (writeScheduleAtomic($dataFile, $schedule)) {
-                    $response = [
-                        'success' => true,
-                        'count' => $result['count']
-                    ];
-                } else {
-                    throw new Exception("Failed to write file");
-                }
-            }
-        } else {
+
             // PUT/POST handles both add and edit operations
             // Validate required fields
             if (!isset($input['key']) || !isset($input['value'])) {
@@ -131,6 +98,9 @@ try {
                 }
             }
 
+            // Automatically drop outdated concrete-date entries on save
+            $schedule = cleanOutdatedScheduleEntries($schedule);
+
             if (writeScheduleAtomic($dataFile, $schedule)) {
                 $response = ['success' => true];
             } else {
@@ -144,6 +114,9 @@ try {
 
         $key = (string) $input['key'];
         unset($schedule[$key]);
+
+        // Automatically drop outdated concrete-date entries on save
+        $schedule = cleanOutdatedScheduleEntries($schedule);
 
         if (writeScheduleAtomic($dataFile, $schedule)) {
             $response = ['success' => true];

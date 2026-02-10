@@ -177,75 +177,6 @@ async function refreshScheduleAndPricesImmediate() {
 // Make globally accessible for edit_modal and visibility-triggered refresh
 window.refreshScheduleAndPricesImmediate = refreshScheduleAndPricesImmediate;
 
-/**
- * Handle clear button click
- */
-async function handleClearClick() {
-    try {
-        // First, simulate to get count
-        const result = await clearOldEntries(API_URL, true);
-
-        if (!result.success) {
-            const errorMsg = result.error || 'Failed to check old entries';
-            if (window.notifications) {
-                window.notifications.error(errorMsg);
-            } else {
-                alert('Error: ' + errorMsg);
-            }
-            return;
-        }
-
-        const count = result.count || 0;
-
-        if (count === 0) {
-            await confirmDialog.alert(
-                'No outdated schedule entries to delete.',
-                'No Entries to Clear',
-                'OK',
-                'btn-primary'
-            );
-            return;
-        }
-
-        // Show confirmation dialog
-        const confirmed = await confirmDialog.show(
-            `Are you sure you want to delete ${count} outdated schedule entries?`,
-            'Clear Old Entries',
-            'Delete',
-            'btn-danger'
-        );
-
-        if (confirmed) {
-            // Perform actual deletion
-            const deleteResult = await clearOldEntries(API_URL, false);
-
-            if (!deleteResult.success) {
-                const errorMsg = deleteResult.error || 'Failed to delete old entries';
-                if (window.notifications) {
-                    window.notifications.error(errorMsg);
-                } else {
-                    alert('Error: ' + errorMsg);
-                }
-                return;
-            }
-            
-            // Show success notification
-            if (window.notifications) {
-                window.notifications.success(`Deleted ${count} outdated entries`);
-            }
-
-            // Refresh data immediately to show updated entries
-            await refreshScheduleAndPricesImmediate();
-        }
-    } catch (error) {
-        console.error('Error in clear button handler:', error);
-        if (window.notifications) {
-            window.notifications.error('Error clearing entries: ' + error.message);
-        } else {
-            alert('Error: ' + error.message);
-        }
-    }
-}
 
 /**
  * Handle auto button click
@@ -388,12 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             priceGraphComponent.init();
         }
-    }
-
-    // Add click handler for Clear button (with debouncing)
-    const clearBtn = document.getElementById('clear-entry-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', debounce(handleClearClick, 500));
     }
 
     // Add click handler for Auto button (with debouncing)
