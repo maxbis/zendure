@@ -106,7 +106,6 @@ try {
             } else {
                 throw new Exception("Failed to write file");
             }
-        }
     } elseif ($method === 'DELETE') {
         $input = json_decode(file_get_contents('php://input'), true);
         if (!isset($input['key']))
