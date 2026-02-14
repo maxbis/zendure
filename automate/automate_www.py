@@ -9,9 +9,10 @@ Supports interactive keyboard commands.
 """
 
 import json
+import os
 import signal
+import sqlite3
 import time
-import requests
 import sys
 import select
 import platform
@@ -20,7 +21,7 @@ import queue
 import http.server
 import socketserver
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, Any, Callable
 
@@ -92,6 +93,90 @@ class ApiState:
         self.last_status: Optional[StatusChange] = None
 
 
+def compute_wh_per_hour(db_path: str, now: int, days_back: int = 3) -> dict:
+    """
+    Compute watt-hours charged and discharged per calendar hour from status_updates SQLite.
+    Uses step integration: power constant between consecutive readings.
+    Returns { "YYYY-MM-DD": [ {"hour": "HH", "charged_wh": float, "discharged_wh": float}, ... ], ... }
+    for the last days_back full days including today. Hours are ordered 00, 01, ... 23 (array preserves order).
+    """
+    tz = ZoneInfo("Europe/Amsterdam")
+    allowed_dates = set()
+    for i in range(days_back + 1):
+        dt = datetime.fromtimestamp(now, tz=tz)
+        from_day = datetime(dt.year, dt.month, dt.day, tzinfo=tz) - timedelta(days=i)
+        allowed_dates.add(from_day.strftime("%Y-%m-%d"))
+
+    if not os.path.exists(db_path):
+        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
+
+    points = []
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.execute(
+                "SELECT new_value, timestamp FROM status_updates WHERE type = 'change' AND new_value IS NOT NULL"
+            )
+            for row in cur.fetchall():
+                nv_raw, ts = row[0], row[1]
+                if ts is None:
+                    continue
+                try:
+                    nv = json.loads(nv_raw) if isinstance(nv_raw, str) else nv_raw
+                    if nv is not None and isinstance(nv, (int, float)):
+                        points.append((int(ts), float(nv)))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    continue
+    except Exception:
+        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
+
+    if not points:
+        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
+
+    points.sort(key=lambda p: p[0])
+    wh_by_date_hour: dict = {}
+    n = len(points)
+    for i in range(n):
+        t_start, power = points[i][0], points[i][1]
+        t_end = points[i + 1][0] if i < n - 1 else now
+        cur = t_start
+        while cur < t_end:
+            dt_start = datetime.fromtimestamp(cur, tz=tz)
+            hour_start = int(dt_start.strftime("%H"))
+            hour_epoch = int(datetime(dt_start.year, dt_start.month, dt_start.day, hour_start, 0, 0, tzinfo=tz).timestamp())
+            hour_end = hour_epoch + 3600
+            clip_start = max(t_start, hour_epoch)
+            clip_end = min(t_end, hour_end)
+            if clip_start < clip_end:
+                date_str = dt_start.strftime("%Y-%m-%d")
+                if date_str not in allowed_dates:
+                    cur = hour_end
+                    continue
+                hh = f"{hour_start:02d}"
+                if date_str not in wh_by_date_hour:
+                    wh_by_date_hour[date_str] = {}
+                if hh not in wh_by_date_hour[date_str]:
+                    wh_by_date_hour[date_str][hh] = {"charged_wh": 0.0, "discharged_wh": 0.0}
+                wh = abs(power) * (clip_end - clip_start) / 3600
+                if power > 0:
+                    wh_by_date_hour[date_str][hh]["charged_wh"] += wh
+                elif power < 0:
+                    wh_by_date_hour[date_str][hh]["discharged_wh"] += wh
+            cur = hour_end
+
+    result = {}
+    for d in sorted(allowed_dates):
+        hours = wh_by_date_hour.get(d, {})
+        result[d] = [
+            {
+                "hour": f"{h:02d}",
+                "charged_wh": round(hours.get(f"{h:02d}", {}).get("charged_wh", 0.0), 2),
+                "discharged_wh": round(hours.get(f"{h:02d}", {}).get("discharged_wh", 0.0), 2),
+            }
+            for h in range(24)
+        ]
+    return result
+
+
 # ============================================================================
 # HTTP API HANDLER
 # ============================================================================
@@ -102,11 +187,11 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
-    """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all with JSON responses."""
+    """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all, /api/wh_per_hour with JSON responses."""
 
-    def _send_json(self, data, status=200):
+    def _send_json(self, data, status=200, sort_keys=True):
         """Send JSON response."""
-        body = json.dumps(data).encode("utf-8")
+        body = json.dumps(data, sort_keys=sort_keys).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -116,6 +201,15 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/test":
             self._send_json({"status": "ok", "message": "API is up and running"})
+            return
+
+        if self.path == "/api/wh_per_hour":
+            db_path = getattr(self.server, "db_path", None)
+            if not db_path or not os.path.exists(db_path):
+                self._send_json({"error": "Status updates database not available"})
+                return
+            data = compute_wh_per_hour(db_path, int(time.time()), 3)
+            self._send_json(data, sort_keys=True)
             return
 
         api_state = getattr(self.server, "api_state", None)
@@ -195,28 +289,90 @@ class Logger:
 
 class StatusApi:
     """
-    Handles status updates to the automation status API.
-    Posts events like start, stop, and power changes.
+    Handles status updates: stores in SQLite and invokes on_update callback.
+    No HTTP POST to external API; used for Wh/h calculation and in-memory last_status.
     """
     
-    def __init__(self, api_url: Optional[str], logger: Logger,
-                 on_update: Optional[Callable[[str, Any, Any, int], None]] = None):
+    _SCHEMA = """
+        CREATE TABLE IF NOT EXISTS status_updates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            p1_total_power INTEGER,
+            electric_level INTEGER,
+            timestamp INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_status_updates_timestamp ON status_updates(timestamp);
+    """
+    
+    def __init__(self, logger: Logger,
+                 on_update: Optional[Callable[[str, Any, Any, int], None]] = None,
+                 db_path: Optional[str] = None,
+                 get_electric_level: Optional[Callable[[], Optional[int]]] = None,
+                 retention_days: int = 7):
         """
-        Initialize status API client.
+        Initialize status storage (SQLite + callback).
         
         Args:
-            api_url: URL of the status API endpoint. If None, operations will be no-ops.
             logger: Logger instance for error/warning messages.
-            on_update: Optional callback(event_type, old_value, new_value, timestamp) when posting.
+            on_update: Optional callback(event_type, old_value, new_value, timestamp) when storing.
+            db_path: Optional path to SQLite DB for storing status updates.
+            get_electric_level: Optional callable returning current battery % (0-100) for DB storage.
+            retention_days: Days to retain rows in SQLite (default 7).
         """
-        self.api_url = api_url
         self.logger = logger
         self.on_update = on_update
+        self.db_path = db_path
+        self.get_electric_level = get_electric_level
+        self.retention_days = retention_days
+        self._db_initialized = False
+    
+    def _ensure_db(self) -> None:
+        """Create DB file, directory, and table if needed."""
+        if not self.db_path or self._db_initialized:
+            return
+        try:
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+            with sqlite3.connect(self.db_path) as conn:
+                conn.executescript(self._SCHEMA)
+            self._db_initialized = True
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize SQLite DB: {e}")
+    
+    def _insert_status(self, event_type: str, old_value: Any, new_value: Any,
+                       p1_total_power: Optional[int], timestamp: int) -> None:
+        """Insert status update into SQLite and optionally run retention cleanup."""
+        if not self.db_path:
+            return
+        self._ensure_db()
+        electric_level = None
+        if self.get_electric_level:
+            try:
+                electric_level = self.get_electric_level()
+            except Exception:
+                pass
+        old_str = json.dumps(old_value) if old_value is not None else None
+        new_str = json.dumps(new_value) if new_value is not None else None
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (event_type, old_str, new_str, p1_total_power, electric_level, timestamp)
+                )
+                cutoff = int(timestamp) - (self.retention_days * 24 * 60 * 60)
+                conn.execute("DELETE FROM status_updates WHERE timestamp < ?", (cutoff,))
+                conn.commit()
+        except Exception as e:
+            self.logger.warning(f"Failed to write status update to SQLite: {e}")
     
     def post_update(self, event_type: str, old_value: Any = None, new_value: Any = None,
                     p1_total_power: Optional[int] = None) -> bool:
         """
-        Post a status update to the automation status API.
+        Store a status update (SQLite + on_update callback).
         
         Args:
             event_type: Type of event ('start', 'stop', 'change')
@@ -225,48 +381,14 @@ class StatusApi:
             p1_total_power: Optional last P1 meter total power (W) to attach to the entry.
         
         Returns:
-            True if successful, False otherwise
+            True after storing.
         """
         timestamp = int(datetime.now(ZoneInfo('Europe/Amsterdam')).timestamp())
         if self.on_update:
             self.on_update(event_type, old_value, new_value, timestamp)
 
-        if not self.api_url:
-            return False
-            
-        try:
-            
-            payload = {
-                'type': event_type,
-                'timestamp': timestamp,
-                'oldValue': old_value,
-                'newValue': new_value
-            }
-            if p1_total_power is not None:
-                payload['p1TotalPower'] = p1_total_power
-            
-            response = requests.post(self.api_url, json=payload, timeout=5, allow_redirects=False)
-            
-            # Check for redirects
-            if response.status_code in [301, 302, 303, 307, 308]:
-                redirect_url = response.headers.get('Location')
-                if redirect_url:
-                    if not redirect_url.startswith('http'):
-                        from urllib.parse import urljoin
-                        redirect_url = urljoin(self.api_url, redirect_url)
-                    response = requests.post(redirect_url, json=payload, timeout=5)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            if not data.get('success', False):
-                self.logger.warning(f"Status API returned success=false: {data.get('error', 'Unknown error')}")
-                return False
-                
-            return True
-        except Exception as e:
-            self.logger.warning(f"Error posting status update to API: {e}")
-            return False
+        self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp)
+        return True
 
 
 # ============================================================================
@@ -560,21 +682,26 @@ class AutomationApp:
             # Initialize logger
             self.logger = Logger(self.controller)
             
-            # Get status API URL - select based on location (matching schedule directory pattern)
-            location = self.schedule_controller.config.get("location", "remote")
-            if location == "local":
-                status_api_url = self.schedule_controller.config.get("statusApiUrl-local")
-            else:
-                status_api_url = self.schedule_controller.config.get("statusApiUrl")
+            data_dir = self.schedule_controller.config.get("dataDir", "./data/")
+            db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
+            retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
             
-            if not status_api_url:
-                self.logger.error("statusApiUrl not found in config.json")
-                return False
+            def get_electric_level() -> Optional[int]:
+                if not self.api_state or not self.api_state.last_zendure:
+                    return None
+                readings = self.api_state.last_zendure.readings
+                if not readings:
+                    return None
+                props = readings.get("properties") or {}
+                return props.get("electricLevel")
             
             # Initialize components
             self.status_api = StatusApi(
-                status_api_url, self.logger,
-                on_update=self._on_status_update
+                self.logger,
+                on_update=self._on_status_update,
+                db_path=db_path,
+                get_electric_level=get_electric_level,
+                retention_days=retention_days
             )
             self.input_handler = InputHandler()
             self.command_handler = CommandHandler(
@@ -656,6 +783,7 @@ class AutomationApp:
         try:
             self.http_server = AutomationTCPServer(("", HTTP_API_PORT), ApiTestHandler)
             self.http_server.api_state = self.api_state
+            self.http_server.db_path = self.status_api.db_path
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
