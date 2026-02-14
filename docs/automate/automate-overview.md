@@ -146,3 +146,97 @@ When the battery reaches its **Minimum Charge Level** (e.g., 20%):
 ### 4. Standby Mode
 
 When the device has been at 0 power for a configurable number of consecutive iterations (default: 10), the system automatically puts the device into standby mode using a sequence: 1W → 2s sleep → 0W. This ensures the device properly enters standby state.
+
+## API Calls Used by automate.py
+
+When `automate.py` runs, it (and the `device_controller.py` components it uses) perform the following API calls. Config keys refer to `config.json` unless noted.
+
+### 1. Schedule API (GET)
+
+| Aspect | Detail |
+|--------|--------|
+| **Config key** | `apiUrl` |
+| **Method** | GET |
+| **Used by** | `ScheduleController.fetch_schedule()` (in `device_controller.py`) |
+| **Purpose** | Fetch the charge/discharge schedule (resolved time slots). Defines what power setting the battery should use at each time of day. |
+| **When** | On startup, every N minutes (default 5; `API_REFRESH_INTERVAL_SECONDS`), and when the user runs the `refresh` keyboard command. |
+| **Expected response** | JSON with `success`, `resolved` (array of `{time, value, key}` entries). |
+
+### 2. Automation status API (POST)
+
+| Aspect | Detail |
+|--------|--------|
+| **Config key** | `statusApiUrl` (or `statusApiUrl-local` when `location` is `"local"`) |
+| **Method** | POST |
+| **Used by** | `StatusApi.post_update()` (in `automate.py`) |
+| **Purpose** | Report automation lifecycle and power changes so the schedule UI can show current status (running, last power, P1 power). |
+| **When** | On start (`type: 'start'`), on stop (`type: 'stop'`), on power change (`type: 'change'`), and on schedule rescan (`type: 'Rescan'`). |
+| **Payload** | `type`, `timestamp`, `oldValue`, `newValue`; optionally `p1TotalPower` (W). |
+
+### 3. Zendure device – read (GET)
+
+| Aspect | Detail |
+|--------|--------|
+| **URL** | `http://{deviceIp}/properties/report` |
+| **Config key** | `deviceIp` |
+| **Method** | GET |
+| **Used by** | `DeviceDataReader.read_zendure_data()` (in `device_controller.py`) |
+| **Purpose** | Read current device state (charge level, input/output limits, etc.) for control logic, net-zero calculation, and status display. |
+| **When** | Every loop iteration (interval set by `LOOP_INTERVAL_SECONDS`). |
+
+### 4. Zendure device – write (POST)
+
+| Aspect | Detail |
+|--------|--------|
+| **URL** | `http://{deviceIp}/properties/write` |
+| **Config keys** | `deviceIp`, `deviceSn` |
+| **Method** | POST |
+| **Used by** | `AutomateController.set_power_feed()` (in `device_controller.py`) |
+| **Purpose** | Apply charge/discharge power by writing `acMode`, `inputLimit`, `outputLimit`, `smartMode` to the device. |
+| **When** | Only when the desired power differs from the current setting (schedule change, manual command, or net-zero update). |
+| **Payload** | `{"sn": "<deviceSn>", "properties": { ... }}` (see Power Control Logic above). |
+
+### 5. P1 meter (GET)
+
+| Aspect | Detail |
+|--------|--------|
+| **URL** | `http://{p1Meter.ip}{p1Meter.endpoint}` (e.g. `http://192.168.2.5/api/v1/data` or `.../properties/report`) |
+| **Config** | `p1Meter` (object with `ip`, `endpoint`, `totalPowerPath`) or legacy `p1MeterIp` (endpoint defaults to `/properties/report`) |
+| **Method** | GET |
+| **Used by** | `DeviceDataReader.read_p1_meter()` (in `device_controller.py`) |
+| **Purpose** | Get current grid power (and optional cumulative kWh) for net-zero calculation and for attaching `p1TotalPower` to status updates. |
+| **When** | Every loop iteration when P1 is configured. |
+
+### 6. Data API – store P1 readings (POST)
+
+| Aspect | Detail |
+|--------|--------|
+| **URL** | `{dataApiUrl}` or `{dataApiUrl-local}` with `?type=zendure_p1` appended |
+| **Config key** | `dataApiUrl` or `dataApiUrl-local` (chosen by `location`) |
+| **Method** | POST |
+| **Used by** | `DeviceDataReader.read_p1_meter()` → `_store_data_via_api()` (in `device_controller.py`) |
+| **Purpose** | Persist P1 meter readings for historical tracking. |
+| **When** | After each successful P1 read when the data API URL is set. |
+
+### 7. Data API – store Zendure readings (POST)
+
+| Aspect | Detail |
+|--------|--------|
+| **URL** | `{dataApiUrl}` or `{dataApiUrl-local}` with `?type=zendure` appended |
+| **Config key** | `dataApiUrl` or `dataApiUrl-local` (chosen by `location`) |
+| **Method** | POST |
+| **Used by** | `DeviceDataReader.read_zendure_data()` → `_store_data_via_api()` (in `device_controller.py`) |
+| **Purpose** | Persist Zendure device snapshots for historical tracking. |
+| **When** | After each successful Zendure read when `update_json=True` and the data API URL is set. |
+
+### Summary table
+
+| # | API | Method | Config / URL | Reason |
+|---|-----|--------|--------------|--------|
+| 1 | Schedule | GET | `apiUrl` | Get charge/discharge schedule |
+| 2 | Automation status | POST | `statusApiUrl` / `statusApiUrl-local` | Report start, stop, power changes, rescan |
+| 3 | Zendure read | GET | `http://{deviceIp}/properties/report` | Read battery state for control and display |
+| 4 | Zendure write | POST | `http://{deviceIp}/properties/write` | Set charge/discharge power |
+| 5 | P1 meter | GET | `p1Meter.ip` + `p1Meter.endpoint` | Grid power for net-zero and status |
+| 6 | Data API (P1) | POST | `dataApiUrl` + `?type=zendure_p1` | Store P1 readings |
+| 7 | Data API (Zendure) | POST | `dataApiUrl` + `?type=zendure` | Store Zendure snapshots |

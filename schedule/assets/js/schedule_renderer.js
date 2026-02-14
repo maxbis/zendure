@@ -539,6 +539,8 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const acStatus = properties.acStatus || 0;
     const electricLevel = properties.electricLevel || 0;
     const solarInputPower = properties.solarInputPower || 0;
+    const inputLimit = properties.inputLimit || 0;
+    const outputLimit = properties.outputLimit || 0;
 
     // Calculate charge/discharge value
     const chargeDischargeValue = (outputPackPower > 0) ? outputPackPower : ((outputHomePower > 0) ? -outputHomePower : 0);
@@ -606,6 +608,16 @@ function renderChargeStatus(zendureData, p1Data = null) {
         barClass = 'discharging';
     }
 
+    // Commanded power marker (inputLimit when charging, -outputLimit when discharging)
+    const commandedPower = (inputLimit > 0) ? inputLimit : ((outputLimit > 0) ? -outputLimit : 0);
+    let commandedMarkerHtml = '';
+    if (commandedPower !== 0) {
+        const commandedClamped = Math.max(-1200, Math.min(1200, commandedPower));
+        const commandedLeft = 50 + (commandedClamped / 1200) * 50;
+        const commandedTitle = 'Commanded: ' + (commandedPower > 0 ? '+' : '') + commandedPower + ' W';
+        commandedMarkerHtml = `<div class="charge-power-bar-marker-commanded" style="left: ${commandedLeft}%; transform: translateX(-50%);" title="${escapeHtml(commandedTitle)}"></div>`;
+    }
+
     // Calculate battery capacity
     const usableNetKwh = Math.max(0, ((electricLevel - MIN_CHARGE_LEVEL) / 100) * TOTAL_CAPACITY_KWH);
     const roomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - electricLevel) / 100) * TOTAL_CAPACITY_KWH);
@@ -639,6 +651,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
                 <div class="charge-power-bar-label right">1200 W</div>
                 <div class="charge-power-bar-center"></div>
                 ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
+                ${commandedMarkerHtml}
             </div>
         </div>
 

@@ -36,6 +36,8 @@ require_once __DIR__ . '/charge_status_data.php';
             $acStatus = $properties['acStatus'] ?? 0;
             $electricLevel = $properties['electricLevel'] ?? 0;
             $solarInputPower = $properties['solarInputPower'] ?? 0;
+            $inputLimit = $properties['inputLimit'] ?? 0;
+            $outputLimit = $properties['outputLimit'] ?? 0;
             
             // Calculate charge/discharge value (positive = charging, negative = discharging)
             $chargeDischargeValue = ($outputPackPower > 0) ? $outputPackPower : (($outputHomePower > 0) ? -$outputHomePower : 0);
@@ -159,6 +161,13 @@ require_once __DIR__ . '/charge_status_data.php';
                         $barWidth = 0;
                         $barClass = '';
                     }
+                    // Commanded power marker (inputLimit when charging, -outputLimit when discharging)
+                    $commandedPower = ($inputLimit > 0) ? $inputLimit : (($outputLimit > 0) ? -$outputLimit : 0);
+                    $commandedLeft = null;
+                    if ($commandedPower != 0) {
+                        $clamped = max(-1200, min(1200, $commandedPower));
+                        $commandedLeft = 50 + ($clamped / 1200) * 50;
+                    }
                     ?>
                     <div class="charge-power-bar-container">
                         <div class="charge-power-bar-label left">-1200 W</div>
@@ -167,6 +176,9 @@ require_once __DIR__ . '/charge_status_data.php';
                         <div class="charge-power-bar-center"></div>
                         <?php if ($barWidth > 0): ?>
                             <div class="charge-power-bar-fill <?php echo htmlspecialchars($barClass); ?>" style="width: <?php echo $barWidth; ?>%;"></div>
+                        <?php endif; ?>
+                        <?php if ($commandedLeft !== null): ?>
+                            <div class="charge-power-bar-marker-commanded" style="left: <?php echo $commandedLeft; ?>%; transform: translateX(-50%);" title="Commanded: <?php echo $commandedPower > 0 ? '+' : ''; ?><?php echo $commandedPower; ?> W"></div>
                         <?php endif; ?>
                     </div>
                 </div>
