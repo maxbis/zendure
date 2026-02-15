@@ -13,6 +13,7 @@ import os
 import signal
 import sqlite3
 import time
+import requests
 import sys
 import select
 import platform
@@ -42,6 +43,10 @@ ZERO_COUNT_THRESHOLD_STANDBY = 21
 
 # HTTP API port for /api/test endpoint
 HTTP_API_PORT = 1611
+
+# Wh-per-hour API: timezone and default days
+WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
+WH_PER_HOUR_DAYS_DEFAULT = 3
 
 # ============================================================================
 # API READINGS DATA CLASSES
@@ -93,14 +98,18 @@ class ApiState:
         self.last_status: Optional[StatusChange] = None
 
 
-def compute_wh_per_hour(db_path: str, now: int, days_back: int = 3) -> dict:
+# ============================================================================
+# HTTP API HANDLER
+# ============================================================================
+
+def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAYS_DEFAULT) -> dict:
     """
     Compute watt-hours charged and discharged per calendar hour from status_updates SQLite.
     Uses step integration: power constant between consecutive readings.
     Returns { "YYYY-MM-DD": [ {"hour": "HH", "charged_wh": float, "discharged_wh": float}, ... ], ... }
     for the last days_back full days including today. Hours are ordered 00, 01, ... 23 (array preserves order).
     """
-    tz = ZoneInfo("Europe/Amsterdam")
+    tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
     allowed_dates = set()
     for i in range(days_back + 1):
         dt = datetime.fromtimestamp(now, tz=tz)
@@ -177,17 +186,13 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = 3) -> dict:
     return result
 
 
-# ============================================================================
-# HTTP API HANDLER
-# ============================================================================
-
 class AutomationTCPServer(socketserver.ThreadingTCPServer):
     """TCPServer that holds api_state for the request handler."""
     pass  # api_state set on instance after construction
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
-    """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all, /api/wh_per_hour with JSON responses."""
+    """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all, /api/wh_per_hour, /api/refresh with JSON responses."""
 
     def _send_json(self, data, status=200, sort_keys=True):
         """Send JSON response."""
@@ -208,8 +213,22 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             if not db_path or not os.path.exists(db_path):
                 self._send_json({"error": "Status updates database not available"})
                 return
-            data = compute_wh_per_hour(db_path, int(time.time()), 3)
+            data = compute_wh_per_hour(db_path, int(time.time()), WH_PER_HOUR_DAYS_DEFAULT)
             self._send_json(data, sort_keys=True)
+            return
+
+        if self.path == "/api/refresh":
+            schedule_controller = getattr(self.server, "schedule_controller", None)
+            status_api = getattr(self.server, "status_api", None)
+            if not schedule_controller or not status_api:
+                self._send_json({"error": "Refresh not available"}, 503)
+                return
+            try:
+                schedule_controller.fetch_schedule()
+                status_api.post_update("Rescan", None, None)
+                self._send_json({"ok": True})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
             return
 
         api_state = getattr(self.server, "api_state", None)
@@ -289,8 +308,9 @@ class Logger:
 
 class StatusApi:
     """
-    Handles status updates: stores in SQLite and invokes on_update callback.
-    No HTTP POST to external API; used for Wh/h calculation and in-memory last_status.
+    Handles status updates to the automation status API.
+    Posts events like start, stop, and power changes.
+    Optionally stores updates in SQLite for Wh/h calculation.
     """
     
     _SCHEMA = """
@@ -306,21 +326,23 @@ class StatusApi:
         CREATE INDEX IF NOT EXISTS idx_status_updates_timestamp ON status_updates(timestamp);
     """
     
-    def __init__(self, logger: Logger,
+    def __init__(self, api_url: Optional[str], logger: Logger,
                  on_update: Optional[Callable[[str, Any, Any, int], None]] = None,
                  db_path: Optional[str] = None,
                  get_electric_level: Optional[Callable[[], Optional[int]]] = None,
                  retention_days: int = 7):
         """
-        Initialize status storage (SQLite + callback).
+        Initialize status API client.
         
         Args:
+            api_url: URL of the status API endpoint. If None, operations will be no-ops.
             logger: Logger instance for error/warning messages.
-            on_update: Optional callback(event_type, old_value, new_value, timestamp) when storing.
+            on_update: Optional callback(event_type, old_value, new_value, timestamp) when posting.
             db_path: Optional path to SQLite DB for storing status updates.
             get_electric_level: Optional callable returning current battery % (0-100) for DB storage.
             retention_days: Days to retain rows in SQLite (default 7).
         """
+        self.api_url = api_url
         self.logger = logger
         self.on_update = on_update
         self.db_path = db_path
@@ -372,7 +394,7 @@ class StatusApi:
     def post_update(self, event_type: str, old_value: Any = None, new_value: Any = None,
                     p1_total_power: Optional[int] = None) -> bool:
         """
-        Store a status update (SQLite + on_update callback).
+        Post a status update to the automation status API.
         
         Args:
             event_type: Type of event ('start', 'stop', 'change')
@@ -381,14 +403,50 @@ class StatusApi:
             p1_total_power: Optional last P1 meter total power (W) to attach to the entry.
         
         Returns:
-            True after storing.
+            True if successful, False otherwise
         """
         timestamp = int(datetime.now(ZoneInfo('Europe/Amsterdam')).timestamp())
         if self.on_update:
             self.on_update(event_type, old_value, new_value, timestamp)
 
         self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp)
-        return True
+
+        if not self.api_url:
+            return False
+            
+        try:
+            
+            payload = {
+                'type': event_type,
+                'timestamp': timestamp,
+                'oldValue': old_value,
+                'newValue': new_value
+            }
+            if p1_total_power is not None:
+                payload['p1TotalPower'] = p1_total_power
+            
+            response = requests.post(self.api_url, json=payload, timeout=5, allow_redirects=False)
+            
+            # Check for redirects
+            if response.status_code in [301, 302, 303, 307, 308]:
+                redirect_url = response.headers.get('Location')
+                if redirect_url:
+                    if not redirect_url.startswith('http'):
+                        from urllib.parse import urljoin
+                        redirect_url = urljoin(self.api_url, redirect_url)
+                    response = requests.post(redirect_url, json=payload, timeout=5)
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data.get('success', False):
+                self.logger.warning(f"Status API returned success=false: {data.get('error', 'Unknown error')}")
+                return False
+                
+            return True
+        except Exception as e:
+            self.logger.warning(f"Error posting status update to API: {e}")
+            return False
 
 
 # ============================================================================
@@ -468,12 +526,12 @@ class CommandHandler:
     Handles keyboard commands for interactive control.
     Processes commands like status, power settings, refresh, etc.
     """
-    
-    def __init__(self, controller: AutomateController, schedule_controller: ScheduleController, 
+
+    def __init__(self, controller: AutomateController, schedule_controller: ScheduleController,
                  status_api: StatusApi, logger: Logger):
         """
         Initialize command handler.
-        
+
         Args:
             controller: Device controller for power operations
             schedule_controller: Schedule controller for schedule operations
@@ -484,7 +542,26 @@ class CommandHandler:
         self.schedule_controller = schedule_controller
         self.status_api = status_api
         self.logger = logger
-    
+        self._command_handlers = {
+            "h": self._cmd_help,
+            "help": self._cmd_help,
+            "s": self._cmd_status,
+            "status": self._cmd_status,
+            "a": self._cmd_accumulators,
+            "accumulators": self._cmd_accumulators,
+            "r": self._cmd_refresh,
+            "refresh": self._cmd_refresh,
+            "p": self._cmd_power,
+            "z": self._cmd_zero,
+            "zero": self._cmd_zero,
+            "nz": self._cmd_netzero,
+            "netzero": self._cmd_netzero,
+            "nzp": self._cmd_netzero_plus,
+            "netzero+": self._cmd_netzero_plus,
+            "q": self._cmd_quit,
+            "quit": self._cmd_quit,
+        }
+
     def print_help(self):
         """Print available keyboard commands."""
         print("\n" + "="*60)
@@ -500,133 +577,139 @@ class CommandHandler:
         print("  nzp, netzero+    - Set power to netzero+ mode")
         print("  q, quit          - Quit gracefully")
         print("="*60 + "\n")
-    
+
     def handle(self, command: str) -> bool:
         """
         Handle a keyboard command.
-        
+
         Args:
             command: Command string from user input
-        
+
         Returns:
             True to continue, False to quit
         """
         command = command.strip().lower()
-        
         if not command:
             return True
-        
+
         parts = command.split()
         cmd = parts[0]
         args = parts[1:] if len(parts) > 1 else []
-        
+
         try:
-            if cmd in ['h', 'help']:
-                self.print_help()
-            
-            elif cmd in ['s', 'status']:
-                self.logger.info("=== Current Status ===")
-                try:
-                    desired_power = self.schedule_controller.get_desired_power(refresh=False)
-                    self.logger.info(f"Schedule desired power: {desired_power}")
-                except Exception as e:
-                    self.logger.error(f"Error getting desired power: {e}")
-                
-                self.controller.check_battery_limits()
-                self.logger.info(f"Battery limit state: {self.controller.limit_state} (1=max, -1=min, 0=ok)")
-                
-                try:
-                    reader = get_reader(self.controller.config_path)
-                    zendure_data = reader.read_zendure(update_json=False)
-                    if zendure_data:
-                        props = zendure_data.get("properties", {})
-                        battery_level = props.get("electricLevel", 'N/A')
-                        self.logger.info(f"Battery level: {battery_level}%")
-                except Exception as e:
-                    self.logger.warning(f"Could not read Zendure data: {e}")
-            
-            elif cmd in ['a', 'accumulators']:
-                self.logger.info("Accumulator debug output has been removed.")
-            
-            elif cmd in ['r', 'refresh']:
-                self.logger.info("Forcing schedule refresh...")
-                try:
-                    # Get the API URL from config
-                    api_url = self.schedule_controller.config.get("apiUrl")
-                    if api_url:
-                        print("\n" + "="*60)
-                        print("API URL:")
-                        print("="*60)
-                        print(api_url)
-                        print("="*60 + "\n")
-                    else:
-                        self.logger.warning("API URL not found in config")
-                    
-                    api_response = self.schedule_controller.fetch_schedule()
-                    self.logger.info("Schedule refreshed successfully")
-                except Exception as e:
-                    self.logger.error(f"Failed to refresh schedule: {e}")
-            
-            elif cmd == 'p' and args:
-                power_arg = args[0]
-                try:
-                    if power_arg.lstrip('-').isdigit():
-                        power_value = int(power_arg)
-                    elif power_arg in ['netzero', 'netzero+']:
-                        power_value = power_arg
-                    else:
-                        self.logger.error(f"Invalid power value: {power_arg}")
-                        self.logger.info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
-                        return True
-                    
-                    self.logger.info(f"Manually setting power to: {power_value}")
-                    result = self.controller.set_power(power_value)
-                    if result.success:
-                        self.logger.info(f"Power set to: {result.power}")
-                        self.status_api.post_update('change', None, result.power)
-                    else:
-                        self.logger.error(f"Failed to set power: {result.error}")
-                except ValueError:
-                    self.logger.error(f"Invalid power value: {power_arg}")
-            
-            elif cmd in ['z', 'zero']:
-                self.logger.info("Setting power to 0")
-                result = self.controller.set_power(0)
-                if result.success:
-                    self.logger.info(f"Power set to 0")
-                    self.status_api.post_update('change', None, 0)
-                else:
-                    self.logger.error(f"Failed to set power: {result.error}")
-            
-            elif cmd in ['nz', 'netzero']:
-                self.logger.info("Setting power to netzero")
-                result = self.controller.set_power('netzero')
-                if result.success:
-                    self.logger.info(f"Power set to netzero")
-                    self.status_api.post_update('change', None, 'netzero')
-                else:
-                    self.logger.error(f"Failed to set power: {result.error}")
-            
-            elif cmd in ['nzp', 'netzero+']:
-                self.logger.info("Setting power to netzero+")
-                result = self.controller.set_power('netzero+')
-                if result.success:
-                    self.logger.info(f"Power set to netzero+")
-                    self.status_api.post_update('change', None, 'netzero+')
-                else:
-                    self.logger.error(f"Failed to set power: {result.error}")
-            
-            elif cmd in ['q', 'quit']:
-                self.logger.info("Quit command received")
-                return False
-            
-            else:
-                self.logger.warning(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
-        
+            handler = self._command_handlers.get(cmd)
+            if handler is not None:
+                return handler(args)
+            self.logger.warning(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
+            return True
         except Exception as e:
             self.logger.error(f"Error executing command: {e}")
-        
+            return True
+
+    def _cmd_help(self, args: list) -> bool:
+        self.print_help()
         return True
+
+    def _cmd_status(self, args: list) -> bool:
+        self.logger.info("=== Current Status ===")
+        try:
+            desired_power = self.schedule_controller.get_desired_power(refresh=False)
+            self.logger.info(f"Schedule desired power: {desired_power}")
+        except Exception as e:
+            self.logger.error(f"Error getting desired power: {e}")
+        self.controller.check_battery_limits()
+        self.logger.info(f"Battery limit state: {self.controller.limit_state} (1=max, -1=min, 0=ok)")
+        try:
+            reader = get_reader(self.controller.config_path)
+            zendure_data = reader.read_zendure(update_json=False)
+            if zendure_data:
+                props = zendure_data.get("properties", {})
+                battery_level = props.get("electricLevel", "N/A")
+                self.logger.info(f"Battery level: {battery_level}%")
+        except Exception as e:
+            self.logger.warning(f"Could not read Zendure data: {e}")
+        return True
+
+    def _cmd_accumulators(self, args: list) -> bool:
+        self.logger.info("Accumulator debug output has been removed.")
+        return True
+
+    def _cmd_refresh(self, args: list) -> bool:
+        self.logger.info("Forcing schedule refresh...")
+        try:
+            api_url = self.schedule_controller.config.get("apiUrl")
+            if api_url:
+                print("\n" + "="*60)
+                print("API URL:")
+                print("="*60)
+                print(api_url)
+                print("="*60 + "\n")
+            else:
+                self.logger.warning("API URL not found in config")
+            self.schedule_controller.fetch_schedule()
+            self.logger.info("Schedule refreshed successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to refresh schedule: {e}")
+        return True
+
+    def _cmd_power(self, args: list) -> bool:
+        if not args:
+            self.logger.error("Power command requires a value (e.g., 'p 500' or 'p netzero')")
+            return True
+        power_arg = args[0]
+        try:
+            if power_arg.lstrip("-").isdigit():
+                power_value = int(power_arg)
+            elif power_arg in ["netzero", "netzero+"]:
+                power_value = power_arg
+            else:
+                self.logger.error(f"Invalid power value: {power_arg}")
+                self.logger.info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
+                return True
+            self.logger.info(f"Manually setting power to: {power_value}")
+            result = self.controller.set_power(power_value)
+            if result.success:
+                self.logger.info(f"Power set to: {result.power}")
+                self.status_api.post_update("change", None, result.power)
+            else:
+                self.logger.error(f"Failed to set power: {result.error}")
+        except ValueError:
+            self.logger.error(f"Invalid power value: {power_arg}")
+        return True
+
+    def _cmd_zero(self, args: list) -> bool:
+        self.logger.info("Setting power to 0")
+        result = self.controller.set_power(0)
+        if result.success:
+            self.logger.info("Power set to 0")
+            self.status_api.post_update("change", None, 0)
+        else:
+            self.logger.error(f"Failed to set power: {result.error}")
+        return True
+
+    def _cmd_netzero(self, args: list) -> bool:
+        self.logger.info("Setting power to netzero")
+        result = self.controller.set_power("netzero")
+        if result.success:
+            self.logger.info("Power set to netzero")
+            self.status_api.post_update("change", None, "netzero")
+        else:
+            self.logger.error(f"Failed to set power: {result.error}")
+        return True
+
+    def _cmd_netzero_plus(self, args: list) -> bool:
+        self.logger.info("Setting power to netzero+")
+        result = self.controller.set_power("netzero+")
+        if result.success:
+            self.logger.info("Power set to netzero+")
+            self.status_api.post_update("change", None, "netzero+")
+        else:
+            self.logger.error(f"Failed to set power: {result.error}")
+        return True
+
+    def _cmd_quit(self, args: list) -> bool:
+        self.logger.info("Quit command received")
+        return False
 
 
 # ============================================================================
@@ -682,6 +765,17 @@ class AutomationApp:
             # Initialize logger
             self.logger = Logger(self.controller)
             
+            # Get status API URL - select based on location (matching schedule directory pattern)
+            location = self.schedule_controller.config.get("location", "remote")
+            if location == "local":
+                status_api_url = self.schedule_controller.config.get("statusApiUrl-local")
+            else:
+                status_api_url = self.schedule_controller.config.get("statusApiUrl")
+            
+            if not status_api_url:
+                self.logger.error("statusApiUrl not found in config.json")
+                return False
+            
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
@@ -697,7 +791,7 @@ class AutomationApp:
             
             # Initialize components
             self.status_api = StatusApi(
-                self.logger,
+                status_api_url, self.logger,
                 on_update=self._on_status_update,
                 db_path=db_path,
                 get_electric_level=get_electric_level,
@@ -715,37 +809,7 @@ class AutomationApp:
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
 
-            # Loop interval (default from module constant, overridable in config.json)
-            try:
-                loop_interval = int(self.controller.config.get("LOOP_INTERVAL_SECONDS", LOOP_INTERVAL_SECONDS))
-            except (TypeError, ValueError):
-                loop_interval = LOOP_INTERVAL_SECONDS
-            self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
-
-            # Generate steps, f.e. [0, 20, 40] for loop_interval_seconds = 20
-            self.steps = self._generate_steps(self.loop_interval_seconds, 59)
-
-            # Max delta for power step changes (configurable)
-            try:
-                power_feed_max_delta = int(self.controller.config.get("POWER_FEED_MAX_DELTA", 2400))
-            except (TypeError, ValueError):
-                power_feed_max_delta = 2400
-            self.power_feed_max_delta = max(0, power_feed_max_delta)
-
-            # API refresh interval (default from module constant, overridable in config.json)
-            try:
-                api_refresh = int(self.controller.config.get("API_REFRESH_INTERVAL_SECONDS", API_REFRESH_INTERVAL_SECONDS))
-            except (TypeError, ValueError):
-                api_refresh = API_REFRESH_INTERVAL_SECONDS
-            self.api_refresh_interval_seconds = max(60, min(api_refresh, 3600))  # clamp 1–60 minutes
-
-            # Zero-count threshold for standby (default from module constant, overridable in config.json)
-            try:
-                zero_threshold = int(self.controller.config.get("ZERO_COUNT_THRESHOLD_STANDBY", ZERO_COUNT_THRESHOLD_STANDBY))
-            except (TypeError, ValueError):
-                zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
-            self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
-
+            self._load_loop_config()
             return True
             
         except FileNotFoundError as e:
@@ -762,6 +826,33 @@ class AutomationApp:
 
     def _generate_steps(self, step, max_value):
         return sorted(set(range(0, max_value + 1, step)) | {0})
+
+    def _load_loop_config(self) -> None:
+        """Load loop-related config from controller config and set attributes."""
+        try:
+            loop_interval = int(self.controller.config.get("LOOP_INTERVAL_SECONDS", LOOP_INTERVAL_SECONDS))
+        except (TypeError, ValueError):
+            loop_interval = LOOP_INTERVAL_SECONDS
+        self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
+        self.steps = self._generate_steps(self.loop_interval_seconds, 59)
+
+        try:
+            power_feed_max_delta = int(self.controller.config.get("POWER_FEED_MAX_DELTA", 2400))
+        except (TypeError, ValueError):
+            power_feed_max_delta = 2400
+        self.power_feed_max_delta = max(0, power_feed_max_delta)
+
+        try:
+            api_refresh = int(self.controller.config.get("API_REFRESH_INTERVAL_SECONDS", API_REFRESH_INTERVAL_SECONDS))
+        except (TypeError, ValueError):
+            api_refresh = API_REFRESH_INTERVAL_SECONDS
+        self.api_refresh_interval_seconds = max(60, min(api_refresh, 3600))  # clamp 1–60 minutes
+
+        try:
+            zero_threshold = int(self.controller.config.get("ZERO_COUNT_THRESHOLD_STANDBY", ZERO_COUNT_THRESHOLD_STANDBY))
+        except (TypeError, ValueError):
+            zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
+        self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -784,6 +875,8 @@ class AutomationApp:
             self.http_server = AutomationTCPServer(("", HTTP_API_PORT), ApiTestHandler)
             self.http_server.api_state = self.api_state
             self.http_server.db_path = self.status_api.db_path
+            self.http_server.schedule_controller = self.schedule_controller
+            self.http_server.status_api = self.status_api
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")

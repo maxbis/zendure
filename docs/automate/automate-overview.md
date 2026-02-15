@@ -29,6 +29,16 @@ This module provides object-oriented wrappers for interacting with the Zendure b
 
 For detailed API documentation, see [device-controller.md](device-controller.md).
 
+### `automate_www.py`
+
+This is the automation script with a built-in HTTP API. It provides the same core functionality as `automate.py` but additionally:
+
+- Exposes an HTTP API on port 1611 for monitoring (P1, Zendure, status, Wh-per-hour) and remote refresh.
+- Stores status updates in SQLite (`data/status_updates.db`) instead of POSTing to an external status API.
+- Uses a slightly different loop interval default (20 seconds) and supports power step delta limiting.
+
+For full documentation, see [automate-www.md](automate-www.md).
+
 ### `automate.py`
 
 This is the main automation script that runs continuously to control the battery based on the schedule. It's organized into several classes for better structure:

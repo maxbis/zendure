@@ -18,6 +18,7 @@ $charge_status_data_initialized = true;
 
 // Unified API endpoint (P1 + Zendure + status in one response)
 const CHARGE_STATUS_ALL_API_URL = 'http://81.204.237.36:1611/api/all';
+const CHARGE_STATUS_ALL_API_URL = 'http://81.204.237.36:1611/api/all';
 
 // Include required functions for temperature conversion and color calculation
 require_once __DIR__ . '/../includes/formatters.php';
