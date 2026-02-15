@@ -254,19 +254,19 @@ def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dic
 
             if type_filter == "all":
                 cur = conn.execute(
-                    "SELECT type, old_value, new_value, p1_total_power, timestamp "
+                    "SELECT type, old_value, new_value, p1_total_power, electric_level, timestamp "
                     "FROM status_updates ORDER BY timestamp DESC LIMIT ?",
                     (limit,),
                 )
             else:
                 cur = conn.execute(
-                    "SELECT type, old_value, new_value, p1_total_power, timestamp "
-                    "FROM status_updates WHERE type = 'change' "
+                    "SELECT type, old_value, new_value, p1_total_power, electric_level, timestamp "
+                    "FROM status_updates WHERE type == 'change'"
                     "ORDER BY timestamp DESC LIMIT ?",
                     (limit,),
                 )
 
-            for event_type, old_value, new_value, p1_total_power, ts in cur.fetchall():
+            for event_type, old_value, new_value, p1_total_power, electric_level,ts in cur.fetchall():
                 last_changes.append(
                     {
                         "timestamp": int(ts) if ts is not None else None,
@@ -274,6 +274,7 @@ def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dic
                         "oldValue": _safe_json_loads(old_value),
                         "newValue": _safe_json_loads(new_value),
                         "p1TotalPower": p1_total_power,
+                        "electricLevel": electric_level,
                     }
                 )
     except Exception as e:
@@ -292,7 +293,8 @@ def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dic
 
 class AutomationTCPServer(socketserver.ThreadingTCPServer):
     """TCPServer that holds api_state for the request handler."""
-    pass  # api_state set on instance after construction
+    allow_reuse_address = True  # avoid "Address already in use" when restarting quickly
+    # api_state etc. set on instance after construction
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
@@ -1043,7 +1045,10 @@ class AutomationApp:
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
-        signal_name = signal.Signals(signum).name
+        try:
+            signal_name = signal.Signals(signum).name
+        except (ValueError, AttributeError):
+            signal_name = str(signum)
         self.logger.warning(f"Received {signal_name} signal, initiating graceful shutdown...")
         self.shutdown_requested = True
 
@@ -1261,8 +1266,18 @@ class AutomationApp:
             else:
                 self.logger.error(f"   Failed to set power to 0: {result.error}")
             
+            # Post 'stop' in a thread with short join so shutdown never blocks (e.g. slow/hanging HTTP on Mac)
             if self.status_api:
-                self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
+                def _post_stop():
+                    try:
+                        self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
+                    except Exception:
+                        pass
+                t = threading.Thread(target=_post_stop, daemon=True)
+                t.start()
+                t.join(timeout=1.5)
+        # Force immediate process exit (nothing can block or catch this; avoids hang on Mac)
+        os._exit(0)
 
     def run(self):
         """Main execution method."""
