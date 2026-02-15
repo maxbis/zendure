@@ -5,6 +5,8 @@ Automation script for charge schedule monitoring (OOP version with HTTP API)
 Runs continuously, checking the charge schedule API and applying power settings
 using the OOP device controller classes. Exposes an HTTP API on port 1611 with
 /api/test, /api/p1, /api/zendure, /api/status, and /api/all endpoints.
+/api/p1 and /api/zendure accept optional query param max_age (or maxAge), default 60: 0 = always refresh;
+N = refresh if cached data is older than N seconds.
 Supports interactive keyboard commands.
 """
 
@@ -25,6 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, Any, Callable
+from urllib.parse import urlparse, parse_qs
 
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 
@@ -203,9 +206,57 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _parse_max_age(self, parsed) -> int:
+        """Parse max_age (or maxAge) from query string; default 60. Returns non-negative int."""
+        max_age = 60
+        query = parse_qs(parsed.query)
+        for key in ("max_age", "maxAge"):
+            if key in query and query[key]:
+                try:
+                    val = int(query[key][0])
+                    if val >= 0:
+                        max_age = val
+                    break
+                except (ValueError, TypeError):
+                    pass
+        return max_age
+
+    def _maybe_refresh_reading(self, reading, max_age: int, refresh_cb) -> None:
+        """If reading is missing or older than max_age seconds, call refresh_cb (0 = always refresh)."""
+        now = int(time.time())
+        need_refresh = (
+            max_age == 0
+            or reading is None
+            or (now - (reading.timestamp or 0)) > max_age
+        )
+        if need_refresh and refresh_cb is not None:
+            refresh_cb()
+
     def do_GET(self):
         if self.path == "/api/test":
-            self._send_json({"status": "ok", "message": "API is up and running"})
+            self._send_json({
+                "status": "ok",
+                "message": "API is up and running",
+                "endpoints": [
+                    {"path": "/api/test", "optional_params": []},
+                    {
+                        "path": "/api/p1",
+                        "optional_params": [
+                            {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
+                        ],
+                    },
+                    {
+                        "path": "/api/zendure",
+                        "optional_params": [
+                            {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
+                        ],
+                    },
+                    {"path": "/api/status", "optional_params": []},
+                    {"path": "/api/all", "optional_params": []},
+                    {"path": "/api/wh_per_hour", "optional_params": []},
+                    {"path": "/api/refresh", "optional_params": []},
+                ],
+            })
             return
 
         if self.path == "/api/wh_per_hour":
@@ -236,16 +287,27 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"error": "API state not initialized"}, 503)
             return
 
-        if self.path == "/api/p1":
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/p1":
+            max_age = self._parse_max_age(parsed)
+            self._maybe_refresh_reading(
+                api_state.last_p1, max_age,
+                getattr(self.server, "refresh_p1_callback", None),
+            )
             data = api_state.last_p1.to_dict() if api_state.last_p1 else None
             self._send_json(data)
-        elif self.path == "/api/zendure":
+        elif parsed.path == "/api/zendure":
+            max_age = self._parse_max_age(parsed)
+            self._maybe_refresh_reading(
+                api_state.last_zendure, max_age,
+                getattr(self.server, "refresh_zendure_callback", None),
+            )
             data = api_state.last_zendure.to_dict() if api_state.last_zendure else None
             self._send_json(data)
-        elif self.path == "/api/status":
+        elif parsed.path == "/api/status":
             data = api_state.last_status.to_dict() if api_state.last_status else None
             self._send_json(data)
-        elif self.path == "/api/all":
+        elif parsed.path == "/api/all":
             response = {
                 "p1": api_state.last_p1.to_dict() if api_state.last_p1 else None,
                 "zendure": api_state.last_zendure.to_dict() if api_state.last_zendure else None,
@@ -877,6 +939,8 @@ class AutomationApp:
             self.http_server.db_path = self.status_api.db_path
             self.http_server.schedule_controller = self.schedule_controller
             self.http_server.status_api = self.status_api
+            self.http_server.refresh_p1_callback = self._refresh_p1_for_api
+            self.http_server.refresh_zendure_callback = self._refresh_zendure_for_api
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
@@ -900,6 +964,33 @@ class AutomationApp:
         except Exception as e:
             self.logger.warning(f"Failed to read P1 for accumulation: {e}")
         return p1_data
+
+    def _refresh_p1_for_api(self) -> None:
+        """Read P1 meter and update api_state.last_p1 (for on-demand refresh from /api/p1)."""
+        p1_data = self._accumulate_p1_data()
+        if p1_data is not None:
+            self.api_state.last_p1 = P1Readings(
+                readings=p1_data,
+                timestamp=int(time.time()),
+            )
+            if p1_data.get("total_power") is not None:
+                try:
+                    self.last_p1_total_power = int(p1_data["total_power"])
+                except (TypeError, ValueError):
+                    pass
+
+    def _refresh_zendure_for_api(self) -> None:
+        """Read Zendure device and update api_state.last_zendure (for on-demand refresh from /api/zendure)."""
+        try:
+            reader = get_reader(self.controller.config_path)
+            zendure_data = reader.read_zendure(update_json=True)
+            if zendure_data is not None:
+                self.api_state.last_zendure = ZendureReadings(
+                    readings=zendure_data,
+                    timestamp=int(time.time()),
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to read Zendure for API: {e}")
 
     def _refresh_schedule_if_needed(self):
         """Refresh schedule API if interval passed."""
