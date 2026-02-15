@@ -17,7 +17,7 @@ if (isset($charge_status_data_initialized) && $charge_status_data_initialized ==
 $charge_status_data_initialized = true;
 
 // Unified API endpoint (P1 + Zendure + status in one response)
-// const CHARGE_STATUS_ALL_API_URL = 'http://81.204.237.36:1611/api/all';
+// Remote API used by server-side PHP fetch
 const CHARGE_STATUS_ALL_API_URL = 'http://81.204.237.36:1611/api/all';
 
 // Include required functions for temperature conversion and color calculation
@@ -45,9 +45,19 @@ if ($MIN_CHARGE_LEVEL > $MAX_CHARGE_LEVEL) {
 }
 $TOTAL_CAPACITY_KWH = 5.76; // Total battery capacity in kWh (57600 Wh / 1000)
 
+// Build same-origin proxy URL for browser fetches (avoid CORS)
+$scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+$basePath = dirname($scriptName);
+if ($basePath === '/' || $basePath === '\\' || $basePath === '.') {
+    $basePath = '';
+}
+$proxyApiUrl = $scheme . '://' . $host . $basePath . '/api/charge_status_all_proxy.php';
+
 // Store API URL and levels for JavaScript
 echo '<script>';
-echo 'const CHARGE_STATUS_ALL_API_URL = ' . json_encode(CHARGE_STATUS_ALL_API_URL, JSON_UNESCAPED_SLASHES) . ';';
+echo 'const CHARGE_STATUS_ALL_API_URL = ' . json_encode($proxyApiUrl, JSON_UNESCAPED_SLASHES) . ';';
 echo 'const CHARGE_STATUS_MIN_CHARGE_LEVEL = ' . json_encode($MIN_CHARGE_LEVEL) . ';';
 echo 'const CHARGE_STATUS_MAX_CHARGE_LEVEL = ' . json_encode($MAX_CHARGE_LEVEL) . ';';
 echo '</script>';

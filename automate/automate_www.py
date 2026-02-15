@@ -189,6 +189,107 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     return result
 
 
+def _safe_json_loads(value: Optional[str]) -> Any:
+    """Parse JSON-encoded value from SQLite; fall back to raw string on error."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return value
+
+
+def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dict:
+    """
+    Build an Automation Status response from SQLite.
+    Matches schedule/api/automation_status_api.php response shape.
+    """
+    if not os.path.exists(db_path):
+        return {"success": False, "error": "Status updates database not available"}
+
+    if type_filter not in ("change", "all"):
+        type_filter = "change"
+
+    if limit < 1:
+        limit = 1
+    if limit > 50:
+        limit = 50
+
+    last_changes = []
+    last_alive = None
+    running_time = 0
+    entry_count = 0
+    last_update = None
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.execute("SELECT COUNT(*) FROM status_updates")
+            row = cur.fetchone()
+            entry_count = int(row[0]) if row else 0
+
+            cur = conn.execute("SELECT MAX(timestamp) FROM status_updates")
+            row = cur.fetchone()
+            last_alive = int(row[0]) if row and row[0] is not None else None
+            last_update = last_alive
+
+            # Running time: last start and first stop after it
+            cur = conn.execute(
+                "SELECT timestamp FROM status_updates WHERE type = 'start' ORDER BY timestamp DESC LIMIT 1"
+            )
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                start_ts = int(row[0])
+                cur = conn.execute(
+                    "SELECT timestamp FROM status_updates WHERE type = 'stop' AND timestamp > ? "
+                    "ORDER BY timestamp ASC LIMIT 1",
+                    (start_ts,),
+                )
+                stop_row = cur.fetchone()
+                if stop_row and stop_row[0] is not None:
+                    running_time = int(stop_row[0]) - start_ts
+                else:
+                    running_time = int(time.time()) - start_ts
+
+            if type_filter == "all":
+                cur = conn.execute(
+                    "SELECT type, old_value, new_value, p1_total_power, timestamp "
+                    "FROM status_updates ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT type, old_value, new_value, p1_total_power, timestamp "
+                    "FROM status_updates WHERE type = 'change' "
+                    "ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                )
+
+            for event_type, old_value, new_value, p1_total_power, ts in cur.fetchall():
+                last_changes.append(
+                    {
+                        "timestamp": int(ts) if ts is not None else None,
+                        "type": event_type,
+                        "oldValue": _safe_json_loads(old_value),
+                        "newValue": _safe_json_loads(new_value),
+                        "p1TotalPower": p1_total_power,
+                    }
+                )
+    except Exception as e:
+        return {"success": False, "error": f"Failed to read status updates: {e}"}
+
+    return {
+        "success": True,
+        "method": "GET",
+        "lastChanges": last_changes,
+        "lastAlive": last_alive,
+        "runningTime": running_time,
+        "entryCount": entry_count,
+        "lastUpdate": last_update,
+    }
+
+
 class AutomationTCPServer(socketserver.ThreadingTCPServer):
     """TCPServer that holds api_state for the request handler."""
     pass  # api_state set on instance after construction
@@ -233,7 +334,9 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             refresh_cb()
 
     def do_GET(self):
-        if self.path == "/api/test":
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/api/test":
             self._send_json({
                 "status": "ok",
                 "message": "API is up and running",
@@ -253,13 +356,20 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                     },
                     {"path": "/api/status", "optional_params": []},
                     {"path": "/api/all", "optional_params": []},
+                    {
+                        "path": "/api/automation_status",
+                        "optional_params": [
+                            {"name": "type", "type": "string", "default": "change", "description": "change or all"},
+                            {"name": "limit", "type": "int", "default": 1, "description": "1-50 (default 1 for change, 10 for all)"},
+                        ],
+                    },
                     {"path": "/api/wh_per_hour", "optional_params": []},
                     {"path": "/api/refresh", "optional_params": []},
                 ],
             })
             return
 
-        if self.path == "/api/wh_per_hour":
+        if parsed.path == "/api/wh_per_hour":
             db_path = getattr(self.server, "db_path", None)
             if not db_path or not os.path.exists(db_path):
                 self._send_json({"error": "Status updates database not available"})
@@ -268,7 +378,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(data, sort_keys=True)
             return
 
-        if self.path == "/api/refresh":
+        if parsed.path == "/api/refresh":
             schedule_controller = getattr(self.server, "schedule_controller", None)
             status_api = getattr(self.server, "status_api", None)
             if not schedule_controller or not status_api:
@@ -287,7 +397,22 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"error": "API state not initialized"}, 503)
             return
 
-        parsed = urlparse(self.path)
+        if parsed.path == "/api/automation_status":
+            db_path = getattr(self.server, "db_path", None)
+            if not db_path:
+                self._send_json({"success": False, "error": "Status updates database not available"}, 503)
+                return
+            query = parse_qs(parsed.query)
+            type_filter = query.get("type", ["change"])[0]
+            limit_default = 10 if type_filter == "all" else 1
+            try:
+                limit = int(query.get("limit", [limit_default])[0])
+            except (ValueError, TypeError):
+                limit = limit_default
+            data = compute_automation_status(db_path, type_filter, limit)
+            self._send_json(data)
+            return
+
         if parsed.path == "/api/p1":
             max_age = self._parse_max_age(parsed)
             self._maybe_refresh_reading(

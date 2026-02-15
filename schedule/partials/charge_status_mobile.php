@@ -49,9 +49,9 @@ require_once __DIR__ . '/charge_status_data_v2.php';
                 $powerColor = '#9e9e9e';
             }
         ?>
-            <div class="charge-status-mobile" id="charge-status-content">
+            <div class="charge-status-mobile" id="charge-status-content" style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px;">
                 <!-- Box 1: Status Indicator -->
-                <div class="charge-status-box">
+                <div class="charge-status-box" style="grid-column: 1 / -1;">
                     <div class="charge-status-box-title">Status</div>
                     <div class="charge-status-box-content">
                         <div class="charge-status-indicator <?php echo $statusClass; ?>" style="padding: 10px; border-radius: 6px;">

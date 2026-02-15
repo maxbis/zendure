@@ -2,22 +2,23 @@
   "timezone": "Europe/Amsterdam",
   "location": "Amsterdam, Europe",
   "description": "Combined: sun elevation (deg), direct radiation (W/m\u00b2), price and spot_price in thousandths (\u20ac/kWh \u00d7 1000, integer) per hour.",
-  "generated_at": "2026-02-10T20:48:08.639196+01:00",
+  "generated_at": "2026-02-11T21:35:49.349680+01:00",
   "sources": {
     "sun_height": "astral",
-    "solar_radiation": "https://api.open-meteo.com/v1/forecast?latitude=52.374&longitude=4.8897&hourly=direct_radiation&models=knmi_seamless&timezone=Europe%2FAmsterdam&start_date=2026-02-10&end_date=2026-02-11",
+    "solar_radiation": "https://api.open-meteo.com/v1/forecast?latitude=52.374&longitude=4.8897&hourly=direct_radiation&models=knmi_seamless&timezone=Europe%2FAmsterdam&start_date=2026-02-11&end_date=2026-02-12",
     "price_api": "http://localhost/zendure/prices/get_prices_v2.php"
   },
   "range": {
-    "start_date": "2026-02-10",
-    "end_date": "2026-02-11"
+    "start_date": "2026-02-11",
+    "end_date": "2026-02-12"
   },
   "dates": [
     "2026-02-07",
     "2026-02-08",
     "2026-02-09",
     "2026-02-10",
-    "2026-02-11"
+    "2026-02-11",
+    "2026-02-12"
   ],
   "combined": {
     "2026-02-07": {
@@ -673,37 +674,37 @@
       },
       "11": {
         "sun_degrees": 19.25,
-        "direct_radiation": 0.1,
+        "direct_radiation": 0.0,
         "price": 265,
         "spot_price": 139
       },
       "12": {
         "sun_degrees": 22.68,
-        "direct_radiation": 0.4,
+        "direct_radiation": 0.8,
         "price": 255,
         "spot_price": 130
       },
       "13": {
         "sun_degrees": 23.73,
-        "direct_radiation": 0.6,
+        "direct_radiation": 5.3,
         "price": 256,
         "spot_price": 132
       },
       "14": {
         "sun_degrees": 22.27,
-        "direct_radiation": 1.8,
+        "direct_radiation": 0.5,
         "price": 256,
         "spot_price": 131
       },
       "15": {
         "sun_degrees": 18.47,
-        "direct_radiation": 2.3,
+        "direct_radiation": 19.3,
         "price": 258,
         "spot_price": 134
       },
       "16": {
         "sun_degrees": 12.73,
-        "direct_radiation": 0.0,
+        "direct_radiation": 6.1,
         "price": 265,
         "spot_price": 139
       },
@@ -748,6 +749,152 @@
         "direct_radiation": 0.0,
         "price": 246,
         "spot_price": 124
+      }
+    },
+    "2026-02-12": {
+      "0": {
+        "sun_degrees": -49.88,
+        "direct_radiation": 0.0,
+        "price": 239,
+        "spot_price": 118
+      },
+      "1": {
+        "sun_degrees": -51.37,
+        "direct_radiation": 0.0,
+        "price": 239,
+        "spot_price": 117
+      },
+      "2": {
+        "sun_degrees": -49.22,
+        "direct_radiation": 0.0,
+        "price": 237,
+        "spot_price": 116
+      },
+      "3": {
+        "sun_degrees": -43.99,
+        "direct_radiation": 0.0,
+        "price": 235,
+        "spot_price": 115
+      },
+      "4": {
+        "sun_degrees": -36.67,
+        "direct_radiation": 0.0,
+        "price": 237,
+        "spot_price": 116
+      },
+      "5": {
+        "sun_degrees": -28.16,
+        "direct_radiation": 0.0,
+        "price": 241,
+        "spot_price": 119
+      },
+      "6": {
+        "sun_degrees": -19.11,
+        "direct_radiation": 0.0,
+        "price": 247,
+        "spot_price": 124
+      },
+      "7": {
+        "sun_degrees": -9.96,
+        "direct_radiation": 0.0,
+        "price": 261,
+        "spot_price": 136
+      },
+      "8": {
+        "sun_degrees": -0.87,
+        "direct_radiation": 0.0,
+        "price": 270,
+        "spot_price": 143
+      },
+      "9": {
+        "sun_degrees": 7.11,
+        "direct_radiation": 0.0,
+        "price": 269,
+        "spot_price": 142
+      },
+      "10": {
+        "sun_degrees": 14.1,
+        "direct_radiation": 2.4,
+        "price": 265,
+        "spot_price": 139
+      },
+      "11": {
+        "sun_degrees": 19.56,
+        "direct_radiation": 1.7,
+        "price": 256,
+        "spot_price": 131
+      },
+      "12": {
+        "sun_degrees": 23.01,
+        "direct_radiation": 0.5,
+        "price": 248,
+        "spot_price": 125
+      },
+      "13": {
+        "sun_degrees": 24.06,
+        "direct_radiation": 0.3,
+        "price": 245,
+        "spot_price": 122
+      },
+      "14": {
+        "sun_degrees": 22.59,
+        "direct_radiation": 3.3,
+        "price": 247,
+        "spot_price": 124
+      },
+      "15": {
+        "sun_degrees": 18.78,
+        "direct_radiation": 5.6,
+        "price": 248,
+        "spot_price": 125
+      },
+      "16": {
+        "sun_degrees": 13.02,
+        "direct_radiation": 0.9,
+        "price": 255,
+        "spot_price": 130
+      },
+      "17": {
+        "sun_degrees": 5.84,
+        "direct_radiation": 0.0,
+        "price": 268,
+        "spot_price": 141
+      },
+      "18": {
+        "sun_degrees": -2.45,
+        "direct_radiation": 0.0,
+        "price": 273,
+        "spot_price": 145
+      },
+      "19": {
+        "sun_degrees": -11.44,
+        "direct_radiation": 0.0,
+        "price": 270,
+        "spot_price": 143
+      },
+      "20": {
+        "sun_degrees": -20.58,
+        "direct_radiation": 0.0,
+        "price": 254,
+        "spot_price": 130
+      },
+      "21": {
+        "sun_degrees": -29.55,
+        "direct_radiation": 0.0,
+        "price": 247,
+        "spot_price": 124
+      },
+      "22": {
+        "sun_degrees": -37.87,
+        "direct_radiation": 0.0,
+        "price": 247,
+        "spot_price": 124
+      },
+      "23": {
+        "sun_degrees": -44.84,
+        "direct_radiation": 0.0,
+        "price": 236,
+        "spot_price": 115
       }
     }
   }

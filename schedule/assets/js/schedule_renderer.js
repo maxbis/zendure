@@ -466,9 +466,8 @@ function renderAutomationStatus(data) {
             <span class="automation-entry-badge ${badgeClass}">
                 ${escapeHtml(badgeLabel)}
             </span>
-            <span class="automation-entry-time">
+            <span class="automation-entry-time" title="${escapeHtml(formatAbsoluteTimeJS(entryTimestamp))}">
                 ${escapeHtml(formatRelativeTimeJS(entryTimestamp))}
-                <span class="automation-entry-timestamp-full">(${escapeHtml(formatAbsoluteTimeJS(entryTimestamp))})</span>
             </span>
             <span class="automation-entry-details">
                 ${entryDetailsHtml}
@@ -622,11 +621,67 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const usableNetKwh = Math.max(0, ((electricLevel - MIN_CHARGE_LEVEL) / 100) * TOTAL_CAPACITY_KWH);
     const roomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - electricLevel) / 100) * TOTAL_CAPACITY_KWH);
 
-    // Build content HTML
-    const contentEl = document.createElement('div');
-    contentEl.id = 'charge-status-content';
-    contentEl.className = 'charge-status-content';
-    contentEl.innerHTML = `
+    const isMobile = document.body && document.body.classList.contains('mobile-dark');
+
+    const mobileContentHtml = `
+        <!-- Box 1: Status Indicator -->
+        <div class="charge-status-box">
+            <div class="charge-status-box-title">Status</div>
+            <div class="charge-status-box-content">
+                <div class="charge-status-indicator ${systemStatus.class}" style="padding: 10px; border-radius: 6px;">
+                    <div class="charge-status-icon" style="font-size: 1.5rem;">${systemStatus.icon}</div>
+                    <div class="charge-status-text">
+                        <div class="charge-status-title" style="font-size: 0.95rem;">${escapeHtml(systemStatus.title)}</div>
+                        <div class="charge-status-subtitle" style="font-size: 0.75rem;">${escapeHtml(systemStatus.subtitle)}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Box 2: Power Display -->
+        <div class="charge-status-box">
+            <div class="charge-status-box-title">Power</div>
+            <div class="charge-status-box-content">
+                <div class="charge-power-display" style="padding: 10px; border-radius: 6px;">
+                    <div class="charge-power-label-value" style="margin-bottom: 8px;">
+                        <span class="charge-power-value" style="color: ${escapeHtml(powerColor)}; font-size: 1.1rem; font-weight: 700;">
+                            ${escapeHtml(powerDisplay)}
+                            ${timeEstimate ? `<span class="charge-power-time" style="font-size: 0.8rem;">(${escapeHtml(timeEstimate)})</span>` : ''}
+                        </span>
+                    </div>
+                    <div class="charge-power-bar-container" style="height: 14px;">
+                        <div class="charge-power-bar-label left" style="font-size: 0.6rem;">-1200</div>
+                        <div class="charge-power-bar-label center" style="font-size: 0.6rem;">0</div>
+                        <div class="charge-power-bar-label right" style="font-size: 0.6rem;">1200</div>
+                        <div class="charge-power-bar-center"></div>
+                        ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
+                        ${commandedMarkerHtml}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Box 3: Battery Level -->
+        <div class="charge-status-box">
+            <div class="charge-status-box-title">Battery</div>
+            <div class="charge-status-box-content">
+                <div class="charge-battery-display" style="padding: 10px; border-radius: 6px;">
+                    <div class="charge-battery-label-value" style="margin-bottom: 8px;">
+                        <span class="charge-battery-value" style="font-size: 1rem; font-weight: 600;">
+                            ${electricLevel}% (${usableNetKwh.toFixed(2)} kWh - ${roomToChargeKwh.toFixed(2)} kWh)
+                        </span>
+                    </div>
+                    <div class="charge-battery-bar" style="height: 14px;">
+                        <div class="charge-battery-bar-marker min" style="left: ${MIN_CHARGE_LEVEL}%;" title="Minimum: ${MIN_CHARGE_LEVEL}%"></div>
+                        <div class="charge-battery-bar-marker max" style="left: ${MAX_CHARGE_LEVEL}%;" title="Maximum: ${MAX_CHARGE_LEVEL}%"></div>
+                        <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, electricLevel))}%; background-color: ${escapeHtml(systemStatus.color)};"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const desktopContentHtml = `
         <!-- Status Indicator -->
         <div class="charge-status-indicator ${systemStatus.class}">
             <div class="charge-status-icon">${systemStatus.icon}</div>
@@ -670,6 +725,17 @@ function renderChargeStatus(zendureData, p1Data = null) {
             </div>
         </div>
     `;
+
+    // Build content HTML
+    const contentEl = document.createElement('div');
+    contentEl.id = 'charge-status-content';
+    contentEl.className = isMobile ? 'charge-status-mobile' : 'charge-status-content';
+    if (isMobile) {
+        contentEl.style.display = 'grid';
+        contentEl.style.gridTemplateColumns = 'minmax(0, 2fr) minmax(0, 3fr)';
+        contentEl.style.gap = '10px';
+    }
+    contentEl.innerHTML = isMobile ? mobileContentHtml : desktopContentHtml;
 
     container.appendChild(contentEl);
 
@@ -720,7 +786,8 @@ function formatRelativeTimeJS(timestamp) {
         const hours = Math.floor(diff / 3600);
         return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
     } else {
-        return formatAbsoluteTimeJS(timestamp);
+        const days = Math.floor(diff / 86400);
+        return days + ' day' + (days > 1 ? 's' : '') + ' ago';
     }
 }
 

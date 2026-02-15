@@ -96,6 +96,38 @@ function updateGraphTimeIndicators() {
 }
 
 /**
+ * Normalize /api/all response to the shape expected by renderers
+ * @param {Object} allData - Unified API response
+ * @returns {{zendureData: Object, p1Data: Object|null}}
+ */
+function normalizeChargeStatusAll(allData) {
+    const zendureReadings = allData?.zendure?.readings || allData?.zendure?.data || null;
+    const p1Readings = allData?.p1?.readings || allData?.p1?.data || null;
+
+    if (!zendureReadings) {
+        return {
+            zendureData: {
+                success: false,
+                error: 'Invalid response from unified API'
+            },
+            p1Data: null
+        };
+    }
+
+    return {
+        zendureData: {
+            success: true,
+            data: {
+                properties: zendureReadings.properties || {},
+                packData: zendureReadings.packData || []
+            },
+            timestamp: allData?.zendure?.timestamp || null
+        },
+        p1Data: p1Readings ? { total_power: p1Readings.total_power || 0 } : null
+    };
+}
+
+/**
  * Refresh all status sections (Automation Status, Charge/Discharge, and System & Grid)
  * This unified function updates all three sections in one go
  */
@@ -139,29 +171,21 @@ async function refreshStatus(isAutoRefresh = false) {
 
     // Fetch charge status
     let chargePromise = Promise.resolve(null);
-    if (typeof CHARGE_STATUS_ZENDURE_API_URL !== 'undefined' && CHARGE_STATUS_ZENDURE_API_URL) {
-        // Detect config key based on URL pattern (localhost = local, otherwise remote)
-        const isLocalUrl = CHARGE_STATUS_ZENDURE_API_URL.includes('localhost') || CHARGE_STATUS_ZENDURE_API_URL.includes('127.0.0.1');
+    if (typeof CHARGE_STATUS_ALL_API_URL !== 'undefined' && CHARGE_STATUS_ALL_API_URL) {
+        // Unified API (P1 + Zendure + status)
+        const isLocalUrl = CHARGE_STATUS_ALL_API_URL.includes('localhost') || CHARGE_STATUS_ALL_API_URL.includes('127.0.0.1');
         const dataConfigKey = 'dataApiUrl' + (isLocalUrl ? '-local' : '');
-        
+
         apisCalled.push({
-            name: 'Charge Status API (Zendure)',
-            url: CHARGE_STATUS_ZENDURE_API_URL,
+            name: 'Charge Status API (Unified)',
+            url: CHARGE_STATUS_ALL_API_URL,
             configKey: dataConfigKey
         });
-        
-        const p1ApiUrl = (typeof CHARGE_STATUS_P1_API_URL !== 'undefined') ? CHARGE_STATUS_P1_API_URL : null;
-        if (p1ApiUrl) {
-            apisCalled.push({
-                name: 'Charge Status API (P1 Meter)',
-                url: p1ApiUrl,
-                configKey: dataConfigKey // P1 uses same base URL with ?type=zendure_p1
-            });
-        }
-        
+
         chargePromise = (async () => {
             try {
-                const { zendureData, p1Data } = await fetchChargeStatus(CHARGE_STATUS_ZENDURE_API_URL, p1ApiUrl);
+                const allData = await fetchChargeStatusAll(CHARGE_STATUS_ALL_API_URL);
+                const { zendureData, p1Data } = normalizeChargeStatusAll(allData);
                 renderChargeStatus(zendureData, p1Data);
 
                 // Also render the details section (System & Grid) if the render function exists
@@ -170,7 +194,7 @@ async function refreshStatus(isAutoRefresh = false) {
                 }
                 return { zendureData, p1Data };
             } catch (error) {
-                console.error('Failed to refresh charge status:', error);
+                console.error('Failed to refresh charge status (unified):', error);
                 renderChargeStatus({
                     success: false,
                     error: error.message || 'Failed to load charge status'

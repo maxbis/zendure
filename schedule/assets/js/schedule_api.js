@@ -300,3 +300,36 @@ async function fetchChargeStatus(zendureApiUrl, p1ApiUrl = null) {
         throw error;
     }
 }
+
+/**
+ * Fetch unified charge/discharge status data from /api/all
+ * @param {string} apiUrl - Unified API URL (e.g. /api/all)
+ * @returns {Promise<Object>} - Promise resolving to unified response
+ */
+async function fetchChargeStatusAll(apiUrl) {
+    try {
+        const baseUrl = apiUrl.split('?')[0];
+        const params = new URLSearchParams(apiUrl.split('?')[1] || '');
+        const client = getApiClient(baseUrl);
+        return await client.get('', Object.fromEntries(params));
+    } catch (error) {
+        // Fallback to original implementation if ApiClient not available
+        if (typeof ApiClient === 'undefined') {
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text.substring(0, 200));
+                throw new Error('Server returned non-JSON response. Check console for details.');
+            }
+
+            return await response.json();
+        }
+        throw error;
+    }
+}
