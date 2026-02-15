@@ -36,6 +36,7 @@ desktop.ini
 .env.local
 
 # Project-specific
+automate/data/status_updates.db
 /data/*.json
 /data/**/*.json
 /config/*
