@@ -4,7 +4,7 @@
  * Displays as three distinct boxes: Status Indicator, Power Display, Battery Level
  */
 
-require_once __DIR__ . '/charge_status_data.php';
+require_once __DIR__ . '/charge_status_data_v2.php';
 ?>
 <!-- Charge/Discharge Status Section - Mobile (Three Boxes) -->
 <div class="card">

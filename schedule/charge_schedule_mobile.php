@@ -66,9 +66,9 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
-<body class="mobile-dark">
+<body class="mobile-dark" style="max-width: 600px;margin: auto;display: flex;justify-content: center;align-items: center;">
     <div class="container">
-        <div class="header" style="max-width: 900px;">
+        <div class="header" style="max-width: 900px; margin: 0 auto;">
             <h1>⚡Zendure Energy Manager</h1>
         </div>
 
@@ -95,6 +95,10 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Confirm Dialog -->
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
 
+        <!-- System & Grid (charge status details) -->
+        <div class="charge-status-wrapper">
+            <?php include __DIR__ . '/partials/charge_status_details_mobile.php'; ?>
+        </div>
 
         <!-- 5. Automation Status -->
         <div class="automation-status-wrapper">

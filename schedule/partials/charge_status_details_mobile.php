@@ -1,20 +1,20 @@
 <?php
 /**
- * Charge/Discharge Status Details Partial
+ * Charge/Discharge Status Details Partial - Mobile
  * Displays detailed system metrics:
- * - Grid power
+ * - Grid power (full width, dark theme)
  * - WiFi signal strength
  * - System temperature
  * - Battery 1 & 2 temperatures
  * - Battery 1 & 2 charge levels
  *
- * Relies on shared data loading from charge_status_data.php.
+ * Mobile layout: Grid full width, WiFi+System temp row, collapsible 2x2 battery bars.
  */
 
 require_once __DIR__ . '/charge_status_data_v2.php';
 ?>
-<!-- Charge/Discharge Status Details Section -->
-<div class="card">
+<!-- Charge/Discharge Status Details Section - Mobile -->
+<div class="card charge-status-details-mobile">
     <div class="metric-section">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h2 class="section-title" style="margin: 0;">⚡ System &amp; Grid</h2>
@@ -177,6 +177,8 @@ require_once __DIR__ . '/charge_status_data_v2.php';
                     </div>
                 </div>
 
+                <!-- Row 2: WiFi and System temp side by side -->
+                <div class="charge-status-details-row charge-status-details-row-wifi-temp">
                 <!-- RSSI (WiFi Signal) -->
                 <div class="charge-battery-display">
                     <div class="charge-battery-label-value">
@@ -207,12 +209,10 @@ require_once __DIR__ . '/charge_status_data_v2.php';
                         <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($systemTempPercent); ?>%; background-color: <?php echo htmlspecialchars($systemTempColor); ?>;"></div>
                     </div>
                 </div>
+                </div>
 
-                <!-- Collapsible section: rows 2-3 (Battery 1 & 2 levels and temps) -->
+                <!-- Collapsible section: Battery 1 & 2 levels and temps (2x2 grid) -->
                 <div class="charge-status-details-collapsible" id="charge-status-details-collapsible">
-                    <!-- Empty placeholder before Battery 1 Level (box alignment) -->
-                    <div class="charge-empty-box"></div>
-
                     <!-- Battery 1 Level -->
                     <div class="charge-battery-display">
                         <div class="charge-battery-label-value">
@@ -245,9 +245,6 @@ require_once __DIR__ . '/charge_status_data_v2.php';
                             <div class="charge-battery-bar-fill" style="width: <?php echo htmlspecialchars($pack1TempPercent); ?>%; background-color: <?php echo htmlspecialchars($pack1TempColor); ?>;"></div>
                         </div>
                     </div>
-
-                    <!-- Empty placeholder before Battery 2 Level (box alignment) -->
-                    <div class="charge-empty-box"></div>
 
                     <!-- Battery 2 Level -->
                     <div class="charge-battery-display">
@@ -290,4 +287,3 @@ require_once __DIR__ . '/charge_status_data_v2.php';
         <?php endif; ?>
     </div>
 </div>
-

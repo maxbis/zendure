@@ -1145,6 +1145,93 @@ body.mobile-dark .charge-battery-display,
     margin-bottom: 0;
 }
 
+/* System & Grid - Mobile Layout and Dark Theme */
+.charge-status-details-mobile .charge-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Grid bar: full width, dark theme (like charge/discharge power bar) */
+.charge-status-details-mobile .charge-power-box {
+    width: 100%;
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 8px;
+}
+
+.charge-status-details-mobile .charge-power-label {
+    color: var(--text-secondary);
+}
+
+.charge-status-details-mobile .charge-power-value {
+    color: var(--text-primary);
+}
+
+.charge-status-details-mobile .charge-grid-bar-container {
+    background: var(--bg-primary);
+}
+
+.charge-status-details-mobile .charge-grid-bar-label.left,
+.charge-status-details-mobile .charge-grid-bar-label.right {
+    color: var(--text-secondary);
+}
+
+.charge-status-details-mobile .charge-grid-bar-label.center {
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.charge-status-details-mobile .charge-grid-bar-center {
+    background: var(--border-color);
+}
+
+.charge-status-details-mobile .charge-grid-bar-fill.positive {
+    background: #42a5f5;
+}
+
+.charge-status-details-mobile .charge-grid-bar-fill.negative {
+    background: #81c784;
+}
+
+.charge-status-details-mobile .charge-grid-bar-fill.positive.overflow,
+.charge-status-details-mobile .charge-grid-bar-fill.negative.overflow {
+    background: var(--discharge-color);
+}
+
+/* Row 2: WiFi and System temp side by side, full width */
+.charge-status-details-mobile .charge-status-details-row-wifi-temp {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+/* Collapsible: 2x2 grid for battery bars when expanded */
+.charge-status-details-mobile .charge-status-details-collapsible {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+.charge-status-details-mobile .charge-status-details-collapsible.expanded {
+    display: grid;
+}
+
+/* Show more/Show less button - darker to match dark theme */
+.charge-status-details-mobile .charge-refresh-btn {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.charge-status-details-mobile .charge-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
 /* Additional compact styling */
 .charge-status-mobile .charge-status-box {
     padding: 10px;

@@ -603,13 +603,15 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             barDiv.appendChild(barLabel);
             barDiv.appendChild(priceLabel);
             
-            const showPopup = () => showPriceGraphPopup(barDiv, container);
-            const hidePopup = () => hidePriceGraphPopup();
-
-            barDiv.addEventListener('mouseenter', showPopup);
-            barDiv.addEventListener('mouseleave', hidePopup);
-            barDiv.addEventListener('focus', showPopup);
-            barDiv.addEventListener('blur', hidePopup);
+            // On mobile: no hover/focus tooltip (only click opens the mobile popup)
+            if (!isPriceGraphMobile()) {
+                const showPopup = () => showPriceGraphPopup(barDiv, container);
+                const hidePopup = () => hidePriceGraphPopup();
+                barDiv.addEventListener('mouseenter', showPopup);
+                barDiv.addEventListener('mouseleave', hidePopup);
+                barDiv.addEventListener('focus', showPopup);
+                barDiv.addEventListener('blur', hidePopup);
+            }
             // Add click handler: on mobile show info popup first; on desktop open edit modal directly
             barDiv.addEventListener('click', () => {
                 if (isPriceGraphMobile()) {
