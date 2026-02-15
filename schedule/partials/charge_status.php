@@ -12,7 +12,7 @@
  * by other partials without duplicating HTTP calls or config parsing.
  */
 
-require_once __DIR__ . '/charge_status_data.php';
+require_once __DIR__ . '/charge_status_data_v2.php';
 ?>
 <!-- Charge/Discharge Status Section -->
 <div class="card">
