@@ -16,10 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 const AUTOMATION_STATUS_API_URL = 'http://81.204.237.36:1611/api/automation_status';
 
 try {
-    $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== ''
-        ? ('?' . $_SERVER['QUERY_STRING'])
-        : '';
-    $url = AUTOMATION_STATUS_API_URL . $query;
+    $url = AUTOMATION_STATUS_API_URL;
 
     $context = stream_context_create([
         'http' => [

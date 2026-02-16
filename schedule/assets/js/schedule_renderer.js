@@ -859,18 +859,36 @@ function formatAutomationEntryDetailsHtml(entry) {
     const oldValue = entry.oldValue;
     const newValue = entry.newValue;
 
+    const extras = [];
+    if (entry.p1TotalPower != null) {
+        const p1Formatted = Number(entry.p1TotalPower).toLocaleString();
+        extras.push('Grid ' + escapeHtml(p1Formatted + ' W'));
+    }
+    if (entry.electricLevel != null) {
+        extras.push('Battery ' + escapeHtml(String(entry.electricLevel)) + '%');
+    }
+
     if (type === 'change') {
         let html = formatPowerValueHtml(oldValue) + ' → ' + formatPowerValueHtml(newValue);
-        if (entry.p1TotalPower != null) {
-            const p1Formatted = Number(entry.p1TotalPower).toLocaleString();
-            html += ' · Grid ' + escapeHtml(p1Formatted + ' W');
+        if (extras.length > 0) {
+            html += ' · ' + extras.join(' · ');
         }
         return html;
     }
 
     const labels = { start: 'Started', stop: 'Stopped', heartbeat: 'Heartbeat' };
     const label = labels[type] || (type.charAt(0).toUpperCase() + type.slice(1));
-    return escapeHtml(label);
+    const extraParts = [];
+    if (oldValue !== undefined) {
+        extraParts.push('old ' + escapeHtml(String(oldValue)));
+    }
+    if (newValue !== undefined) {
+        extraParts.push('new ' + escapeHtml(String(newValue)));
+    }
+    if (extras.length > 0) {
+        extraParts.push(...extras);
+    }
+    return escapeHtml(label) + (extraParts.length > 0 ? ' · ' + extraParts.join(' · ') : '');
 }
 
 function getAutomationEntryTypeClass(type) {

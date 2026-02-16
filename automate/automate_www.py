@@ -92,6 +92,25 @@ class StatusChange:
         }
 
 
+@dataclass
+class AutomationStatusEntry:
+    """Last status entry per event type."""
+    event_type: str
+    old_value: Any
+    new_value: Any
+    p1_total_power: Optional[int]
+    timestamp: Optional[int]
+
+    def to_dict(self) -> dict:
+        return {
+            "timestamp": self.timestamp,
+            "type": self.event_type,
+            "oldValue": self.old_value,
+            "newValue": self.new_value,
+            "p1TotalPower": self.p1_total_power,
+        }
+
+
 class ApiState:
     """Shared state for API endpoints: latest P1, Zendure, and status readings."""
 
@@ -99,6 +118,7 @@ class ApiState:
         self.last_p1: Optional[P1Readings] = None
         self.last_zendure: Optional[ZendureReadings] = None
         self.last_status: Optional[StatusChange] = None
+        self.last_status_by_type: dict[str, AutomationStatusEntry] = {}
 
 
 # ============================================================================
@@ -189,26 +209,8 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     return result
 
 
-def _safe_json_loads(value: Optional[str]) -> Any:
-    """Parse JSON-encoded value from SQLite; fall back to raw string on error."""
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        return value
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, TypeError, ValueError):
-        return value
-
-
-def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dict:
-    """
-    Build an Automation Status response from SQLite.
-    Matches schedule/api/automation_status_api.php response shape.
-    """
-    if not os.path.exists(db_path):
-        return {"success": False, "error": "Status updates database not available"}
-
+def compute_automation_status_from_state(api_state: ApiState, type_filter: str, limit: int) -> dict:
+    """Build Automation Status response from in-memory state."""
     if type_filter not in ("change", "all"):
         type_filter = "change"
 
@@ -217,68 +219,29 @@ def compute_automation_status(db_path: str, type_filter: str, limit: int) -> dic
     if limit > 50:
         limit = 50
 
-    last_changes = []
-    last_alive = None
+    all_entries = list(api_state.last_status_by_type.values())
+    filtered = (
+        all_entries
+        if type_filter == "all"
+        else [entry for entry in all_entries if entry.event_type == "change"]
+    )
+
+    filtered.sort(key=lambda e: (e.timestamp or 0), reverse=True)
+    last_changes = [entry.to_dict() for entry in filtered[:limit]]
+
+    timestamps = [e.timestamp for e in all_entries if e.timestamp is not None]
+    last_alive = max(timestamps) if timestamps else None
+    last_update = last_alive
+    entry_count = len(all_entries)
+
     running_time = 0
-    entry_count = 0
-    last_update = None
-
-    try:
-        with sqlite3.connect(db_path) as conn:
-            cur = conn.execute("SELECT COUNT(*) FROM status_updates")
-            row = cur.fetchone()
-            entry_count = int(row[0]) if row else 0
-
-            cur = conn.execute("SELECT MAX(timestamp) FROM status_updates")
-            row = cur.fetchone()
-            last_alive = int(row[0]) if row and row[0] is not None else None
-            last_update = last_alive
-
-            # Running time: last start and first stop after it
-            cur = conn.execute(
-                "SELECT timestamp FROM status_updates WHERE type = 'start' ORDER BY timestamp DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-            if row and row[0] is not None:
-                start_ts = int(row[0])
-                cur = conn.execute(
-                    "SELECT timestamp FROM status_updates WHERE type = 'stop' AND timestamp > ? "
-                    "ORDER BY timestamp ASC LIMIT 1",
-                    (start_ts,),
-                )
-                stop_row = cur.fetchone()
-                if stop_row and stop_row[0] is not None:
-                    running_time = int(stop_row[0]) - start_ts
-                else:
-                    running_time = int(time.time()) - start_ts
-
-            if type_filter == "all":
-                cur = conn.execute(
-                    "SELECT type, old_value, new_value, p1_total_power, electric_level, timestamp "
-                    "FROM status_updates ORDER BY timestamp DESC LIMIT ?",
-                    (limit,),
-                )
-            else:
-                cur = conn.execute(
-                    "SELECT type, old_value, new_value, p1_total_power, electric_level, timestamp "
-                    "FROM status_updates WHERE type == 'change'"
-                    "ORDER BY timestamp DESC LIMIT ?",
-                    (limit,),
-                )
-
-            for event_type, old_value, new_value, p1_total_power, electric_level,ts in cur.fetchall():
-                last_changes.append(
-                    {
-                        "timestamp": int(ts) if ts is not None else None,
-                        "type": event_type,
-                        "oldValue": _safe_json_loads(old_value),
-                        "newValue": _safe_json_loads(new_value),
-                        "p1TotalPower": p1_total_power,
-                        "electricLevel": electric_level,
-                    }
-                )
-    except Exception as e:
-        return {"success": False, "error": f"Failed to read status updates: {e}"}
+    start_entry = api_state.last_status_by_type.get("start")
+    stop_entry = api_state.last_status_by_type.get("stop")
+    if start_entry and start_entry.timestamp is not None:
+        if stop_entry and stop_entry.timestamp is not None and stop_entry.timestamp >= start_entry.timestamp:
+            running_time = stop_entry.timestamp - start_entry.timestamp
+        else:
+            running_time = int(time.time()) - start_entry.timestamp
 
     return {
         "success": True,
@@ -358,13 +321,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                     },
                     {"path": "/api/status", "optional_params": []},
                     {"path": "/api/all", "optional_params": []},
-                    {
-                        "path": "/api/automation_status",
-                        "optional_params": [
-                            {"name": "type", "type": "string", "default": "change", "description": "change or all"},
-                            {"name": "limit", "type": "int", "default": 1, "description": "1-50 (default 1 for change, 10 for all)"},
-                        ],
-                    },
+                    {"path": "/api/automation_status", "optional_params": []},
                     {"path": "/api/wh_per_hour", "optional_params": []},
                     {"path": "/api/refresh", "optional_params": []},
                 ],
@@ -400,18 +357,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/api/automation_status":
-            db_path = getattr(self.server, "db_path", None)
-            if not db_path:
-                self._send_json({"success": False, "error": "Status updates database not available"}, 503)
-                return
-            query = parse_qs(parsed.query)
-            type_filter = query.get("type", ["change"])[0]
-            limit_default = 10 if type_filter == "all" else 1
-            try:
-                limit = int(query.get("limit", [limit_default])[0])
-            except (ValueError, TypeError):
-                limit = limit_default
-            data = compute_automation_status(db_path, type_filter, limit)
+            data = compute_automation_status_from_state(api_state, "all", 50)
             self._send_json(data)
             return
 
@@ -516,7 +462,7 @@ class StatusApi:
     """
     
     def __init__(self, api_url: Optional[str], logger: Logger,
-                 on_update: Optional[Callable[[str, Any, Any, int], None]] = None,
+                 on_update: Optional[Callable[[str, Any, Any, Optional[int], int], None]] = None,
                  db_path: Optional[str] = None,
                  get_electric_level: Optional[Callable[[], Optional[int]]] = None,
                  retention_days: int = 7):
@@ -526,7 +472,7 @@ class StatusApi:
         Args:
             api_url: URL of the status API endpoint. If None, operations will be no-ops.
             logger: Logger instance for error/warning messages.
-            on_update: Optional callback(event_type, old_value, new_value, timestamp) when posting.
+            on_update: Optional callback(event_type, old_value, new_value, p1_total_power, timestamp) when posting.
             db_path: Optional path to SQLite DB for storing status updates.
             get_electric_level: Optional callable returning current battery % (0-100) for DB storage.
             retention_days: Days to retain rows in SQLite (default 7).
@@ -596,7 +542,7 @@ class StatusApi:
         """
         timestamp = int(datetime.now(ZoneInfo('Europe/Amsterdam')).timestamp())
         if self.on_update:
-            self.on_update(event_type, old_value, new_value, timestamp)
+            self.on_update(event_type, old_value, new_value, p1_total_power, timestamp)
 
         self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp)
 
@@ -939,6 +885,7 @@ class AutomationApp:
         self.value = 0
         self.zero_count = 0
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
+        self.stop_posted = False
 
 
     def initialize(self) -> bool:
@@ -1052,12 +999,20 @@ class AutomationApp:
         self.logger.warning(f"Received {signal_name} signal, initiating graceful shutdown...")
         self.shutdown_requested = True
 
-    def _on_status_update(self, event_type: str, old_value: Any, new_value: Any, timestamp: int):
-        """Callback when status is posted; updates api_state.last_status."""
+    def _on_status_update(self, event_type: str, old_value: Any, new_value: Any,
+                          p1_total_power: Optional[int], timestamp: int):
+        """Callback when status is posted; updates api_state.last_status and last_status_by_type."""
         self.api_state.last_status = StatusChange(
             event_type=event_type,
             old_value=old_value,
             new_value=new_value,
+            timestamp=timestamp,
+        )
+        self.api_state.last_status_by_type[event_type] = AutomationStatusEntry(
+            event_type=event_type,
+            old_value=old_value,
+            new_value=new_value,
+            p1_total_power=p1_total_power,
             timestamp=timestamp,
         )
 
@@ -1267,7 +1222,8 @@ class AutomationApp:
                 self.logger.error(f"   Failed to set power to 0: {result.error}")
             
             # Post 'stop' in a thread with short join so shutdown never blocks (e.g. slow/hanging HTTP on Mac)
-            if self.status_api:
+            if self.status_api and not self.stop_posted:
+                self.stop_posted = True
                 def _post_stop():
                     try:
                         self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
@@ -1305,6 +1261,8 @@ class AutomationApp:
             while not self.shutdown_requested:
                  # 0. Sleep
                 self._sleep_interrupted()
+                if self.shutdown_requested:
+                    break
 
                 # 1. Accumulate Data
                 p1_data = self._accumulate_p1_data()
@@ -1321,6 +1279,8 @@ class AutomationApp:
                 
                 # 2. Check input
                 if not self._handle_user_input():
+                    break
+                if self.shutdown_requested:
                     break
                     
                 # 3. Schedule Logic
@@ -1364,6 +1324,7 @@ class AutomationApp:
         except Exception as e:
             self.logger.error(f"Fatal error in main loop: {e}")
             if self.status_api:
+                self.stop_posted = True
                 self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
             raise
         finally:

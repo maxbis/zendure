@@ -28,20 +28,12 @@
         }
 
         // Build API URL for JavaScript (JS fetches and renders the list)
-        $baseUrl = ConfigLoader::getWithLocation('statusApiUrl');
-        $automationStatusUrl = null;
-
-        if ($baseUrl) {
-            $automationStatusUrl = $baseUrl . (strpos($baseUrl, '?') !== false ? '&' : '?') . 'type=all&limit=20';
-        }
-
-        if ($automationStatusUrl === null) {
-            $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-            $basePath = dirname($scriptName);
-            $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_api.php?type=all&limit=20';
-        }
+        // Use same-origin proxy to avoid CORS.
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        $basePath = dirname($scriptName);
+        $automationStatusUrl = $scheme . '://' . $host . $basePath . '/api/automation_status_proxy.php?type=all&limit=20';
 
         echo '<script>const AUTOMATION_STATUS_API_URL = ' . json_encode($automationStatusUrl, JSON_UNESCAPED_SLASHES) . ';</script>';
         ?>
