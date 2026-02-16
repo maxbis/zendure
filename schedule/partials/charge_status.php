@@ -64,18 +64,19 @@ require_once __DIR__ . '/charge_status_data_v2.php';
         ?>
           
             
-            <div class="charge-status-content" id="charge-status-content">
-                <!-- Status Indicator -->
-                <div class="charge-status-indicator <?php echo $statusClass; ?>">
-                    <div class="charge-status-icon"><?php echo $statusIcon; ?></div>
-                    <div class="charge-status-text">
-                        <div class="charge-status-title"><?php echo htmlspecialchars($statusText); ?></div>
-                        <div class="charge-status-subtitle"><?php echo htmlspecialchars($systemStatus['subtitle']); ?></div>
+            <div class="charge-status-content" id="charge-status-content" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Row 1: Status (40%) + Power (60%) -->
+                <div class="charge-status-row" style="display: flex; gap: 12px;">
+                    <div class="charge-status-indicator <?php echo $statusClass; ?>" style="flex: 0 0 40%; max-width: 40%;">
+                        <div class="charge-status-icon"><?php echo $statusIcon; ?></div>
+                        <div class="charge-status-text">
+                            <div class="charge-status-title"><?php echo htmlspecialchars($statusText); ?></div>
+                            <div class="charge-status-subtitle"><?php echo htmlspecialchars($systemStatus['subtitle']); ?></div>
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Power Value -->
-                <div class="charge-power-display">
+                    
+                    <!-- Power Value -->
+                    <div class="charge-power-display" style="flex: 0 0 60%; max-width: 60%;">
                     <div class="charge-power-label-value">
                         <span class="charge-power-label">Power:</span>
                         <span class="charge-power-value" style="color: <?php echo htmlspecialchars($powerColor); ?>;">
@@ -182,9 +183,10 @@ require_once __DIR__ . '/charge_status_data_v2.php';
                         <?php endif; ?>
                     </div>
                 </div>
+                </div>
                 
-                <!-- Battery Level -->
-                <div class="charge-battery-display">
+                <!-- Row 2: Battery Level (full width) -->
+                <div class="charge-battery-display" style="width: 100%;">
                     <div class="charge-battery-label-value">
                         <span class="charge-battery-label">Battery Level:</span>
                         <span class="charge-battery-value">

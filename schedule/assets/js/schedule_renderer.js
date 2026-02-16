@@ -660,36 +660,38 @@ function renderChargeStatus(zendureData, p1Data = null) {
     `;
 
     const desktopContentHtml = `
-        <!-- Status Indicator -->
-        <div class="charge-status-indicator ${systemStatus.class}">
-            <div class="charge-status-icon">${systemStatus.icon}</div>
-            <div class="charge-status-text">
-                <div class="charge-status-title">${escapeHtml(systemStatus.title)}</div>
-                <div class="charge-status-subtitle">${escapeHtml(systemStatus.subtitle)}</div>
+        <!-- Row 1: Status (40%) + Power (60%) -->
+        <div class="charge-status-row" style="display: flex; gap: 12px;">
+            <div class="charge-status-indicator ${systemStatus.class}" style="flex: 0 0 40%; max-width: 40%;">
+                <div class="charge-status-icon">${systemStatus.icon}</div>
+                <div class="charge-status-text">
+                    <div class="charge-status-title">${escapeHtml(systemStatus.title)}</div>
+                    <div class="charge-status-subtitle">${escapeHtml(systemStatus.subtitle)}</div>
+                </div>
+            </div>
+
+            <!-- Power Value -->
+            <div class="charge-power-display" style="flex: 0 0 60%; max-width: 60%;">
+                <div class="charge-power-label-value">
+                    <span class="charge-power-label">Power:</span>
+                    <span class="charge-power-value" style="color: ${escapeHtml(powerColor)};">
+                        ${escapeHtml(powerDisplay)}
+                        ${timeEstimate ? `<span class="charge-power-time">(${escapeHtml(timeEstimate)})</span>` : ''}
+                    </span>
+                </div>
+                <div class="charge-power-bar-container">
+                    <div class="charge-power-bar-label left">-1200 W</div>
+                    <div class="charge-power-bar-label center">0</div>
+                    <div class="charge-power-bar-label right">1200 W</div>
+                    <div class="charge-power-bar-center"></div>
+                    ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
+                    ${commandedMarkerHtml}
+                </div>
             </div>
         </div>
 
-        <!-- Power Value -->
-        <div class="charge-power-display">
-            <div class="charge-power-label-value">
-                <span class="charge-power-label">Power:</span>
-                <span class="charge-power-value" style="color: ${escapeHtml(powerColor)};">
-                    ${escapeHtml(powerDisplay)}
-                    ${timeEstimate ? `<span class="charge-power-time">(${escapeHtml(timeEstimate)})</span>` : ''}
-                </span>
-            </div>
-            <div class="charge-power-bar-container">
-                <div class="charge-power-bar-label left">-1200 W</div>
-                <div class="charge-power-bar-label center">0</div>
-                <div class="charge-power-bar-label right">1200 W</div>
-                <div class="charge-power-bar-center"></div>
-                ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
-                ${commandedMarkerHtml}
-            </div>
-        </div>
-
-        <!-- Battery Level -->
-        <div class="charge-battery-display">
+        <!-- Row 2: Battery Level (full width) -->
+        <div class="charge-battery-display" style="width: 100%;">
             <div class="charge-battery-label-value">
                 <span class="charge-battery-label">Battery Level:</span>
                 <span class="charge-battery-value">
@@ -712,6 +714,10 @@ function renderChargeStatus(zendureData, p1Data = null) {
         contentEl.style.display = 'grid';
         contentEl.style.gridTemplateColumns = 'minmax(0, 2fr) minmax(0, 3fr)';
         contentEl.style.gap = '10px';
+    } else {
+        contentEl.style.display = 'flex';
+        contentEl.style.flexDirection = 'column';
+        contentEl.style.gap = '12px';
     }
     contentEl.innerHTML = isMobile ? mobileContentHtml : desktopContentHtml;
 

@@ -74,26 +74,26 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <!-- <p id="current-time" class="title-desktop"><?php echo date('Y-m-d H:i:s'); ?></p> -->
         </div>
 
-        <!-- Charge/Discharge Status Section - Full Width -->
+        <!-- 1. Charge/Discharge Status -->
         <div class="charge-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/charge_status.php'; ?>
         </div>
 
-        <div class="charge-status-wrapper" style="margin-top: 20px;">
-            <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
-        </div>
-
-
-        <!-- Price Overview Bar Graph Section - Full Width -->
+        <!-- 2. Today's Prices -->
         <?php include __DIR__ . '/partials/price_overview_bar.php'; ?>
 
-        <!-- Energy Graph Section -->
+        <!-- 3. Energy Graph -->
         <?php include __DIR__ . '/partials/energy_graph.php'; ?>
 
-        <!-- Schedule Panels: Today's Schedule and Schedule Entries -->
+        <!-- 4. Schedule Panels -->
         <?php include __DIR__ . '/partials/schedule_panels.php'; ?>
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
+
+        <!-- 5. System & Grid (charge status details) -->
+        <div class="charge-status-wrapper" style="margin-top: 20px;">
+            <?php include __DIR__ . '/partials/charge_status_details.php'; ?>
+        </div>
 
         <!-- Bar Graph Section - Full Width -->
         <?php #include __DIR__ . '/partials/schedule_overview_bar.php'; ?>
@@ -107,7 +107,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php #include __DIR__ . '/partials/calculate.php'; ?>
 
 
-        <!-- Automation Status Section - Full Width -->
+        <!-- 6. Automation Status -->
         <div class="automation-status-wrapper" style="margin-top: 20px;">
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
