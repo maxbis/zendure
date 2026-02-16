@@ -68,7 +68,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 
 <body class="mobile-dark" style="max-width: 600px;margin: auto;display: flex;justify-content: center;align-items: center;">
     <div class="container">
-        <div class="header" style="max-width: 900px; margin: 0 auto;">
+        <div class="header" style="max-width: 900px; margin: 5 auto;">
             <h1>⚡Zendure Energy Manager</h1>
         </div>
 

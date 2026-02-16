@@ -431,10 +431,7 @@ function renderAutomationStatus(data) {
         return;
     }
 
-    // Render entries
-    const totalEntries = entries.length;
-    const hasMoreEntries = totalEntries > 1;
-
+    // Render entries - all visible, no collapse/toggle
     const wrapperEl = document.createElement('div');
     wrapperEl.id = 'automation-entries-wrapper';
     wrapperEl.className = 'automation-entries-wrapper';
@@ -442,7 +439,6 @@ function renderAutomationStatus(data) {
     const listEl = document.createElement('div');
     listEl.id = 'automation-entries-list';
     listEl.className = 'automation-entries-list';
-    listEl.dataset.totalEntries = totalEntries;
 
     entries.forEach((entry, index) => {
         const entryType = entry.type || 'unknown';
@@ -450,17 +446,10 @@ function renderAutomationStatus(data) {
         const entryDetailsHtml = formatAutomationEntryDetailsHtml(entry);
         const badgeClass = getAutomationEntryTypeClass(entryType);
         const badgeLabel = getAutomationEntryTypeLabel(entryType);
-        const isFirst = index === 0;
-        const entryClass = 'automation-entry' + (isFirst ? ' automation-entry-first' : ' automation-entry-collapsed');
 
         const entryEl = document.createElement('div');
-        entryEl.className = entryClass;
+        entryEl.className = 'automation-entry';
         entryEl.dataset.index = index;
-
-        if (isFirst && hasMoreEntries) {
-            entryEl.style.cursor = 'pointer';
-            entryEl.onclick = toggleAutomationEntries;
-        }
 
         entryEl.innerHTML = `
             <span class="automation-entry-badge ${badgeClass}">
@@ -472,23 +461,12 @@ function renderAutomationStatus(data) {
             <span class="automation-entry-details">
                 ${entryDetailsHtml}
             </span>
-            ${isFirst && hasMoreEntries ? '<span class="automation-entry-expand-icon">▼</span>' : ''}
         `;
 
         listEl.appendChild(entryEl);
     });
 
     wrapperEl.appendChild(listEl);
-
-    if (hasMoreEntries) {
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'automation-toggle-button';
-        toggleBtn.innerHTML = '<span class="automation-toggle-text">Show all (' + totalEntries + ')</span><span class="automation-toggle-icon">▼</span>';
-        toggleBtn.onclick = toggleAutomationEntries;
-        wrapperEl.appendChild(toggleBtn);
-    }
-
     container.appendChild(wrapperEl);
 }
 
@@ -852,7 +830,7 @@ function formatPowerValueHtml(value) {
 
 /**
  * Returns HTML for the automation entry details cell (power transition + optional grid; colored spans for change type).
- * For change: only "old W → new W" and optional "· Grid N W"; for other types, short escaped label.
+ * For change: only "old W → new W" and optional "· Grid:N W"; for other types, short escaped label (name:value, vars sep by " - ").
  */
 function formatAutomationEntryDetailsHtml(entry) {
     const type = (entry.type || 'unknown').toLowerCase();
@@ -862,16 +840,16 @@ function formatAutomationEntryDetailsHtml(entry) {
     const extras = [];
     if (entry.p1TotalPower != null) {
         const p1Formatted = Number(entry.p1TotalPower).toLocaleString();
-        extras.push('Grid ' + escapeHtml(p1Formatted + ' W'));
+        extras.push('Grid:' + escapeHtml(p1Formatted + ' W'));
     }
     if (entry.electricLevel != null) {
-        extras.push('Battery ' + escapeHtml(String(entry.electricLevel)) + '%');
+        extras.push('Battery:' + escapeHtml(String(entry.electricLevel)) + '%');
     }
 
     if (type === 'change') {
         let html = formatPowerValueHtml(oldValue) + ' → ' + formatPowerValueHtml(newValue);
         if (extras.length > 0) {
-            html += ' · ' + extras.join(' · ');
+            html += ' · ' + extras.join(' - ');
         }
         return html;
     }
@@ -879,16 +857,16 @@ function formatAutomationEntryDetailsHtml(entry) {
     const labels = { start: 'Started', stop: 'Stopped', heartbeat: 'Heartbeat' };
     const label = labels[type] || (type.charAt(0).toUpperCase() + type.slice(1));
     const extraParts = [];
-    if (oldValue !== undefined) {
-        extraParts.push('old ' + escapeHtml(String(oldValue)));
+    if (oldValue != null) {
+        extraParts.push('old:' + escapeHtml(String(oldValue)));
     }
-    if (newValue !== undefined) {
-        extraParts.push('new ' + escapeHtml(String(newValue)));
+    if (newValue != null) {
+        extraParts.push('new:' + escapeHtml(String(newValue)));
     }
     if (extras.length > 0) {
         extraParts.push(...extras);
     }
-    return escapeHtml(label) + (extraParts.length > 0 ? ' · ' + extraParts.join(' · ') : '');
+    return escapeHtml(label) + (extraParts.length > 0 ? ' · ' + extraParts.join(' - ') : '');
 }
 
 function getAutomationEntryTypeClass(type) {

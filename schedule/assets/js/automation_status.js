@@ -3,28 +3,6 @@
  * Client-side logic for fetching and rendering automation status
  */
 
-// Automation entries toggle functionality
-window.toggleAutomationEntries = function () {
-    const entriesWrapper = document.getElementById('automation-entries-wrapper');
-    const entriesList = document.getElementById('automation-entries-list');
-    if (!entriesWrapper || !entriesList) return;
-
-    if (entriesWrapper.classList.contains('expanded')) {
-        entriesWrapper.classList.remove('expanded');
-        entriesList.classList.remove('expanded');
-    } else {
-        entriesWrapper.classList.add('expanded');
-        entriesList.classList.add('expanded');
-    }
-
-    const toggleBtn = entriesWrapper.querySelector('.automation-toggle-button');
-    const toggleText = toggleBtn ? toggleBtn.querySelector('.automation-toggle-text') : null;
-    if (toggleText) {
-        const n = entriesList.dataset.totalEntries || entriesList.children.length;
-        toggleText.textContent = entriesWrapper.classList.contains('expanded') ? 'Show less' : 'Show all (' + n + ')';
-    }
-};
-
 /**
  * Perform normal refresh (Automation Status + Charge/Discharge + System & Grid)
  */
