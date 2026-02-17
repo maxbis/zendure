@@ -273,6 +273,7 @@ class EditModal {
     }
 
     async handleSave() {
+        console.log('[EditModal] handleSave called');
         let d = document.getElementById('inp-date').value.trim();
         let t = document.getElementById('inp-time').value.trim();
         
@@ -317,6 +318,7 @@ class EditModal {
             payload.originalKey = this.currentOriginalKey;
         }
 
+        console.log('[EditModal] handleSave payload:', payload, 'limit1hour checkbox:', this.limit1HourInput?.checked);
         await this.submitPayload(payload);
     }
 
@@ -339,11 +341,13 @@ class EditModal {
             payload.originalKey = options.originalKey;
         }
 
+        console.log('[EditModal] applyQuickMode payload:', payload);
         await this.submitPayload(payload);
     }
 
     async submitPayload(payload) {
         try {
+            console.log('[EditModal] submitPayload PUT to', this.apiUrl, 'payload:', payload);
             const res = await fetch(this.apiUrl, {
                 method: 'PUT',
                 headers: {
