@@ -242,6 +242,17 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
                 limit1hour: true,
                 originalKey: hasExistingEntry ? key : null
             });
+
+            // Ensure schedule panels and price graph are refreshed after a quick change,
+            // especially on the mobile page where the user expects immediate feedback.
+            if (typeof window !== 'undefined' &&
+                typeof window.refreshScheduleAndPricesImmediate === 'function') {
+                try {
+                    await window.refreshScheduleAndPricesImmediate();
+                } catch (e) {
+                    console.error('Failed to refresh schedule after quick mode change:', e);
+                }
+            }
         } else if (editModal) {
             if (existingValue !== undefined) {
                 editModal.open(key, existingValue);
@@ -668,15 +679,22 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         renderPriceRow(pricesToRender, tomorrowDateStr, tomorrowContainerMobile, false);
     }
     
-    // Auto-scroll to current time (center it)
+    // Auto-scroll to current time (center it) for desktop view.
+    // Use the today container and its nearest price-graph-container instead of the first match on the page.
     setTimeout(() => {
-        const currentBar = document.querySelector('.price-graph-bar.price-current');
-        const container = document.querySelector('.price-graph-container');
-        if (currentBar && container) {
+        if (!todayContainer) {
+            return;
+        }
+
+        const currentBar = todayContainer.querySelector('.price-graph-bar.price-current');
+        const container =
+            todayContainer.closest('.price-graph-container') || todayContainer;
+
+        if (currentBar && container && typeof container.scrollTo === 'function') {
             const containerWidth = container.clientWidth;
             const barLeft = currentBar.offsetLeft;
             const barWidth = currentBar.clientWidth;
-            
+
             // Calculate scroll position to center the bar
             const scrollPos = barLeft - (containerWidth / 2) + (barWidth / 2);
             container.scrollTo({

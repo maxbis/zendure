@@ -12,7 +12,7 @@
  */
 ?>
 <!-- Automation Status Section -->
-<div class="card">
+<div class="card" data-component="automation-status">
     <div class="metric-section">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3 class="card-header">🤖 Automation Status</h3>

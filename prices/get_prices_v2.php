@@ -18,6 +18,11 @@
  */
 
 // Configuration
+// When set to true, this script will NOT call any external price API.
+// It will only use existing local price files (and let the frontend fall back
+// to its own default/proxy values when files are missing).
+const PRICE_API_OFFLINE_MODE = true;
+
 define('CONFIG_FILE', __DIR__ . '/../config/config.json');
 define('DATA_BASE_DIR', __DIR__ . '/../data');
 define('PRICE_DIR', DATA_BASE_DIR . '/price');
@@ -459,7 +464,22 @@ function getLastTwoAvailableDates() {
  * @return array Array with 'today', 'tomorrow', 'dates', and 'updateResults' keys
  */
 function getPriceData() {
-    // Load configuration
+    // Offline mode: do NOT try to refresh from the external API.
+    // Just use whatever local price files are available.
+    if (PRICE_API_OFFLINE_MODE) {
+        $priceData = getLastTwoAvailableDates();
+
+        // Indicate that no remote updates were attempted
+        $priceData['updateResults'] = [
+            'today' => priceFileExists(date('Ymd')),
+            'tomorrow' => priceFileExists(date('Ymd', strtotime('+1 day'))),
+            'skipped' => true,
+        ];
+
+        return $priceData;
+    }
+
+    // Normal mode: load config and refresh prices when needed
     $config = loadConfig();
     if (!$config) {
         return [

@@ -405,8 +405,8 @@ function renderAutomationStatus(data) {
     if (emptyDiv) emptyDiv.remove();
     if (wrapperDiv) wrapperDiv.remove();
 
-    // Injection target: .metric-section inside partials/automation_status.php
-    const container = document.querySelector('.automation-status-wrapper .metric-section');
+    // Injection target: .metric-section inside the Automation Status card
+    const container = document.querySelector('[data-component="automation-status"] .metric-section');
     if (!container) return;
 
     // Handle error
@@ -485,7 +485,8 @@ function renderChargeStatus(zendureData, p1Data = null) {
     if (emptyDiv) emptyDiv.remove();
     if (contentDiv) contentDiv.remove();
 
-    const container = document.querySelector('.charge-status-wrapper .metric-section');
+    // Injection target: .metric-section inside the main Charge/Discharge card
+    const container = document.querySelector('[data-component="charge-status-main"] .metric-section');
     if (!container) return;
 
     // Remove initial placeholder if present
@@ -1070,9 +1071,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update WiFi Signal (RSSI)
-    const wifiDisplay =
-        detailsContainer.querySelector('[data-metric="wifi-signal"]') ||
-        findElementByLabel(detailsContainer, 'WiFi Signal:');
+    const wifiDisplay = detailsContainer.querySelector('[data-metric="wifi-signal"]');
     if (wifiDisplay) {
         const rssi = properties.rssi ?? -90;
         const minRssi = -90;
@@ -1102,9 +1101,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update System Temperature
-    const systemTempDisplay =
-        detailsContainer.querySelector('[data-metric="system-temp"]') ||
-        findElementByLabel(detailsContainer, 'System Temp:');
+    const systemTempDisplay = detailsContainer.querySelector('[data-metric="system-temp"]');
     if (systemTempDisplay) {
         const hyperTmp = properties.hyperTmp ?? 2731;
         const systemTempCelsius = convertHyperTmpJS(hyperTmp);
@@ -1127,9 +1124,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 1 Level
-    const battery1LevelDisplay =
-        detailsContainer.querySelector('[data-metric="battery1-level"]') ||
-        findElementByLabel(detailsContainer, 'Battery 1 Level:');
+    const battery1LevelDisplay = detailsContainer.querySelector('[data-metric="battery1-level"]');
     if (battery1LevelDisplay) {
         const pack1Soc = packData[0]?.socLevel ?? 0;
         const pack1UsableNetKwh = Math.max(0, ((pack1Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
@@ -1157,9 +1152,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 1 Temperature
-    const battery1TempDisplay =
-        detailsContainer.querySelector('[data-metric="battery1-temp"]') ||
-        findElementByLabel(detailsContainer, 'Battery 1 Temp:');
+    const battery1TempDisplay = detailsContainer.querySelector('[data-metric="battery1-temp"]');
     if (battery1TempDisplay) {
         const pack1MaxTemp = packData[0]?.maxTemp ?? 2731;
         const pack1TempCelsius = convertHyperTmpJS(pack1MaxTemp);
@@ -1182,9 +1175,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 2 Level
-    const battery2LevelDisplay =
-        detailsContainer.querySelector('[data-metric="battery2-level"]') ||
-        findElementByLabel(detailsContainer, 'Battery 2 Level:');
+    const battery2LevelDisplay = detailsContainer.querySelector('[data-metric="battery2-level"]');
     if (battery2LevelDisplay) {
         const pack2Soc = packData[1]?.socLevel ?? 0;
         const pack2UsableNetKwh = Math.max(0, ((pack2Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
@@ -1212,9 +1203,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 2 Temperature
-    const battery2TempDisplay =
-        detailsContainer.querySelector('[data-metric="battery2-temp"]') ||
-        findElementByLabel(detailsContainer, 'Battery 2 Temp:');
+    const battery2TempDisplay = detailsContainer.querySelector('[data-metric="battery2-temp"]');
     if (battery2TempDisplay) {
         const pack2MaxTemp = packData[1]?.maxTemp ?? 2731;
         const pack2TempCelsius = convertHyperTmpJS(pack2MaxTemp);
