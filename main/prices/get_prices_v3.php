@@ -1,335 +1,75 @@
 <?php
 /**
- * Electricity Price Fetcher v3 - Frank Energie GraphQL
+ * Electricity Price Fetcher v3 - jeroen.nl API (v2-style)
  *
  * Features:
- * - Fetches prices from Frank Energie GraphQL endpoint
- * - Stores prices in: data/price/YYYYMM/priceYYYYMMDD.json
- * - Uses priceIncludingMarkup
- * - Fetches today and tomorrow (when available)
+ * - Reads API endpoints from config (priceUrls-alta or priceUrls)
+ * - Fetches from jeroen.nl-style API: bare JSON array with datum_nl, prijs_excl_belastingen (15-min)
+ * - Stores prices in: data/price/YYYYMM/priceYYYYMMDD.json (hour keys "00"-"23", same format as v2)
+ * - Same algorithm as get_prices_v2: fetch today/tomorrow when needed, return last two available dates
  */
 
 define('CONFIG_FILE', __DIR__ . '/../config/config.json');
 define('DATA_BASE_DIR', __DIR__ . '/../data');
 define('PRICE_DIR', DATA_BASE_DIR . '/price');
-// Primary endpoint observed in recent community examples.
-define('FRANK_GRAPHQL_URL', 'https://frank-graphql-prod.graphcdn.app/');
-// Legacy endpoint fallback.
-define('FRANK_GRAPHQL_URL_FALLBACK', 'https://graphcdn.frankenergie.nl/');
-define('ENEVER_SUPPLIER_KEY', 'prijsFR');
 
 /**
  * Loads configuration from config.json.
- * 
- * @return array Configuration values with defaults
+ * Prefers priceUrls-alta.today / priceUrls-alta.tomorrow when present, else priceUrls.
+ *
+ * @return array|null Array with 'urlToday', 'urlTomorrow', 'tomorrowFetchHour' or null on error
  */
 function loadConfig() {
-    $tomorrowFetchHour = 15;
-    $urlToday = null;
-    $urlTomorrow = null;
-
     if (!file_exists(CONFIG_FILE)) {
-        return [
-            'tomorrowFetchHour' => $tomorrowFetchHour,
-            'urlToday' => $urlToday,
-            'urlTomorrow' => $urlTomorrow
-        ];
+        error_log("ERROR: Config file " . CONFIG_FILE . " not found");
+        return null;
     }
 
     $configContent = file_get_contents(CONFIG_FILE);
     if ($configContent === false) {
-        return [
-            'tomorrowFetchHour' => $tomorrowFetchHour,
-            'urlToday' => $urlToday,
-            'urlTomorrow' => $urlTomorrow
-        ];
+        error_log("ERROR: Could not read config file " . CONFIG_FILE);
+        return null;
     }
 
     $config = json_decode($configContent, true);
-    if (!is_array($config)) {
-        return [
-            'tomorrowFetchHour' => $tomorrowFetchHour,
-            'urlToday' => $urlToday,
-            'urlTomorrow' => $urlTomorrow
-        ];
+    if ($config === null) {
+        error_log("ERROR: Could not parse config file " . CONFIG_FILE);
+        return null;
     }
 
-    if (isset($config['tomorrowFetchHour'])) {
-        $tomorrowFetchHour = (int)$config['tomorrowFetchHour'];
+    // v3 uses priceUrls-alta only (jeroen.nl); do not fall back to priceUrls (enever) to avoid wrong API.
+    $alta = isset($config['priceUrls-alta']) && is_array($config['priceUrls-alta'])
+        ? $config['priceUrls-alta']
+        : null;
+    $urlToday = $alta['today'] ?? null;
+    $urlTomorrow = $alta['tomorrow'] ?? null;
+
+    if (empty($urlToday) || empty($urlTomorrow)) {
+        error_log("ERROR: priceUrls-alta.today and priceUrls-alta.tomorrow required in config for get_prices_v3 (jeroen.nl)");
+        return null;
     }
 
-    if (isset($config['priceUrls']['today'])) {
-        $urlToday = $config['priceUrls']['today'];
-    }
-    if (isset($config['priceUrls']['tomorrow'])) {
-        $urlTomorrow = $config['priceUrls']['tomorrow'];
-    }
+    $tomorrowFetchHour = isset($config['tomorrowFetchHour']) ? (int)$config['tomorrowFetchHour'] : 15;
 
     return [
-        'tomorrowFetchHour' => $tomorrowFetchHour,
         'urlToday' => $urlToday,
-        'urlTomorrow' => $urlTomorrow
+        'urlTomorrow' => $urlTomorrow,
+        'tomorrowFetchHour' => $tomorrowFetchHour
     ];
 }
 
 /**
- * Executes a GraphQL query and returns decoded data.
- * 
- * @param string $query GraphQL query string
- * @param array $variables GraphQL variables
- * @return array|null Decoded JSON response or null on error
- */
-function isDebugEnabled() {
-    return getenv('DEBUG') === '1';
-}
-
-function fetchGraphQl($query, $variables = null, $operationName = null) {
-    $payloadArray = ['query' => $query];
-    if ($variables !== null) {
-        $payloadArray['variables'] = $variables;
-    }
-    if ($operationName !== null) {
-        $payloadArray['operationName'] = $operationName;
-    }
-
-    $payload = json_encode($payloadArray);
-
-    if ($payload === false) {
-        error_log("❌ Error encoding GraphQL payload");
-        return null;
-    }
-
-    $ch = curl_init(FRANK_GRAPHQL_URL);
-    if ($ch === false) {
-        error_log("❌ Error initializing cURL for GraphQL");
-        return null;
-    }
-
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Accept: application/json',
-            'User-Agent: Mozilla/5.0'
-        ],
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-
-    if ($response === false || !empty($curlError)) {
-        error_log("❌ GraphQL request failed: $curlError");
-        return null;
-    }
-
-    if ($httpCode !== 200) {
-        // Try legacy endpoint once if primary fails.
-        $fallback = fetchGraphQlFallback($payload);
-        if ($fallback !== null) {
-            return $fallback;
-        }
-        if (isDebugEnabled()) {
-            error_log("❌ GraphQL HTTP $httpCode response: " . trim($response));
-        } else {
-            error_log("❌ GraphQL returned HTTP status: $httpCode");
-        }
-        return null;
-    }
-
-    $data = json_decode($response, true);
-    if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-        error_log("❌ Error parsing GraphQL response: " . json_last_error_msg());
-        return null;
-    }
-
-    if (isset($data['errors'])) {
-        if (isDebugEnabled()) {
-            error_log("❌ GraphQL returned errors: " . json_encode($data['errors'], JSON_UNESCAPED_UNICODE));
-            error_log("❌ GraphQL full response: " . json_encode($data, JSON_UNESCAPED_UNICODE));
-        } else {
-            error_log("❌ GraphQL returned errors");
-        }
-        return null;
-    }
-
-    return $data;
-}
-
-/**
- * Fallback GraphQL request to legacy endpoint.
+ * Fetches price data from API endpoint (GET).
+ * Expects jeroen.nl-style response: bare JSON array of entries.
  *
- * @param string $payload JSON payload
- * @return array|null
+ * @param string $url API endpoint URL
+ * @return array|null Decoded array or null on error
  */
-function fetchGraphQlFallback($payload) {
-    $ch = curl_init(FRANK_GRAPHQL_URL_FALLBACK);
-    if ($ch === false) {
-        return null;
-    }
-
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Accept: application/json',
-            'User-Agent: Mozilla/5.0'
-        ],
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-
-    if ($response === false || !empty($curlError)) {
-        return null;
-    }
-
-    if ($httpCode !== 200) {
-        if (isDebugEnabled()) {
-            error_log("❌ Fallback GraphQL HTTP $httpCode response: " . trim($response));
-        }
-        return null;
-    }
-
-    $data = json_decode($response, true);
-    if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-        return null;
-    }
-
-    if (isset($data['errors'])) {
-        if (isDebugEnabled()) {
-            error_log("❌ Fallback GraphQL returned errors: " . json_encode($data['errors'], JSON_UNESCAPED_UNICODE));
-        }
-        return null;
-    }
-
-    return $data;
-}
-
-/**
- * Fetches price entries for a specific date.
- * 
- * @param string $dateYmd Date in YYYY-MM-DD
- * @return array|null List of entries or null
- */
-function fetchPricesForDate($dateYmd) {
-    $endDateYmd = date('Y-m-d', strtotime($dateYmd . ' +1 day'));
-
-    $variants = [];
-
-    $variants[] = [
-        'label' => 'Date variables',
-        'query' => <<<GQL
-query MarketPrices(\$startDate: Date!, \$endDate: Date!) {
-  marketPricesElectricity(startDate: \$startDate, endDate: \$endDate) {
-    from
-    till
-    priceIncludingMarkup
-  }
-}
-GQL,
-        'variables' => ['startDate' => $dateYmd, 'endDate' => $endDateYmd],
-        'operationName' => 'MarketPrices'
-    ];
-
-    $variants[] = [
-        'label' => 'String variables',
-        'query' => <<<GQL
-query MarketPrices(\$startDate: String!, \$endDate: String!) {
-  marketPricesElectricity(startDate: \$startDate, endDate: \$endDate) {
-    from
-    till
-    priceIncludingMarkup
-  }
-}
-GQL,
-        'variables' => ['startDate' => $dateYmd, 'endDate' => $endDateYmd],
-        'operationName' => 'MarketPrices'
-    ];
-
-    $startDateIso = $dateYmd . 'T00:00:00+01:00';
-    $endDateIso = $endDateYmd . 'T00:00:00+01:00';
-    $variants[] = [
-        'label' => 'DateTime variables',
-        'query' => <<<GQL
-query MarketPrices(\$startDate: DateTime!, \$endDate: DateTime!) {
-  marketPricesElectricity(startDate: \$startDate, endDate: \$endDate) {
-    from
-    till
-    priceIncludingMarkup
-  }
-}
-GQL,
-        'variables' => ['startDate' => $startDateIso, 'endDate' => $endDateIso],
-        'operationName' => 'MarketPrices'
-    ];
-
-    $variants[] = [
-        'label' => 'Inline dates',
-        'query' => <<<GQL
-query MarketPrices {
-  marketPricesElectricity(startDate: "{$dateYmd}", endDate: "{$endDateYmd}") {
-    from
-    till
-    priceIncludingMarkup
-  }
-}
-GQL,
-        'variables' => null,
-        'operationName' => 'MarketPrices'
-    ];
-
-    foreach ($variants as $variant) {
-        if (isDebugEnabled()) {
-            error_log("ℹ️ Trying GraphQL variant: " . $variant['label']);
-        }
-
-        $response = fetchGraphQl($variant['query'], $variant['variables'], $variant['operationName']);
-        if (!$response || !isset($response['data']['marketPricesElectricity'])) {
-            continue;
-        }
-
-        $items = $response['data']['marketPricesElectricity'];
-        if (is_array($items) && !empty($items)) {
-            return $items;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Fetches prices from Enever API and extracts supplier prices.
- *
- * @param string $url API URL
- * @param string $priceKey Supplier price key (e.g., prijsFR)
- * @return array|null Hourly prices array or null
- */
-function fetchPricesFromEnever($url, $priceKey) {
-    if (!$url) {
-        return null;
-    }
-
-    if (strpos($url, 'price=') === false) {
-        $separator = (strpos($url, '?') === false) ? '?' : '&';
-        $url .= $separator . 'price=' . $priceKey;
-    }
-
+function fetchPricesFromApi($url) {
     $ch = curl_init($url);
+
     if ($ch === false) {
+        error_log("❌ Error initializing cURL for URL: $url");
         return null;
     }
 
@@ -346,88 +86,97 @@ function fetchPricesFromEnever($url, $priceKey) {
     curl_close($ch);
 
     if ($response === false || !empty($curlError)) {
+        error_log("❌ Error fetching prices from API: $curlError");
         return null;
     }
 
     if ($httpCode !== 200) {
+        error_log("❌ API returned HTTP status: $httpCode");
         return null;
     }
 
     $data = json_decode($response, true);
+
     if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-        return null;
-    }
-
-    if (!isset($data['status']) || $data['status'] !== 'true') {
-        return null;
-    }
-
-    if (!isset($data['data']) || !is_array($data['data'])) {
-        return null;
-    }
-
-    $prices = [];
-    try {
-        foreach ($data['data'] as $entry) {
-            if (!isset($entry['datum']) || !isset($entry[$priceKey])) {
-                continue;
-            }
-
-            $dt = new DateTime($entry['datum']);
-            $hour = $dt->format('H');
-            $prices[$hour] = (float)$entry[$priceKey];
+        $preview = trim(substr($response, 0, 300));
+        if (stripos($response, 'limiet') !== false || stripos($response, 'query') !== false) {
+            error_log("❌ API may have returned rate-limit or error page (not JSON). Preview: " . $preview);
+        } else {
+            error_log("❌ Error parsing JSON response: " . json_last_error_msg() . ". Preview: " . $preview);
         }
-    } catch (Exception $e) {
         return null;
     }
 
-    if (count($prices) < 24) {
+    if (!is_array($data) || empty($data)) {
+        error_log("❌ API did not return a non-empty array");
         return null;
     }
 
-    ksort($prices);
-    return $prices;
+    return $data;
 }
 
 /**
- * Convert interval prices to hourly prices (averaging if 15-min data).
- * 
- * @param array $items GraphQL items
- * @return array|null Hourly prices array with keys "00"-"23"
+ * Extracts date from jeroen.nl API response (first entry datum_nl).
+ *
+ * @param array $data Raw array of entries with datum_nl
+ * @return string|null Date string in format Ymd or null
  */
-function normalizeToHourlyPrices($items, $targetDateYmd) {
+function extractDateFromApiData($data) {
+    if (!is_array($data) || empty($data)) {
+        return null;
+    }
+
+    try {
+        $firstEntry = $data[0];
+        if (!isset($firstEntry['datum_nl']) || empty($firstEntry['datum_nl'])) {
+            return null;
+        }
+        $dt = new DateTime($firstEntry['datum_nl']);
+        return $dt->format('Ymd');
+    } catch (Exception $e) {
+        error_log("❌ Error extracting date from data: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Extracts prices from jeroen.nl API: 15-min entries → hourly average.
+ * prijs_excl_belastingen uses comma as decimal separator.
+ *
+ * @param array $data Raw array of entries with datum_nl, prijs_excl_belastingen
+ * @return array|null Dictionary with hour keys "00"-"23" and float values, or null
+ */
+function extractPricesFromApiData($data) {
+    if (!is_array($data) || empty($data)) {
+        return null;
+    }
+
     $sum = [];
     $count = [];
 
     try {
-        foreach ($items as $entry) {
-            if (!isset($entry['from']) || !isset($entry['priceIncludingMarkup'])) {
+        foreach ($data as $entry) {
+            if (!isset($entry['datum_nl']) || !isset($entry['prijs_excl_belastingen'])) {
                 continue;
             }
-
-            $from = $entry['from'];
-            $price = $entry['priceIncludingMarkup'];
-
-            if ($from === null || $price === null) {
+            $datumNl = $entry['datum_nl'];
+            $prijsStr = $entry['prijs_excl_belastingen'];
+            if (empty($datumNl) || $prijsStr === null || $prijsStr === '') {
                 continue;
             }
-
-            $dt = new DateTime($from);
-            if ($dt->format('Y-m-d') !== $targetDateYmd) {
-                continue;
-            }
+            $dt = new DateTime($datumNl);
             $hour = $dt->format('H');
+            $price = (float)str_replace(',', '.', $prijsStr);
 
             if (!isset($sum[$hour])) {
                 $sum[$hour] = 0.0;
                 $count[$hour] = 0;
             }
-
-            $sum[$hour] += (float)$price;
+            $sum[$hour] += $price;
             $count[$hour] += 1;
         }
     } catch (Exception $e) {
-        error_log("❌ Error normalizing prices: " . $e->getMessage());
+        error_log("❌ Error extracting prices: " . $e->getMessage());
         return null;
     }
 
@@ -440,7 +189,6 @@ function normalizeToHourlyPrices($items, $targetDateYmd) {
         $prices[$hour] = $total / max(1, $count[$hour]);
     }
 
-    // Ensure we have a full day (24 hours)
     if (count($prices) < 24) {
         return null;
     }
@@ -521,49 +269,46 @@ function savePriceData($dateStr, $prices) {
 }
 
 /**
- * Fetches and saves prices for a specific date.
+ * Fetches and saves prices for a given URL (date comes from response).
+ * Same semantics as v2 fetchAndSavePrices.
+ *
+ * @param string $url API endpoint URL
+ * @param string $dateLabel Label for logging (e.g. "today", "tomorrow")
+ * @return bool True if successful
  */
-function fetchAndSavePricesForDate($dateStr, $label, $config) {
+function fetchAndSavePrices($url, $dateLabel) {
     if (isRunningInCLI()) {
-        echo "\n📊 Fetching $label prices...\n";
+        echo "\n📊 Fetching $dateLabel prices...\n";
+    }
+
+    $data = fetchPricesFromApi($url);
+    if (!$data) {
+        return false;
+    }
+
+    $dateStr = extractDateFromApiData($data);
+    if (!$dateStr) {
+        if (isRunningInCLI()) {
+            echo "❌ Could not extract date from $dateLabel data\n";
+        } else {
+            error_log("❌ Could not extract date from $dateLabel data");
+        }
+        return false;
     }
 
     if (priceFileExists($dateStr)) {
         if (isRunningInCLI()) {
-            echo "ℹ️  File for $label ($dateStr) already exists, skipping\n";
+            echo "ℹ️  File for $dateLabel ($dateStr) already exists, skipping API call\n";
         }
         return true;
     }
 
-    $dt = DateTime::createFromFormat('Ymd', $dateStr);
-    if ($dt === false) {
-        if (isRunningInCLI()) {
-            echo "❌ Invalid date format for $label: $dateStr\n";
-        }
-        return false;
-    }
-    $dateYmd = $dt->format('Y-m-d');
-    $prices = null;
-
-    $items = fetchPricesForDate($dateYmd);
-    if ($items) {
-        $prices = normalizeToHourlyPrices($items, $dateYmd);
-    }
-
-    if (!$prices) {
-        $fallbackUrl = null;
-        if ($label === 'today') {
-            $fallbackUrl = $config['urlToday'] ?? null;
-        } elseif ($label === 'tomorrow') {
-            $fallbackUrl = $config['urlTomorrow'] ?? null;
-        }
-
-        $prices = fetchPricesFromEnever($fallbackUrl, ENEVER_SUPPLIER_KEY);
-    }
-
+    $prices = extractPricesFromApiData($data);
     if (!$prices) {
         if (isRunningInCLI()) {
-            echo "❌ No data available for $label ($dateStr)\n";
+            echo "❌ Could not extract prices from $dateLabel data\n";
+        } else {
+            error_log("❌ Could not extract prices from $dateLabel data");
         }
         return false;
     }
@@ -572,22 +317,29 @@ function fetchAndSavePricesForDate($dateStr, $label, $config) {
 }
 
 /**
- * Checks if updates are needed and performs them.
+ * Checks if updates are needed and performs them (same algorithm as v2).
+ *
+ * @param array $config Configuration with urlToday, urlTomorrow, tomorrowFetchHour
+ * @return array ['today' => bool, 'tomorrow' => bool]
  */
 function checkAndUpdatePrices($config) {
     $results = ['today' => false, 'tomorrow' => false];
     $currentDate = date('Ymd');
-    $tomorrowDate = date('Ymd', strtotime('+1 day'));
     $currentHour = (int)date('H');
+    $tomorrowDate = date('Ymd', strtotime('+1 day'));
 
-    // Always try today
-    $results['today'] = fetchAndSavePricesForDate($currentDate, 'today', $config);
+    if (!priceFileExists($currentDate)) {
+        $results['today'] = fetchAndSavePrices($config['urlToday'], 'today');
+    } else {
+        $results['today'] = true;
+    }
 
-    // Try tomorrow when likely available (or already exists)
-    if (priceFileExists($tomorrowDate)) {
-        $results['tomorrow'] = true;
-    } elseif ($currentHour >= $config['tomorrowFetchHour']) {
-        $results['tomorrow'] = fetchAndSavePricesForDate($tomorrowDate, 'tomorrow', $config);
+    if ($currentHour >= $config['tomorrowFetchHour']) {
+        if (!priceFileExists($tomorrowDate)) {
+            $results['tomorrow'] = fetchAndSavePrices($config['urlTomorrow'], 'tomorrow');
+        } else {
+            $results['tomorrow'] = true;
+        }
     } else {
         $results['tomorrow'] = false;
     }
@@ -621,7 +373,7 @@ function findAllAvailableDates() {
 }
 
 /**
- * Returns the last two available dates of price data.
+ * Returns the last two available dates of price data (same as v2).
  */
 function getLastTwoAvailableDates() {
     $availableDates = findAllAvailableDates();
@@ -677,12 +429,20 @@ function loadPriceData($dateStr) {
 }
 
 /**
- * Main function: checks for updates, performs them if needed, and returns price data.
+ * Main function: load config, check and update prices, return last two available dates.
  */
 function getPriceData() {
     $config = loadConfig();
-    $updateResults = checkAndUpdatePrices($config);
+    if (!$config) {
+        return [
+            'error' => 'Failed to load configuration',
+            'today' => null,
+            'tomorrow' => null,
+            'dates' => ['today' => null, 'tomorrow' => null]
+        ];
+    }
 
+    $updateResults = checkAndUpdatePrices($config);
     $priceData = getLastTwoAvailableDates();
     $priceData['updateResults'] = $updateResults;
 
@@ -716,7 +476,7 @@ if (!isRunningInCLI()) {
 
 // Handle CLI execution
 if (isset($_SERVER['argv'][0]) && realpath($_SERVER['argv'][0]) === realpath(__FILE__)) {
-    echo "🔌 Electricity Price Fetcher v3 (Frank Energie)\n";
+    echo "🔌 Electricity Price Fetcher v3 (jeroen.nl / alta)\n";
     echo str_repeat("=", 50) . "\n";
 
     $result = getPriceData();
