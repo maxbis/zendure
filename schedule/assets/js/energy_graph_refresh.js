@@ -17,6 +17,40 @@
         return sign * 3;
     }
 
+    function inverseTransformWh(tv) {
+        if (tv === 0) return 0;
+        var sign = tv < 0 ? -1 : 1;
+        var abs = Math.abs(tv);
+        if (abs <= 1) return sign * (abs * 200);
+        if (abs <= 2) return sign * (200 + (abs - 1) * 200);
+        return sign * (400 + (abs - 2) * 400);
+    }
+
+    function computeIsDateLabel(hourLabels) {
+        var labels = hourLabels || [];
+        return labels.map(function(label) {
+            if (!label || typeof label !== 'string') return false;
+            var parts = label.split(' ');
+            var timePart = parts[1] || '00:00';
+            var hour = parseInt(timePart.split(':')[0], 10) || 0;
+            return hour === 0;
+        });
+    }
+
+    function isChartInstance(obj) {
+        return !!(obj &&
+            typeof obj.update === 'function' &&
+            obj.data &&
+            obj.data.datasets &&
+            obj.data.datasets.length);
+    }
+
+    function safeDestroyChart(obj) {
+        if (obj && typeof obj.destroy === 'function') {
+            try { obj.destroy(); } catch (e) { /* ignore */ }
+        }
+    }
+
     function buildChartData(whPerHour) {
         var data = whPerHour || [];
         var originalValues = data.map(function(d) { return Number(d.wh || 0); });
@@ -101,7 +135,13 @@
 
     function updateDesktopChart(cd) {
         var chart = window.energyChart;
-        if (!chart || !cd) return;
+        if (!cd) return;
+        if (!isChartInstance(chart)) {
+            ensureDesktopChartExists();
+            chart = window.energyChart;
+        }
+        if (!isChartInstance(chart)) return;
+        chart.$energyGraphIsDateLabel = computeIsDateLabel(cd.hourLabels);
         chart.data.labels = cd.labels;
         chart.data.datasets[0].data = cd.values;
         chart.data.datasets[0].backgroundColor = cd.backgroundColor;
@@ -125,7 +165,13 @@
 
     function updateMobileChart(cd) {
         var chart = window.energyChartMobile;
-        if (!chart || !cd) return;
+        if (!cd) return;
+        if (!isChartInstance(chart)) {
+            ensureMobileChartExists();
+            chart = window.energyChartMobile;
+        }
+        if (!isChartInstance(chart)) return;
+        chart.$energyGraphIsDateLabel = computeIsDateLabel(cd.hourLabels);
         chart.data.labels = cd.labels;
         chart.data.datasets[0].data = cd.values;
         chart.data.datasets[0].backgroundColor = cd.backgroundColor;
@@ -145,6 +191,153 @@
             }
         };
         chart.update('none');
+    }
+
+    function ensureDesktopChartExists() {
+        if (isChartInstance(window.energyChart)) return;
+        safeDestroyChart(window.energyChart);
+        window.energyChart = null;
+        var ctx = document.getElementById('energyChart');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        var chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Watt-hours',
+                    data: [],
+                    backgroundColor: [],
+                    borderColor: [],
+                    borderWidth: 1,
+                    minBarLength: 0,
+                    barPercentage: 0.9,
+                    categoryPercentage: 0.9
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: false },
+                    legend: { display: false },
+                    tooltip: { callbacks: {} }
+                },
+                scales: {
+                    y: {
+                        min: -3,
+                        max: 3,
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(tickValue) {
+                                return inverseTransformWh(tickValue).toFixed(0);
+                            }
+                        },
+                        title: { display: true, text: 'Wh (non-linear scale)' }
+                    },
+                    x: {
+                        type: 'category',
+                        title: { display: false, text: 'Hour' },
+                        grid: {
+                            color: function(context) {
+                                var arr = (context.chart && context.chart.$energyGraphIsDateLabel) ? context.chart.$energyGraphIsDateLabel : [];
+                                return arr[context.index] ? '#555' : '#e8e8e8';
+                            }
+                        },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45,
+                            color: function(context) {
+                                var arr = (context.chart && context.chart.$energyGraphIsDateLabel) ? context.chart.$energyGraphIsDateLabel : [];
+                                return arr[context.index] ? '#1976d2' : '#333';
+                            },
+                            font: { size: 11 }
+                        }
+                    }
+                }
+            }
+        });
+        chart.$energyGraphIsDateLabel = [];
+        window.energyChart = chart;
+    }
+
+    function ensureMobileChartExists() {
+        if (isChartInstance(window.energyChartMobile)) return;
+        safeDestroyChart(window.energyChartMobile);
+        window.energyChartMobile = null;
+        var ctx = document.getElementById('energyChartMobile');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        var tickColor = '#b0b0b0';
+        var dateLabelColor = '#64b5f6';
+        var gridColor = '#404040';
+
+        var chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Watt-hours',
+                    data: [],
+                    backgroundColor: [],
+                    borderColor: [],
+                    borderWidth: 1,
+                    minBarLength: 0,
+                    barPercentage: 0.9,
+                    categoryPercentage: 0.9
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: false },
+                    legend: { display: false },
+                    tooltip: { callbacks: {} }
+                },
+                scales: {
+                    y: {
+                        min: -3,
+                        max: 3,
+                        beginAtZero: true,
+                        title: { display: false },
+                        ticks: {
+                            stepSize: 1,
+                            color: tickColor,
+                            font: { size: 11 },
+                            callback: function(tickValue) {
+                                return inverseTransformWh(tickValue).toFixed(0);
+                            }
+                        },
+                        grid: { color: gridColor }
+                    },
+                    x: {
+                        type: 'category',
+                        title: { display: false },
+                        grid: {
+                            color: function(context) {
+                                var arr = (context.chart && context.chart.$energyGraphIsDateLabel) ? context.chart.$energyGraphIsDateLabel : [];
+                                return arr[context.index] ? '#888' : gridColor;
+                            }
+                        },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45,
+                            color: function(context) {
+                                var arr = (context.chart && context.chart.$energyGraphIsDateLabel) ? context.chart.$energyGraphIsDateLabel : [];
+                                return arr[context.index] ? dateLabelColor : tickColor;
+                            },
+                            font: { size: 11 }
+                        }
+                    }
+                }
+            }
+        });
+        chart.$energyGraphIsDateLabel = [];
+        window.energyChartMobile = chart;
     }
 
     function escapeHtml(str) {
@@ -224,6 +417,8 @@
 
             var cd = buildChartData(whPerHour);
             var cdMobile = buildChartDataMobile(whPerHour);
+            ensureDesktopChartExists();
+            ensureMobileChartExists();
             updateDesktopChart(cd);
             updateMobileChart(cdMobile);
             renderDesktopDailyTable(whPerDay, baseWh);

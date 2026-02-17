@@ -488,6 +488,12 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const container = document.querySelector('.charge-status-wrapper .metric-section');
     if (!container) return;
 
+    // Remove initial placeholder if present
+    const placeholder = container.querySelector('.charge-status-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
     // Handle error
     if (!zendureData || !zendureData.success) {
         const errorEl = document.createElement('div');
@@ -1064,7 +1070,9 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update WiFi Signal (RSSI)
-    const wifiDisplay = findElementByLabel(detailsContainer, 'WiFi Signal:');
+    const wifiDisplay =
+        detailsContainer.querySelector('[data-metric="wifi-signal"]') ||
+        findElementByLabel(detailsContainer, 'WiFi Signal:');
     if (wifiDisplay) {
         const rssi = properties.rssi ?? -90;
         const minRssi = -90;
@@ -1094,7 +1102,9 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update System Temperature
-    const systemTempDisplay = findElementByLabel(detailsContainer, 'System Temp:');
+    const systemTempDisplay =
+        detailsContainer.querySelector('[data-metric="system-temp"]') ||
+        findElementByLabel(detailsContainer, 'System Temp:');
     if (systemTempDisplay) {
         const hyperTmp = properties.hyperTmp ?? 2731;
         const systemTempCelsius = convertHyperTmpJS(hyperTmp);
@@ -1117,7 +1127,9 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 1 Level
-    const battery1LevelDisplay = findElementByLabel(detailsContainer, 'Battery 1 Level:');
+    const battery1LevelDisplay =
+        detailsContainer.querySelector('[data-metric="battery1-level"]') ||
+        findElementByLabel(detailsContainer, 'Battery 1 Level:');
     if (battery1LevelDisplay) {
         const pack1Soc = packData[0]?.socLevel ?? 0;
         const pack1UsableNetKwh = Math.max(0, ((pack1Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
@@ -1125,17 +1137,29 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const battery1Value = battery1LevelDisplay.querySelector('.charge-battery-value');
         const battery1BarFill = battery1LevelDisplay.querySelector('.charge-battery-bar-fill');
+        const battery1MinMarker = battery1LevelDisplay.querySelector('.charge-battery-bar-marker.min');
+        const battery1MaxMarker = battery1LevelDisplay.querySelector('.charge-battery-bar-marker.max');
         
         if (battery1Value) {
             battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1UsableNetKwh.toFixed(2)} kWh - ${pack1RoomToChargeKwh.toFixed(2)} kWh)`;
         }
         if (battery1BarFill) {
             battery1BarFill.style.width = `${Math.min(100, Math.max(0, pack1Soc))}%`;
+            // Use a consistent green fill for battery level bars
+            battery1BarFill.style.backgroundColor = '#81c784';
+        }
+        if (battery1MinMarker) {
+            battery1MinMarker.style.left = `${MIN_CHARGE_LEVEL}%`;
+        }
+        if (battery1MaxMarker) {
+            battery1MaxMarker.style.left = `${MAX_CHARGE_LEVEL}%`;
         }
     }
 
     // Update Battery 1 Temperature
-    const battery1TempDisplay = findElementByLabel(detailsContainer, 'Battery 1 Temp:');
+    const battery1TempDisplay =
+        detailsContainer.querySelector('[data-metric="battery1-temp"]') ||
+        findElementByLabel(detailsContainer, 'Battery 1 Temp:');
     if (battery1TempDisplay) {
         const pack1MaxTemp = packData[0]?.maxTemp ?? 2731;
         const pack1TempCelsius = convertHyperTmpJS(pack1MaxTemp);
@@ -1158,7 +1182,9 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     }
 
     // Update Battery 2 Level
-    const battery2LevelDisplay = findElementByLabel(detailsContainer, 'Battery 2 Level:');
+    const battery2LevelDisplay =
+        detailsContainer.querySelector('[data-metric="battery2-level"]') ||
+        findElementByLabel(detailsContainer, 'Battery 2 Level:');
     if (battery2LevelDisplay) {
         const pack2Soc = packData[1]?.socLevel ?? 0;
         const pack2UsableNetKwh = Math.max(0, ((pack2Soc - MIN_CHARGE_LEVEL) / 100) * packCapacityKwh);
@@ -1166,17 +1192,29 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const battery2Value = battery2LevelDisplay.querySelector('.charge-battery-value');
         const battery2BarFill = battery2LevelDisplay.querySelector('.charge-battery-bar-fill');
+        const battery2MinMarker = battery2LevelDisplay.querySelector('.charge-battery-bar-marker.min');
+        const battery2MaxMarker = battery2LevelDisplay.querySelector('.charge-battery-bar-marker.max');
         
         if (battery2Value) {
             battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2UsableNetKwh.toFixed(2)} kWh - ${pack2RoomToChargeKwh.toFixed(2)} kWh)`;
         }
         if (battery2BarFill) {
             battery2BarFill.style.width = `${Math.min(100, Math.max(0, pack2Soc))}%`;
+            // Use a consistent green fill for battery level bars
+            battery2BarFill.style.backgroundColor = '#81c784';
+        }
+        if (battery2MinMarker) {
+            battery2MinMarker.style.left = `${MIN_CHARGE_LEVEL}%`;
+        }
+        if (battery2MaxMarker) {
+            battery2MaxMarker.style.left = `${MAX_CHARGE_LEVEL}%`;
         }
     }
 
     // Update Battery 2 Temperature
-    const battery2TempDisplay = findElementByLabel(detailsContainer, 'Battery 2 Temp:');
+    const battery2TempDisplay =
+        detailsContainer.querySelector('[data-metric="battery2-temp"]') ||
+        findElementByLabel(detailsContainer, 'Battery 2 Temp:');
     if (battery2TempDisplay) {
         const pack2MaxTemp = packData[1]?.maxTemp ?? 2731;
         const pack2TempCelsius = convertHyperTmpJS(pack2MaxTemp);

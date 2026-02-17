@@ -77,6 +77,11 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             <?php include __DIR__ . '/partials/charge_status_mobile.php'; ?>
         </div>
 
+        <!-- System & Grid (charge status details) -->
+        <div class="charge-status-wrapper">
+            <?php include __DIR__ . '/partials/charge_status_details_mobile.php'; ?>
+        </div>
+
         <!-- 2. Today's Prices (with scrollbar) -->
         <div class="price-graph-wrapper-mobile">
             <?php include __DIR__ . '/partials/price_overview_bar_mobile.php'; ?>
@@ -95,10 +100,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- Confirm Dialog -->
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
 
-        <!-- System & Grid (charge status details) -->
-        <div class="charge-status-wrapper">
-            <?php include __DIR__ . '/partials/charge_status_details_mobile.php'; ?>
-        </div>
+
 
         <!-- 5. Automation Status -->
         <div class="automation-status-wrapper">
@@ -110,7 +112,12 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
-            const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_api.php', JSON_UNESCAPED_SLASHES); ?>;
+            const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_proxy.php', JSON_UNESCAPED_SLASHES); ?>;
+
+            // Charge status unified API (same-origin proxy) + config levels
+            const CHARGE_STATUS_ALL_API_URL = <?php echo json_encode('api/charge_status_all_proxy.php', JSON_UNESCAPED_SLASHES); ?>;
+            const CHARGE_STATUS_MIN_CHARGE_LEVEL = <?php echo (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 20); ?>;
+            const CHARGE_STATUS_MAX_CHARGE_LEVEL = <?php echo (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 90); ?>;
         </script>
 
         <!-- Core modules (must load first) -->

@@ -121,7 +121,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             const API_URL = <?php echo json_encode($apiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
-            const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_api.php', JSON_UNESCAPED_SLASHES); ?>;
+            const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_proxy.php', JSON_UNESCAPED_SLASHES); ?>;
         </script>
 
         <!-- Core modules (must load first) -->

@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../login/validate.php';
 
 $dataFile = __DIR__ . '/../../data/automation_status.json';
 // Graph: today plus last 3 days (4 calendar days)
-$energyGraphDaysBack = 3;
+$energyGraphDaysBack = 2;
 // Table: today plus last 7 days (up to 8 lines)
 $energyTableDaysBack = 7;
 $retentionDays = $energyGraphDaysBack + 1; // for subtitle: "today and last N days"
