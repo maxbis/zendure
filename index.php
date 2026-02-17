@@ -5,7 +5,7 @@
 
 // Preserve query parameters if they exist
 $queryString = $_SERVER['QUERY_STRING'] ? '?' . $_SERVER['QUERY_STRING'] : '';
-$redirectUrl = 'schedule/charge_schedule.php' . $queryString;
+$redirectUrl = 'main/charge_schedule_mobile.php' . $queryString;
 
 // Perform redirect
 header('Location: ' . $redirectUrl, true, 302);

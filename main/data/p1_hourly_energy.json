@@ -1,0 +1,2013 @@
+{
+  "_metadata": {
+    "reference_import_kwh": 13177.389,
+    "reference_export_kwh": 3220.979,
+    "last_reset_hour": 18
+  },
+  "2026-01-18": {
+    "10": {
+      "import_delta_kwh": 0.18699999999989814,
+      "export_delta_kwh": 0.0
+    },
+    "11": {
+      "import_delta_kwh": 0.07800000000133878,
+      "export_delta_kwh": 0.0
+    },
+    "12": {
+      "import_delta_kwh": 0.15599999999903957,
+      "export_delta_kwh": 0.009000000000014552
+    },
+    "13": {
+      "import_delta_kwh": 0.6720000000004802,
+      "export_delta_kwh": 0.041999999999916326
+    },
+    "14": {
+      "import_delta_kwh": 0.2250000000003638,
+      "export_delta_kwh": 0.0340000000001055
+    },
+    "15": {
+      "import_delta_kwh": 0.9380000000001019,
+      "export_delta_kwh": 0.0
+    },
+    "16": {
+      "import_delta_kwh": 0.1459999999988213,
+      "export_delta_kwh": 0.0
+    },
+    "17": {
+      "import_delta_kwh": 0.23500000000058208,
+      "export_delta_kwh": 0.0
+    },
+    "18": {
+      "import_delta_kwh": 0.2999999999992724,
+      "export_delta_kwh": 0.0
+    },
+    "19": {
+      "import_delta_kwh": 0.4250000000010914,
+      "export_delta_kwh": 0.0
+    },
+    "20": {
+      "import_delta_kwh": 0.24799999999959255,
+      "export_delta_kwh": 0.0
+    },
+    "21": {
+      "import_delta_kwh": 0.2569999999996071,
+      "export_delta_kwh": 0.0
+    },
+    "22": {
+      "import_delta_kwh": 0.6300000000010186,
+      "export_delta_kwh": 0.0
+    },
+    "23": {
+      "import_delta_kwh": 0.19499999999970896,
+      "export_delta_kwh": 0.0
+    }
+  },
+  "2026-01-19": {
+    "00": {
+      "import_delta_kwh": 0.6379999999990105,
+      "export_delta_kwh": 0.0
+    },
+    "01": {
+      "import_delta_kwh": 0.13800000000082946,
+      "export_delta_kwh": 0.0
+    },
+    "02": {
+      "import_delta_kwh": 0.12099999999918509,
+      "export_delta_kwh": 0.0
+    },
+    "03": {
+      "import_delta_kwh": 0.11599999999998545,
+      "export_delta_kwh": 0.0
+    },
+    "04": {
+      "import_delta_kwh": 0.12100000000100408,
+      "export_delta_kwh": 0.0
+    },
+    "05": {
+      "import_delta_kwh": 0.11899999999877764,
+      "export_delta_kwh": 0.0
+    },
+    "06": {
+      "import_delta_kwh": 0.19100000000071304,
+      "export_delta_kwh": 0.0
+    },
+    "07": {
+      "import_delta_kwh": 0.1679999999996653,
+      "export_delta_kwh": 0.0
+    },
+    "08": {
+      "import_delta_kwh": 0.10499999999956344,
+      "export_delta_kwh": 0.0
+    },
+    "09": {
+      "import_delta_kwh": 0.028000000000247383,
+      "export_delta_kwh": 0.011999999999716238
+    },
+    "10": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.0860000000002401
+    },
+    "11": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.13699999999971624
+    },
+    "12": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.13300000000026557
+    },
+    "13": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.1230000000000473
+    },
+    "14": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.1619999999998072
+    },
+    "15": {
+      "import_delta_kwh": 0.0,
+      "export_delta_kwh": 0.0729999999998654
+    },
+    "16": {
+      "import_delta_kwh": 0.4279999999998836,
+      "export_delta_kwh": 0.003000000000156433
+    },
+    "17": {
+      "import_delta_kwh": 0.29200000000128057,
+      "export_delta_kwh": 0.0
+    },
+    "18": {
+      "import_delta_kwh": 0.18999999999869033,
+      "export_delta_kwh": 0.0039999999999054126
+    },
+    "19": {
+      "import_delta_kwh": 0.15300000000024738,
+      "export_delta_kwh": 0.021000000000185537
+    },
+    "20": {
+      "import_delta_kwh": 0.5930000000007567,
+      "export_delta_kwh": 0.0
+    },
+    "21": {
+      "import_delta_kwh": 0.18000000000029104,
+      "export_delta_kwh": 0.0
+    },
+    "22": {
+      "import_delta_kwh": 0.19899999999870488,
+      "export_delta_kwh": 0.0
+    },
+    "23": {
+      "import_delta_kwh": 0.20300000000133878,
+      "export_delta_kwh": 0.0
+    }
+  },
+  "2026-01-20": {
+    "00": {
+      "import_delta_kwh": 0.2139999999999418,
+      "export_delta_kwh": 0.0
+    },
+    "01": {
+      "import_delta_kwh": 0.1389999999992142,
+      "export_delta_kwh": 0.0
+    },
+    "02": {
+      "import_delta_kwh": 0.12800000000061118,
+      "export_delta_kwh": 0.0
+    },
+    "03": {
+      "import_delta_kwh": 0.13400000000001455,
+      "export_delta_kwh": 0.0
+    },
+    "04": {
+      "import_delta_kwh": 0.1279999999987922,
+      "export_delta_kwh": 0.0
+    },
+    "05": {
+      "import_delta_kwh": 0.1290000000008149,
+      "export_delta_kwh": 0.0
+    },
+    "06": {
+      "import_delta_kwh": 0.22899999999935972,
+      "export_delta_kwh": 0.0
+    },
+    "07": {
+      "import_delta_kwh": 0.1320000000014261,
+      "export_delta_kwh": 0.0
+    },
+    "08": {
+      "import_delta_kwh": 0.2899999999990541,
+      "export_delta_kwh": 0.0
+    },
+    "09": {
+      "import_delta_kwh": 0.19499999999970896,
+      "export_delta_kwh": 0.0
+    },
+    "10": {
+      "import_delta_kwh": 0.36300000000119326,
+      "export_delta_kwh": 0.0
+    },
+    "11": {
+      "import_delta_kwh": 0.2639999999992142,
+      "export_delta_kwh": 0.009000000000014552
+    },
+    "12": {
+      "import_delta_kwh": 0.3109999999996944,
+      "export_delta_kwh": 0.0,
+      "electric_level": 71
+    },
+    "13": {
+      "import_delta_kwh": 0.009000000000014552,
+      "export_delta_kwh": 0.013999999999668944,
+      "electric_level": 73
+    },
+    "14": {
+      "import_delta_kwh": 0.011000000000422006,
+      "export_delta_kwh": 0.017000000000280124,
+      "electric_level": 76
+    },
+    "15": {
+      "import_delta_kwh": 0.0010000000002037268,
+      "export_delta_kwh": 0.04399999999986903,
+      "electric_level": 76
+    },
+    "16": {
+      "import_delta_kwh": 0.19700000000011642,
+      "export_delta_kwh": 0.0039999999999054126,
+      "electric_level": 76
+    },
+    "17": {
+      "import_delta_kwh": 0.12399999999979627,
+      "export_delta_kwh": 0.023000000000138243,
+      "electric_level": 71
+    },
+    "18": {
+      "import_delta_kwh": 0.2669999999998254,
+      "export_delta_kwh": 0.0,
+      "electric_level": 71
+    },
+    "19": {
+      "import_delta_kwh": 0.26599999999962165,
+      "export_delta_kwh": 0.0,
+      "electric_level": 71
+    },
+    "20": {
+      "import_delta_wh": 722,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2000,
+      "schedule_value": 0,
+      "schedule_key": "202601201800"
+    },
+    "21": {
+      "import_delta_wh": 175,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2100,
+      "schedule_value": 0,
+      "schedule_key": "202601201800"
+    },
+    "22": {
+      "import_delta_wh": 235,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2200,
+      "schedule_value": 0,
+      "schedule_key": "202601201800"
+    },
+    "23": {
+      "import_delta_wh": 195,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2300,
+      "schedule_value": 0,
+      "schedule_key": "202601201800"
+    }
+  },
+  "2026-01-21": {
+    "00": {
+      "import_delta_wh": 154,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 140,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 122,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 127,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 130,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 126,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 123,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 130,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 346,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 277,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 194,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": 1000,
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 59,
+      "export_delta_wh": 1,
+      "electric_level": 72,
+      "schedule_time": 1100,
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "12": {
+      "import_delta_wh": 65,
+      "export_delta_wh": 3,
+      "electric_level": 72,
+      "schedule_time": 1200,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "13": {
+      "import_delta_wh": 770,
+      "export_delta_wh": 9,
+      "electric_level": 72,
+      "schedule_time": 1300,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "14": {
+      "import_delta_wh": 19,
+      "export_delta_wh": 14,
+      "electric_level": 75,
+      "schedule_time": 1400,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "15": {
+      "import_delta_wh": 55,
+      "export_delta_wh": 59,
+      "electric_level": 75,
+      "schedule_time": 1500,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "16": {
+      "import_delta_wh": 74,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 1600,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "17": {
+      "import_delta_wh": 242,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 1700,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "18": {
+      "import_delta_wh": 420,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 1800,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "19": {
+      "import_delta_wh": 219,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 1900,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "20": {
+      "import_delta_wh": 911,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 2000,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "21": {
+      "import_delta_wh": 250,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 2100,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "22": {
+      "import_delta_wh": 715,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 2200,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "23": {
+      "import_delta_wh": 207,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": 2300,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    }
+  },
+  "2026-01-22": {
+    "00": {
+      "import_delta_wh": 655,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 134,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 122,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 127,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 118,
+      "export_delta_wh": 0,
+      "electric_level": 75,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 130,
+      "export_delta_wh": 0,
+      "electric_level": 76,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 164,
+      "export_delta_wh": 0,
+      "electric_level": 76,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 167,
+      "export_delta_wh": 0,
+      "electric_level": 76,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 91,
+      "export_delta_wh": 0,
+      "electric_level": 76,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 15,
+      "export_delta_wh": 21,
+      "electric_level": 76,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 0,
+      "export_delta_wh": 130,
+      "electric_level": 76,
+      "schedule_time": 1000,
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 0,
+      "export_delta_wh": 186,
+      "electric_level": 76,
+      "schedule_time": 1100,
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "12": {
+      "import_delta_wh": 27,
+      "export_delta_wh": 23,
+      "electric_level": 78,
+      "schedule_time": 1200,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "13": {
+      "import_delta_wh": 19,
+      "export_delta_wh": 23,
+      "electric_level": 81,
+      "schedule_time": 1300,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "14": {
+      "import_delta_wh": 49,
+      "export_delta_wh": 47,
+      "electric_level": 84,
+      "schedule_time": 1400,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "15": {
+      "import_delta_wh": 1,
+      "export_delta_wh": 97,
+      "electric_level": 84,
+      "schedule_time": 1500,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "16": {
+      "import_delta_wh": 156,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 1600,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "17": {
+      "import_delta_wh": 227,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 1700,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "18": {
+      "import_delta_wh": 351,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 1800,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "19": {
+      "import_delta_wh": 207,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 1900,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "20": {
+      "import_delta_wh": 826,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 2000,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "21": {
+      "import_delta_wh": 210,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 2100,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "22": {
+      "import_delta_wh": 189,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 2200,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "23": {
+      "import_delta_wh": 209,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": 2300,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    }
+  },
+  "2026-01-23": {
+    "00": {
+      "import_delta_wh": 174,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 188,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 147,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 132,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 133,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 125,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 130,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 252,
+      "export_delta_wh": 0,
+      "electric_level": 84,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 552,
+      "export_delta_wh": 37,
+      "electric_level": 78,
+      "schedule_time": "0800",
+      "schedule_value": "netzero",
+      "schedule_key": "202601230800"
+    },
+    "09": {
+      "import_delta_wh": 4,
+      "export_delta_wh": 11,
+      "electric_level": 77,
+      "schedule_time": "0900",
+      "schedule_value": "netzero",
+      "schedule_key": "202601230800"
+    },
+    "10": {
+      "import_delta_wh": 5,
+      "export_delta_wh": 41,
+      "electric_level": 77,
+      "schedule_time": 1000,
+      "schedule_value": 0,
+      "schedule_key": "202601231000"
+    },
+    "11": {
+      "import_delta_wh": 0,
+      "export_delta_wh": 170,
+      "electric_level": 77,
+      "schedule_time": 1100,
+      "schedule_value": 0,
+      "schedule_key": "202601231000"
+    },
+    "12": {
+      "import_delta_wh": 22,
+      "export_delta_wh": 12,
+      "electric_level": 79,
+      "schedule_time": 1200,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "13": {
+      "import_delta_wh": 11,
+      "export_delta_wh": 12,
+      "electric_level": 80,
+      "schedule_time": 1300,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "14": {
+      "import_delta_wh": 28,
+      "export_delta_wh": 1,
+      "electric_level": 80,
+      "schedule_time": 1400,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "15": {
+      "import_delta_wh": 33,
+      "export_delta_wh": 13,
+      "electric_level": 80,
+      "schedule_time": 1500,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "16": {
+      "import_delta_wh": 163,
+      "export_delta_wh": 14,
+      "electric_level": 80,
+      "schedule_time": 1600,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "17": {
+      "import_delta_wh": 85,
+      "export_delta_wh": 26,
+      "electric_level": 77,
+      "schedule_time": 1700,
+      "schedule_value": "netzero",
+      "schedule_key": "202601231700"
+    },
+    "18": {
+      "import_delta_wh": 88,
+      "export_delta_wh": 22,
+      "electric_level": 71,
+      "schedule_time": 1800,
+      "schedule_value": "netzero",
+      "schedule_key": "202601231700"
+    },
+    "19": {
+      "import_delta_wh": 298,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 1900,
+      "schedule_value": 0,
+      "schedule_key": "202601231900"
+    },
+    "20": {
+      "import_delta_wh": 393,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2000,
+      "schedule_value": 0,
+      "schedule_key": "202601231900"
+    },
+    "21": {
+      "import_delta_wh": 159,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2100,
+      "schedule_value": 0,
+      "schedule_key": "202601231900"
+    },
+    "22": {
+      "import_delta_wh": 164,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2200,
+      "schedule_value": 0,
+      "schedule_key": "202601231900"
+    },
+    "23": {
+      "import_delta_wh": 159,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": 2300,
+      "schedule_value": 0,
+      "schedule_key": "202601231900"
+    }
+  },
+  "2026-01-24": {
+    "00": {
+      "import_delta_wh": 161,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 137,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 132,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 131,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 122,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 124,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 131,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 105,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 146,
+      "export_delta_wh": 0,
+      "electric_level": 71,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 82,
+      "export_delta_wh": 10,
+      "electric_level": 71,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 29,
+      "export_delta_wh": 58,
+      "electric_level": 71,
+      "schedule_time": 1000,
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 37,
+      "export_delta_wh": 24,
+      "electric_level": 71,
+      "schedule_time": 1100,
+      "schedule_value": "netzero+",
+      "schedule_key": "202601241100"
+    },
+    "12": {
+      "import_delta_wh": 12,
+      "export_delta_wh": 13,
+      "electric_level": 73,
+      "schedule_time": 1200,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "13": {
+      "import_delta_wh": 122,
+      "export_delta_wh": 16,
+      "electric_level": 75,
+      "schedule_time": 1300,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "14": {
+      "import_delta_wh": 14,
+      "export_delta_wh": 7,
+      "electric_level": 78,
+      "schedule_time": 1400,
+      "schedule_value": "netzero+",
+      "schedule_key": "********1200"
+    },
+    "15": {
+      "import_delta_wh": 149,
+      "export_delta_wh": 39,
+      "electric_level": 78,
+      "schedule_time": 1500,
+      "schedule_value": 0,
+      "schedule_key": "********1500"
+    },
+    "16": {
+      "import_delta_wh": 222,
+      "export_delta_wh": 0,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    },
+    "17": {
+      "import_delta_wh": 4,
+      "export_delta_wh": 14,
+      "electric_level": 74,
+      "schedule_time": 1700,
+      "schedule_value": "netzero",
+      "schedule_key": "202601241700"
+    },
+    "18": {
+      "import_delta_wh": 117,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": 1800,
+      "schedule_value": "netzero",
+      "schedule_key": "202601241700"
+    },
+    "19": {
+      "import_delta_wh": 79,
+      "export_delta_wh": 14,
+      "electric_level": 69,
+      "schedule_time": 1900,
+      "schedule_value": "netzero",
+      "schedule_key": "202601241900"
+    },
+    "20": {
+      "import_delta_wh": 266,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": 2000,
+      "schedule_value": 0,
+      "schedule_key": "202601242000"
+    },
+    "21": {
+      "import_delta_wh": 810,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": 2100,
+      "schedule_value": 0,
+      "schedule_key": "202601242000"
+    },
+    "22": {
+      "import_delta_wh": 283,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": 2200,
+      "schedule_value": 0,
+      "schedule_key": "202601242000"
+    },
+    "23": {
+      "import_delta_wh": 751,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": 2300,
+      "schedule_value": 0,
+      "schedule_key": "202601242000"
+    }
+  },
+  "2026-01-25": {
+    "00": {
+      "import_delta_wh": 168,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 149,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 129,
+      "export_delta_wh": 0,
+      "electric_level": 69,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 130,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 194,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 150,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 134,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 191,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 112,
+      "export_delta_wh": 0,
+      "electric_level": 68,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 72,
+      "export_delta_wh": 5,
+      "electric_level": 68,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 48,
+      "export_delta_wh": 7,
+      "electric_level": 68,
+      "schedule_time": "1000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 23,
+      "export_delta_wh": 20,
+      "electric_level": 69,
+      "schedule_time": "1100",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "12": {
+      "import_delta_wh": 16,
+      "export_delta_wh": 16,
+      "electric_level": 70,
+      "schedule_time": "1200",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "13": {
+      "import_delta_wh": 6,
+      "export_delta_wh": 16,
+      "electric_level": 74,
+      "schedule_time": "1300",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "14": {
+      "import_delta_wh": 5,
+      "export_delta_wh": 5,
+      "electric_level": 78,
+      "schedule_time": "1400",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "15": {
+      "import_delta_wh": 18,
+      "export_delta_wh": 5,
+      "electric_level": 79,
+      "schedule_time": "1500",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "16": {
+      "import_delta_wh": 239,
+      "export_delta_wh": 32,
+      "electric_level": 80,
+      "schedule_time": "1600",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "17": {
+      "import_delta_wh": 48,
+      "export_delta_wh": 13,
+      "electric_level": 77,
+      "schedule_time": "1700",
+      "schedule_value": 0,
+      "schedule_key": "202601251700"
+    },
+    "18": {
+      "import_delta_wh": 117,
+      "export_delta_wh": 19,
+      "electric_level": 71,
+      "schedule_time": "1800",
+      "schedule_value": "netzero",
+      "schedule_key": "202601251800"
+    },
+    "19": {
+      "import_delta_wh": 376,
+      "export_delta_wh": 12,
+      "electric_level": 66,
+      "schedule_time": "1900",
+      "schedule_value": "netzero",
+      "schedule_key": "202601251900"
+    },
+    "20": {
+      "import_delta_wh": 381,
+      "export_delta_wh": 0,
+      "electric_level": 65,
+      "schedule_time": "2000",
+      "schedule_value": 0,
+      "schedule_key": "202601252000"
+    },
+    "21": {
+      "import_delta_wh": 191,
+      "export_delta_wh": 0,
+      "electric_level": 65,
+      "schedule_time": "2100",
+      "schedule_value": 0,
+      "schedule_key": "202601252100"
+    },
+    "22": {
+      "import_delta_wh": 190,
+      "export_delta_wh": 0,
+      "electric_level": 65,
+      "schedule_time": "2200",
+      "schedule_value": 0,
+      "schedule_key": "202601252100"
+    },
+    "23": {
+      "import_delta_wh": 215,
+      "export_delta_wh": 0,
+      "electric_level": 66,
+      "schedule_time": "2300",
+      "schedule_value": 0,
+      "schedule_key": "202601252100"
+    }
+  },
+  "2026-01-26": {
+    "00": {
+      "import_delta_wh": 149,
+      "export_delta_wh": 0,
+      "electric_level": 66,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 136,
+      "export_delta_wh": 0,
+      "electric_level": 66,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 122,
+      "export_delta_wh": 0,
+      "electric_level": 66,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 128,
+      "export_delta_wh": 0,
+      "electric_level": 66,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 536,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": "0400",
+      "schedule_value": 400,
+      "schedule_key": "202601260400"
+    },
+    "05": {
+      "import_delta_wh": 127,
+      "export_delta_wh": 0,
+      "electric_level": 72,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "202601260500"
+    },
+    "06": {
+      "import_delta_wh": 194,
+      "export_delta_wh": 0,
+      "electric_level": 73,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "202601260500"
+    },
+    "07": {
+      "import_delta_wh": 181,
+      "export_delta_wh": 0,
+      "electric_level": 73,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "202601260500"
+    },
+    "08": {
+      "import_delta_wh": 0,
+      "export_delta_wh": 32,
+      "electric_level": 70,
+      "schedule_time": "0800",
+      "schedule_value": "netzero",
+      "schedule_key": "202601260800"
+    },
+    "09": {
+      "import_delta_wh": 10,
+      "export_delta_wh": 22,
+      "electric_level": 69,
+      "schedule_time": "0900",
+      "schedule_value": "netzero",
+      "schedule_key": "202601260800"
+    },
+    "10": {
+      "import_delta_wh": 4,
+      "export_delta_wh": 24,
+      "electric_level": 68,
+      "schedule_time": "1000",
+      "schedule_value": "netzero",
+      "schedule_key": "202601260800"
+    },
+    "11": {
+      "import_delta_wh": 13,
+      "export_delta_wh": 13,
+      "electric_level": 69,
+      "schedule_time": "1100",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "12": {
+      "import_delta_wh": 6,
+      "export_delta_wh": 15,
+      "electric_level": 71,
+      "schedule_time": "1200",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "13": {
+      "import_delta_wh": 6,
+      "export_delta_wh": 19,
+      "electric_level": 71,
+      "schedule_time": "1300",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "14": {
+      "import_delta_wh": 10,
+      "export_delta_wh": 16,
+      "electric_level": 73,
+      "schedule_time": "1400",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "15": {
+      "import_delta_wh": 15,
+      "export_delta_wh": 6,
+      "electric_level": 73,
+      "schedule_time": "1500",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "16": {
+      "import_delta_wh": 3,
+      "export_delta_wh": 9,
+      "electric_level": 69,
+      "schedule_time": "1600",
+      "schedule_value": "netzero",
+      "schedule_key": "202601261600"
+    },
+    "17": {
+      "import_delta_wh": 94,
+      "export_delta_wh": 13,
+      "electric_level": 65,
+      "schedule_time": "1700",
+      "schedule_value": "netzero",
+      "schedule_key": "202601261700"
+    },
+    "18": {
+      "import_delta_wh": 93,
+      "export_delta_wh": 15,
+      "electric_level": 60,
+      "schedule_time": "1800",
+      "schedule_value": "netzero",
+      "schedule_key": "202601261700"
+    },
+    "19": {
+      "import_delta_wh": 20,
+      "export_delta_wh": 17,
+      "electric_level": 45,
+      "schedule_time": "1900",
+      "schedule_value": "netzero",
+      "schedule_key": "202601261700"
+    },
+    "20": {
+      "import_delta_wh": 358,
+      "export_delta_wh": 0,
+      "electric_level": 5,
+      "schedule_time": "2000",
+      "schedule_value": 0,
+      "schedule_key": "202601262000"
+    },
+    "21": {
+      "import_delta_wh": 181,
+      "export_delta_wh": 0,
+      "electric_level": 2,
+      "schedule_time": "2100",
+      "schedule_value": 0,
+      "schedule_key": "202601262100"
+    },
+    "22": {
+      "import_delta_wh": 1004,
+      "export_delta_wh": 0,
+      "electric_level": 14,
+      "schedule_time": "2200",
+      "schedule_value": 0,
+      "schedule_key": "202601262100"
+    },
+    "23": {
+      "import_delta_wh": 829,
+      "export_delta_wh": 0,
+      "electric_level": 25,
+      "schedule_time": "2300",
+      "schedule_value": 0,
+      "schedule_key": "202601262100"
+    }
+  },
+  "2026-01-27": {
+    "00": {
+      "import_delta_wh": 175,
+      "export_delta_wh": 0,
+      "electric_level": 25,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 142,
+      "export_delta_wh": 0,
+      "electric_level": 25,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 125,
+      "export_delta_wh": 0,
+      "electric_level": 25,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 644,
+      "export_delta_wh": 0,
+      "electric_level": 33,
+      "schedule_time": "0300",
+      "schedule_value": 500,
+      "schedule_key": "202601270300"
+    },
+    "04": {
+      "import_delta_wh": 635,
+      "export_delta_wh": 0,
+      "electric_level": 41,
+      "schedule_time": "0400",
+      "schedule_value": 500,
+      "schedule_key": "202601270300"
+    },
+    "05": {
+      "import_delta_wh": 106,
+      "export_delta_wh": 0,
+      "electric_level": 41,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "202601270500"
+    },
+    "06": {
+      "import_delta_wh": 166,
+      "export_delta_wh": 0,
+      "electric_level": 41,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "202601270500"
+    },
+    "07": {
+      "import_delta_wh": 106,
+      "export_delta_wh": 0,
+      "electric_level": 41,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "202601270500"
+    },
+    "08": {
+      "import_delta_wh": 238,
+      "export_delta_wh": 0,
+      "electric_level": 41,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "202601270500"
+    },
+    "09": {
+      "import_delta_wh": 1837,
+      "export_delta_wh": 7,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    },
+    "13": {
+      "import_delta_wh": 99,
+      "export_delta_wh": 0,
+      "electric_level": 57,
+      "schedule_time": "1300",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "14": {
+      "import_delta_wh": 78,
+      "export_delta_wh": 5,
+      "electric_level": 57,
+      "schedule_time": "1400",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "15": {
+      "import_delta_wh": 112,
+      "export_delta_wh": 0,
+      "electric_level": 57,
+      "schedule_time": "1500",
+      "schedule_value": 100,
+      "schedule_key": "202601271500"
+    },
+    "16": {
+      "import_delta_wh": 107,
+      "export_delta_wh": 0,
+      "electric_level": 57,
+      "schedule_time": "1600",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "17": {
+      "import_delta_wh": 498,
+      "export_delta_wh": 0,
+      "electric_level": 57,
+      "schedule_time": "1700",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "18": {
+      "import_delta_wh": 262,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "1800",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "19": {
+      "import_delta_wh": 131,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "1900",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "20": {
+      "import_delta_wh": 128,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "2000",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "21": {
+      "import_delta_wh": 159,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "2100",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "22": {
+      "import_delta_wh": 961,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "2200",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "23": {
+      "import_delta_wh": 207,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "2300",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    }
+  },
+  "2026-01-28": {
+    "00": {
+      "import_delta_wh": 944,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 142,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 126,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 132,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 125,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 125,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 129,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 189,
+      "export_delta_wh": 0,
+      "electric_level": 58,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 238,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 746,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 879,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "1000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 51,
+      "export_delta_wh": 7,
+      "electric_level": 59,
+      "schedule_time": "1100",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "12": {
+      "import_delta_wh": 83,
+      "export_delta_wh": 11,
+      "electric_level": 59,
+      "schedule_time": "1200",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "13": {
+      "import_delta_wh": 920,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "1300",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "14": {
+      "import_delta_wh": 347,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "1400",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "15": {
+      "import_delta_wh": 689,
+      "export_delta_wh": 0,
+      "electric_level": 59,
+      "schedule_time": "1500",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "16": {
+      "import_delta_wh": 179,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "1600",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "17": {
+      "import_delta_wh": 183,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "1700",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "18": {
+      "import_delta_wh": 449,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "1800",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "19": {
+      "import_delta_wh": 195,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "1900",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "20": {
+      "import_delta_wh": 288,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "2000",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "21": {
+      "import_delta_wh": 347,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "2100",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "22": {
+      "import_delta_wh": 241,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "2200",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "23": {
+      "import_delta_wh": 258,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "2300",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    }
+  },
+  "2026-01-29": {
+    "00": {
+      "import_delta_wh": 148,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "01": {
+      "import_delta_wh": 134,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0100",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "02": {
+      "import_delta_wh": 119,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0200",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "03": {
+      "import_delta_wh": 119,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0300",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "04": {
+      "import_delta_wh": 118,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0400",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "05": {
+      "import_delta_wh": 117,
+      "export_delta_wh": 0,
+      "electric_level": 60,
+      "schedule_time": "0500",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "06": {
+      "import_delta_wh": 273,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "0600",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "07": {
+      "import_delta_wh": 171,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "0700",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "08": {
+      "import_delta_wh": 102,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "0800",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "09": {
+      "import_delta_wh": 97,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "0900",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "10": {
+      "import_delta_wh": 90,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1000",
+      "schedule_value": 0,
+      "schedule_key": "********0000"
+    },
+    "11": {
+      "import_delta_wh": 86,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1100",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "12": {
+      "import_delta_wh": 76,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1200",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "13": {
+      "import_delta_wh": 68,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1300",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "14": {
+      "import_delta_wh": 94,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1400",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "15": {
+      "import_delta_wh": 87,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1500",
+      "schedule_value": "netzero+",
+      "schedule_key": "********1100"
+    },
+    "16": {
+      "import_delta_wh": 104,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1600",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "17": {
+      "import_delta_wh": 888,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1700",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "18": {
+      "import_delta_wh": 225,
+      "export_delta_wh": 0,
+      "electric_level": 61,
+      "schedule_time": "1800",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    },
+    "19": {
+      "import_delta_wh": 245,
+      "export_delta_wh": 0,
+      "electric_level": 62,
+      "schedule_time": "1900",
+      "schedule_value": 0,
+      "schedule_key": "********1600"
+    }
+  },
+  "2026-02-03": {
+    "20": {
+      "import_delta_wh": 22584,
+      "export_delta_wh": 1031,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    }
+  },
+  "2026-02-15": {
+    "21": {
+      "import_delta_wh": 54233,
+      "export_delta_wh": 4415,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    },
+    "22": {
+      "import_delta_wh": 367,
+      "export_delta_wh": 0,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    }
+  },
+  "2026-02-16": {
+    "23": {
+      "import_delta_wh": 3337,
+      "export_delta_wh": 753,
+      "electric_level": null,
+      "schedule_time": null,
+      "schedule_value": null,
+      "schedule_key": null
+    }
+  }
+}

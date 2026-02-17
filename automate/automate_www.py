@@ -32,7 +32,7 @@ from urllib.parse import urlparse, parse_qs
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 
 # ============================================================================
-# CONFIGURATION PARAMETERS - default values, can be overridden in config.json
+# CONSTANTS & DEFAULT CONFIG (override via config.json)
 # ============================================================================
 
 # Time to pause between loop iterations (seconds)
@@ -50,6 +50,34 @@ HTTP_API_PORT = 1611
 # Wh-per-hour API: timezone and default days
 WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
 WH_PER_HOUR_DAYS_DEFAULT = 3
+
+# Shared timezone for status timestamps
+STATUS_TIMEZONE = "Europe/Amsterdam"
+
+# Power mode strings and validation defaults
+POWER_MODE_NETZERO = "netzero"
+POWER_MODE_NETZERO_PLUS = "netzero+"
+POWER_MODE_NETZERO_VALIDATION_W = -250
+POWER_MODE_NETZERO_PLUS_VALIDATION_W = 250
+
+# Event types
+EVENT_TYPE_START = "start"
+EVENT_TYPE_STOP = "stop"
+EVENT_TYPE_CHANGE = "change"
+EVENT_TYPE_RESCAN = "Rescan"
+
+# HTTP API endpoints
+API_PATH_TEST = "/api/test"
+API_PATH_P1 = "/api/p1"
+API_PATH_ZENDURE = "/api/zendure"
+API_PATH_STATUS = "/api/status"
+API_PATH_ALL = "/api/all"
+API_PATH_AUTOMATION_STATUS = "/api/automation_status"
+API_PATH_WH_PER_HOUR = "/api/wh_per_hour"
+API_PATH_REFRESH = "/api/refresh"
+
+# Shutdown behavior
+SHUTDOWN_FORCE_EXIT_SECONDS = 5.0
 
 # ============================================================================
 # API READINGS DATA CLASSES
@@ -146,7 +174,8 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     try:
         with sqlite3.connect(db_path) as conn:
             cur = conn.execute(
-                "SELECT new_value, timestamp FROM status_updates WHERE type = 'change' AND new_value IS NOT NULL"
+                "SELECT new_value, timestamp FROM status_updates WHERE type = ? AND new_value IS NOT NULL",
+                (EVENT_TYPE_CHANGE,)
             )
             for row in cur.fetchall():
                 nv_raw, ts = row[0], row[1]
@@ -211,8 +240,8 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
 
 def compute_automation_status_from_state(api_state: ApiState, type_filter: str, limit: int) -> dict:
     """Build Automation Status response from in-memory state."""
-    if type_filter not in ("change", "all"):
-        type_filter = "change"
+    if type_filter not in (EVENT_TYPE_CHANGE, "all"):
+        type_filter = EVENT_TYPE_CHANGE
 
     if limit < 1:
         limit = 1
@@ -223,7 +252,7 @@ def compute_automation_status_from_state(api_state: ApiState, type_filter: str, 
     filtered = (
         all_entries
         if type_filter == "all"
-        else [entry for entry in all_entries if entry.event_type == "change"]
+        else [entry for entry in all_entries if entry.event_type == EVENT_TYPE_CHANGE]
     )
 
     filtered.sort(key=lambda e: (e.timestamp or 0), reverse=True)
@@ -301,34 +330,34 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
 
-        if parsed.path == "/api/test":
+        if parsed.path == API_PATH_TEST:
             self._send_json({
                 "status": "ok",
                 "message": "API is up and running",
                 "endpoints": [
-                    {"path": "/api/test", "optional_params": []},
+                    {"path": API_PATH_TEST, "optional_params": []},
                     {
-                        "path": "/api/p1",
+                        "path": API_PATH_P1,
                         "optional_params": [
                             {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
                         ],
                     },
                     {
-                        "path": "/api/zendure",
+                        "path": API_PATH_ZENDURE,
                         "optional_params": [
                             {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
                         ],
                     },
-                    {"path": "/api/status", "optional_params": []},
-                    {"path": "/api/all", "optional_params": []},
-                    {"path": "/api/automation_status", "optional_params": []},
-                    {"path": "/api/wh_per_hour", "optional_params": []},
-                    {"path": "/api/refresh", "optional_params": []},
+                    {"path": API_PATH_STATUS, "optional_params": []},
+                    {"path": API_PATH_ALL, "optional_params": []},
+                    {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
+                    {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
+                    {"path": API_PATH_REFRESH, "optional_params": []},
                 ],
             })
             return
 
-        if parsed.path == "/api/wh_per_hour":
+        if parsed.path == API_PATH_WH_PER_HOUR:
             db_path = getattr(self.server, "db_path", None)
             if not db_path or not os.path.exists(db_path):
                 self._send_json({"error": "Status updates database not available"})
@@ -337,7 +366,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(data, sort_keys=True)
             return
 
-        if parsed.path == "/api/refresh":
+        if parsed.path == API_PATH_REFRESH:
             schedule_controller = getattr(self.server, "schedule_controller", None)
             status_api = getattr(self.server, "status_api", None)
             if not schedule_controller or not status_api:
@@ -345,7 +374,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                 return
             try:
                 schedule_controller.fetch_schedule()
-                status_api.post_update("Rescan", None, None)
+                status_api.post_update(EVENT_TYPE_RESCAN, None, None)
                 self._send_json({"ok": True})
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -356,12 +385,12 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"error": "API state not initialized"}, 503)
             return
 
-        if parsed.path == "/api/automation_status":
+        if parsed.path == API_PATH_AUTOMATION_STATUS:
             data = compute_automation_status_from_state(api_state, "all", 50)
             self._send_json(data)
             return
 
-        if parsed.path == "/api/p1":
+        if parsed.path == API_PATH_P1:
             max_age = self._parse_max_age(parsed)
             self._maybe_refresh_reading(
                 api_state.last_p1, max_age,
@@ -369,7 +398,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             )
             data = api_state.last_p1.to_dict() if api_state.last_p1 else None
             self._send_json(data)
-        elif parsed.path == "/api/zendure":
+        elif parsed.path == API_PATH_ZENDURE:
             max_age = self._parse_max_age(parsed)
             self._maybe_refresh_reading(
                 api_state.last_zendure, max_age,
@@ -377,10 +406,10 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             )
             data = api_state.last_zendure.to_dict() if api_state.last_zendure else None
             self._send_json(data)
-        elif parsed.path == "/api/status":
+        elif parsed.path == API_PATH_STATUS:
             data = api_state.last_status.to_dict() if api_state.last_status else None
             self._send_json(data)
-        elif parsed.path == "/api/all":
+        elif parsed.path == API_PATH_ALL:
             response = {
                 "p1": api_state.last_p1.to_dict() if api_state.last_p1 else None,
                 "zendure": api_state.last_zendure.to_dict() if api_state.last_zendure else None,
@@ -540,7 +569,7 @@ class StatusApi:
         Returns:
             True if successful, False otherwise
         """
-        timestamp = int(datetime.now(ZoneInfo('Europe/Amsterdam')).timestamp())
+        timestamp = int(datetime.now(ZoneInfo(STATUS_TIMEZONE)).timestamp())
         if self.on_update:
             self.on_update(event_type, old_value, new_value, p1_total_power, timestamp)
 
@@ -795,7 +824,7 @@ class CommandHandler:
         try:
             if power_arg.lstrip("-").isdigit():
                 power_value = int(power_arg)
-            elif power_arg in ["netzero", "netzero+"]:
+            elif power_arg in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS]:
                 power_value = power_arg
             else:
                 self.logger.error(f"Invalid power value: {power_arg}")
@@ -805,7 +834,7 @@ class CommandHandler:
             result = self.controller.set_power(power_value)
             if result.success:
                 self.logger.info(f"Power set to: {result.power}")
-                self.status_api.post_update("change", None, result.power)
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
             else:
                 self.logger.error(f"Failed to set power: {result.error}")
         except ValueError:
@@ -817,27 +846,27 @@ class CommandHandler:
         result = self.controller.set_power(0)
         if result.success:
             self.logger.info("Power set to 0")
-            self.status_api.post_update("change", None, 0)
+        self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0)
         else:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
     def _cmd_netzero(self, args: list) -> bool:
         self.logger.info("Setting power to netzero")
-        result = self.controller.set_power("netzero")
+        result = self.controller.set_power(POWER_MODE_NETZERO)
         if result.success:
             self.logger.info("Power set to netzero")
-            self.status_api.post_update("change", None, "netzero")
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, POWER_MODE_NETZERO)
         else:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
     def _cmd_netzero_plus(self, args: list) -> bool:
         self.logger.info("Setting power to netzero+")
-        result = self.controller.set_power("netzero+")
+        result = self.controller.set_power(POWER_MODE_NETZERO_PLUS)
         if result.success:
             self.logger.info("Power set to netzero+")
-            self.status_api.post_update("change", None, "netzero+")
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, POWER_MODE_NETZERO_PLUS)
         else:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
@@ -1089,7 +1118,7 @@ class AutomationApp:
                 self.logger.info("Schedule data refreshed from API")
                 
                 # (print_accumulators removed)
-                self.status_api.post_update('Rescan', None, None, p1_total_power=self.last_p1_total_power)
+            self.status_api.post_update(EVENT_TYPE_RESCAN, None, None, p1_total_power=self.last_p1_total_power)
             except Exception as e:
                 self.logger.error(f"Failed to refresh schedule: {e}")
 
@@ -1121,10 +1150,10 @@ class AutomationApp:
         self.controller.check_battery_limits()
         
         validation_power = desired_power
-        if desired_power == 'netzero':
-            validation_power = -250
-        elif desired_power == 'netzero+':
-            validation_power = 250
+        if desired_power == POWER_MODE_NETZERO:
+            validation_power = POWER_MODE_NETZERO_VALIDATION_W
+        elif desired_power == POWER_MODE_NETZERO_PLUS:
+            validation_power = POWER_MODE_NETZERO_PLUS_VALIDATION_W
             
         if isinstance(validation_power, int):
             if validation_power > 0 and self.controller.limit_state == 1:
@@ -1138,7 +1167,10 @@ class AutomationApp:
 
     def _apply_power_settings(self, desired_power: any, p1_data: Optional[dict]):
         """Apply the power settings if changed."""
-        should_apply = (self.old_value != desired_power) or (desired_power in ['netzero', 'netzero+'])
+        should_apply = (
+            self.old_value != desired_power
+            or (desired_power in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS])
+        )
         
         if should_apply:
             result = self.controller.set_power(desired_power, p1_data=p1_data)
@@ -1150,7 +1182,7 @@ class AutomationApp:
                         p1_w = int(p1_data['total_power'])
                     except (TypeError, ValueError):
                         pass
-                self.status_api.post_update('change', self.old_value, result.power, p1_total_power=p1_w)
+                self.status_api.post_update(EVENT_TYPE_CHANGE, self.old_value, result.power, p1_total_power=p1_w)
                 # Update self.value with the actual power that was set (result.power)
                 # This is important for netzero modes where calculated power may differ from 'netzero'
                 self.value = result.power
@@ -1201,12 +1233,20 @@ class AutomationApp:
 
     def _shutdown(self):
         """Perform graceful shutdown."""
+        start_time = time.time()
+
         # Shutdown HTTP API server
         if self.http_server:
             try:
                 self.http_server.shutdown()
+                self.http_server.server_close()
             except Exception:
                 pass
+            if self.http_server_thread:
+                try:
+                    self.http_server_thread.join(timeout=1.5)
+                except Exception:
+                    pass
 
         # Stop input thread
         if self.input_handler:
@@ -1226,21 +1266,27 @@ class AutomationApp:
                 self.stop_posted = True
                 def _post_stop():
                     try:
-                        self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
+                        self.status_api.post_update(EVENT_TYPE_STOP, self.value, None, p1_total_power=self.last_p1_total_power)
                     except Exception:
                         pass
                 t = threading.Thread(target=_post_stop, daemon=True)
                 t.start()
                 t.join(timeout=1.5)
-        # Force immediate process exit (nothing can block or catch this; avoids hang on Mac)
-        os._exit(0)
+        force_exit = False
+        if self.http_server_thread and self.http_server_thread.is_alive():
+            force_exit = True
+        if (time.time() - start_time) > SHUTDOWN_FORCE_EXIT_SECONDS:
+            force_exit = True
+        if force_exit:
+            # Force immediate process exit (nothing can block or catch this; avoids hang on Mac)
+            os._exit(0)
 
     def run(self):
         """Main execution method."""
         if not self.initialize():
             return
             
-        self.status_api.post_update('start')
+        self.status_api.post_update(EVENT_TYPE_START)
         
         self.logger.info("🚀 Starting charge schedule automation script")
         # Show test mode prominently on startup (controlled via config.json key: TEST_MODE).
@@ -1325,7 +1371,7 @@ class AutomationApp:
             self.logger.error(f"Fatal error in main loop: {e}")
             if self.status_api:
                 self.stop_posted = True
-                self.status_api.post_update('stop', self.value, None, p1_total_power=self.last_p1_total_power)
+                self.status_api.post_update(EVENT_TYPE_STOP, self.value, None, p1_total_power=self.last_p1_total_power)
             raise
         finally:
             self._shutdown()

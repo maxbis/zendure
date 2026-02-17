@@ -1,0 +1,332 @@
+/* Automation Status Styles */
+
+/* Reload Overlay */
+.reload-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.reload-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.reload-overlay-content {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 500;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    animation: reloadPulse 1s ease-in-out infinite;
+}
+
+@keyframes reloadPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* Automation Status - Full Width */
+.automation-status-wrapper {
+    width: 100%;
+}
+
+.automation-status-wrapper .card .metric-section {
+    margin-bottom: 0;
+}
+
+.automation-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.automation-last-update {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+}
+
+.automation-timestamp-full {
+    color: #999;
+    font-size: 0.85rem;
+    margin-left: 5px;
+}
+
+/* Refresh Button */
+.automation-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: #666;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    /* Prevent text selection on iOS */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.automation-refresh-btn:hover:not(:disabled) {
+    background: #eeeeee;
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+.automation-refresh-btn:active:not(:disabled) {
+    background: #e0e0e0;
+    transform: scale(0.98);
+}
+
+.automation-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.automation-refresh-btn .refresh-icon {
+    font-size: 1rem;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.automation-refresh-btn.refreshing .refresh-icon {
+    animation: spin 1s linear infinite;
+}
+
+.automation-refresh-btn .refresh-text {
+    font-weight: 500;
+}
+
+/* Long-press visual feedback */
+.automation-refresh-btn.long-pressing {
+    position: relative;
+    background: #e3f2fd;
+    border-color: #64b5f6;
+    color: #1976d2;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.3);
+    transition: all 0.1s ease;
+    --progress: 0%;
+}
+
+.automation-refresh-btn.long-pressing::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #64b5f6 0%,
+        #64b5f6 var(--progress),
+        transparent var(--progress),
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+.automation-refresh-btn.long-pressing::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    background: #e3f2fd;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Ensure text and icon are above progress ring */
+.automation-refresh-btn.long-pressing .refresh-icon,
+.automation-refresh-btn.long-pressing .refresh-text {
+    position: relative;
+    z-index: 3;
+}
+
+/* Spin animation for refresh icon */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.automation-status-error {
+    padding: 20px;
+    background: #fee;
+    border-left: 4px solid #f00;
+    border-radius: 4px;
+    color: #c00;
+    text-align: center;
+}
+
+.automation-status-empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.automation-entries-wrapper {
+    position: relative;
+}
+
+.automation-entries-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.automation-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    transition: background 0.15s ease;
+}
+
+.automation-entry:last-child {
+    border-bottom: none;
+}
+
+.automation-entry:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.automation-entry-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    min-width: 70px;
+    text-align: center;
+    opacity: 0.60;
+}
+
+.automation-badge-start {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+
+.automation-badge-stop {
+    background: #ffcdd2;
+    color: #c62828;
+}
+
+.automation-badge-change {
+    background: #bbdefb;
+    color: #1565c0;
+}
+
+.automation-badge-heartbeat {
+    background: #e0e0e0;
+    color: #616161;
+}
+
+.automation-badge-unknown {
+    background: #f5f5f5;
+    color: #757575;
+}
+
+.automation-entry-time {
+    font-size: 0.85rem;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    flex-shrink: 0;
+    min-width: 120px;
+}
+
+.automation-entry-timestamp-full {
+    color: #999;
+    font-size: 0.75rem;
+    margin-left: 5px;
+    font-family: 'Courier New', monospace;
+}
+
+.automation-entry-details {
+    flex: 1;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.automation-entry-details .automation-power {
+    font-weight: 600;
+}
+
+.automation-entry-details .automation-power.charging {
+    color: var(--charge-status-charging);
+}
+
+.automation-entry-details .automation-power.discharging {
+    color: var(--charge-status-discharging);
+}
+
+.automation-entry-details .automation-power.standby {
+    color: var(--charge-status-standby);
+}
+
+/* Responsive design for automation status */
+@media (max-width: 768px) {
+    .automation-status-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .automation-refresh-btn {
+        align-self: flex-start;
+    }
+    
+    .automation-entry {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .automation-entry-badge {
+        align-self: flex-start;
+    }
+
+    .automation-entry-time {
+        min-width: auto;
+    }
+}
