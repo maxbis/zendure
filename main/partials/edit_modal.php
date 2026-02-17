@@ -5,33 +5,43 @@
             <button class="modal-close" id="modal-close">&times;</button>
         </div>
         <div class="modal-body">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="edit-modal-grid">
                 <div class="form-group">
-                    <label>Date (YYYYMMDD)</label>
+                    <label>Date Pattern (YYYYMMDD)</label>
                     <input type="text" id="inp-date" maxlength="8" placeholder="20251222">
                 </div>
                 <div class="form-group">
-                    <label>Time (HHmm)</label>
+                    <label>Time Pattern (HHmm)</label>
                     <input type="text" id="inp-time" maxlength="4" placeholder="0800">
                 </div>
             </div>
-            <div class="helper-text" style="margin-bottom:15px;">Use <code>*</code> for wildcards.</div>
+            <div class="helper-text edit-modal-helper">Use <code>*</code> for wildcards.</div>
 
             <div class="form-group">
-                <label>Mode</label>
-                <div class="mode-buttons">
-                    <label class="mode-btn"><input type="radio" name="val-mode" value="fixed" checked><span>Watts (W)</span></label>
-                    <label class="mode-btn"><input type="radio" name="val-mode" value="netzero" label="Net Zero"><span>NetZero</span></label>
-                    <label class="mode-btn"><input type="radio" name="val-mode" value="netzero+" label="☀️ Only"><span>NetZero+</span></label>
+                <label>Value Mode</label>
+                <div class="edit-modal-mode-options">
+                    <label class="edit-modal-toggle edit-modal-toggle-radio">
+                        <input type="radio" name="val-mode" value="fixed" checked>
+                        <span class="edit-modal-toggle-label">Watts (W)</span>
+                    </label>
+                    <label class="edit-modal-toggle edit-modal-toggle-radio">
+                        <input type="radio" name="val-mode" value="netzero" label="Net Zero">
+                        <span class="edit-modal-toggle-label">NetZero</span>
+                    </label>
+                    <label class="edit-modal-toggle edit-modal-toggle-radio">
+                        <input type="radio" name="val-mode" value="netzero+" label="☀️ Only">
+                        <span class="edit-modal-toggle-label">NetZero+</span>
+                    </label>
                 </div>
             </div>
             <div class="form-group" id="group-watts">
                 <label>Watts (Positive = Charge, Negative = Discharge)</label>
                 <div class="watts-limit-row">
                     <input type="number" id="inp-watts" placeholder="0">
-                    <label for="inp-limit-1-hour" class="limit-1h-row">
-                        <span>Limit 1 hour</span>
-                        <input type="checkbox" id="inp-limit-1-hour" checked>
+                    <label for="inp-limit-1-hour" class="edit-modal-toggle edit-modal-toggle-checkbox limit-1h-row">
+                        <span class="edit-modal-toggle-label">Limit 1 hour</span>
+                        <input type="checkbox" id="inp-limit-1-hour" name="limit1hour" checked>
+                        <span class="edit-modal-toggle-check" aria-hidden="true">✓</span>
                     </label>
                 </div>
             </div>
