@@ -13,7 +13,7 @@ define('PRICE_DIR', DATA_BASE_DIR . '/price');
 // Energy price conversion (apply to raw/base prices to get consumer price)
 define('ENERGY_TAX', 0.0917);
 define('ENERGY_VAT', 1.21);
-define('ENERGY_SUPPLIER', 0.02);
+define('ENERGY_SUPPLIER', 0.0219); // inkoopvergoeding (procurement fee) – aligned with get_prices_v4
 
 /** price = (price_from_json + energy_supplier + energy_tax) * energy_vat */
 function applyPriceConversion($price) {
