@@ -39,6 +39,7 @@ desktop.ini
 automate/data/status_updates.db
 /data/*.json
 /data/**/*.json
+/main/data/*.json
 /config/*
 config.json
 config/config.json
