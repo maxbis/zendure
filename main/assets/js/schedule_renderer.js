@@ -616,13 +616,9 @@ function renderChargeStatus(zendureData, p1Data = null) {
         <div class="charge-status-box">
             <div class="charge-status-box-title">Status</div>
             <div class="charge-status-box-content">
-             <div class="charge-status-subtitle" style="font-size: 0.75rem;margin-bottom: 10px;">${escapeHtml(systemStatus.subtitle)}</div>
+             <div class="charge-status-subtitle" style="font-size: 0.75rem;margin-bottom: 10px;">${escapeHtml(systemStatus.title)}</div>
                 <div class="charge-status-indicator ${systemStatus.class}" style="padding: 10px; border-radius: 6px;">
                     <div class="charge-status-icon" style="font-size: 1.5rem;">${systemStatus.icon}</div>
-                    <div class="charge-status-text">
-                        <div class="charge-status-title" style="font-size: 0.95rem;">${escapeHtml(systemStatus.title)}</div>
-                       
-                    </div>
                 </div>
             </div>
         </div>
@@ -723,7 +719,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     contentEl.className = isMobile ? 'charge-status-mobile' : 'charge-status-content';
     if (isMobile) {
         contentEl.style.display = 'grid';
-        contentEl.style.gridTemplateColumns = 'minmax(0, 2fr) minmax(0, 3fr)';
+        contentEl.style.gridTemplateColumns = 'minmax(0, 0.75fr) minmax(0, 1.5fr)';
         contentEl.style.gap = '10px';
     } else {
         contentEl.style.display = 'flex';
