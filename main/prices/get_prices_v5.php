@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 const CONFIG_FILE = __DIR__ . '/../config/config.json';
-const DATA_BASE_DIR = __DIR__ . '/../../data';
+const DATA_BASE_DIR = __DIR__ . '/../data';
 const PRICE_DIR = DATA_BASE_DIR . '/price';
 
 const CONFIG_PRICE_URLS_KEY = 'priceUrls-alta';
