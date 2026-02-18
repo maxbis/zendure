@@ -99,11 +99,6 @@ if ($is15Min) {
         if (count($hourlyMwh[$h]) !== 4) {
             die(json_encode(['error' => "Hour $h has " . count($hourlyMwh[$h]) . " points, expected 4"], JSON_PRETTY_PRINT));
         }
-        $quarters = [];
-        foreach ($hourlyMwh[$h] as $mwh) {
-            $qKwh = $mwh / 1000;
-            $quarters[] = round(($qKwh + BELASTING + INKOOPVERGOEDING) * BTW, 6);
-        }
         $avgMwh = array_sum($hourlyMwh[$h]) / 4;
         $priceKwh = $avgMwh / 1000;
         $consumerPrice = ($priceKwh + BELASTING + INKOOPVERGOEDING) * BTW;
@@ -111,7 +106,6 @@ if ($is15Min) {
         $prices[$hourStr] = [
             'price_eur_kwh' => round($priceKwh, 6),
             'consumer_price' => round($consumerPrice, 6),
-            'quarters' => $quarters,
         ];
     }
 } else {
