@@ -580,9 +580,13 @@ function renderChargeStatus(zendureData, p1Data = null) {
         }
     }
 
-    // Calculate bar width
-    const minPower = -1200;
-    const maxPower = 1200;
+    // Calculate bar width (use config GRID_MIN_POWER / GRID_MAX_POWER when available)
+    const minPower = (typeof GRID_MIN_POWER !== 'undefined' && Number.isFinite(Number(GRID_MIN_POWER)))
+        ? Number(GRID_MIN_POWER)
+        : -1200;
+    const maxPower = (typeof GRID_MAX_POWER !== 'undefined' && Number.isFinite(Number(GRID_MAX_POWER)))
+        ? Number(GRID_MAX_POWER)
+        : 1200;
     const clampedValue = Math.max(minPower, Math.min(maxPower, chargeDischargeValue));
     let barWidth = 0;
     let barClass = '';
@@ -599,8 +603,11 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const commandedPower = (inputLimit > 0) ? inputLimit : ((outputLimit > 0) ? -outputLimit : 0);
     let commandedMarkerHtml = '';
     if (commandedPower !== 0) {
-        const commandedClamped = Math.max(-1200, Math.min(1200, commandedPower));
-        const commandedLeft = 50 + (commandedClamped / 1200) * 50;
+        const commandedClamped = Math.max(minPower, Math.min(maxPower, commandedPower));
+        // Scale: 0% = minPower, 50% = 0, 100% = maxPower. For negative use 50 - ... so marker is left of center.
+        const commandedLeft = commandedClamped >= 0
+            ? 50 + (commandedClamped / maxPower) * 50
+            : 50 - (Math.abs(commandedClamped) / Math.abs(minPower)) * 50;
         const commandedTitle = 'Commanded: ' + (commandedPower > 0 ? '+' : '') + commandedPower + ' W';
         commandedMarkerHtml = `<div class="charge-power-bar-marker-commanded" style="left: ${commandedLeft}%; transform: translateX(-50%);" title="${escapeHtml(commandedTitle)}"></div>`;
     }
@@ -635,9 +642,9 @@ function renderChargeStatus(zendureData, p1Data = null) {
                         </span>
                     </div>
                     <div class="charge-power-bar-container" style="height: 14px;">
-                        <div class="charge-power-bar-label left" style="font-size: 0.6rem;">-1200</div>
+                        <div class="charge-power-bar-label left" style="font-size: 0.6rem;">${minPower}</div>
                         <div class="charge-power-bar-label center" style="font-size: 0.6rem;">0</div>
-                        <div class="charge-power-bar-label right" style="font-size: 0.6rem;">1200</div>
+                        <div class="charge-power-bar-label right" style="font-size: 0.6rem;">${maxPower}</div>
                         <div class="charge-power-bar-center"></div>
                         ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
                         ${commandedMarkerHtml}
@@ -687,9 +694,9 @@ function renderChargeStatus(zendureData, p1Data = null) {
                     </span>
                 </div>
                 <div class="charge-power-bar-container">
-                    <div class="charge-power-bar-label left">-1200 W</div>
+                    <div class="charge-power-bar-label left">${minPower} W</div>
                     <div class="charge-power-bar-label center">0</div>
-                    <div class="charge-power-bar-label right">1200 W</div>
+                    <div class="charge-power-bar-label right">${maxPower} W</div>
                     <div class="charge-power-bar-center"></div>
                     ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
                     ${commandedMarkerHtml}
@@ -1060,6 +1067,12 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
                 gridBarClass += ' overflow';
             }
         }
+
+        // Update grid bar labels from config (e.g. -800 / 800)
+        const gridLabelLeft = gridBarContainer.querySelector('.charge-grid-bar-label.left');
+        const gridLabelRight = gridBarContainer.querySelector('.charge-grid-bar-label.right');
+        if (gridLabelLeft) gridLabelLeft.textContent = minGridPower + ' W';
+        if (gridLabelRight) gridLabelRight.textContent = '+' + maxGridPower + ' W';
 
         // Update or create the bar fill
         if (gridBarFill) {
