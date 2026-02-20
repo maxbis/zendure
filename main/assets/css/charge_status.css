@@ -717,6 +717,10 @@ body.mobile-dark .charge-status-mobile .charge-refresh-btn:hover:not(:disabled) 
     color: #64b5f6;
 }
 
+body.mobile-dark .charge-status-main-title {
+    margin-bottom: 10px;
+}
+
 body.mobile-dark .charge-status-details-mobile .charge-refresh-btn {
     background: var(--bg-tertiary);
     border-color: var(--border-color);

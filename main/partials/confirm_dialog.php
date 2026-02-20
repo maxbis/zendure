@@ -2,7 +2,7 @@
 <div class="modal-backdrop" id="confirm-dialog-generic">
     <div class="modal-dialog confirm-dialog">
         <div class="modal-header">
-            <div class="modal-title" id="confirm-dialog-title">Confirm</div>
+            <div class="modal-title" id="confirm-dialog-title">✅ Confirm</div>
             <button class="modal-close" id="confirm-dialog-close">&times;</button>
         </div>
         <div class="modal-body">

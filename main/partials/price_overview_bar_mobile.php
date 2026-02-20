@@ -21,11 +21,11 @@ $tomorrow_modified = $todayDt->modify('+1 day')->format('Y-m-d');
 ?>
 <div class="price-cards">
     <div class="card">
-        <h3 class="card-header">Today's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($today_modified); ?>)</span></h3>
+        <h3 class="card-header">💲 Today's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($today_modified); ?>)</span></h3>
         <div class="price-graph-row-mobile" id="price-graph-today"></div>
     </div>
     <div class="card" id="tomorrow-price-card-mobile" style="display: none;">
-        <h3 class="card-header">Tomorrow's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($tomorrow_modified); ?>)</span></h3>
+        <h3 class="card-header">💲 Tomorrow's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($tomorrow_modified); ?>)</span></h3>
         <div class="price-graph-row-mobile" id="price-graph-tomorrow-mobile"></div>
     </div>
 </div>

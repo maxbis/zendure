@@ -1,7 +1,7 @@
 <div class="modal-backdrop" id="edit-modal">
     <div class="modal-dialog">
         <div class="modal-header">
-            <div class="modal-title" id="modal-title">Edit Entry</div>
+            <div class="modal-title" id="modal-title">✏️ Edit Entry</div>
             <button class="modal-close" id="modal-close">&times;</button>
         </div>
         <div class="modal-body">
@@ -60,7 +60,7 @@
 <div class="modal-backdrop" id="confirm-dialog">
     <div class="modal-dialog confirm-dialog">
         <div class="modal-header">
-            <div class="modal-title">Confirm Delete</div>
+            <div class="modal-title">🗑️ Confirm Delete</div>
         </div>
         <div class="modal-body">
             <p id="confirm-message">Are you sure you want to delete this entry?</p>
