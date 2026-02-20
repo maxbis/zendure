@@ -1139,8 +1139,11 @@ code {
 }
 #edit-modal #inp-date,
 #edit-modal #inp-time {
-    width: 80%;
-    max-width: 80%;
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
     box-sizing: border-box;
 }
 .watts-limit-row {
@@ -1150,8 +1153,11 @@ code {
     margin-top: 4px;
 }
 .watts-limit-row input[type="number"] {
-    width: 30%;
-    max-width: 30%;
+    width: 45%;
+    max-width: 45%;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
     box-sizing: border-box;
 }
 .watts-limit-row .limit-1h-row {
@@ -1164,4 +1170,3 @@ code {
 .watts-limit-row .limit-1h-row input {
     width: auto;
 }
-

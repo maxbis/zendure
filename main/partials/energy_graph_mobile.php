@@ -7,7 +7,7 @@
 ?>
 
 <div class="card energy-graph-mobile">
-    <h3 class="card-header">Watt-hours per hour <span class="energy-unit">(Wh)</span></h3>
+    <h3 class="card-header">Energy per Hour <span class="energy-unit">(Wh)</span></h3>
     <div class="energy-graph-mobile-tabs" role="tablist">
         <button type="button" class="energy-graph-mobile-tab active" data-tab="graph" role="tab" aria-selected="true">Graph</button>
         <button type="button" class="energy-graph-mobile-tab" data-tab="daily" role="tab" aria-selected="false">Daily totals</button>

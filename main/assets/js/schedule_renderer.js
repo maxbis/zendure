@@ -588,14 +588,16 @@ function renderChargeStatus(zendureData, p1Data = null) {
         ? Number(GRID_MAX_POWER)
         : 1200;
     const clampedValue = Math.max(minPower, Math.min(maxPower, chargeDischargeValue));
+    // Minimum visible width for non-zero charge/discharge bars (percent of full bar width).
+    const MIN_POWER_BAR_WIDTH_PERCENT = 30;
     let barWidth = 0;
     let barClass = '';
 
     if (clampedValue > 0) {
-        barWidth = Math.max(6, (Math.abs(clampedValue) / Math.abs(maxPower)) * 50);
+        barWidth = Math.max(MIN_POWER_BAR_WIDTH_PERCENT, (Math.abs(clampedValue) / Math.abs(maxPower)) * 50);
         barClass = 'charging';
     } else if (clampedValue < 0) {
-        barWidth = Math.max(6, (Math.abs(clampedValue) / Math.abs(minPower)) * 50);
+        barWidth = Math.max(MIN_POWER_BAR_WIDTH_PERCENT, (Math.abs(clampedValue) / Math.abs(minPower)) * 50);
         barClass = 'discharging';
     }
 
@@ -726,7 +728,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     contentEl.className = isMobile ? 'charge-status-mobile' : 'charge-status-content';
     if (isMobile) {
         contentEl.style.display = 'grid';
-        contentEl.style.gridTemplateColumns = 'minmax(0, 0.75fr) minmax(0, 1.5fr)';
+        contentEl.style.gridTemplateColumns = 'minmax(0, 0.5fr) minmax(0, 1.5fr)';
         contentEl.style.gap = '10px';
     } else {
         contentEl.style.display = 'flex';
