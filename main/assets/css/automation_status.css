@@ -49,26 +49,6 @@
     margin-bottom: 0;
 }
 
-.automation-status-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.automation-last-update {
-    font-size: 0.9rem;
-    color: #666;
-    font-style: italic;
-}
-
-.automation-timestamp-full {
-    color: #999;
-    font-size: 0.85rem;
-    margin-left: 5px;
-}
 
 /* Refresh Button */
 .automation-refresh-btn {
@@ -275,13 +255,6 @@
     min-width: 120px;
 }
 
-.automation-entry-timestamp-full {
-    color: #999;
-    font-size: 0.75rem;
-    margin-left: 5px;
-    font-family: 'Courier New', monospace;
-}
-
 .automation-entry-details {
     flex: 1;
     color: #333;
@@ -306,12 +279,6 @@
 
 /* Responsive design for automation status */
 @media (max-width: 768px) {
-    .automation-status-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    
     .automation-refresh-btn {
         align-self: flex-start;
     }
@@ -329,4 +296,79 @@
     .automation-entry-time {
         min-width: auto;
     }
+}
+
+/* Mobile dark theme overrides */
+body.mobile-dark .automation-status-wrapper {
+    width: 100%;
+    margin-top: 0;
+}
+
+body.mobile-dark .automation-status-wrapper .card {
+    padding: 12px;
+}
+
+body.mobile-dark .automation-entry {
+    background: transparent;
+    border-bottom-color: var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 0;
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .automation-entry:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+body.mobile-dark .automation-entry-time {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+body.mobile-dark .automation-entry-details {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .automation-entry-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+}
+
+body.mobile-dark .automation-status-error {
+    background: rgba(244, 67, 54, 0.2);
+    border-left: 4px solid var(--discharge-color);
+    color: var(--discharge-color);
+    padding: 12px;
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .automation-status-empty {
+    color: var(--text-tertiary);
+    padding: 12px;
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .automation-refresh-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    font-size: 0.75rem;
+}
+
+body.mobile-dark .automation-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+body.mobile-dark .automation-refresh-btn.long-pressing {
+    background: rgba(100, 181, 246, 0.2);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
+body.mobile-dark .automation-refresh-btn.long-pressing::after {
+    background: rgba(100, 181, 246, 0.2);
 }

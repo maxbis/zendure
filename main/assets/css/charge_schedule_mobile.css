@@ -1,45 +1,5 @@
 /* Mobile Dark Mode Schedule Page Styles */
 
-/* Reload Overlay */
-.reload-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #000000;
-    z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    pointer-events: none;
-}
-
-.reload-overlay.active {
-    opacity: 1;
-    pointer-events: all;
-}
-
-.reload-overlay-content {
-    color: #ffffff;
-    font-size: 1.5rem;
-    font-weight: 500;
-    text-align: center;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    animation: reloadPulse 1s ease-in-out infinite;
-}
-
-@keyframes reloadPulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.6;
-    }
-}
-
 /* Reset and Base Styles */
 * {
     margin: 0;
@@ -53,6 +13,11 @@ body.mobile-dark {
     padding: 12px;
     color: var(--text-primary);
     min-height: 100vh;
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 /* Color Classes */
@@ -298,7 +263,7 @@ body.mobile-dark {
 }
 
 .slot-current {
-    border: 2px solid #ff9800 !important;
+    border: 2px solid #ff9800;
     box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5), 0 2px 8px rgba(255, 152, 0, 0.3);
     font-weight: 600;
 }
@@ -906,337 +871,6 @@ body.mobile-dark {
     color: var(--text-primary);
 }
 
-/* Automation Status - Dark Mode */
-.automation-status-wrapper {
-    width: 100%;
-    margin-top: 0;
-}
-
-.automation-status-wrapper .card {
-    padding: 12px;
-}
-
-/* Override automation_status.css with higher specificity for mobile dark mode */
-body.mobile-dark .automation-entry,
-.automation-status-wrapper .automation-entry {
-    background: transparent !important;
-    border-bottom-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-    padding: 8px 0;
-    font-size: 0.85rem;
-}
-
-body.mobile-dark .automation-entry:hover,
-.automation-status-wrapper .automation-entry:hover {
-    background: rgba(255, 255, 255, 0.04) !important;
-}
-
-body.mobile-dark .automation-entry-time,
-.automation-status-wrapper .automation-entry-time {
-    color: var(--text-secondary) !important;
-    font-size: 0.8rem;
-}
-
-body.mobile-dark .automation-entry-details,
-.automation-status-wrapper .automation-entry-details {
-    color: var(--text-primary) !important;
-    font-size: 0.85rem;
-}
-
-body.mobile-dark .automation-entry-badge,
-.automation-status-wrapper .automation-entry-badge {
-    font-size: 0.7rem;
-    padding: 3px 8px;
-}
-
-.automation-status-error {
-    background: rgba(244, 67, 54, 0.2);
-    border-left: 4px solid var(--discharge-color);
-    color: var(--discharge-color);
-    padding: 12px;
-    font-size: 0.85rem;
-}
-
-.automation-status-empty {
-    color: var(--text-tertiary);
-    padding: 12px;
-    font-size: 0.85rem;
-}
-
-.automation-refresh-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    /* Prevent text selection on iOS */
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-}
-
-.automation-refresh-btn:hover:not(:disabled) {
-    background: var(--bg-primary);
-    border-color: #64b5f6;
-    color: #64b5f6;
-}
-
-/* Long-press visual feedback for mobile */
-.automation-refresh-btn.long-pressing {
-    position: relative;
-    background: rgba(100, 181, 246, 0.2);
-    border-color: #64b5f6;
-    color: #64b5f6;
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.3);
-    transition: all 0.1s ease;
-    --progress: 0%;
-}
-
-.automation-refresh-btn.long-pressing::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 24px;
-    height: 24px;
-    margin: -12px 0 0 -12px;
-    border-radius: 50%;
-    background: conic-gradient(
-        #64b5f6 0%,
-        #64b5f6 var(--progress),
-        transparent var(--progress),
-        transparent 100%
-    );
-    pointer-events: none;
-    z-index: 1;
-}
-
-.automation-refresh-btn.long-pressing::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 18px;
-    height: 18px;
-    margin: -9px 0 0 -9px;
-    background: rgba(100, 181, 246, 0.2);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 2;
-}
-
-/* Ensure text and icon are above progress ring */
-.automation-refresh-btn.long-pressing .refresh-icon,
-.automation-refresh-btn.long-pressing .refresh-text {
-    position: relative;
-    z-index: 3;
-}
-
-/* Charge Status Content - Dark Mode Overrides */
-.charge-status-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.charge-status-error {
-    padding: 12px;
-    background: rgba(244, 67, 54, 0.2);
-    border-left: 4px solid var(--discharge-color);
-    border-radius: 4px;
-    color: var(--discharge-color);
-    text-align: center;
-    font-size: 0.85rem;
-}
-
-.charge-status-empty {
-    padding: 12px;
-    text-align: center;
-    color: var(--text-tertiary);
-    font-style: italic;
-    font-size: 0.85rem;
-}
-
-/* Override charge_status.css with higher specificity for mobile dark mode */
-body.mobile-dark .charge-status-indicator,
-.charge-status-mobile .charge-status-indicator {
-    background: var(--bg-tertiary) !important;
-    border-color: var(--border-color) !important;
-}
-
-body.mobile-dark .charge-status-indicator.charging,
-.charge-status-mobile .charge-status-indicator.charging {
-    border-color: var(--charge-color) !important;
-    background: rgba(76, 175, 80, 0.15) !important;
-}
-
-body.mobile-dark .charge-status-indicator.discharging,
-.charge-status-mobile .charge-status-indicator.discharging {
-    border-color: var(--discharge-color) !important;
-    background: rgba(244, 67, 54, 0.15) !important;
-}
-
-body.mobile-dark .charge-status-indicator.standby,
-.charge-status-mobile .charge-status-indicator.standby {
-    border-color: var(--neutral-color) !important;
-    background: var(--bg-tertiary) !important;
-}
-
-.charge-battery-level {
-    color: var(--text-secondary) !important;
-}
-
-.charge-battery-value {
-    color: var(--text-primary) !important;
-}
-
-.charge-status-subtitle {
-    color: var(--text-secondary) !important;
-}
-
-/* Override charge_status.css with higher specificity for mobile dark mode */
-body.mobile-dark .charge-power-display,
-.charge-status-mobile .charge-power-display,
-body.mobile-dark .charge-battery-display,
-.charge-status-mobile .charge-battery-display {
-    background: var(--bg-tertiary) !important;
-    border-color: var(--border-color) !important;
-}
-
-.charge-power-label,
-.charge-battery-label {
-    color: var(--text-secondary);
-}
-
-.charge-power-value,
-.charge-battery-value {
-    color: var(--text-primary);
-}
-
-body.mobile-dark .charge-value-highlight,
-.charge-status-mobile .charge-value-highlight {
-    color: #ffffff;
-}
-
-.charge-power-bar-container,
-.charge-battery-bar {
-    background: var(--bg-primary);
-}
-
-.charge-power-bar-label {
-    color: var(--text-secondary);
-}
-
-.charge-battery-bar-marker {
-    background: var(--text-tertiary);
-}
-
-/* Metric Section */
-.metric-section {
-    margin-bottom: 0;
-}
-
-/* System & Grid - Mobile Layout and Dark Theme */
-.charge-status-details-mobile .charge-status-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* Grid bar: full width, dark theme (like charge/discharge power bar) */
-.charge-status-details-mobile .charge-power-box {
-    width: 100%;
-    background: var(--bg-tertiary) !important;
-    border-color: var(--border-color) !important;
-    border-radius: 8px;
-}
-
-.charge-status-details-mobile .charge-power-label {
-    color: var(--text-secondary);
-}
-
-.charge-status-details-mobile .charge-power-value {
-    color: var(--text-primary);
-}
-
-.charge-status-details-mobile .charge-grid-bar-container {
-    background: var(--bg-primary);
-}
-
-.charge-status-details-mobile .charge-grid-bar-label.left,
-.charge-status-details-mobile .charge-grid-bar-label.right {
-    color: var(--text-secondary);
-}
-
-.charge-status-details-mobile .charge-grid-bar-label.center {
-    color: var(--text-primary);
-    background: transparent;
-}
-
-.charge-status-details-mobile .charge-grid-bar-center {
-    background: var(--border-color);
-}
-
-.charge-status-details-mobile .charge-grid-bar-fill.positive {
-    background: #42a5f5;
-}
-
-.charge-status-details-mobile .charge-grid-bar-fill.negative {
-    background: #81c784;
-}
-
-.charge-status-details-mobile .charge-grid-bar-fill.positive.overflow,
-.charge-status-details-mobile .charge-grid-bar-fill.negative.overflow {
-    background: var(--discharge-color);
-}
-
-/* Row 2: WiFi and System temp side by side, full width */
-.charge-status-details-mobile .charge-status-details-row-wifi-temp {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    width: 100%;
-}
-
-/* Collapsible: 2x2 grid for battery bars when expanded */
-.charge-status-details-mobile .charge-status-details-collapsible {
-    display: none;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    width: 100%;
-}
-
-.charge-status-details-mobile .charge-status-details-collapsible.expanded {
-    display: grid;
-}
-
-/* Show more/Show less button - darker to match dark theme */
-.charge-status-details-mobile .charge-refresh-btn {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
-    color: var(--text-primary);
-}
-
-.charge-status-details-mobile .charge-refresh-btn:hover:not(:disabled) {
-    background: var(--bg-primary);
-    border-color: #64b5f6;
-    color: #64b5f6;
-}
-
-/* Additional compact styling */
-.charge-status-mobile .charge-status-box {
-    padding: 10px;
-}
-
-.charge-status-mobile .charge-status-box-content {
-    font-size: 0.9rem;
-}
-
 /* Compact form elements */
 .form-group input[type="radio"] {
     margin-right: 4px;
@@ -1443,6 +1077,7 @@ code {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin-top: 8px;
+    text-align: center;
 }
 .edit-modal-toggle {
     display: inline-flex;
@@ -1496,11 +1131,11 @@ code {
 }
 #edit-modal input::selection {
     background: #1976d2;
-    color: #fff !important;
+    color: #fff;
 }
 #edit-modal input::-moz-selection {
     background: #1976d2;
-    color: #fff !important;
+    color: #fff;
 }
 #edit-modal #inp-date,
 #edit-modal #inp-time {
@@ -1529,24 +1164,4 @@ code {
 .watts-limit-row .limit-1h-row input {
     width: auto;
 }
-@media (max-width: 720px) {
-    .edit-modal-grid {
-        grid-template-columns: 1fr;
-    }
-    .edit-modal-mode-options {
-        grid-template-columns: 1fr;
-    }
-    #edit-modal #inp-date,
-    #edit-modal #inp-time,
-    .watts-limit-row input[type="number"] {
-        width: 100%;
-        max-width: 100%;
-    }
-    .watts-limit-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .watts-limit-row .limit-1h-row {
-        margin-left: 0;
-    }
-}
+

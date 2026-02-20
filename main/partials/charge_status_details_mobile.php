@@ -1,9 +1,9 @@
 <!-- Charge/Discharge Status Details Section - Mobile (JS-rendered) -->
 <div class="card charge-status-details-mobile">
     <div class="metric-section">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="section-title" style="margin: 0;">⚡ System &amp; Grid</h2>
-            <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional status details" style="margin-left: auto;">
+        <div class="charge-status-details-header">
+            <h2 class="section-title charge-status-details-title">⚡ System &amp; Grid</h2>
+            <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional status details">
                 <span class="refresh-icon charge-details-toggle-icon">▼</span>
                 <span class="refresh-text charge-details-toggle-text">Show more</span>
             </button>

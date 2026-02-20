@@ -12,7 +12,6 @@
     align-items: center;
     margin-bottom: 2px;
     padding-bottom: 2px;
-    _border-bottom: 1px solid #e0e0e0;
 }
 
 .charge-last-update {
@@ -338,12 +337,6 @@
     min-width: 0;
 }
 
-/* Empty Box */
-.charge-empty-box {
-    min-width: 0;
-    /* Empty box - no content, just maintains grid layout */
-}
-
 /* Collapsible section for charge status details (rows 2-3) */
 .charge-status-details-collapsible {
     display: none;
@@ -439,14 +432,9 @@
     .charge-power-box,
     .charge-status-indicator,
     .charge-power-display,
-    .charge-battery-display,
-    .charge-empty-box {
+    .charge-battery-display {
         flex: none;
         width: 100%;
-    }
-    
-    .charge-empty-box {
-        display: none; /* Hide empty boxes on mobile */
     }
     
     .charge-status-indicator {
@@ -501,4 +489,188 @@
     .charge-battery-bar {
         height: 14px;
     }
+}
+
+/* Mobile dark theme overrides */
+body.mobile-dark .charge-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+body.mobile-dark .charge-status-error {
+    padding: 12px;
+    background: rgba(244, 67, 54, 0.2);
+    border-left: 4px solid var(--discharge-color);
+    color: var(--discharge-color);
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .charge-status-empty {
+    padding: 12px;
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .charge-status-indicator,
+body.mobile-dark .charge-status-mobile .charge-status-indicator {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+body.mobile-dark .charge-status-indicator.charging,
+body.mobile-dark .charge-status-mobile .charge-status-indicator.charging {
+    border-color: var(--charge-color);
+    background: rgba(76, 175, 80, 0.15);
+}
+
+body.mobile-dark .charge-status-indicator.discharging,
+body.mobile-dark .charge-status-mobile .charge-status-indicator.discharging {
+    border-color: var(--discharge-color);
+    background: rgba(244, 67, 54, 0.15);
+}
+
+body.mobile-dark .charge-status-indicator.standby,
+body.mobile-dark .charge-status-mobile .charge-status-indicator.standby {
+    border-color: var(--neutral-color);
+    background: var(--bg-tertiary);
+}
+
+body.mobile-dark .charge-status-title {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-status-subtitle {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-power-display,
+body.mobile-dark .charge-battery-display {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+body.mobile-dark .charge-power-label,
+body.mobile-dark .charge-battery-label {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-power-value,
+body.mobile-dark .charge-battery-value {
+    color: var(--text-primary);
+}
+
+body.mobile-dark .charge-value-highlight {
+    color: #ffffff;
+}
+
+body.mobile-dark .charge-power-bar-container,
+body.mobile-dark .charge-battery-bar {
+    background: var(--bg-primary);
+}
+
+body.mobile-dark .charge-power-bar-label {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-battery-bar-marker {
+    background: var(--text-tertiary);
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-box {
+    padding: 10px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-box-content {
+    font-size: 0.9rem;
+}
+
+/* System & Grid (mobile details) */
+.charge-status-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.charge-status-details-title {
+    margin: 0;
+}
+
+.charge-status-details-header .charge-refresh-btn {
+    margin-left: auto;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-power-box {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    border-radius: 8px;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-power-label {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-power-value {
+    color: var(--text-primary);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-container {
+    background: var(--bg-primary);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-label.left,
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-label.right {
+    color: var(--text-secondary);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-label.center {
+    color: var(--text-primary);
+    background: transparent;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-center {
+    background: var(--border-color);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-fill.positive {
+    background: #42a5f5;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-fill.negative {
+    background: #81c784;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-fill.positive.overflow,
+body.mobile-dark .charge-status-details-mobile .charge-grid-bar-fill.negative.overflow {
+    background: var(--discharge-color);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-status-details-collapsible {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-status-details-collapsible.expanded {
+    display: grid;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-refresh-btn {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: #64b5f6;
+    color: #64b5f6;
 }

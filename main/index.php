@@ -1,4 +1,4 @@
 <?php
-# redirect to charge_schedule.php
+// Canonical entrypoint: mobile-first schedule page
 header('Location: charge_schedule_mobile.php');
 exit();

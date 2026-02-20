@@ -22,7 +22,7 @@
                 <div class="edit-modal-mode-options">
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="fixed" checked>
-                        <span class="edit-modal-toggle-label">Watts (W)</span>
+                        <span class="edit-modal-toggle-label">Watts&nbsp;(W)</span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="netzero" label="Net Zero">

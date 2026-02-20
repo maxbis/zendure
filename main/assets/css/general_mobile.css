@@ -19,7 +19,8 @@
 /* Page header */
 .header {
     text-align: center;
-    margin-bottom: var(--card-gap);
+    max-width: 900px;
+    margin: 5px auto var(--card-gap);
 }
 
 .header h1 {
@@ -89,10 +90,6 @@
 .charge-status-mobile .charge-status-box-title {
     font-size: 0.8rem;
     margin-bottom: 6px;
-}
-
-.charge-status-title {
-    color: var(--text-secondary) !important;
 }
 
 /* Responsive – header adjustments */

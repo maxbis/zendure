@@ -10,7 +10,7 @@
  * - component_base.js - Component base class
  * - utils_performance.js - Performance utilities
  *
- * API_URL is injected from PHP (charge_schedule.php) which reads it from config.json
+ * API_URL is injected from the PHP schedule page (mobile canonical entrypoint)
  */
 
 // API_URL is injected from PHP via inline script tag
