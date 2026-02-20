@@ -61,6 +61,12 @@
     padding-bottom: 6px;
 }
 
+.card-header--no-line {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
 /* Schedule day header wrapper (spacing only) */
 .schedule-day-header {
     margin-bottom: 6px;

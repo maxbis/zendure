@@ -663,6 +663,60 @@ body.mobile-dark .charge-status-details-mobile .charge-status-details-collapsibl
     display: grid;
 }
 
+body.mobile-dark .charge-status-mobile .charge-status-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-box-header .charge-status-box-title {
+    margin-bottom: 0;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-box-header .charge-refresh-btn {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-box-header .charge-refresh-btn .refresh-icon {
+    font-size: 0.85rem;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible {
+    margin-top: 8px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-details-toggle-row {
+    display: none;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible {
+    display: none;
+    margin-top: 10px;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible.expanded {
+    display: grid;
+}
+
+body.mobile-dark .charge-status-mobile .charge-refresh-btn {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.mobile-dark .charge-status-mobile .charge-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-primary);
+    border-color: #64b5f6;
+    color: #64b5f6;
+}
+
 body.mobile-dark .charge-status-details-mobile .charge-refresh-btn {
     background: var(--bg-tertiary);
     border-color: var(--border-color);

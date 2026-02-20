@@ -657,7 +657,13 @@ function renderChargeStatus(zendureData, p1Data = null) {
 
         <!-- Box 3: Battery Level -->
         <div class="charge-status-box">
-            <div class="charge-status-box-title">Battery</div>
+            <div class="charge-status-box-header">
+                <div class="charge-status-box-title">Battery</div>
+                <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional battery details">
+                    <span class="refresh-icon charge-details-toggle-icon">▼</span>
+                    <span class="refresh-text charge-details-toggle-text">Show more</span>
+                </button>
+            </div>
             <div class="charge-status-box-content">
                 <div class="charge-battery-display" style="padding: 10px; border-radius: 6px;">
                     <div class="charge-battery-label-value" style="margin-bottom: 8px;">
@@ -669,6 +675,66 @@ function renderChargeStatus(zendureData, p1Data = null) {
                         <div class="charge-battery-bar-marker min" style="left: ${MIN_CHARGE_LEVEL}%;" title="Minimum: ${MIN_CHARGE_LEVEL}%"></div>
                         <div class="charge-battery-bar-marker max" style="left: ${MAX_CHARGE_LEVEL}%;" title="Maximum: ${MAX_CHARGE_LEVEL}%"></div>
                         <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, electricLevel))}%; background-color: ${escapeHtml(systemStatus.color)};"></div>
+                    </div>
+                </div>
+                <div class="charge-status-details-collapsible" id="charge-status-details-collapsible">
+                    <div class="charge-battery-display" data-metric="wifi-signal">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">WiFi Signal:</span>
+                            <span class="charge-battery-value">–/10 (-- dBm)</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-battery-display" data-metric="system-temp">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">System Temp:</span>
+                            <span class="charge-battery-value">-- °C</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-battery-display" data-metric="battery1-level">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">B1:</span>
+                            <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-marker min" title="Minimum"></div>
+                            <div class="charge-battery-bar-marker max" title="Maximum"></div>
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-battery-display" data-metric="battery1-temp">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">B1 Temp:</span>
+                            <span class="charge-battery-value">-- °C</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-battery-display" data-metric="battery2-level">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">B2:</span>
+                            <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-marker min" title="Minimum"></div>
+                            <div class="charge-battery-bar-marker max" title="Maximum"></div>
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-battery-display" data-metric="battery2-temp">
+                        <div class="charge-battery-label-value">
+                            <span class="charge-battery-label">B2 Temp:</span>
+                            <span class="charge-battery-value">-- °C</span>
+                        </div>
+                        <div class="charge-battery-bar">
+                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1002,11 +1068,7 @@ function findElementByLabel(container, labelText) {
  * @param {Object} p1Data - P1 data from API (optional)
  */
 function renderChargeStatusDetails(zendureData, p1Data = null) {
-    const detailsContainer = document.getElementById('charge-status-details-content');
-    if (!detailsContainer) {
-        // Container not found - this is expected in mobile version where details section is not included
-        return;
-    }
+    const detailsContainer = document;
 
     // Constants
     const MIN_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
