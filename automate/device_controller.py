@@ -494,7 +494,7 @@ class AutomateController(BaseDeviceController):
     POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
     
     # Thresholds and battery limits
-    POWER_FEED_MIN_THRESHOLD = 30  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
+    POWER_FEED_MIN_THRESHOLD = 20  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
     POWER_FEED_MIN_DELTA = 50      # Minimum change (W) to actually adjust limits - if |delta| < threshold, keep current
     
     # Power accumulation log file path (relative to script directory)
