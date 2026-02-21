@@ -573,6 +573,10 @@ body.mobile-dark .charge-power-bar-label {
     color: var(--text-secondary);
 }
 
+body.mobile-dark .charge-power-bar-label.center {
+    background: transparent;
+}
+
 body.mobile-dark .charge-battery-bar-marker {
     background: var(--text-tertiary);
 }
