@@ -589,7 +589,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
         : 1200;
     const clampedValue = Math.max(minPower, Math.min(maxPower, chargeDischargeValue));
     // Minimum visible width for non-zero charge/discharge bars (percent of full bar width).
-    const MIN_POWER_BAR_WIDTH_PERCENT = 30;
+    const MIN_POWER_BAR_WIDTH_PERCENT = 15;
     let barWidth = 0;
     let barClass = '';
 
