@@ -152,6 +152,126 @@ class ApiState:
 # HTTP API HANDLER
 # ============================================================================
 
+def _allowed_wh_dates(now: int, days_back: int, tz: ZoneInfo) -> list[str]:
+    dt = datetime.fromtimestamp(now, tz=tz)
+    start_day = datetime(dt.year, dt.month, dt.day, tzinfo=tz)
+    return [
+        (start_day - timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(days_back + 1)
+    ]
+
+
+def _empty_wh_result(allowed_dates: list[str]) -> dict:
+    return {
+        d: [
+            {"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0}
+            for h in range(24)
+        ]
+        for d in sorted(allowed_dates)
+    }
+
+
+def _load_change_points(db_path: str) -> list[tuple[int, float]]:
+    points: list[tuple[int, float]] = []
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.execute(
+            "SELECT new_value, timestamp FROM status_updates "
+            "WHERE type = ? AND new_value IS NOT NULL",
+            (EVENT_TYPE_CHANGE,),
+        )
+        for nv_raw, ts in cur.fetchall():
+            if ts is None:
+                continue
+            try:
+                nv = json.loads(nv_raw) if isinstance(nv_raw, str) else nv_raw
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+            if isinstance(nv, (int, float)):
+                points.append((int(ts), float(nv)))
+    points.sort(key=lambda p: p[0])
+    return points
+
+
+def _accumulate_wh_segment(
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]],
+    allowed_dates: set[str],
+    tz: ZoneInfo,
+    t_start: int,
+    t_end: int,
+    power: float,
+) -> None:
+    def _slice_for_hour(cur_ts: int) -> tuple[int, str, str, int]:
+        dt_start = datetime.fromtimestamp(cur_ts, tz=tz)
+        hour_start = int(dt_start.strftime("%H"))
+        hour_epoch = int(
+            datetime(
+                dt_start.year,
+                dt_start.month,
+                dt_start.day,
+                hour_start,
+                0,
+                0,
+                tzinfo=tz,
+            ).timestamp()
+        )
+        hour_end = hour_epoch + 3600
+        clip_start = max(t_start, hour_epoch)
+        clip_end = min(t_end, hour_end)
+        seconds = max(0, clip_end - clip_start)
+        return hour_end, dt_start.strftime("%Y-%m-%d"), f"{hour_start:02d}", seconds
+
+    cur = t_start
+    while cur < t_end:
+        hour_end, date_str, hour_key, seconds = _slice_for_hour(cur)
+        if seconds > 0 and date_str in allowed_dates:
+            by_hour = wh_by_date_hour.setdefault(date_str, {})
+            bucket = by_hour.setdefault(
+                hour_key, {"charged_wh": 0.0, "discharged_wh": 0.0}
+            )
+            wh = abs(power) * seconds / 3600
+            if power > 0:
+                bucket["charged_wh"] += wh
+            elif power < 0:
+                bucket["discharged_wh"] += wh
+        cur = hour_end
+
+
+def _integrate_wh_points(
+    points: list[tuple[int, float]], now: int, allowed_dates: set[str], tz: ZoneInfo
+) -> dict[str, dict[str, dict[str, float]]]:
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]] = {}
+    for idx, (t_start, power) in enumerate(points):
+        t_end = points[idx + 1][0] if idx < len(points) - 1 else now
+        _accumulate_wh_segment(
+            wh_by_date_hour=wh_by_date_hour,
+            allowed_dates=allowed_dates,
+            tz=tz,
+            t_start=t_start,
+            t_end=t_end,
+            power=power,
+        )
+    return wh_by_date_hour
+
+
+def _build_wh_result(
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]], allowed_dates: list[str]
+) -> dict:
+    result = {}
+    for date_key in sorted(allowed_dates):
+        hours = wh_by_date_hour.get(date_key, {})
+        result[date_key] = [
+            {
+                "hour": f"{hour:02d}",
+                "charged_wh": round(hours.get(f"{hour:02d}", {}).get("charged_wh", 0.0), 2),
+                "discharged_wh": round(
+                    hours.get(f"{hour:02d}", {}).get("discharged_wh", 0.0), 2
+                ),
+            }
+            for hour in range(24)
+        ]
+    return result
+
+
 def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAYS_DEFAULT) -> dict:
     """
     Compute watt-hours charged and discharged per calendar hour from status_updates SQLite.
@@ -160,81 +280,22 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     for the last days_back full days including today. Hours are ordered 00, 01, ... 23 (array preserves order).
     """
     tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
-    allowed_dates = set()
-    for i in range(days_back + 1):
-        dt = datetime.fromtimestamp(now, tz=tz)
-        from_day = datetime(dt.year, dt.month, dt.day, tzinfo=tz) - timedelta(days=i)
-        allowed_dates.add(from_day.strftime("%Y-%m-%d"))
-
+    allowed_dates = _allowed_wh_dates(now=now, days_back=days_back, tz=tz)
     if not os.path.exists(db_path):
-        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
-
-    points = []
+        return _empty_wh_result(allowed_dates)
     try:
-        with sqlite3.connect(db_path) as conn:
-            cur = conn.execute(
-                "SELECT new_value, timestamp FROM status_updates WHERE type = ? AND new_value IS NOT NULL",
-                (EVENT_TYPE_CHANGE,)
-            )
-            for row in cur.fetchall():
-                nv_raw, ts = row[0], row[1]
-                if ts is None:
-                    continue
-                try:
-                    nv = json.loads(nv_raw) if isinstance(nv_raw, str) else nv_raw
-                    if nv is not None and isinstance(nv, (int, float)):
-                        points.append((int(ts), float(nv)))
-                except (json.JSONDecodeError, TypeError, ValueError):
-                    continue
+        points = _load_change_points(db_path)
     except Exception:
-        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
-
+        return _empty_wh_result(allowed_dates)
     if not points:
-        return {d: [{"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0} for h in range(24)] for d in sorted(allowed_dates)}
-
-    points.sort(key=lambda p: p[0])
-    wh_by_date_hour: dict = {}
-    n = len(points)
-    for i in range(n):
-        t_start, power = points[i][0], points[i][1]
-        t_end = points[i + 1][0] if i < n - 1 else now
-        cur = t_start
-        while cur < t_end:
-            dt_start = datetime.fromtimestamp(cur, tz=tz)
-            hour_start = int(dt_start.strftime("%H"))
-            hour_epoch = int(datetime(dt_start.year, dt_start.month, dt_start.day, hour_start, 0, 0, tzinfo=tz).timestamp())
-            hour_end = hour_epoch + 3600
-            clip_start = max(t_start, hour_epoch)
-            clip_end = min(t_end, hour_end)
-            if clip_start < clip_end:
-                date_str = dt_start.strftime("%Y-%m-%d")
-                if date_str not in allowed_dates:
-                    cur = hour_end
-                    continue
-                hh = f"{hour_start:02d}"
-                if date_str not in wh_by_date_hour:
-                    wh_by_date_hour[date_str] = {}
-                if hh not in wh_by_date_hour[date_str]:
-                    wh_by_date_hour[date_str][hh] = {"charged_wh": 0.0, "discharged_wh": 0.0}
-                wh = abs(power) * (clip_end - clip_start) / 3600
-                if power > 0:
-                    wh_by_date_hour[date_str][hh]["charged_wh"] += wh
-                elif power < 0:
-                    wh_by_date_hour[date_str][hh]["discharged_wh"] += wh
-            cur = hour_end
-
-    result = {}
-    for d in sorted(allowed_dates):
-        hours = wh_by_date_hour.get(d, {})
-        result[d] = [
-            {
-                "hour": f"{h:02d}",
-                "charged_wh": round(hours.get(f"{h:02d}", {}).get("charged_wh", 0.0), 2),
-                "discharged_wh": round(hours.get(f"{h:02d}", {}).get("discharged_wh", 0.0), 2),
-            }
-            for h in range(24)
-        ]
-    return result
+        return _empty_wh_result(allowed_dates)
+    wh_by_date_hour = _integrate_wh_points(
+        points=points,
+        now=now,
+        allowed_dates=set(allowed_dates),
+        tz=tz,
+    )
+    return _build_wh_result(wh_by_date_hour, allowed_dates)
 
 
 def compute_automation_status_from_state(api_state: ApiState, type_filter: str, limit: int) -> dict:
@@ -242,10 +303,8 @@ def compute_automation_status_from_state(api_state: ApiState, type_filter: str, 
     if type_filter not in (EVENT_TYPE_CHANGE, "all"):
         type_filter = EVENT_TYPE_CHANGE
 
-    if limit < 1:
-        limit = 1
-    if limit > 50:
-        limit = 50
+    limit = max(limit, 1) # minimum 1
+    limit = min(limit, 50) # maximum 50
 
     all_entries = list(api_state.last_status_by_type.values())
     filtered = (
@@ -285,7 +344,15 @@ def compute_automation_status_from_state(api_state: ApiState, type_filter: str, 
 class AutomationTCPServer(socketserver.ThreadingTCPServer):
     """TCPServer that holds api_state for the request handler."""
     allow_reuse_address = True  # avoid "Address already in use" when restarting quickly
-    # api_state etc. set on instance after construction
+
+    def __init__(self, server_address, request_handler_class):
+        super().__init__(server_address, request_handler_class)
+        self.api_state: Optional[ApiState] = None
+        self.db_path: Optional[str] = None
+        self.schedule_controller: Optional[ScheduleController] = None
+        self.status_api: Optional["StatusApi"] = None
+        self.refresh_p1_callback: Optional[Callable[[], None]] = None
+        self.refresh_zendure_callback: Optional[Callable[[], None]] = None
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
@@ -326,97 +393,157 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if need_refresh and refresh_cb is not None:
             refresh_cb()
 
+    def _test_payload(self) -> dict:
+        return {
+            "status": "ok",
+            "message": "API is up and running",
+            "endpoints": [
+                {"path": API_PATH_TEST, "optional_params": []},
+                {
+                    "path": API_PATH_P1,
+                    "optional_params": [
+                        {
+                            "name": "max_age",
+                            "alt": "maxAge",
+                            "type": "int",
+                            "default": 60,
+                            "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)",
+                        },
+                    ],
+                },
+                {
+                    "path": API_PATH_ZENDURE,
+                    "optional_params": [
+                        {
+                            "name": "max_age",
+                            "alt": "maxAge",
+                            "type": "int",
+                            "default": 60,
+                            "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)",
+                        },
+                    ],
+                },
+                {"path": API_PATH_STATUS, "optional_params": []},
+                {"path": API_PATH_ALL, "optional_params": []},
+                {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
+                {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
+                {"path": API_PATH_REFRESH, "optional_params": []},
+            ],
+        }
+
+    def _handle_test(self, path: str) -> bool:
+        if path != API_PATH_TEST:
+            return False
+        self._send_json(self._test_payload())
+        return True
+
+    def _handle_wh_per_hour(self, path: str) -> bool:
+        if path != API_PATH_WH_PER_HOUR:
+            return False
+        db_path = getattr(self.server, "db_path", None)
+        if not db_path or not os.path.exists(db_path):
+            self._send_json({"error": "Status updates database not available"})
+            return True
+        data = compute_wh_per_hour(db_path, int(time.time()), WH_PER_HOUR_DAYS_DEFAULT)
+        self._send_json(data, sort_keys=True)
+        return True
+
+    def _handle_refresh(self, path: str) -> bool:
+        if path != API_PATH_REFRESH:
+            return False
+        schedule_controller = getattr(self.server, "schedule_controller", None)
+        status_api = getattr(self.server, "status_api", None)
+        if not schedule_controller or not status_api:
+            self._send_json({"error": "Refresh not available"}, 503)
+            return True
+        try:
+            schedule_controller.fetch_schedule()
+            status_api.post_update(EVENT_TYPE_RESCAN, None, None)
+            self._send_json({"ok": True})
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+        return True
+
+    def _handle_automation_status(self, path: str, api_state: ApiState) -> bool:
+        if path != API_PATH_AUTOMATION_STATUS:
+            return False
+        data = compute_automation_status_from_state(api_state, "all", 50)
+        self._send_json(data)
+        return True
+
+    def _handle_p1(self, parsed, api_state: ApiState) -> bool:
+        if parsed.path != API_PATH_P1:
+            return False
+        max_age = self._parse_max_age(parsed)
+        self._maybe_refresh_reading(
+            api_state.last_p1, max_age, getattr(self.server, "refresh_p1_callback", None)
+        )
+        data = api_state.last_p1.to_dict() if api_state.last_p1 else None
+        self._send_json(data)
+        return True
+
+    def _handle_zendure(self, parsed, api_state: ApiState) -> bool:
+        if parsed.path != API_PATH_ZENDURE:
+            return False
+        max_age = self._parse_max_age(parsed)
+        self._maybe_refresh_reading(
+            api_state.last_zendure,
+            max_age,
+            getattr(self.server, "refresh_zendure_callback", None),
+        )
+        data = api_state.last_zendure.to_dict() if api_state.last_zendure else None
+        self._send_json(data)
+        return True
+
+    def _handle_status(self, path: str, api_state: ApiState) -> bool:
+        if path != API_PATH_STATUS:
+            return False
+        data = api_state.last_status.to_dict() if api_state.last_status else None
+        self._send_json(data)
+        return True
+
+    def _handle_all(self, path: str, api_state: ApiState) -> bool:
+        if path != API_PATH_ALL:
+            return False
+        response = {
+            "p1": api_state.last_p1.to_dict() if api_state.last_p1 else None,
+            "zendure": api_state.last_zendure.to_dict() if api_state.last_zendure else None,
+            "status": api_state.last_status.to_dict() if api_state.last_status else None,
+        }
+        self._send_json(response)
+        return True
+
     def do_GET(self):
+        """
+        Handle HTTP GET requests for the automation API server.
+
+        Routes recognized API paths (such as /api/test, /api/wh_per_hour, /api/refresh, /api/automation_status, 
+        /api/p1, /api/zendure, /api/status, and /api/all) to their respective handlers. 
+        Returns JSON responses for successful API calls. If the API state is not initialized, 
+        returns a 503 error with an explanation. Unrecognized paths result in a 404 error response.
+        """
         parsed = urlparse(self.path)
-
-        if parsed.path == API_PATH_TEST:
-            self._send_json({
-                "status": "ok",
-                "message": "API is up and running",
-                "endpoints": [
-                    {"path": API_PATH_TEST, "optional_params": []},
-                    {
-                        "path": API_PATH_P1,
-                        "optional_params": [
-                            {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
-                        ],
-                    },
-                    {
-                        "path": API_PATH_ZENDURE,
-                        "optional_params": [
-                            {"name": "max_age", "alt": "maxAge", "type": "int", "default": 60, "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)"},
-                        ],
-                    },
-                    {"path": API_PATH_STATUS, "optional_params": []},
-                    {"path": API_PATH_ALL, "optional_params": []},
-                    {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
-                    {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
-                    {"path": API_PATH_REFRESH, "optional_params": []},
-                ],
-            })
+        if self._handle_test(parsed.path):
             return
-
-        if parsed.path == API_PATH_WH_PER_HOUR:
-            db_path = getattr(self.server, "db_path", None)
-            if not db_path or not os.path.exists(db_path):
-                self._send_json({"error": "Status updates database not available"})
-                return
-            data = compute_wh_per_hour(db_path, int(time.time()), WH_PER_HOUR_DAYS_DEFAULT)
-            self._send_json(data, sort_keys=True)
+        if self._handle_wh_per_hour(parsed.path):
             return
-
-        if parsed.path == API_PATH_REFRESH:
-            schedule_controller = getattr(self.server, "schedule_controller", None)
-            status_api = getattr(self.server, "status_api", None)
-            if not schedule_controller or not status_api:
-                self._send_json({"error": "Refresh not available"}, 503)
-                return
-            try:
-                schedule_controller.fetch_schedule()
-                status_api.post_update(EVENT_TYPE_RESCAN, None, None)
-                self._send_json({"ok": True})
-            except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, 500)
+        if self._handle_refresh(parsed.path):
             return
-
         api_state = getattr(self.server, "api_state", None)
         if api_state is None:
             self._send_json({"error": "API state not initialized"}, 503)
             return
-
-        if parsed.path == API_PATH_AUTOMATION_STATUS:
-            data = compute_automation_status_from_state(api_state, "all", 50)
-            self._send_json(data)
+        if self._handle_automation_status(parsed.path, api_state):
             return
-
-        if parsed.path == API_PATH_P1:
-            max_age = self._parse_max_age(parsed)
-            self._maybe_refresh_reading(
-                api_state.last_p1, max_age,
-                getattr(self.server, "refresh_p1_callback", None),
-            )
-            data = api_state.last_p1.to_dict() if api_state.last_p1 else None
-            self._send_json(data)
-        elif parsed.path == API_PATH_ZENDURE:
-            max_age = self._parse_max_age(parsed)
-            self._maybe_refresh_reading(
-                api_state.last_zendure, max_age,
-                getattr(self.server, "refresh_zendure_callback", None),
-            )
-            data = api_state.last_zendure.to_dict() if api_state.last_zendure else None
-            self._send_json(data)
-        elif parsed.path == API_PATH_STATUS:
-            data = api_state.last_status.to_dict() if api_state.last_status else None
-            self._send_json(data)
-        elif parsed.path == API_PATH_ALL:
-            response = {
-                "p1": api_state.last_p1.to_dict() if api_state.last_p1 else None,
-                "zendure": api_state.last_zendure.to_dict() if api_state.last_zendure else None,
-                "status": api_state.last_status.to_dict() if api_state.last_status else None,
-            }
-            self._send_json(response)
-        else:
-            self.send_error(404, "Not Found")
+        if self._handle_p1(parsed, api_state):
+            return
+        if self._handle_zendure(parsed, api_state):
+            return
+        if self._handle_status(parsed.path, api_state):
+            return
+        if self._handle_all(parsed.path, api_state):
+            return
+        self.send_error(404, "Not Found")
 
     def log_message(self, msg_format, *args):
         """Suppress default request logging to avoid cluttering automation output."""
@@ -432,31 +559,31 @@ class Logger:
     Wrapper around device controller logging.
     Provides a consistent logging interface for the automation app.
     """
-    
+
     def __init__(self, controller: Optional[BaseDeviceController] = None):
         """
         Initialize logger with optional controller.
-        
+
         Args:
             controller: Device controller instance that provides logging functionality.
                        If None, falls back to print statements.
         """
         self.controller = controller
-    
+
     def info(self, message: str, include_timestamp: bool = True):
         """Log info message."""
         if self.controller:
             self.controller.log('info', message, include_timestamp)
         else:
             print(message)
-    
+
     def warning(self, message: str, include_timestamp: bool = True):
         """Log warning message."""
         if self.controller:
             self.controller.log('warning', message, include_timestamp)
         else:
             print(f"WARNING: {message}")
-    
+
     def error(self, message: str, include_timestamp: bool = True):
         """Log error message."""
         if self.controller:
@@ -475,7 +602,7 @@ class StatusApi:
     Posts events like start, stop, and power changes.
     Optionally stores updates in SQLite for Wh/h calculation.
     """
-    
+
     _SCHEMA = """
         CREATE TABLE IF NOT EXISTS status_updates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -488,7 +615,7 @@ class StatusApi:
         );
         CREATE INDEX IF NOT EXISTS idx_status_updates_timestamp ON status_updates(timestamp);
     """
-    
+
     def __init__(self, logger: Logger,
                  on_update: Optional[Callable[[str, Any, Any, Optional[int], int], None]] = None,
                  db_path: Optional[str] = None,
@@ -496,7 +623,7 @@ class StatusApi:
                  retention_days: int = 7):
         """
         Initialize status API client (callback + SQLite only; no HTTP POST).
-        
+
         Args:
             logger: Logger instance for error/warning messages.
             on_update: Optional callback(event_type, old_value, new_value, p1_total_power, timestamp) when posting.
@@ -510,7 +637,7 @@ class StatusApi:
         self.get_electric_level = get_electric_level
         self.retention_days = retention_days
         self._db_initialized = False
-    
+
     def _ensure_db(self) -> None:
         """Create DB file, directory, and table if needed."""
         if not self.db_path or self._db_initialized:
@@ -524,7 +651,7 @@ class StatusApi:
             self._db_initialized = True
         except Exception as e:
             self.logger.warning(f"Failed to initialize SQLite DB: {e}")
-    
+
     def _insert_status(self, event_type: str, old_value: Any, new_value: Any,
                        p1_total_power: Optional[int], timestamp: int) -> None:
         """Insert status update into SQLite and optionally run retention cleanup."""
@@ -551,18 +678,18 @@ class StatusApi:
                 conn.commit()
         except Exception as e:
             self.logger.warning(f"Failed to write status update to SQLite: {e}")
-    
+
     def post_update(self, event_type: str, old_value: Any = None, new_value: Any = None,
                     p1_total_power: Optional[int] = None) -> bool:
         """
         Post a status update to the automation status API.
-        
+
         Args:
             event_type: Type of event ('start', 'stop', 'change')
             old_value: Previous value (for change events)
             new_value: New value (for change events)
             p1_total_power: Optional last P1 meter total power (W) to attach to the entry.
-        
+
         Returns:
             True if successful, False otherwise
         """
@@ -583,20 +710,20 @@ class InputHandler:
     Cross-platform input handling for keyboard commands.
     Handles both Unix (select) and Windows (threading) input methods.
     """
-    
+
     def __init__(self):
         """Initialize input handler with platform-specific setup."""
         self.input_queue = queue.Queue()
         self.input_thread = None
         self.input_thread_running = False
-    
+
     def start_input_thread(self):
         """Start input thread for Windows compatibility."""
         if self.input_thread is None or not self.input_thread.is_alive():
             self.input_thread_running = True
             self.input_thread = threading.Thread(target=self._input_thread_worker, daemon=True)
             self.input_thread.start()
-    
+
     def _input_thread_worker(self):
         """Worker to read stdin."""
         try:
@@ -611,14 +738,14 @@ class InputHandler:
                     break
         except Exception:
             pass
-    
+
     def check_for_input(self, timeout: float = 0.1) -> Optional[str]:
         """
         Check for user input.
-        
+
         Args:
             timeout: Timeout in seconds for non-blocking input check
-        
+
         Returns:
             User input string if available, None otherwise
         """
@@ -635,7 +762,7 @@ class InputHandler:
                 except (EOFError, OSError):
                     return None
             return None
-    
+
     def stop(self):
         """Stop input thread (for Windows)."""
         if platform.system() == 'Windows' and self.input_thread_running:
@@ -735,7 +862,7 @@ class CommandHandler:
         self.print_help()
         return True
 
-    def _cmd_status(self, args: list) -> bool:
+    def _cmd_status(self) -> bool:
         self.logger.info("=== Current Status ===")
         try:
             desired_power = self.schedule_controller.get_desired_power(refresh=False)
@@ -755,11 +882,11 @@ class CommandHandler:
             self.logger.warning(f"Could not read Zendure data: {e}")
         return True
 
-    def _cmd_accumulators(self, args: list) -> bool:
+    def _cmd_accumulators(self) -> bool:
         self.logger.info("Accumulator debug output has been removed.")
         return True
 
-    def _cmd_refresh(self, args: list) -> bool:
+    def _cmd_refresh(self) -> bool:
         self.logger.info("Forcing schedule refresh...")
         try:
             api_url = self.schedule_controller.config.get("apiUrl")
@@ -802,7 +929,7 @@ class CommandHandler:
             self.logger.error(f"Invalid power value: {power_arg}")
         return True
 
-    def _cmd_zero(self, args: list) -> bool:
+    def _cmd_zero(self) -> bool:
         self.logger.info("Setting power to 0")
         result = self.controller.set_power(0)
         if result.success:
@@ -812,7 +939,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_netzero(self, args: list) -> bool:
+    def _cmd_netzero(self) -> bool:
         self.logger.info("Setting power to netzero")
         result = self.controller.set_power(POWER_MODE_NETZERO)
         if result.success:
@@ -822,7 +949,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_netzero_plus(self, args: list) -> bool:
+    def _cmd_netzero_plus(self) -> bool:
         self.logger.info("Setting power to netzero+")
         result = self.controller.set_power(POWER_MODE_NETZERO_PLUS)
         if result.success:
@@ -832,7 +959,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_quit(self, args: list) -> bool:
+    def _cmd_quit(self) -> bool:
         self.logger.info("Quit command received")
         return False
 
@@ -848,27 +975,27 @@ class AutomationApp:
     Orchestrates all components: logger, status API, input handler, command handler.
     Includes HTTP API server for /api/test endpoint.
     """
-    
+
     def __init__(self):
         self.shutdown_requested = False
-        
+
         # Controllers
         self.controller = None
         self.schedule_controller = None
-        
+
         # Components
         self.logger = None
         self.status_api = None
         self.input_handler = None
         self.command_handler = None
-        
+
         # HTTP API server
         self.http_server = None
         self.http_server_thread = None
-        
+
         # Shared state for API endpoints
         self.api_state = ApiState()
-        
+
         # State variables
         self.last_api_refresh_time = 0
         self.old_value = None
@@ -876,6 +1003,11 @@ class AutomationApp:
         self.zero_count = 0
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
         self.stop_posted = False
+        self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
+        self.steps = self._generate_steps(self.loop_interval_seconds, 59)
+        self.power_feed_max_delta = 2400
+        self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
+        self.zero_count_threshold_standby = ZERO_COUNT_THRESHOLD_STANDBY
 
 
     def initialize(self) -> bool:
@@ -887,14 +1019,14 @@ class AutomationApp:
 
             # Initialize shared DeviceDataReader early (fail fast on config issues)
             get_reader(self.controller.config_path)
-            
+
             # Initialize logger
             self.logger = Logger(self.controller)
-            
+
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
-            
+
             def get_electric_level() -> Optional[int]:
                 if not self.api_state or not self.api_state.last_zendure:
                     return None
@@ -903,7 +1035,7 @@ class AutomationApp:
                     return None
                 props = readings.get("properties") or {}
                 return props.get("electricLevel")
-            
+
             # Initialize components
             self.status_api = StatusApi(
                 self.logger,
@@ -919,14 +1051,14 @@ class AutomationApp:
                 self.status_api,
                 self.logger
             )
-                
+
             # Set up signal handlers
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
 
             self._load_loop_config()
             return True
-            
+
         except FileNotFoundError as e:
             # Create a temporary simple logger if controller init fails
             print(f"Configuration error: {e}")
@@ -969,7 +1101,7 @@ class AutomationApp:
             zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
         self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
-    def _signal_handler(self, signum, frame):
+    def _signal_handler(self, signum):
         """Handle shutdown signals."""
         try:
             signal_name = signal.Signals(signum).name
@@ -1060,7 +1192,7 @@ class AutomationApp:
         """Refresh schedule API if interval passed."""
         current_time = time.time()
         time_since_last_refresh = current_time - self.last_api_refresh_time
-        
+
         if time_since_last_refresh >= self.api_refresh_interval_seconds:
             try:
                 self.schedule_controller.fetch_schedule()
@@ -1096,21 +1228,21 @@ class AutomationApp:
     def _check_battery_limits(self, desired_power: any) -> any:
         """Check availability and modify desired power if limited."""
         self.controller.check_battery_limits()
-        
+
         validation_power = desired_power
         if desired_power == POWER_MODE_NETZERO:
             validation_power = POWER_MODE_NETZERO_VALIDATION_W
         elif desired_power == POWER_MODE_NETZERO_PLUS:
             validation_power = POWER_MODE_NETZERO_PLUS_VALIDATION_W
-            
+
         if isinstance(validation_power, int):
             if validation_power > 0 and self.controller.limit_state == 1:
-                self.logger.warning(f"Battery at MAX_CHARGE_LEVEL, preventing charge")
+                self.logger.warning("Battery at MAX_CHARGE_LEVEL, preventing charge")
                 return 0
-            elif validation_power < 0 and self.controller.limit_state == -1:
-                self.logger.warning(f"Battery at MIN_CHARGE_LEVEL, preventing discharge")
+            if validation_power < 0 and self.controller.limit_state == -1:
+                self.logger.warning("Battery at MIN_CHARGE_LEVEL, preventing discharge")
                 return 0
-                 
+
         return desired_power
 
     def _apply_power_settings(self, desired_power: any, p1_data: Optional[dict]):
@@ -1119,7 +1251,7 @@ class AutomationApp:
             self.old_value != desired_power
             or (desired_power in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS])
         )
-        
+
         if should_apply:
             result = self.controller.set_power(desired_power, p1_data=p1_data)
             if result.success:
@@ -1147,7 +1279,7 @@ class AutomationApp:
             self.zero_count += 1
         else:
             self.zero_count = 0
-            
+
         if self.zero_count == self.zero_count_threshold_standby:
             self.logger.info(f"0 power for {self.zero_count_threshold_standby} consecutive iterations, setting device in standby mode")
             self.controller.set_standby_mode()
@@ -1170,11 +1302,11 @@ class AutomationApp:
             now = time.localtime().tm_sec
             if now in (self.steps) and sleep_remaining < self.loop_interval_seconds:
                 return
-            
+
             # Check input
             if not self._handle_user_input():
                 break
-                
+
             if not self.shutdown_requested:
                 time.sleep(min(1, sleep_remaining))
             sleep_remaining -= 1
@@ -1205,10 +1337,10 @@ class AutomationApp:
             self.logger.info("   Setting power to 0 before shutdown...")
             result = self.controller.set_power(0)
             if result.success:
-                self.logger.info(f"   Power set to 0")
+                self.logger.info("   Power set to 0")
             else:
                 self.logger.error(f"   Failed to set power to 0: {result.error}")
-            
+
             # Post 'stop' in a thread with short join so shutdown never blocks (e.g. slow/hanging HTTP on Mac)
             if self.status_api and not self.stop_posted:
                 self.stop_posted = True
@@ -1229,90 +1361,111 @@ class AutomationApp:
             # Force immediate process exit (nothing can block or catch this; avoids hang on Mac)
             os._exit(0)
 
+    def _log_startup(self) -> None:
+        self.logger.info("🚀 Starting charge schedule automation script")
+        # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
+        if getattr(self.controller, "test_mode", False):
+            self.logger.warning(
+                "TEST MODE: ON (no commands wil be send to the Zendure device)"
+            )
+        else:
+            self.logger.info("TEST MODE: OFF")
+        self.logger.info(f"   Loop interval: {self.loop_interval_seconds} seconds")
+        self.logger.info(
+            "   API refresh interval: "
+            f"{self.api_refresh_interval_seconds} seconds "
+            f"({self.api_refresh_interval_seconds // 60} minutes)"
+        )
+        self.logger.info("   Type 'h' or 'help' for available keyboard commands")
+        print()
+
+    def _update_p1_state(self, p1_data: Optional[dict]) -> None:
+        if p1_data is None:
+            return
+        self.api_state.last_p1 = P1Readings(
+            readings=p1_data,
+            timestamp=int(time.time()),
+        )
+        total_power = p1_data.get("total_power")
+        if total_power is None:
+            return
+        try:
+            self.last_p1_total_power = int(total_power)
+        except (TypeError, ValueError):
+            pass
+
+    def _update_zendure_state(self) -> None:
+        zendure_data = getattr(
+            get_reader(self.controller.config_path), "last_zendure_data", None
+        )
+        if zendure_data is None:
+            return
+        self.api_state.last_zendure = ZendureReadings(
+            readings=zendure_data,
+            timestamp=int(time.time()),
+        )
+
+    def _limit_delta_step(self, desired_power: any) -> any:
+        if not isinstance(desired_power, int) or not isinstance(self.old_value, int):
+            return desired_power
+        delta = desired_power - self.old_value
+        if abs(delta) <= self.power_feed_max_delta:
+            return desired_power
+        limited_power = self.old_value + (
+            self.power_feed_max_delta if delta > 0 else -self.power_feed_max_delta
+        )
+        self.logger.warning(
+            f"Max delta limit hit: old={self.old_value}, desired={desired_power}, "
+            f"power_feed_max_delta={self.power_feed_max_delta}, limited={limited_power}"
+        )
+        return limited_power
+
+    def _run_cycle(self) -> bool:
+        # 0. Sleep
+        self._sleep_interrupted()
+        if self.shutdown_requested:
+            return False
+
+        # 1. Accumulate Data
+        p1_data = self._accumulate_p1_data()
+        self._update_p1_state(p1_data)
+
+        # 2. Check input
+        if not self._handle_user_input() or self.shutdown_requested:
+            return False
+
+        # 3. Schedule Logic
+        self._refresh_schedule_if_needed()
+        self.old_value = self.value
+        desired_power = self._calculate_desired_power()
+
+        # 4. Battery limits + state updates
+        desired_power = self._check_battery_limits(desired_power)
+        self._update_zendure_state()
+        desired_power = self._limit_delta_step(desired_power)
+
+        # 5. Apply settings
+        self._apply_power_settings(desired_power, p1_data)
+
+        # 6. Standby check
+        self._handle_standby_check()
+        return True
+
     def run(self):
         """Main execution method."""
         if not self.initialize():
             return
-            
-        self.status_api.post_update(EVENT_TYPE_START)
-        
-        self.logger.info("🚀 Starting charge schedule automation script")
-        # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
-        if getattr(self.controller, "test_mode", False):
-            self.logger.warning("TEST MODE: ON (no commands wil be send to the Zendure device)")
-        else:
-            self.logger.info("TEST MODE: OFF")
 
-        self.logger.info(f"   Loop interval: {self.loop_interval_seconds} seconds")
-        self.logger.info(f"   API refresh interval: {self.api_refresh_interval_seconds} seconds ({self.api_refresh_interval_seconds // 60} minutes)")
-        self.logger.info("   Type 'h' or 'help' for available keyboard commands")
-        print()
-        
+        self.status_api.post_update(EVENT_TYPE_START)
+        self._log_startup()
+
         # Start HTTP API server
         self._start_http_server()
-        
+
         try:
             while not self.shutdown_requested:
-                 # 0. Sleep
-                self._sleep_interrupted()
-                if self.shutdown_requested:
+                if not self._run_cycle():
                     break
-
-                # 1. Accumulate Data
-                p1_data = self._accumulate_p1_data()
-                if p1_data is not None:
-                    self.api_state.last_p1 = P1Readings(
-                        readings=p1_data,
-                        timestamp=int(time.time()),
-                    )
-                    if p1_data.get('total_power') is not None:
-                        try:
-                            self.last_p1_total_power = int(p1_data['total_power'])
-                        except (TypeError, ValueError):
-                            pass
-                
-                # 2. Check input
-                if not self._handle_user_input():
-                    break
-                if self.shutdown_requested:
-                    break
-                    
-                # 3. Schedule Logic
-                self._refresh_schedule_if_needed()
-                
-                self.old_value = self.value
-                desired_power = self._calculate_desired_power()
-                
-                # 4. Battery Limits
-                desired_power = self._check_battery_limits(desired_power)
-                zendure_data = getattr(
-                    get_reader(self.controller.config_path), "last_zendure_data", None
-                )
-                if zendure_data is not None:
-                    self.api_state.last_zendure = ZendureReadings(
-                        readings=zendure_data,
-                        timestamp=int(time.time()),
-                    )
-
-                # 4b. Max delta step limiting
-                if isinstance(desired_power, int) and isinstance(self.old_value, int):
-                    delta = desired_power - self.old_value
-                    if abs(delta) > self.power_feed_max_delta:
-                        limited_power = self.old_value + (
-                            self.power_feed_max_delta if delta > 0 else -self.power_feed_max_delta
-                        )
-                        self.logger.warning(
-                            f"Max delta limit hit: old={self.old_value}, desired={desired_power}, "
-                            f"power_feed_max_delta={self.power_feed_max_delta}, limited={limited_power}"
-                        )
-                        desired_power = limited_power
-                
-                # 5. Apply Settings
-                self._apply_power_settings(desired_power, p1_data)
-                
-                # 6. Standby Check
-                self._handle_standby_check()
-                
         except KeyboardInterrupt:
             self.shutdown_requested = True
         except Exception as e:
