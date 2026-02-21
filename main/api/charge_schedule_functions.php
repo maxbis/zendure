@@ -72,6 +72,56 @@ function getNextHourKey($key)
     return date('Ymd', $ts) . date('H', $ts) . '00';
 }
 
+/**
+ * Build the explicit H+1 entry for limit1hour behavior.
+ *
+ * New business rule ("true 1-hour override"):
+ * - At H, set the user-selected value.
+ * - At H+1, restore what H+1 resolved to before the change.
+ * - If H+1 was empty before the change, restore to 0.
+ * - Never overwrite an already explicit concrete H+1 key.
+ *
+ * @param array $schedule Current schedule map before setting key H
+ * @param string $key Current edited concrete key (YYYYMMDDHHmm)
+ * @return array|null ['key' => string, 'value' => mixed] or null when no restore entry should be added
+ */
+function getLimit1HourRestoreEntry(array $schedule, string $key): ?array
+{
+    if (strlen($key) !== 12 || strpos($key, '*') !== false) {
+        return null;
+    }
+
+    $nextKey = getNextHourKey($key);
+    if ($nextKey === null) {
+        return null;
+    }
+
+    // Keep explicit next-hour entries untouched.
+    if (isset($schedule[$nextKey])) {
+        return null;
+    }
+
+    $nextDate = substr($nextKey, 0, 8);
+    $nextTime = substr($nextKey, 8, 4);
+    $resolved = resolveScheduleForDate($schedule, $nextDate);
+
+    $restoreValue = 0; // Empty fallback
+    foreach ($resolved as $slot) {
+        if (!isset($slot['time']) || (string) $slot['time'] !== $nextTime) {
+            continue;
+        }
+        if (array_key_exists('value', $slot) && $slot['value'] !== null) {
+            $restoreValue = $slot['value'];
+        }
+        break;
+    }
+
+    return [
+        'key' => $nextKey,
+        'value' => $restoreValue
+    ];
+}
+
 function matchesAndBeforeTime($entryKey, $datetime, $slotTime)
 {
     $datePart = substr($datetime, 0, 8);

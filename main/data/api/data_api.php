@@ -355,21 +355,22 @@ try {
                     unset($schedule[$orig]);
                 }
                 
-                // Add or update the entry
-                $schedule[$key] = $val;
-
-                // Limit 1 hour: add next hour as 0 if checkbox was checked (excludes wildcard keys)
+                $limit1HourRestoreEntry = null;
+                // Limit 1 hour: restore H+1 to previous resolved value (or 0 when empty), excludes wildcard keys
                 if (!empty($input['limit1hour']) && strpos($key, '*') === false) {
                     $scheduleFunctionsPath = __DIR__ . '/../../api/charge_schedule_functions.php';
                     if (file_exists($scheduleFunctionsPath)) {
                         require_once $scheduleFunctionsPath;
-                        $nextKey = getNextHourKey($key);
-                        if ($nextKey !== null && !isset($schedule[$nextKey])) {
-                            $schedule[$nextKey] = 0;
-                        }
-                        $schedule = cleanOutdatedScheduleEntries($schedule);
+                        $limit1HourRestoreEntry = getLimit1HourRestoreEntry($schedule, $key);
                     }
                 }
+
+                // Add or update the entry
+                $schedule[$key] = $val;
+                if ($limit1HourRestoreEntry !== null) {
+                    $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
+                }
+                $schedule = cleanOutdatedScheduleEntries($schedule);
 
                 // Write updated schedule
                 if (writeDataFileAtomic($filePath, $schedule)) {
@@ -491,21 +492,22 @@ try {
                 unset($schedule[$orig]);
             }
             
-            // Set new value (add or update)
-            $schedule[$key] = $val;
-
-            // Limit 1 hour: add next hour as 0 if checkbox was checked (excludes wildcard keys)
+            $limit1HourRestoreEntry = null;
+            // Limit 1 hour: restore H+1 to previous resolved value (or 0 when empty), excludes wildcard keys
             if (!empty($input['limit1hour']) && strpos($key, '*') === false) {
                 $scheduleFunctionsPath = __DIR__ . '/../../api/charge_schedule_functions.php';
                 if (file_exists($scheduleFunctionsPath)) {
                     require_once $scheduleFunctionsPath;
-                    $nextKey = getNextHourKey($key);
-                    if ($nextKey !== null && !isset($schedule[$nextKey])) {
-                        $schedule[$nextKey] = 0;
-                    }
-                    $schedule = cleanOutdatedScheduleEntries($schedule);
+                    $limit1HourRestoreEntry = getLimit1HourRestoreEntry($schedule, $key);
                 }
             }
+
+            // Set new value (add or update)
+            $schedule[$key] = $val;
+            if ($limit1HourRestoreEntry !== null) {
+                $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
+            }
+            $schedule = cleanOutdatedScheduleEntries($schedule);
 
             // Write updated schedule
             if (writeDataFileAtomic($filePath, $schedule)) {

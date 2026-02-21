@@ -88,14 +88,15 @@ try {
                 unset($schedule[$orig]);
             }
             
+            $limit1HourRestoreEntry = null;
+            if (!empty($input['limit1hour']) && strpos($key, '*') === false) {
+                $limit1HourRestoreEntry = getLimit1HourRestoreEntry($schedule, $key);
+            }
+
             // Set the new entry (or update existing one)
             $schedule[$key] = $val;
-
-            if (!empty($input['limit1hour']) && strpos($key, '*') === false) {
-                $nextKey = getNextHourKey($key);
-                if ($nextKey !== null && !isset($schedule[$nextKey])) {
-                    $schedule[$nextKey] = 0;
-                }
+            if ($limit1HourRestoreEntry !== null) {
+                $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
             }
 
             // Automatically drop outdated concrete-date entries on save
