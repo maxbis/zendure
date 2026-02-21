@@ -9,26 +9,26 @@ import json
 import os
 import sqlite3
 import sys
+
+from config_loader import load_config
 from datetime import datetime
 
 DEFAULT_DB = os.path.join(os.path.dirname(__file__), "data", "status_updates.db")
 
 
 def load_db_path() -> str:
-    """Load DB path from config.json if available."""
+    """Load DB path from automate/config/config.jsonc if available."""
     config_paths = [
-        os.path.join(os.path.dirname(__file__), "..", "config", "config.json"),
-        os.path.join(os.path.dirname(__file__), "config.json"),
+        os.path.join(os.path.dirname(__file__), "config", "config.jsonc"),
     ]
     for p in config_paths:
         if os.path.exists(p):
             try:
-                with open(p, encoding="utf-8") as f:
-                    cfg = json.load(f)
+                cfg = load_config(p)
                 data_dir = cfg.get("dataDir", "./data/")
                 base = data_dir.rstrip("/").rstrip("\\")
                 return os.path.join(base, "status_updates.db")
-            except (json.JSONDecodeError, OSError):
+            except (ValueError, OSError):
                 pass
     return DEFAULT_DB
 

@@ -1,0 +1,40 @@
+{
+  // If true: simulate only, do not apply power/charge actions to the device
+  "TEST_MODE": true,
+  // Minimum and maximumbattery SoC (%); don't discharge under MIN_CHARGE_LEVEL or charge above MAX_CHARGE_LEVEL
+  "MIN_CHARGE_LEVEL": 15,
+  "MAX_CHARGE_LEVEL": 96,
+  // Min absolute power (W); if desired power is below this, it is treated as 0
+  "POWER_FEED_MIN_THRESHOLD": 30,
+  // Min change (W) to apply a new power limit; smaller deltas are ignored
+  "POWER_FEED_MIN_DELTA": 50,
+  // Max allowed step (W) for a single power-feed change; to prevent sudden large changes
+  "POWER_FEED_MAX_DELTA": 300,
+  // Seconds between main automation loop iterations
+  "LOOP_INTERVAL_SECONDS": 20,
+  // How often (seconds) to refresh data from external APIs (e.g. schedule)
+  "API_REFRESH_INTERVAL_SECONDS": 60,
+
+  // Consecutive "zero" readings before treating the system as standby
+  "ZERO_COUNT_THRESHOLD_STANDBY": 3,
+
+  // Directory for local data (e.g. status_updates.db)
+  "dataDir": "./data/",
+
+  // Days to keep rows in status_updates DB; older rows are pruned
+  "statusUpdatesRetentionDays": 7,
+
+  // IP address of the Zendure device on the local network
+  "deviceIp": "192.168.2.93",
+  // Serial number of the Zendure device
+  "deviceSn": "HOA1NAN9N385989",
+
+  // P1 meter: IP, HTTP path, and JSON path to total power field
+  "p1Meter": {
+    "ip": "192.168.2.5",
+    "endpoint": "/api/v1/data",
+    "totalPowerPath": "active_power_w"
+  },
+  // Schedule API URL; returns the resolved schedule (times and values)
+  "apiUrl": "https://zendure.qool.ovh/data/api/data_api.php?type=schedule&resolved=1"
+}

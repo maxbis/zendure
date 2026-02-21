@@ -89,6 +89,8 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
         <!-- Confirm Dialog -->
         <?php include __DIR__ . '/partials/confirm_dialog.php'; ?>
+        <!-- No Back-end Dialog (502) -->
+        <?php include __DIR__ . '/partials/no_backend_dialog.php'; ?>
 
 
 

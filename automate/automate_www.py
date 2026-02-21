@@ -32,7 +32,7 @@ from urllib.parse import urlparse, parse_qs
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 
 # ============================================================================
-# CONSTANTS & DEFAULT CONFIG (override via config.json)
+# CONSTANTS & DEFAULT CONFIG (override via config.jsonc)
 # ============================================================================
 
 # Time to pause between loop iterations (seconds)
@@ -490,23 +490,21 @@ class StatusApi:
         CREATE INDEX IF NOT EXISTS idx_status_updates_timestamp ON status_updates(timestamp);
     """
     
-    def __init__(self, api_url: Optional[str], logger: Logger,
+    def __init__(self, logger: Logger,
                  on_update: Optional[Callable[[str, Any, Any, Optional[int], int], None]] = None,
                  db_path: Optional[str] = None,
                  get_electric_level: Optional[Callable[[], Optional[int]]] = None,
                  retention_days: int = 7):
         """
-        Initialize status API client.
+        Initialize status API client (callback + SQLite only; no HTTP POST).
         
         Args:
-            api_url: URL of the status API endpoint. If None, operations will be no-ops.
             logger: Logger instance for error/warning messages.
             on_update: Optional callback(event_type, old_value, new_value, p1_total_power, timestamp) when posting.
             db_path: Optional path to SQLite DB for storing status updates.
             get_electric_level: Optional callable returning current battery % (0-100) for DB storage.
             retention_days: Days to retain rows in SQLite (default 7).
         """
-        self.api_url = api_url
         self.logger = logger
         self.on_update = on_update
         self.db_path = db_path
@@ -574,43 +572,7 @@ class StatusApi:
             self.on_update(event_type, old_value, new_value, p1_total_power, timestamp)
 
         self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp)
-
-        if not self.api_url:
-            return False
-            
-        try:
-            
-            payload = {
-                'type': event_type,
-                'timestamp': timestamp,
-                'oldValue': old_value,
-                'newValue': new_value
-            }
-            if p1_total_power is not None:
-                payload['p1TotalPower'] = p1_total_power
-            
-            response = requests.post(self.api_url, json=payload, timeout=5, allow_redirects=False)
-            
-            # Check for redirects
-            if response.status_code in [301, 302, 303, 307, 308]:
-                redirect_url = response.headers.get('Location')
-                if redirect_url:
-                    if not redirect_url.startswith('http'):
-                        from urllib.parse import urljoin
-                        redirect_url = urljoin(self.api_url, redirect_url)
-                    response = requests.post(redirect_url, json=payload, timeout=5)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            if not data.get('success', False):
-                self.logger.warning(f"Status API returned success=false: {data.get('error', 'Unknown error')}")
-                return False
-                
-            return True
-        except Exception as e:
-            self.logger.warning(f"Error posting status update to API: {e}")
-            return False
+        return True
 
 
 # ============================================================================
@@ -834,7 +796,7 @@ class CommandHandler:
             result = self.controller.set_power(power_value)
             if result.success:
                 self.logger.info(f"Power set to: {result.power}")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
+                self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
             else:
                 self.logger.error(f"Failed to set power: {result.error}")
         except ValueError:
@@ -846,7 +808,7 @@ class CommandHandler:
         result = self.controller.set_power(0)
         if result.success:
             self.logger.info("Power set to 0")
-        self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0)
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0)
         else:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
@@ -930,17 +892,6 @@ class AutomationApp:
             # Initialize logger
             self.logger = Logger(self.controller)
             
-            # Get status API URL - select based on location (matching schedule directory pattern)
-            location = self.schedule_controller.config.get("location", "remote")
-            if location == "local":
-                status_api_url = self.schedule_controller.config.get("statusApiUrl-local")
-            else:
-                status_api_url = self.schedule_controller.config.get("statusApiUrl")
-            
-            if not status_api_url:
-                self.logger.error("statusApiUrl not found in config.json")
-                return False
-            
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
@@ -956,7 +907,7 @@ class AutomationApp:
             
             # Initialize components
             self.status_api = StatusApi(
-                status_api_url, self.logger,
+                self.logger,
                 on_update=self._on_status_update,
                 db_path=db_path,
                 get_electric_level=get_electric_level,
@@ -980,7 +931,7 @@ class AutomationApp:
         except FileNotFoundError as e:
             # Create a temporary simple logger if controller init fails
             print(f"Configuration error: {e}")
-            print("   Please ensure config.json exists in one of the checked locations")
+            print("   Please ensure automate/config/config.jsonc exists")
             return False
         except ValueError as e:
             print(f"Configuration error: {e}")
@@ -1116,9 +1067,7 @@ class AutomationApp:
                 self.schedule_controller.fetch_schedule()
                 self.last_api_refresh_time = current_time
                 self.logger.info("Schedule data refreshed from API")
-                
-                # (print_accumulators removed)
-            self.status_api.post_update(EVENT_TYPE_RESCAN, None, None, p1_total_power=self.last_p1_total_power)
+                self.status_api.post_update(EVENT_TYPE_RESCAN, None, None, p1_total_power=self.last_p1_total_power)
             except Exception as e:
                 self.logger.error(f"Failed to refresh schedule: {e}")
 
@@ -1289,7 +1238,7 @@ class AutomationApp:
         self.status_api.post_update(EVENT_TYPE_START)
         
         self.logger.info("🚀 Starting charge schedule automation script")
-        # Show test mode prominently on startup (controlled via config.json key: TEST_MODE).
+        # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning("TEST MODE: ON (no commands wil be send to the Zendure device)")
         else:

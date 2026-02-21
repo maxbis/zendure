@@ -16,6 +16,38 @@ let autoRefreshIntervalId = null;
 let wasPageHidden = false;
 let scheduleRefreshTickCount = 0;
 
+// Track if "back-end not running" dialog was already shown (avoid duplicate modals)
+let noBackendDialogShown = false;
+
+/**
+ * Return true if the error indicates the back-end (proxy upstream) is unavailable (502).
+ * @param {Error|ApiError} error
+ * @returns {boolean}
+ */
+function isBackendUnavailableError(error) {
+    if (!error) return false;
+    if (typeof ApiError !== 'undefined' && error instanceof ApiError) {
+        return error.status === 502;
+    }
+    const msg = (error.message || String(error)) || '';
+    return msg.includes('502') || msg.includes('Bad Gateway');
+}
+
+/**
+ * Show the "Back-end not running" modal, stop auto-refresh, and wire Retry to reload.
+ * Idempotent: only shows once per page load.
+ */
+function showNoBackendDialog() {
+    if (noBackendDialogShown) return;
+    noBackendDialogShown = true;
+    stopAutoRefresh();
+    const dialog = document.getElementById('no-backend-dialog');
+    if (dialog) {
+        dialog.classList.add('active');
+        dialog.setAttribute('aria-hidden', 'false');
+    }
+}
+
 /**
  * Hide the refresh button temporarily to indicate auto-refresh is happening
  */
@@ -161,6 +193,9 @@ async function refreshStatus(isAutoRefresh = false) {
             })
             .catch(error => {
                 console.error('Failed to refresh automation status:', error);
+                if (isBackendUnavailableError(error)) {
+                    showNoBackendDialog();
+                }
                 renderAutomationStatus({
                     success: false,
                     error: error.message || 'Failed to load automation status'
@@ -195,6 +230,9 @@ async function refreshStatus(isAutoRefresh = false) {
                 return { zendureData, p1Data };
             } catch (error) {
                 console.error('Failed to refresh charge status (unified):', error);
+                if (isBackendUnavailableError(error)) {
+                    showNoBackendDialog();
+                }
                 renderChargeStatus({
                     success: false,
                     error: error.message || 'Failed to load charge status'
@@ -322,6 +360,12 @@ function stopAutoRefresh() {
  * Refreshes every 20 seconds when the tab is visible
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // Wire "Back-end not running" dialog Retry button
+    const noBackendRetryBtn = document.getElementById('no-backend-retry-btn');
+    if (noBackendRetryBtn) {
+        noBackendRetryBtn.addEventListener('click', () => { location.reload(); });
+    }
+
     // Track initial state
     wasPageHidden = document.hidden;
     

@@ -9,6 +9,8 @@ the functionality in zero_feed_in_controller.py.
 
 import json
 import time
+
+from config_loader import load_config as load_config_json
 from dataclasses import dataclass
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -22,7 +24,7 @@ import requests
 # GLOBAL CONSTANTS
 # ============================================================================
 
-# NOTE: TEST_MODE is now configurable via config.json (key: "TEST_MODE").
+# NOTE: TEST_MODE is now configurable via config.jsonc (key: "TEST_MODE").
 # This global remains for backward compatibility, but is overridden at runtime
 # when BaseDeviceController loads the config.
 TEST_MODE = False               # If True, operations are simulated but not applied
@@ -43,7 +45,7 @@ def get_reader(config_path: Optional[Path] = None) -> "DeviceDataReader":
     """
     Return a shared, long-lived DeviceDataReader instance.
 
-    This avoids re-loading/parsing config.json and recreating readers on every loop.
+    This avoids re-loading/parsing config.jsonc and recreating readers on every loop.
     Since config hot-reload is not desired, we guard against callers requesting a
     different config path after the reader has been created.
     """
@@ -92,8 +94,8 @@ class BaseDeviceController:
         Initialize the base controller.
         
         Args:
-            config_path: Optional path to config.json. If None, will search for
-                        config in standard locations (project root or local).
+            config_path: Optional path to config.jsonc. If None, will search for
+                        config in standard locations (automate/config/config.jsonc).
         
         Raises:
             FileNotFoundError: If config file not found
@@ -108,7 +110,7 @@ class BaseDeviceController:
         self.test_mode = bool(self.config.get("TEST_MODE", TEST_MODE))
         TEST_MODE = self.test_mode
 
-        # Battery SoC limits (single source of truth: config.json)
+        # Battery SoC limits (single source of truth: config.jsonc)
         # Fallbacks are the legacy defaults (20/90) when keys are missing.
         def _parse_soc(key: str, default: int) -> int:
             try:
@@ -132,36 +134,29 @@ class BaseDeviceController:
         
     def _find_config_file(self) -> Path:
         """
-        Find config.json file with fallback logic.
-        Checks project root config first, then local config.
+        Find config.jsonc for automate (automate/config/config.jsonc only).
         
         Returns:
             Path to the config file that exists
         
         Raises:
-            FileNotFoundError: If neither config file exists
+            FileNotFoundError: If config file does not exist
         """
         script_dir = Path(__file__).parent
-        root_config = script_dir.parent / "config" / "config.json"
-        local_config = script_dir / "config" / "config.json"
-        
-        if root_config.exists():
-            return root_config
-        elif local_config.exists():
-            return local_config
-        else:
+        config_path = script_dir / "config" / "config.jsonc"
+        if not config_path.exists():
             raise FileNotFoundError(
-                f"Config file not found in either location:\n"
-                f"  1. {root_config}\n"
-                f"  2. {local_config}"
+                f"Config file not found: {config_path}\n"
+                "   Automate uses automate/config/config.jsonc only."
             )
+        return config_path
     
     def _load_config(self, config_path: Path) -> Dict[str, Any]:
         """
-        Load configuration from config.json.
+        Load configuration from config.jsonc.
         
         Args:
-            config_path: Path to config.json file
+            config_path: Path to config.jsonc file
         
         Returns:
             dict: Configuration dictionary
@@ -171,14 +166,11 @@ class BaseDeviceController:
             ValueError: If config is invalid
         """
         try:
-            with open(config_path, "r") as f:
-                config = json.load(f)
+            return load_config_json(config_path)
         except FileNotFoundError:
             raise FileNotFoundError(f"Config file not found: {config_path}")
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in config file {config_path}: {e}")
-        
-        return config
+        except ValueError as e:
+            raise e
     
     def log(self, level: str, message: str, include_timestamp: bool = True, file_path: str = None):
         """
@@ -505,8 +497,8 @@ class AutomateController(BaseDeviceController):
         Initialize the AutomateController.
         
         Args:
-            config_path: Optional path to config.json. If None, will search for
-                        config in standard locations (project root or local).
+            config_path: Optional path to config.jsonc. If None, will search for
+                        config in standard locations (automate/config/config.jsonc).
         
         Raises:
             FileNotFoundError: If config file not found
@@ -534,9 +526,9 @@ class AutomateController(BaseDeviceController):
         device_sn = self.config.get("deviceSn")
         
         if not device_ip:
-            raise ValueError("deviceIp not found in config.json")
+            raise ValueError("deviceIp not found in config.jsonc")
         if not device_sn:
-            raise ValueError("deviceSn not found in config.json")
+            raise ValueError("deviceSn not found in config.jsonc")
         
         self.device_ip = device_ip
         self.device_sn = device_sn
@@ -922,7 +914,7 @@ class AutomateController(BaseDeviceController):
             Exception: On device communication errors
         
         Note:
-            Test mode is controlled by config.json key "TEST_MODE".
+            Test mode is controlled by config.jsonc key "TEST_MODE".
             When enabled, operations are simulated but not applied.
         """
         # Handle specific power feed (int), charge is positive, discharge is negative
@@ -1022,8 +1014,8 @@ class DeviceDataReader(BaseDeviceController):
         Initialize the DeviceDataReader.
         
         Args:
-            config_path: Optional path to config.json. If None, will search for
-                        config in standard locations (project root or local).
+            config_path: Optional path to config.jsonc. If None, will search for
+                        config in standard locations (automate/config/config.jsonc).
         
         Raises:
             FileNotFoundError: If config file not found
@@ -1045,49 +1037,6 @@ class DeviceDataReader(BaseDeviceController):
             self.p1_total_power_path = self.FIELD_TOTAL_POWER
         
         self.device_ip = self.config.get(self.CONFIG_KEY_DEVICE_IP)
-    
-    def _store_data_via_api(
-        self,
-        api_url: Optional[str],
-        data: dict,
-        data_type: str = "data",
-        ) -> bool:
-        """
-        Store data via data_api.php endpoint.
-        
-        Args:
-            api_url: API endpoint URL (from config)
-            data: Data dictionary to store
-            data_type: Type of data for logging (e.g., "P1 meter data", "Zendure data")
-        
-        Returns:
-            bool: True if storage was successful, False otherwise (warnings logged, doesn't raise)
-        """
-        if not api_url:
-            self.log('warning', f"{data_type} API URL not found in config.json, skipping storage")
-            return False
-        
-        try:
-            store_response = requests.post(
-                api_url,
-                json=data,
-                timeout=self.REQUEST_TIMEOUT,
-                headers={"Content-Type": "application/json"},
-            )
-            store_response.raise_for_status()
-            store_result = store_response.json()
-            
-            if store_result.get("success", False):
-                # self.log('info', f"{data_type} stored via API: {store_result.get('file', 'data.json')}")
-                return True
-            else:
-                error_msg = store_result.get("error", "Unknown API error")
-                self.log('warning', f"API returned error when storing {data_type}: {error_msg}")
-                return False
-        except Exception as e:
-            # Log warning but don't fail - reading was successful
-            self.log('warning', f"Failed to store {data_type} via API: {e}")
-            return False
     
     def _get_json_value(self, data: dict, path: str):
         """
@@ -1130,14 +1079,14 @@ class DeviceDataReader(BaseDeviceController):
         Read data from P1 meter device via API call.
         
         Args:
-            update_json: If True, store data via API endpoint (default: True)
+            update_json: Ignored (kept for API compatibility).
         
         Returns:
             dict: Raw P1 meter data from device, or None on error
         """
         url = self._get_p1_api_url()
         if not url:
-            self.log('error', "P1 meter configuration not found in config.json (check p1Meter or p1MeterIp)")
+            self.log('error', "P1 meter configuration not found in config.jsonc (check p1Meter or p1MeterIp)")
             return None
         
         try:
@@ -1152,29 +1101,6 @@ class DeviceDataReader(BaseDeviceController):
             if total_power is None:
                 self.log('warning', f"Failed to extract total_power using path '{self.p1_total_power_path}'. "
                           f"Available keys in response: {list(data.keys())[:10]}")  # Show first 10 keys
-            
-            # Store via API if requested
-            if update_json:
-                # Prepare reading data with timestamp
-                reading_data = {
-                    self.FIELD_TIMESTAMP: datetime.now().isoformat(),
-                    self.FIELD_TOTAL_POWER: total_power,
-                }
-                
-                # Store via data_api.php endpoint (non-fatal)
-                # Derive p1StoreApiUrl from dataApiUrl based on location
-                location = self.config.get("location", "remote")
-                if location == "local":
-                    base_url = self.config.get("dataApiUrl-local")
-                else:
-                    base_url = self.config.get("dataApiUrl")
-                
-                if base_url:
-                    api_url = base_url + ("&" if "?" in base_url else "?") + "type=zendure_p1"
-                else:
-                    api_url = None
-                
-                self._store_data_via_api(api_url, reading_data, "P1 meter data")
             
             # Add total_power to returned data for use by accumulation code
             # Return the raw device data with total_power added
@@ -1194,13 +1120,13 @@ class DeviceDataReader(BaseDeviceController):
         Read data from Zendure battery device via API call.
         
         Args:
-            update_json: If True, store data via API endpoint (default: True)
+            update_json: Ignored (kept for API compatibility).
         
         Returns:
             dict: Raw Zendure device data from device, or None on error
         """
         if not self.device_ip:
-            self.log('error', f"{self.CONFIG_KEY_DEVICE_IP} not found in config.json")
+            self.log('error', f"{self.CONFIG_KEY_DEVICE_IP} not found in config.jsonc")
             return None
         
         # Read from Zendure device directly
@@ -1217,31 +1143,7 @@ class DeviceDataReader(BaseDeviceController):
 
             self.last_zendure_data = data
             
-            # Store via API if requested
-            if update_json:
-                # Prepare reading data with timestamp
-                reading_data = {
-                    self.FIELD_TIMESTAMP: datetime.now().isoformat(),
-                    self.FIELD_PROPERTIES: props,
-                    self.FIELD_PACK_DATA: packs,
-                }
-                
-                # Store via data_api.php endpoint (non-fatal)
-                # Derive zendureStoreApiUrl from dataApiUrl based on location
-                location = self.config.get("location", "remote")
-                if location == "local":
-                    base_url = self.config.get("dataApiUrl-local")
-                else:
-                    base_url = self.config.get("dataApiUrl")
-                
-                if base_url:
-                    api_url = base_url + ("&" if "?" in base_url else "?") + "type=zendure"
-                else:
-                    api_url = None
-                
-                self._store_data_via_api(api_url, reading_data, "Zendure data")
-            
-            # Return the raw device data (not the stored format)
+            # Return the raw device data
             return data
         
         except requests.exceptions.RequestException as e:
@@ -1274,8 +1176,8 @@ class ScheduleController(BaseDeviceController):
         Initialize the ScheduleController.
         
         Args:
-            config_path: Optional path to config.json. If None, will search for
-                        config in standard locations (project root or local).
+            config_path: Optional path to config.jsonc. If None, will search for
+                        config in standard locations (automate/config/config.jsonc).
         
         Raises:
             FileNotFoundError: If config file not found
@@ -1313,7 +1215,7 @@ class ScheduleController(BaseDeviceController):
         """
         api_url = self.config.get(self.CONFIG_KEY_SCHEDULE_API_URL)
         if not api_url:
-            raise ValueError(f"{self.CONFIG_KEY_SCHEDULE_API_URL} not found in config.json")
+            raise ValueError(f"{self.CONFIG_KEY_SCHEDULE_API_URL} not found in config.jsonc")
         
         try:
             response = requests.get(api_url, timeout=self.REQUEST_TIMEOUT)
