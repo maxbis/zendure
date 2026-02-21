@@ -1,0 +1,35 @@
+[2026-02-21 10:04:01] Power: 265 (desired: netzero+)
+[2026-02-21 10:04:20] P1 deltas: import_delta=1 Wh, export_delta=1 Wh, actual power=-4.0 W
+[2026-02-21 10:04:21] 🔍 P1 power (grid-status): -4.0
+[2026-02-21 10:04:21] Power value unchanged (265 W), skipping device update
+[2026-02-21 10:04:21] Power: 265 (desired: netzero+)
+[2026-02-21 10:04:40] P1 deltas: import_delta=1 Wh, export_delta=1 Wh, actual power=10.0 W
+[2026-02-21 10:04:41] 🔍 P1 power (grid-status): 10.0
+[2026-02-21 10:04:41] Power value unchanged (265 W), skipping device update
+[2026-02-21 10:04:41] Power: 265 (desired: netzero+)
+[2026-02-21 10:05:00] P1 deltas: import_delta=4 Wh, export_delta=1 Wh, actual power=1456.0 W
+[2026-02-21 10:05:00] 🔍 P1 power (grid-status): 1456.0
+[2026-02-21 10:05:01] Setting power feed to 0 W...
+[2026-02-21 10:05:01] ✅ Successfully set power feed to 0 W
+[2026-02-21 10:05:01] Power: 0 (desired: netzero+)
+[2026-02-21 10:05:20] P1 deltas: import_delta=10 Wh, export_delta=1 Wh, actual power=1166.0 W
+[2026-02-21 10:05:20] 🔍 P1 power (grid-status): 1166.0
+[2026-02-21 10:05:21] Power value unchanged (0 W), skipping device update
+[2026-02-21 10:05:21] Power: 0 (desired: netzero+)
+[2026-02-21 10:05:40] P1 deltas: import_delta=15 Wh, export_delta=1 Wh, actual power=-969.0 W
+[2026-02-21 10:05:40] 🔍 P1 power (grid-status): -969.0
+[2026-02-21 10:05:40] Setting power feed to 800 W...
+[2026-02-21 10:05:40] ✅ Successfully set power feed to 800 W
+[2026-02-21 10:05:40] Power: 800 (desired: netzero+)
+[2026-02-21 10:06:00] P1 deltas: import_delta=15 Wh, export_delta=3 Wh, actual power=514.0 W
+[2026-02-21 10:06:00] 🔍 P1 power (grid-status): 514.0
+[2026-02-21 10:06:00] Setting power feed to 286 W...
+[2026-02-21 10:06:00] ✅ Successfully set power feed to 286 W
+[2026-02-21 10:06:00] Power: 286 (desired: netzero+)
+[2026-02-21 10:06:21] P1 deltas: import_delta=18 Wh, export_delta=3 Wh, actual power=19.0 W
+[2026-02-21 10:06:21] 🔍 P1 power (grid-status): 19.0
+[2026-02-21 10:06:21] Power value unchanged (286 W), skipping device update
+[2026-02-21 10:06:21] Power: 286 (desired: netzero+)
+[2026-02-21 10:06:40] P1 deltas: import_delta=18 Wh, export_delta=3 Wh, actual power=7.0 W
+[2026-02-21 10:06:41] 🔍 P1 power (grid-status): 7.0
+[2026-02-21 10:06:41] Power value unchanged (286 W), skipping device update

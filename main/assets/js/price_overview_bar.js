@@ -34,7 +34,7 @@ function interpolateColor(r1, g1, b1, r2, g2, b2, factor) {
  */
 function getPriceColor(price, minPrice, maxPrice) {
     if (price === null || price === undefined || isNaN(price)) {
-        return '#656566'; // Gray for null values
+        return '#606060'; // Gray for null values
     }
     
     if (minPrice === maxPrice) {
