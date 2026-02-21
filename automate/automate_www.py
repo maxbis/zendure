@@ -15,7 +15,6 @@ import os
 import signal
 import sqlite3
 import time
-import requests
 import sys
 import select
 import platform
@@ -419,7 +418,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-    def log_message(self, format, *args):
+    def log_message(self, msg_format, *args):
         """Suppress default request logging to avoid cluttering automation output."""
         pass
 
@@ -1106,11 +1105,11 @@ class AutomationApp:
             
         if isinstance(validation_power, int):
             if validation_power > 0 and self.controller.limit_state == 1:
-                 self.logger.warning(f"Battery at MAX_CHARGE_LEVEL, preventing charge")
-                 return 0
+                self.logger.warning(f"Battery at MAX_CHARGE_LEVEL, preventing charge")
+                return 0
             elif validation_power < 0 and self.controller.limit_state == -1:
-                 self.logger.warning(f"Battery at MIN_CHARGE_LEVEL, preventing discharge")
-                 return 0
+                self.logger.warning(f"Battery at MIN_CHARGE_LEVEL, preventing discharge")
+                return 0
                  
         return desired_power
 
