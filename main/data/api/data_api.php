@@ -117,7 +117,7 @@ try {
             if ($data === null) {
                 $errorDetails = '';
                 if (!file_exists($filePath)) {
-                    $errorDetails = "Data file does not exist";
+                    $errorDetails = "Data file ($filePath) does not exist";
                 } elseif (!is_readable($filePath)) {
                     $errorDetails = "Data file exists but is not readable by the web process";
                 } else {
