@@ -157,10 +157,10 @@
                     return pct == null ? 'Battery: n/a' : ('Battery: ' + pct.toFixed(0) + '%');
                 }
                 var v = cd.originalValues[i] || 0;
-                var label = v.toFixed(0) + ' Wh';
-                if (v > 800) label += ' (clipped at 800)';
-                else if (v < -800) label += ' (clipped at -800)';
-                return label;
+                var whLabel = v.toFixed(0) + ' Wh';
+                if (v > 800) whLabel += ' (clipped at 800)';
+                else if (v < -800) whLabel += ' (clipped at -800)';
+                return whLabel;
             }
         };
         chart.update('none');
@@ -243,14 +243,15 @@
                 maintainAspectRatio: false,
                 interaction: {
                     mode: 'index',
-                    intersect: false
+                    intersect: true
                 },
                 plugins: {
                     title: { display: false },
                     legend: { display: false },
                     tooltip: {
                         mode: 'index',
-                        intersect: false,
+                        intersect: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
                         callbacks: {}
                     }
                 },
