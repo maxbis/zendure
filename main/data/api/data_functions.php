@@ -87,44 +87,67 @@ function readDataFile($filePath) {
  * @return bool True on success, false on error
  */
 function writeDataFileAtomic($filePath, $data) {
+    $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = null;
+
     // Ensure directory exists
     $dir = dirname($filePath);
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0755, true)) {
-            error_log("Failed to create directory: $dir");
+            $msg = "Failed to create directory: $dir";
+            $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = $msg;
+            error_log($msg);
             return false;
         }
     }
     
     // Check if directory is writable
     if (!is_writable($dir)) {
-        error_log("Directory is not writable: $dir");
+        $msg = "Directory is not writable: $dir";
+        $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = $msg;
+        error_log($msg);
         return false;
     }
     
     // Encode to JSON
     $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     if ($json === false) {
-        error_log("Failed to encode JSON data");
+        $msg = "Failed to encode JSON data";
+        $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = $msg;
+        error_log($msg);
         return false;
     }
     
     // Write to temporary file first
     $tempFile = $filePath . '.tmp';
     if (file_put_contents($tempFile, $json) === false) {
-        error_log("Failed to write temp file: $tempFile");
+        $msg = "Failed to write temp file: $tempFile";
+        $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = $msg;
+        error_log($msg);
         return false;
     }
     
     // Atomically replace the target file
     if (!rename($tempFile, $filePath)) {
-        error_log("Failed to rename temp file to: $filePath");
+        $msg = "Failed to rename temp file to: $filePath";
+        $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'] = $msg;
+        error_log($msg);
         // Clean up temp file if rename failed
         @unlink($tempFile);
         return false;
     }
     
     return true;
+}
+
+/**
+ * Returns the last detailed error message from writeDataFileAtomic().
+ *
+ * @return string|null
+ */
+function getLastWriteDataFileAtomicError() {
+    return isset($GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR'])
+        ? $GLOBALS['WRITE_DATA_FILE_ATOMIC_LAST_ERROR']
+        : null;
 }
 
 /**
@@ -386,4 +409,3 @@ function cleanupOldPriceFiles($retentionDays = 4, $dataDir = null, $archiveDir =
     
     return $stats;
 }
-

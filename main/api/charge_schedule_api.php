@@ -6,6 +6,14 @@ date_default_timezone_set('Europe/Amsterdam');
 
 require_once __DIR__ . '/charge_schedule_functions.php';
 
+function buildScheduleWriteFailureMessage($context, $filePath) {
+    $details = function_exists('getLastWriteScheduleAtomicError')
+        ? getLastWriteScheduleAtomicError()
+        : null;
+    $base = "Write failed [$context]: " . basename($filePath);
+    return $details ? ($base . " (" . $details . ")") : $base;
+}
+
 // CORS headers to allow cross-origin requests
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -105,7 +113,7 @@ try {
             if (writeScheduleAtomic($dataFile, $schedule)) {
                 $response = ['success' => true];
             } else {
-                throw new Exception("Write failed [charge_schedule_api PUT/POST]: " . basename($dataFile));
+                throw new Exception(buildScheduleWriteFailureMessage('charge_schedule_api PUT/POST', $dataFile));
             }
     } elseif ($method === 'DELETE') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -121,7 +129,7 @@ try {
         if (writeScheduleAtomic($dataFile, $schedule)) {
             $response = ['success' => true];
         } else {
-            throw new Exception("Write failed [charge_schedule_api DELETE]: " . basename($dataFile));
+            throw new Exception(buildScheduleWriteFailureMessage('charge_schedule_api DELETE', $dataFile));
         }
     }
 } catch (Exception $e) {

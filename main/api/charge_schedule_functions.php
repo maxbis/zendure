@@ -23,12 +23,26 @@ function loadSchedule($dataFile)
 
 function writeScheduleAtomic($dataFile, $schedule)
 {
+    $GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR'] = null;
     $tempFile = $dataFile . '.tmp';
     $json = json_encode($schedule, JSON_PRETTY_PRINT);
     if (file_put_contents($tempFile, $json) === false) {
+        $GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR'] = "Failed to write temp file: $tempFile";
         return false;
     }
-    return rename($tempFile, $dataFile);
+    if (!rename($tempFile, $dataFile)) {
+        $GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR'] = "Failed to rename temp file to: $dataFile";
+        @unlink($tempFile);
+        return false;
+    }
+    return true;
+}
+
+function getLastWriteScheduleAtomicError()
+{
+    return isset($GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR'])
+        ? $GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR']
+        : null;
 }
 
 function calculateSpecificity($key)

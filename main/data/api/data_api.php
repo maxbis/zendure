@@ -24,6 +24,14 @@ define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
 define('PRICE_RETENTION_DAYS', 4); // Days to keep price files before archiving
 define('PRICE_ARCHIVE_DIR', DATA_DIR . '/price_archive');
 
+function buildWriteFailureMessage($context, $filePath) {
+    $details = function_exists('getLastWriteDataFileAtomicError')
+        ? getLastWriteDataFileAtomicError()
+        : null;
+    $base = "Write failed [$context]: " . basename($filePath);
+    return $details ? ($base . " (" . $details . ")") : $base;
+}
+
 // --- Request Handling ---
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -107,9 +115,29 @@ try {
             
             $data = readDataFile($filePath);
             if ($data === null) {
+                $errorDetails = '';
+                if (!file_exists($filePath)) {
+                    $errorDetails = "Data file does not exist";
+                } elseif (!is_readable($filePath)) {
+                    $errorDetails = "Data file exists but is not readable by the web process";
+                } else {
+                    $raw = @file_get_contents($filePath);
+                    if ($raw === false) {
+                        $errorDetails = "Data file exists but reading failed";
+                    } else {
+                        json_decode($raw, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $errorDetails = "Data file contains invalid JSON: " . json_last_error_msg();
+                        } else {
+                            $errorDetails = "Data file could not be loaded for an unknown reason";
+                        }
+                    }
+                }
+
+                $prefix = ($type === 'schedule') ? 'Schedule data unavailable' : 'Data unavailable';
                 $response = [
                     'success' => false,
-                    'error' => 'File not found',
+                    'error' => $prefix . ': ' . $errorDetails,
                     'file' => basename($filePath)
                 ];
             } else {
@@ -220,7 +248,7 @@ try {
                     error_log("Price cleanup errors: " . implode('; ', $cleanupStats['errors']));
                 }
             } else {
-                throw new Exception("Write failed [POST price]: " . basename($filePath));
+                throw new Exception(buildWriteFailureMessage('POST price', $filePath));
             }
         } elseif ($type === 'file') {
             if (!isset($_GET['name'])) {
@@ -241,7 +269,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                throw new Exception("Write failed [POST file]: " . basename($filePath));
+                throw new Exception(buildWriteFailureMessage('POST file', $filePath));
             }
         } elseif ($type === 'schedule') {
             // Special handling for schedule type
@@ -309,7 +337,7 @@ try {
                             'count' => $result['count']
                         ];
                     } else {
-                        throw new Exception("Write failed [POST schedule action=delete]: " . basename($filePath));
+                        throw new Exception(buildWriteFailureMessage('POST schedule action=delete', $filePath));
                     }
                 }
             }
@@ -386,7 +414,7 @@ try {
                         'file' => basename($filePath)
                     ];
                 } else {
-                    throw new Exception("Write failed [POST schedule single-entry]: " . basename($filePath));
+                    throw new Exception(buildWriteFailureMessage('POST schedule single-entry', $filePath));
                 }
             } else {
                 // Full schedule format - validate and replace entire schedule
@@ -413,7 +441,7 @@ try {
                         'file' => basename($filePath)
                     ];
                 } else {
-                    throw new Exception("Write failed [POST schedule full-replace]: " . basename($filePath));
+                    throw new Exception(buildWriteFailureMessage('POST schedule full-replace', $filePath));
                 }
             }
         } else {
@@ -432,7 +460,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                $error = "Write failed [POST generic type=" . $type . "]: " . basename($filePath);
+                $error = buildWriteFailureMessage('POST generic type=' . $type, $filePath);
                 throw new Exception($error);
             }
         }
@@ -529,7 +557,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                throw new Exception("Write failed [PUT schedule]: " . basename($filePath));
+                throw new Exception(buildWriteFailureMessage('PUT schedule', $filePath));
             }
         } else {
             throw new Exception("PUT method only supported for schedule type");
@@ -619,7 +647,7 @@ try {
                             'file' => basename($filePath)
                         ];
                     } else {
-                        throw new Exception("Write failed [DELETE schedule]: " . basename($filePath));
+                        throw new Exception(buildWriteFailureMessage('DELETE schedule', $filePath));
                     }
                 }
             }
