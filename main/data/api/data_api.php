@@ -20,7 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Configuration
 define('DATA_DIR', __DIR__ . '/..');
 define('ALLOWED_TYPES', ['price', 'zendure', 'zendure_p1', 'schedule', 'automation_status', 'file', 'list']);
-define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
 define('PRICE_RETENTION_DAYS', 4); // Days to keep price files before archiving
 define('PRICE_ARCHIVE_DIR', DATA_DIR . '/price_archive');
 
