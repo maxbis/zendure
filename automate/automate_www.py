@@ -164,7 +164,12 @@ def _allowed_wh_dates(now: int, days_back: int, tz: ZoneInfo) -> list[str]:
 def _empty_wh_result(allowed_dates: list[str]) -> dict:
     return {
         d: [
-            {"hour": f"{h:02d}", "charged_wh": 0.0, "discharged_wh": 0.0}
+            {
+                "hour": f"{h:02d}",
+                "charged_wh": 0.0,
+                "discharged_wh": 0.0,
+                "electric_level": None,
+            }
             for h in range(24)
         ]
         for d in sorted(allowed_dates)
@@ -190,6 +195,34 @@ def _load_change_points(db_path: str) -> list[tuple[int, float]]:
                 points.append((int(ts), float(nv)))
     points.sort(key=lambda p: p[0])
     return points
+
+
+def _load_electric_levels_by_hour(
+    db_path: str, allowed_dates: set[str], tz: ZoneInfo
+) -> dict[str, dict[str, int]]:
+    levels_by_date_hour: dict[str, dict[str, int]] = {}
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.execute(
+            "SELECT timestamp, electric_level FROM status_updates "
+            "WHERE timestamp IS NOT NULL AND electric_level IS NOT NULL "
+            "ORDER BY timestamp ASC"
+        )
+        for ts_raw, level_raw in cur.fetchall():
+            try:
+                ts = int(ts_raw)
+                level = int(level_raw)
+            except (TypeError, ValueError):
+                continue
+            dt = datetime.fromtimestamp(ts, tz=tz)
+            date_key = dt.strftime("%Y-%m-%d")
+            if date_key not in allowed_dates:
+                continue
+            hour_key = dt.strftime("%H")
+            by_hour = levels_by_date_hour.setdefault(date_key, {})
+            # Rows are processed in ascending timestamp order, so this keeps the
+            # latest non-null level seen within each hour bucket.
+            by_hour[hour_key] = level
+    return levels_by_date_hour
 
 
 def _accumulate_wh_segment(
@@ -254,11 +287,14 @@ def _integrate_wh_points(
 
 
 def _build_wh_result(
-    wh_by_date_hour: dict[str, dict[str, dict[str, float]]], allowed_dates: list[str]
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]],
+    electric_levels_by_date_hour: dict[str, dict[str, int]],
+    allowed_dates: list[str],
 ) -> dict:
     result = {}
     for date_key in sorted(allowed_dates):
         hours = wh_by_date_hour.get(date_key, {})
+        levels = electric_levels_by_date_hour.get(date_key, {})
         result[date_key] = [
             {
                 "hour": f"{hour:02d}",
@@ -266,6 +302,7 @@ def _build_wh_result(
                 "discharged_wh": round(
                     hours.get(f"{hour:02d}", {}).get("discharged_wh", 0.0), 2
                 ),
+                "electric_level": levels.get(f"{hour:02d}"),
             }
             for hour in range(24)
         ]
@@ -276,26 +313,37 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     """
     Compute watt-hours charged and discharged per calendar hour from status_updates SQLite.
     Uses step integration: power constant between consecutive readings.
-    Returns { "YYYY-MM-DD": [ {"hour": "HH", "charged_wh": float, "discharged_wh": float}, ... ], ... }
+    Returns { "YYYY-MM-DD": [ {"hour": "HH", "charged_wh": float, "discharged_wh": float,
+                               "electric_level": int|null}, ... ], ... }
     for the last days_back full days including today. Hours are ordered 00, 01, ... 23 (array preserves order).
     """
     tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
     allowed_dates = _allowed_wh_dates(now=now, days_back=days_back, tz=tz)
     if not os.path.exists(db_path):
         return _empty_wh_result(allowed_dates)
+    allowed_dates_set = set(allowed_dates)
+
+    try:
+        electric_levels_by_date_hour = _load_electric_levels_by_hour(
+            db_path=db_path, allowed_dates=allowed_dates_set, tz=tz
+        )
+    except Exception:
+        electric_levels_by_date_hour = {}
+
     try:
         points = _load_change_points(db_path)
     except Exception:
-        return _empty_wh_result(allowed_dates)
-    if not points:
-        return _empty_wh_result(allowed_dates)
-    wh_by_date_hour = _integrate_wh_points(
-        points=points,
-        now=now,
-        allowed_dates=set(allowed_dates),
-        tz=tz,
-    )
-    return _build_wh_result(wh_by_date_hour, allowed_dates)
+        points = []
+
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]] = {}
+    if points:
+        wh_by_date_hour = _integrate_wh_points(
+            points=points,
+            now=now,
+            allowed_dates=allowed_dates_set,
+            tz=tz,
+        )
+    return _build_wh_result(wh_by_date_hour, electric_levels_by_date_hour, allowed_dates)
 
 
 def compute_automation_status_from_state(api_state: ApiState, type_filter: str, limit: int) -> dict:

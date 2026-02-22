@@ -55,7 +55,7 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 | `/api/status` | GET | Last status change event (eventType, oldValue, newValue, timestamp). |
 | `/api/all` | GET | Combined response: `p1`, `zendure`, and `status`. |
 | `/api/automation_status` | GET | Automation status entries from in-memory last-per-type cache. Returns all cached types (no params). |
-| `/api/wh_per_hour` | GET | Watt-hours charged/discharged per calendar hour for the last N days. Uses SQLite `status_updates` table. Returns `{"YYYY-MM-DD": [{"hour": "HH", "charged_wh": float, "discharged_wh": float}, ...], ...}`. |
+| `/api/wh_per_hour` | GET | Watt-hours charged/discharged per calendar hour for the last N days. Uses SQLite `status_updates` table. Returns `{"YYYY-MM-DD": [{"hour": "HH", "charged_wh": float, "discharged_wh": float, "electric_level": int|null}, ...], ...}`. |
 | `/api/refresh` | GET | Triggers a schedule refresh: fetches from schedule API and posts a Rescan status update. Returns `{"ok": true}` on success, `{"ok": false, "error": "..."}` on failure (500). |
 
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.
