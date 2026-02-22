@@ -1149,7 +1149,7 @@ class AutomationApp:
             zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
         self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
-    def _signal_handler(self, signum):
+    def _signal_handler(self, signum, frame=None):
         """Handle shutdown signals."""
         try:
             signal_name = signal.Signals(signum).name
