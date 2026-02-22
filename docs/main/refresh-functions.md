@@ -83,6 +83,7 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 ## 5. Energy graph refresh
 
 **File:** `main/assets/js/energy_graph_refresh.js`
+**Related partial doc:** `docs/main/energy-graph-mobile.md`
 
 **API:** **`refreshEnergyGraph()`** (exposed as `window.refreshEnergyGraph`)
 
