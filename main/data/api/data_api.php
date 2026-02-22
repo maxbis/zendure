@@ -370,7 +370,13 @@ try {
                 if ($limit1HourRestoreEntry !== null) {
                     $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
                 }
-                $schedule = cleanOutdatedScheduleEntries($schedule);
+                $scheduleFunctionsPath = __DIR__ . '/../../api/charge_schedule_functions.php';
+                if (!function_exists('cleanOutdatedScheduleEntries') && file_exists($scheduleFunctionsPath)) {
+                    require_once $scheduleFunctionsPath;
+                }
+                if (function_exists('cleanOutdatedScheduleEntries')) {
+                    $schedule = cleanOutdatedScheduleEntries($schedule);
+                }
 
                 // Write updated schedule
                 if (writeDataFileAtomic($filePath, $schedule)) {
@@ -507,7 +513,13 @@ try {
             if ($limit1HourRestoreEntry !== null) {
                 $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
             }
-            $schedule = cleanOutdatedScheduleEntries($schedule);
+            $scheduleFunctionsPath = __DIR__ . '/../../api/charge_schedule_functions.php';
+            if (!function_exists('cleanOutdatedScheduleEntries') && file_exists($scheduleFunctionsPath)) {
+                require_once $scheduleFunctionsPath;
+            }
+            if (function_exists('cleanOutdatedScheduleEntries')) {
+                $schedule = cleanOutdatedScheduleEntries($schedule);
+            }
 
             // Write updated schedule
             if (writeDataFileAtomic($filePath, $schedule)) {

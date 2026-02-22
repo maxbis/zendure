@@ -44,6 +44,7 @@ automate/data/status_updates.db
 /config/*
 config.json
 config/config.json
+automate/config/config.jsonc
 /data/automation_status.json
 run_schedule/data/zendure_data.json
 /_archive/*
