@@ -43,7 +43,7 @@ $upstreamUrl = str_replace('${apiBaseUrlPiControl}', $baseUrl, $rawUrl);
 
 /**
  * Transform external API response to front-end format.
- * External: { "YYYY-MM-DD": [ { "hour": "00".."23", "charged_wh", "discharged_wh" }, ... ], ... }
+ * External: { "YYYY-MM-DD": [ { "hour": "00".."23", "charged_wh", "discharged_wh", "electric_level" }, ... ], ... }
  * Return: [ 'whPerHour' => [...], 'whPerDay' => [...], 'baseWh' => 5760 ]
  */
 function transformWhPerHourResponse(array $external, $baseWh, $energyGraphDaysBack, $energyTableDaysBack) {
@@ -73,13 +73,22 @@ function transformWhPerHourResponse(array $external, $baseWh, $energyGraphDaysBa
             $hour = isset($row['hour']) ? str_pad((string) $row['hour'], 2, '0', STR_PAD_LEFT) : '00';
             $charged = isset($row['charged_wh']) ? (float) $row['charged_wh'] : 0;
             $discharged = isset($row['discharged_wh']) ? (float) $row['discharged_wh'] : 0;
+            $electricLevel = null;
+            if (isset($row['electric_level']) && $row['electric_level'] !== null && $row['electric_level'] !== '') {
+                $electricLevel = (float) $row['electric_level'];
+                $electricLevel = max(0, min(100, $electricLevel));
+            }
             $wh = $charged - $discharged;
             $dayPos += $charged;
             $dayNeg += $discharged;
 
             if (in_array($date, $graphAllowedDates, true)) {
                 $hourLabel = $date . ' ' . $hour . ':00';
-                $whPerHour[] = ['hourLabel' => $hourLabel, 'wh' => round($wh, 2)];
+                $whPerHour[] = [
+                    'hourLabel' => $hourLabel,
+                    'wh' => round($wh, 2),
+                    'electricLevel' => $electricLevel
+                ];
             }
         }
         if (in_array($date, $tableAllowedDates, true)) {

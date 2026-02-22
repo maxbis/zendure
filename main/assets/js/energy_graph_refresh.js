@@ -81,6 +81,12 @@
         var data = whPerHour || [];
         var isFocused = !!selectedMobileDay;
         var originalValues = data.map(function(d) { return Number(d.wh || 0); });
+        var electricLevels = data.map(function(d) {
+            if (!d || d.electricLevel == null || d.electricLevel === '') return null;
+            var parsed = Number(d.electricLevel);
+            if (!isFinite(parsed)) return null;
+            return Math.max(0, Math.min(100, parsed));
+        });
         var clippedValues = originalValues.map(function(v) { return Math.max(-800, Math.min(800, v)); });
         var values = clippedValues.map(transformWh);
         var barColors = originalValues.map(function(v) {
@@ -119,6 +125,7 @@
             backgroundColor: barColors,
             borderColor: borderColors,
             originalValues: originalValues,
+            electricLevels: electricLevels,
             hourLabels: hourLabels
         };
     }
@@ -137,6 +144,7 @@
         chart.data.datasets[0].data = cd.values;
         chart.data.datasets[0].backgroundColor = cd.backgroundColor;
         chart.data.datasets[0].borderColor = cd.borderColor;
+        chart.data.datasets[1].data = cd.electricLevels;
         chart.options.plugins.tooltip.callbacks = {
             title: function(context) {
                 var i = context[0].dataIndex;
@@ -144,6 +152,10 @@
             },
             label: function(context) {
                 var i = context.dataIndex;
+                if (context.datasetIndex === 1) {
+                    var pct = cd.electricLevels[i];
+                    return pct == null ? 'Battery: n/a' : ('Battery: ' + pct.toFixed(0) + '%');
+                }
                 var v = cd.originalValues[i] || 0;
                 var label = v.toFixed(0) + ' Wh';
                 if (v > 800) label += ' (clipped at 800)';
@@ -169,16 +181,32 @@
             type: 'bar',
             data: {
                 labels: [],
-                datasets: [{
-                    label: 'Watt-hours',
-                    data: [],
-                    backgroundColor: [],
-                    borderColor: [],
-                    borderWidth: 1,
-                    minBarLength: 0,
-                    barPercentage: 0.9,
-                    categoryPercentage: 0.9
-                }]
+                datasets: [
+                    {
+                        label: 'Watt-hours',
+                        data: [],
+                        backgroundColor: [],
+                        borderColor: [],
+                        borderWidth: 1,
+                        minBarLength: 0,
+                        barPercentage: 0.9,
+                        categoryPercentage: 0.9,
+                        yAxisID: 'y'
+                    },
+                    {
+                        type: 'line',
+                        label: 'Battery %',
+                        data: [],
+                        yAxisID: 'yPercent',
+                        borderColor: 'rgba(100, 181, 246, 0.95)',
+                        backgroundColor: 'rgba(100, 181, 246, 0.25)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 8,
+                        tension: 0.25,
+                        spanGaps: false
+                    }
+                ]
             },
             options: {
                 onClick: function(event, elements, chartRef) {
@@ -213,10 +241,18 @@
                 },
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     title: { display: false },
                     legend: { display: false },
-                    tooltip: { callbacks: {} }
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {}
+                    }
                 },
                 scales: {
                     y: {
@@ -233,6 +269,23 @@
                             }
                         },
                         grid: { color: gridColor }
+                    },
+                    yPercent: {
+                        position: 'right',
+                        min: 0,
+                        max: 100,
+                        title: { display: false },
+                        ticks: {
+                            stepSize: 20,
+                            color: '#64b5f6',
+                            font: { size: 11 },
+                            callback: function(v) {
+                                return v + '%';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     },
                     x: {
                         type: 'category',
