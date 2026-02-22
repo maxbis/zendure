@@ -105,7 +105,7 @@ try {
             if (writeScheduleAtomic($dataFile, $schedule)) {
                 $response = ['success' => true];
             } else {
-                throw new Exception("Failed to write file");
+                throw new Exception("Write failed [charge_schedule_api PUT/POST]: " . basename($dataFile));
             }
     } elseif ($method === 'DELETE') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -121,7 +121,7 @@ try {
         if (writeScheduleAtomic($dataFile, $schedule)) {
             $response = ['success' => true];
         } else {
-            throw new Exception("Failed to write file");
+            throw new Exception("Write failed [charge_schedule_api DELETE]: " . basename($dataFile));
         }
     }
 } catch (Exception $e) {

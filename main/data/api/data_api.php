@@ -220,7 +220,7 @@ try {
                     error_log("Price cleanup errors: " . implode('; ', $cleanupStats['errors']));
                 }
             } else {
-                throw new Exception("Failed to write file: " . basename($filePath));
+                throw new Exception("Write failed [POST price]: " . basename($filePath));
             }
         } elseif ($type === 'file') {
             if (!isset($_GET['name'])) {
@@ -241,7 +241,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                throw new Exception("Failed to write file: " . basename($filePath));
+                throw new Exception("Write failed [POST file]: " . basename($filePath));
             }
         } elseif ($type === 'schedule') {
             // Special handling for schedule type
@@ -309,7 +309,7 @@ try {
                             'count' => $result['count']
                         ];
                     } else {
-                        throw new Exception("Failed to write file");
+                        throw new Exception("Write failed [POST schedule action=delete]: " . basename($filePath));
                     }
                 }
             }
@@ -386,7 +386,7 @@ try {
                         'file' => basename($filePath)
                     ];
                 } else {
-                    throw new Exception("Failed to write file: " . basename($filePath));
+                    throw new Exception("Write failed [POST schedule single-entry]: " . basename($filePath));
                 }
             } else {
                 // Full schedule format - validate and replace entire schedule
@@ -413,7 +413,7 @@ try {
                         'file' => basename($filePath)
                     ];
                 } else {
-                    throw new Exception("Failed to write file: " . basename($filePath));
+                    throw new Exception("Write failed [POST schedule full-replace]: " . basename($filePath));
                 }
             }
         } else {
@@ -432,7 +432,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                $error = "Failed to write file: " . basename($filePath);
+                $error = "Write failed [POST generic type=" . $type . "]: " . basename($filePath);
                 throw new Exception($error);
             }
         }
@@ -529,7 +529,7 @@ try {
                     'file' => basename($filePath)
                 ];
             } else {
-                throw new Exception("Failed to write file: " . basename($filePath));
+                throw new Exception("Write failed [PUT schedule]: " . basename($filePath));
             }
         } else {
             throw new Exception("PUT method only supported for schedule type");
@@ -619,7 +619,7 @@ try {
                             'file' => basename($filePath)
                         ];
                     } else {
-                        throw new Exception("Failed to write file: " . basename($filePath));
+                        throw new Exception("Write failed [DELETE schedule]: " . basename($filePath));
                     }
                 }
             }
