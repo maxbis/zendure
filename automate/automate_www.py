@@ -1026,6 +1026,8 @@ class AutomationApp:
 
     def __init__(self):
         self.shutdown_requested = False
+        self._shutdown_signal_count = 0
+        self._first_shutdown_signal_at: Optional[float] = None
 
         # Controllers
         self.controller = None
@@ -1150,13 +1152,27 @@ class AutomationApp:
         self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
     def _signal_handler(self, signum, frame=None):
-        """Handle shutdown signals."""
+        """Handle shutdown signals; force-exit on repeated Ctrl-C."""
         try:
             signal_name = signal.Signals(signum).name
         except (ValueError, AttributeError):
             signal_name = str(signum)
-        self.logger.warning(f"Received {signal_name} signal, initiating graceful shutdown...")
-        self.shutdown_requested = True
+        now = time.time()
+        self._shutdown_signal_count += 1
+        if self._first_shutdown_signal_at is None:
+            self._first_shutdown_signal_at = now
+
+        # First signal: graceful shutdown request.
+        if not self.shutdown_requested:
+            self.logger.warning(f"Received {signal_name} signal, initiating graceful shutdown...")
+            self.shutdown_requested = True
+            return
+
+        # If a second signal arrives during shutdown (or many in a short window),
+        # exit immediately so a blocked network/device call cannot hang the process.
+        if self._shutdown_signal_count >= 2:
+            self.logger.warning(f"Received {signal_name} again, forcing immediate exit...")
+            os._exit(130)
 
     def _on_status_update(self, event_type: str, old_value: Any, new_value: Any,
                           p1_total_power: Optional[int], timestamp: int):
