@@ -1,6 +1,6 @@
 # Mobile Page – External API Dependencies
 
-This document lists **all API calls** required for the mobile schedule page (`schedule/charge_schedule_mobile.php`) to function. It covers endpoints the frontend calls directly and, where relevant, what those backends depend on externally.
+This document lists **all API calls** required for the mobile schedule page (`main/charge_schedule_mobile.php`) to function. It covers endpoints the frontend calls directly and, where relevant, what those backends depend on externally.
 
 **Related docs:** The mobile page uses the same schedule JS modules as the desktop. For refresh behavior and JS structure, see [docs/schedule/refresh-functions.md](../schedule/refresh-functions.md) and [docs/schedule/schedule-overview.md](../schedule/schedule-overview.md).
 
@@ -12,12 +12,12 @@ The mobile page uses the same JavaScript modules as the desktop schedule app. Al
 
 | # | Purpose | Config key(s) | HTTP | Endpoint (typical) | When used |
 |---|---------|----------------|------|--------------------|-----------|
-| 1 | **Schedule CRUD** | `scheduleApiUrl` | GET, POST, DELETE | `data/api/data_api.php?type=schedule&resolved=1` or `schedule/api/charge_schedule_api.php` | Load today/tomorrow schedule, save/edit/delete entries, clear old entries |
+| 1 | **Schedule CRUD** | `scheduleApiUrl` | GET, POST, DELETE | `main/data/api/data_api.php?type=schedule&resolved=1` (default in current config) or `main/api/charge_schedule_api.php` | Load today/tomorrow schedule, save/edit/delete entries, clear old entries |
 | 2 | **Prices (today/tomorrow)** | `priceUrls.get_prices` / `priceUrls.get_prices-local` | GET | `prices/get_prices_v2.php` (or `get_price_v2.php` per config) | Price graph, schedule calculator, auto-calculate |
-| 3 | **Calculate schedule** | `calculate_schedule_apiUrl` | POST | `schedule/api/calculate_schedule_api.php` | "Auto" button: simulate then calculate charge/discharge pairs |
-| 4 | **Automation status** | `statusApiUrl` / `statusApiUrl-local` | GET | `schedule/api/automation_status_api.php?type=all&limit=20` | Automation Status section, manual refresh, auto-refresh |
-| 5 | **Charge status (Zendure)** | `dataApiUrl` / `dataApiUrl-local` | GET | `data/api/data_api.php?type=zendure` | Charge/Discharge boxes (status, power, battery), refresh |
-| 6 | **Charge status (P1 meter)** | Same base as above | GET | `data/api/data_api.php?type=zendure_p1` | System & Grid details when P1 is configured; optional |
+| 3 | **Calculate schedule** | `calculate_schedule_apiUrl` | POST | `main/api/calculate_schedule_api.php` | "Auto" button: simulate then calculate charge/discharge pairs |
+| 4 | **Automation status** | `statusApiUrl` / `statusApiUrl-local` | GET | `main/api/automation_status_api.php?type=all&limit=20` | Automation Status section, manual refresh, auto-refresh |
+| 5 | **Charge status (Zendure)** | `dataApiUrl` / `dataApiUrl-local` | GET | `main/data/api/data_api.php?type=zendure` | Charge/Discharge boxes (status, power, battery), refresh |
+| 6 | **Charge status (P1 meter)** | Same base as above | GET | `main/data/api/data_api.php?type=zendure_p1` | System & Grid details when P1 is configured; optional |
 
 ---
 
@@ -31,8 +31,8 @@ These globals are set by PHP so the JS can call the right URLs:
 | `PRICE_API_URL` | `charge_schedule_mobile.php` | Price API URL (`priceUrls.get_prices` or `get_prices-local`) |
 | `CALCULATE_SCHEDULE_API_URL` | `charge_schedule_mobile.php` | Calculate-schedule API URL |
 | `AUTOMATION_STATUS_API_URL` | `partials/automation_status.php` | Automation status API URL (base + `?type=all&limit=20`) |
-| `CHARGE_STATUS_ZENDURE_API_URL` | `partials/charge_status_data.php` | Data API URL with `?type=zendure` |
-| `CHARGE_STATUS_P1_API_URL` | `partials/charge_status_data.php` | Data API URL with `?type=zendure_p1` (optional) |
+| `CHARGE_STATUS_ALL_API_URL` | `charge_schedule_mobile.php` | Unified charge-status proxy URL (`api/charge_status_all_proxy.php`) |
+| `CHARGE_STATUS_MIN_CHARGE_LEVEL` / `CHARGE_STATUS_MAX_CHARGE_LEVEL` | `charge_schedule_mobile.php` | Battery min/max thresholds used by status renderer |
 
 ---
 
@@ -84,7 +84,7 @@ These are **not** called directly by the mobile page, but the endpoints above re
 |---------|---------------------|----------------|
 | **Prices** (`prices/get_prices_v2.php`) | **enever.nl** – `priceUrls.today`, `priceUrls.tomorrow` | Fetches today/tomorrow prices; tokens in config. |
 | **Calculate schedule** (`calculate_schedule_api.php`) | **Price API** (`priceUrls.get_prices` or `get_prices`) | Uses it to fetch prices for auto-calculation. |
-| **Data API** (`data/api/data_api.php`) | **Local JSON** (e.g. Zendure / P1 files) | Reads from files populated by device/meter ingest (e.g. MQTT, `deviceIp`, `p1Meter`). |
+| **Data API** (`main/data/api/data_api.php`) | **Local JSON** (e.g. Zendure / P1 files) | Reads from files populated by device/meter ingest (e.g. MQTT, `deviceIp`, `p1Meter`). |
 | **Automation status** (`automation_status_api.php`) | **Local** `data/automation_status.json` | No external HTTP; file-based. |
 
 ---

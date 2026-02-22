@@ -3,18 +3,35 @@
 declare(strict_types=1);
 
 /**
- * ENTSO-E quarter-hour market price test endpoint.
+ * ENTSO-E quarter-hour market price test endpoint (v2).
  *
- * Fetches A44 day-ahead XML from ENTSO-E and outputs JSON grouped per NL hour:
- * - four quarter prices (EUR/MWh)
- * - average hour price over those quarters (EUR/MWh)
+ * Same as entsoe_test.php: fetches A44 day-ahead XML from ENTSO-E and outputs JSON
+ * grouped per NL hour. In addition, writes the retrieved prices to:
+ *   main/data/price/YYYYMM/priceYYYYMMDD.json
+ * Format: object with hour keys "00"-"23" and consumer price (EUR/kWh) per hour.
  */
 
-const ENTSOE_TEST_URL = 'https://web-api.tp.entsoe.eu/api?documentType=A44&in_Domain=10YNL----------L&out_Domain=10YNL----------L&periodStart=202602180000&periodEnd=202602190000&securityToken=4b813a09-87ad-4ae8-8f3d-d15b635d7f96';
+const ENTSOE_BASE_URL = 'https://web-api.tp.entsoe.eu/api?documentType=A44&in_Domain=10YNL----------L&out_Domain=10YNL----------L';
+const ENTSOE_SECURITY_TOKEN = '4b813a09-87ad-4ae8-8f3d-d15b635d7f96';
 const TIMEZONE_NL = 'Europe/Amsterdam';
 const INKOOPVERGOEDING = 0.0219;
 const BELASTING = 0.08980;
 const BTW = 1.21;
+
+define('PRICE_DIR', __DIR__ . '/../data/price');
+
+/**
+ * Build ENTSO-E A44 URL for a period (start inclusive, end exclusive) in NL timezone.
+ * periodStart/periodEnd are in UTC (YYYYMMDDHHmm).
+ */
+function buildEntsoeUrl(DateTimeImmutable $startNl, DateTimeImmutable $endNlExclusive): string {
+    $tzUtc = new DateTimeZone('UTC');
+    $startUtc = $startNl->setTimezone($tzUtc);
+    $endUtc = $endNlExclusive->setTimezone($tzUtc);
+    $periodStart = $startUtc->format('Ymd') . $startUtc->format('Hi');
+    $periodEnd = $endUtc->format('Ymd') . $endUtc->format('Hi');
+    return ENTSOE_BASE_URL . '&periodStart=' . $periodStart . '&periodEnd=' . $periodEnd . '&securityToken=' . ENTSOE_SECURITY_TOKEN;
+}
 
 function isRunningInCLI(): bool {
     return php_sapi_name() === 'cli' || php_sapi_name() === 'phpdbg';
@@ -35,7 +52,7 @@ function sendJsonResponse(array $data, int $statusCode = 200): void {
 function fetchXml(string $url): ?string {
     $ch = curl_init($url);
     if ($ch === false) {
-        error_log('entsoe_test: Failed to initialize cURL');
+        error_log('entsoe_test2: Failed to initialize cURL');
         return null;
     }
 
@@ -52,12 +69,12 @@ function fetchXml(string $url): ?string {
     curl_close($ch);
 
     if ($response === false || $curlError !== '') {
-        error_log('entsoe_test: cURL error: ' . $curlError);
+        error_log('entsoe_test2: cURL error: ' . $curlError);
         return null;
     }
 
     if ($httpCode !== 200) {
-        error_log('entsoe_test: HTTP error code ' . $httpCode);
+        error_log('entsoe_test2: HTTP error code ' . $httpCode);
         return null;
     }
 
@@ -160,13 +177,76 @@ function parseHourlyPrices(string $xmlContent): array {
     return $result;
 }
 
+/**
+ * Build per-date hour->consumer_price map for file storage.
+ * Keys "00"-"23", values consumer price (EUR/kWh).
+ *
+ * @param array<int, array<string, mixed>> $hours
+ * @return array<string, array<string, float>> Map of date (Y-m-d) => hour "00"-"23" => price
+ */
+function buildPriceFilesByDate(array $hours): array {
+    $byDate = [];
+    foreach ($hours as $row) {
+        $date = $row['date_nl'];
+        $hour = str_pad((string)(int)$row['hour_nl'], 2, '0', STR_PAD_LEFT);
+        $price = $row['consumer_price'];
+        if ($price === null) {
+            continue;
+        }
+        if (!isset($byDate[$date])) {
+            $byDate[$date] = [];
+        }
+        $byDate[$date][$hour] = $price;
+    }
+    return $byDate;
+}
+
+/**
+ * Ensure directory exists and write price file.
+ *
+ * @param string $dateStr YYYYMMDD
+ * @param array<string, float> $prices Hour "00"-"23" => consumer price
+ * @return string|false Full path of written file on success, false on failure
+ */
+function savePriceFile(string $dateStr, array $prices): string|false {
+    if (strlen($dateStr) !== 8) {
+        return false;
+    }
+    $yearMonth = substr($dateStr, 0, 6);
+    $dir = PRICE_DIR . '/' . $yearMonth;
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0755, true)) {
+            error_log('entsoe_test2: Failed to create directory ' . $dir);
+            return false;
+        }
+    }
+    $filePath = $dir . '/price' . $dateStr . '.json';
+    ksort($prices);
+    $json = json_encode($prices, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        return false;
+    }
+    if (file_put_contents($filePath, $json, LOCK_EX) === false) {
+        error_log('entsoe_test2: Failed to write ' . $filePath);
+        return false;
+    }
+    return $filePath;
+}
+
 function run(): array {
-    $xmlContent = fetchXml(ENTSOE_TEST_URL);
+    $tzNl = new DateTimeZone(TIMEZONE_NL);
+    $nowNl = new DateTimeImmutable('now', $tzNl);
+    $todayStart = $nowNl->setTime(0, 0, 0);
+    $dayAfterTomorrowStart = $todayStart->modify('+2 days');
+
+    $url = buildEntsoeUrl($todayStart, $dayAfterTomorrowStart);
+
+    $xmlContent = fetchXml($url);
     if ($xmlContent === null) {
         return [
             'ok' => false,
             'error' => 'Failed to fetch ENTSO-E XML data',
-            'source_url' => ENTSOE_TEST_URL,
+            'source_url' => $url,
         ];
     }
 
@@ -175,19 +255,39 @@ function run(): array {
         return [
             'ok' => false,
             'error' => 'No PT15M points found in response',
-            'source_url' => ENTSOE_TEST_URL,
+            'source_url' => $url,
         ];
+    }
+
+    $writtenFiles = [];
+    $byDate = buildPriceFilesByDate($hours);
+    foreach ($byDate as $dateYmd => $hourPrices) {
+        $dateStr = str_replace('-', '', $dateYmd);
+        $path = savePriceFile($dateStr, $hourPrices);
+        if ($path !== false) {
+            $writtenFiles[] = $path;
+        }
     }
 
     return [
         'ok' => true,
-        'source_url' => ENTSOE_TEST_URL,
+        'source_url' => $url,
         'timezone' => TIMEZONE_NL,
+        'period_start_nl' => $todayStart->format('Y-m-d H:i:s'),
+        'period_end_nl' => $dayAfterTomorrowStart->format('Y-m-d H:i:s'),
         'generated_at_utc' => gmdate('Y-m-d H:i:s'),
         'hours' => $hours,
+        'written_files' => $writtenFiles,
     ];
 }
 
 $result = run();
 $statusCode = ($result['ok'] ?? false) ? 200 : 500;
 sendJsonResponse($result, $statusCode);
+
+if (isRunningInCLI() && !empty($result['written_files'] ?? [])) {
+    echo "\nFile(s) written:\n";
+    foreach ($result['written_files'] as $path) {
+        echo "  " . $path . "\n";
+    }
+}

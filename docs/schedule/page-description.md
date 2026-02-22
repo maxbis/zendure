@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard for managing and monitoring the Zendure battery system. It provides real-time visualization of charge/discharge schedules, electricity prices, automation status, battery state, and grid usage.
+The Charge Schedule Manager (`charge_schedule_mobile.php`) is a comprehensive dashboard for managing and monitoring the Zendure battery system. It provides real-time visualization of charge/discharge schedules, electricity prices, automation status, battery state, and grid usage.
 
 ## Page Sections
 
@@ -29,8 +29,8 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 - Actions: Add, Auto, Clear buttons for managing entries
 
 **Data Source**: 
-- File: `/data/charge_schedule.json`
-- API: `schedule/api/charge_schedule_api.php`
+- File: `/main/data/charge_schedule.json`
+- API: `main/data/api/data_api.php?type=schedule&resolved=1` (via `scheduleApiUrl` in config)
 - Loaded server-side on page load, updated via AJAX
 
 ---
@@ -73,8 +73,8 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 **Data Source**:
 - API: Configured via `config.json` → `priceUrls.get_price` or `priceUrls.get_prices`
 - Fetched client-side by `price_overview_bar.js`
-- Price files stored in `/data/price/YYYYMM/priceYYYYMMDD.json` format (organized by year-month)
-- Retrieved via `data/api/data_api.php?type=price&date=YYYYMMDD`
+- Price files stored in `/main/data/price/YYYYMM/priceYYYYMMDD.json` format (organized by year-month)
+- Retrieved via `main/data/api/data_api.php?type=price&date=YYYYMMDD`
 
 ---
 
@@ -112,8 +112,8 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 - Values are color-coded (green for charge, red for discharge)
 
 **Data Source**:
-- Schedule data from `charge_schedule_api.php`
-- Calculated server-side in `partials/calculate.php`
+- Schedule data from `scheduleApiUrl` (currently `main/data/api/data_api.php?type=schedule&resolved=1`)
+- Calculated client-side during refresh in `main/assets/js/charge_schedule.js` (via `renderScheduleCalculator(...)` when available)
 - Uses resolved schedule with duration calculations
 - `netzero` evaluates to -350W, `netzero+` evaluates to +350W
 
@@ -140,7 +140,7 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 
 **Data Source**:
 - File: `/data/automation_status.json`
-- API: `schedule/api/automation_status_api.php`
+- API: `main/api/automation_status_api.php`
 - Loaded server-side on page load
 - Updated by automation process (`automate/automate.py`) when commands are sent
 - Entries older than 3 days are automatically cleaned up
@@ -166,7 +166,7 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
   - Visual bar with min/max markers (20% min, 90% max)
 
 **Data Source**:
-- API: `data/api/data_api.php?type=zendure`
+- API: `main/data/api/data_api.php?type=zendure`
 - File: `/data/zendure_data.json` (cached)
 - Updated by automation process or external data collection
 - Properties used:
@@ -210,7 +210,7 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
     - `maxTemp`: Maximum temperature (hyper format)
     - `heatState`: Heating state (0=cooling, 1=heating)
 - **P1 Meter Data**: 
-  - API: `data/api/data_api.php?type=zendure_p1`
+  - API: `main/data/api/data_api.php?type=zendure_p1`
   - File: `/data/zendure_p1_data.json` (cached)
   - Updated by automation process reading from P1 meter device
   - Properties used:
@@ -222,7 +222,7 @@ The Charge Schedule Manager (`charge_schedule.php`) is a comprehensive dashboard
 
 ### Schedule Data
 ```
-charge_schedule.json → charge_schedule_api.php → Page (server-side + AJAX)
+main/data/charge_schedule.json → main/data/api/data_api.php?type=schedule → Page (server-side + AJAX)
 ```
 
 ### Price Data
@@ -273,21 +273,22 @@ The page uses configuration from `config/config.json` (or fallback to `run_sched
 ## File Structure
 
 ```
-schedule/
-├── charge_schedule.php          # Main page
+main/
+├── charge_schedule_mobile.php          # Main page
 ├── partials/                    # Page sections
-│   ├── schedule_panels.php
-│   ├── schedule_overview_bar.php
-│   ├── price_overview_bar.php
-│   ├── price_statistics.php
-│   ├── calculate.php
+│   ├── schedule_panels_mobile.php
+│   ├── price_overview_bar_mobile.php
 │   ├── automation_status.php
-│   ├── charge_status.php
-│   ├── charge_status_details.php
-│   └── charge_status_data.php  # Shared data loader
+│   ├── charge_status_mobile.php
+│   ├── charge_status_details_mobile.php
+│   ├── energy_graph_mobile.php
+│   └── edit_modal.php
 ├── api/                         # API endpoints
 │   ├── charge_schedule_api.php
-│   └── automation_status_api.php
+│   ├── calculate_schedule_api.php
+│   ├── automation_status_proxy.php
+│   ├── charge_status_all_proxy.php
+│   └── energy_graph_proxy.php
 └── assets/                      # Frontend resources
     ├── js/                      # JavaScript modules
     └── css/                     # Stylesheets

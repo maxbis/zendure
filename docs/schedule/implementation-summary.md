@@ -16,7 +16,7 @@
 **Usage**:
 ```php
 // Simple get
-$apiUrl = ConfigLoader::get('scheduleApiUrl', 'api/charge_schedule_api.php');
+$apiUrl = ConfigLoader::get('scheduleApiUrl', 'main/data/api/data_api.php?type=schedule&resolved=1');
 
 // Dot notation for nested keys
 $priceUrl = ConfigLoader::get('priceUrls.get_price');
@@ -26,10 +26,10 @@ $dataApiUrl = ConfigLoader::getWithLocation('dataApiUrl');
 ```
 
 **Updated Files**:
-- `charge_schedule.php` - Replaced manual config loading
+- `charge_schedule_mobile.php` - Replaced manual config loading
 - `partials/automation_status.php` - Uses ConfigLoader
-- `partials/charge_status_data.php` - Uses ConfigLoader
-- `partials/calculate.php` - Uses ConfigLoader
+- `api/charge_status_all_proxy.php` - Uses ConfigLoader
+- `api/energy_graph_proxy.php` - Uses ConfigLoader
 
 ---
 
@@ -62,7 +62,7 @@ window.notifications.info('Schedule updated');
 ```
 
 **Updated Files**:
-- `charge_schedule.php` - Added script tag to load notification service
+- `charge_schedule_mobile.php` - Added script tag to load notification service
 - `charge_schedule.js` - Replaced all `alert()` calls with notifications
 
 ---
@@ -84,7 +84,7 @@ window.notifications.info('Schedule updated');
 **Usage**:
 ```javascript
 // Create client instance
-const client = new ApiClient('api/charge_schedule_api.php', {
+const client = new ApiClient('main/data/api/data_api.php?type=schedule&resolved=1', {
     timeout: 10000,
     retries: 3,
     retryDelay: 1000
@@ -111,7 +111,7 @@ try {
 ```
 
 **Updated Files**:
-- `charge_schedule.php` - Added script tag to load API client
+- `charge_schedule_mobile.php` - Added script tag to load API client
 - `schedule_api.js` - Refactored all API functions to use ApiClient with fallback
 
 ---
@@ -169,18 +169,18 @@ Developers can now:
 
 ## 📁 Files Created
 
-1. `schedule/includes/config_loader.php` - Centralized configuration loader
-2. `schedule/assets/js/notification_service.js` - Unified notification system
-3. `schedule/assets/js/api_client.js` - Robust API client with retry logic
+1. `main/includes/config_loader.php` - Centralized configuration loader
+2. `main/assets/js/notification_service.js` - Unified notification system
+3. `main/assets/js/api_client.js` - Robust API client with retry logic
 
 ## 📝 Files Modified
 
-1. `schedule/charge_schedule.php` - Uses ConfigLoader, loads new JS files
-2. `schedule/partials/automation_status.php` - Uses ConfigLoader
-3. `schedule/partials/charge_status_data.php` - Uses ConfigLoader
-4. `schedule/partials/calculate.php` - Uses ConfigLoader
-5. `schedule/assets/js/charge_schedule.js` - Uses notifications instead of alerts
-6. `schedule/assets/js/schedule_api.js` - Uses ApiClient with fallback
+1. `main/charge_schedule_mobile.php` - Uses ConfigLoader, loads new JS files
+2. `main/partials/automation_status.php` - Uses ConfigLoader
+3. `main/api/charge_status_all_proxy.php` - Uses ConfigLoader
+4. `main/api/energy_graph_proxy.php` - Uses ConfigLoader
+5. `main/assets/js/charge_schedule.js` - Uses notifications instead of alerts
+6. `main/assets/js/schedule_api.js` - Uses ApiClient with fallback
 
 ---
 

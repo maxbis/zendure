@@ -1,6 +1,6 @@
 # Charge Schedule Manager
 
-A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The same schedule JS is used by both the desktop page (`charge_schedule.php`) and the mobile page (`charge_schedule_mobile.php`).
+A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The active entrypoint in this repository is `main/charge_schedule_mobile.php`, which uses the shared schedule JS modules.
 
 **Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [docs/mobile/api-dependencies.md](../mobile/api-dependencies.md) (mobile API usage).
 
@@ -14,17 +14,17 @@ The application uses a **Progressive Enhancement** architecture:
 ## Directory Structure
 
 ```
-schedule/
-├── charge_schedule.php          # Main entry point
+main/
+├── charge_schedule_mobile.php          # Main entry point
 ├── api/
 │   ├── charge_schedule_api.php      # REST API endpoint
 │   ├── charge_schedule_functions.php # Schedule logic functions
 │   └── calculate_schedule_api.php   # Auto-calculation endpoint
 ├── assets/
 │   ├── css/                     # Stylesheets
-│   │   ├── charge_schedule.css
-│   │   ├── schedule_calculator.css
-│   │   ├── schedule_panels.css
+│   │   ├── charge_schedule_mobile.css
+│   │   ├── general_mobile.css
+│   │   ├── charge_status.css
 │   │   └── ...
 │   └── js/                      # JavaScript modules
 │       ├── schedule_utils.js        # Shared utility functions
@@ -135,7 +135,7 @@ Main application orchestrator.
 ### Initial Page Load
 
 ```
-1. User requests charge_schedule.php
+1. User requests charge_schedule_mobile.php
 2. PHP loads schedule from charge_schedule.json
 3. PHP renders initial HTML with data (fast!)
 4. Browser loads JavaScript modules
@@ -168,14 +168,14 @@ Main application orchestrator.
 
 ### Main Files
 
-#### `charge_schedule.php`
+#### `charge_schedule_mobile.php`
 - Entry point for the application
 - Loads configuration from `config.json`
 - Performs initial server-side render
 - Injects API URLs as JavaScript constants
 - Includes partials for HTML structure
 
-#### `api/charge_schedule_api.php`
+#### `main/data/api/data_api.php?type=schedule`
 REST API endpoint supporting:
 - `GET ?date=YYYYMMDD` - Fetch schedule for date
 - `POST {action: "simulate|delete"}` - Clear old entries
@@ -214,7 +214,7 @@ The application reads configuration from `config/config.json`:
 
 ```json
 {
-  "scheduleApiUrl": "api/charge_schedule_api.php",
+  "scheduleApiUrl": "main/data/api/data_api.php?type=schedule&resolved=1",
   "calculate_schedule_apiUrl": "api/calculate_schedule_api.php",
   "priceUrls": {
     "get_price": "..."
@@ -227,7 +227,7 @@ The application reads configuration from `config/config.json`:
 
 ## Schedule Data Format
 
-### Storage (`data/charge_schedule.json`)
+### Storage (`main/data/charge_schedule.json`)
 
 ```json
 {
@@ -297,7 +297,7 @@ Every 30-minute slot for the day with resolved values.
 3. **Add rendering** to `schedule_renderer.js` if DOM updates needed
 4. **Add business logic** to `charge_schedule.js` or create new feature module
 5. **Update PHP** if initial render needs new data
-6. **Add to load order** in `charge_schedule.php` if new file created
+6. **Add to load order** in `charge_schedule_mobile.php` if new file created
 
 ### Best Practices
 
@@ -341,18 +341,18 @@ Manual testing checklist:
 ### Changes not appearing
 1. Check browser console for JavaScript errors
 2. Verify API URL in browser network tab
-3. Check `data/charge_schedule.json` has correct permissions
+3. Check `main/data/charge_schedule.json` has correct permissions
 4. Clear browser cache
 
 ### Rendering issues
-1. Check script load order in `charge_schedule.php`
+1. Check script load order in `charge_schedule_mobile.php`
 2. Verify all utility functions are available (check console)
 3. Check CSS files are loaded
 
 ### API errors
 1. Check PHP error log
 2. Verify `data/` directory is writable
-3. Test API endpoint directly: `api/charge_schedule_api.php?date=20260115`
+3. Test API endpoint directly: `main/data/api/data_api.php?type=schedule&resolved=1&date=20260115`
 
 ## License
 

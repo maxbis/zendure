@@ -6,7 +6,7 @@ Overview of refresh-related JavaScript in the schedule app: the two main APIs, w
 
 ## 1. Schedule and prices
 
-**File:** `schedule/assets/js/charge_schedule.js`
+**File:** `main/assets/js/charge_schedule.js`
 
 **APIs:**
 
@@ -38,7 +38,7 @@ Does **not** touch automation status or charge status.
 
 ## 2. Status
 
-**File:** `schedule/assets/js/charge_status.js`
+**File:** `main/assets/js/charge_status.js`
 
 **API:** **`refreshStatus(isAutoRefresh = false)`**
 
@@ -62,7 +62,7 @@ Does **not** re-fetch or re-render schedule or price data.
 
 ## 3. `performNormalRefresh`
 
-**File:** `schedule/assets/js/automation_status.js`
+**File:** `main/assets/js/automation_status.js`
 
 Handles the Automation "Refresh" button: disables button, shows "refreshing" UX, then calls `refreshStatus()` only.
 
@@ -72,7 +72,7 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ## 4. `SchedulePanelComponent.refresh`
 
-**File:** `schedule/assets/js/components/schedule_panel_component.js`
+**File:** `main/assets/js/components/schedule_panel_component.js`
 
 **When triggered:** Click on the schedule panel "Refresh" button (`#refresh-schedule-btn`).
 
@@ -82,11 +82,11 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ## 5. Energy graph refresh
 
-**File:** `schedule/assets/js/energy_graph_refresh.js`
+**File:** `main/assets/js/energy_graph_refresh.js`
 
 **API:** **`refreshEnergyGraph()`** (exposed as `window.refreshEnergyGraph`)
 
-**When triggered:** From `_refreshScheduleAndPricesInternal()` in `charge_schedule.js` (and thus whenever the schedule/prices refresh runs: 20×20 auto-refresh tick, after save/delete, Clear, Auto, or when the tab becomes visible).
+**When triggered:** From `_refreshScheduleAndPricesInternal()` in `charge_schedule.js` (and thus whenever the main/prices refresh runs: 20×20 auto-refresh tick, after save/delete, Clear, Auto, or when the tab becomes visible).
 
 **Updates:** Watt-hours per hour chart(s) (desktop and/or mobile) and daily totals table(s) from `api/energy_graph_api.php`. No other partials.
 
@@ -102,13 +102,10 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ---
 
-## 7. DataService (internal)
+## 7. DataService (legacy note)
 
-**`DataService._refreshInBackground`** (`schedule/assets/js/data_service.js`)
-
-**When triggered:** Internally by `DataService.fetch()` when the cache entry has expired and stale-while-revalidate is enabled. Not tied to any user action.
-
-**Updates:** DataService cache for that key (re-fetches and notifies subscribers).
+`main/assets/js/data_service.js` is not part of the current mobile page load order.  
+The active refresh path is driven by `main/assets/js/charge_schedule.js` and `main/assets/js/charge_status.js`.
 
 ---
 

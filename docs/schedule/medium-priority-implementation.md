@@ -206,7 +206,7 @@ const memoizedCalculate = memoize(expensiveCalculation);
 
 ### Updated Files
 
-1. **`charge_schedule.php`**:
+1. **`charge_schedule_mobile.php`**:
    - Added script tags for new modules:
      - `state_manager.js`
      - `data_service.js`
@@ -276,7 +276,7 @@ The implementation allows gradual migration:
 
 ## 📝 Files Modified
 
-1. `charge_schedule.php` - Added new script tags
+1. `charge_schedule_mobile.php` - Added new script tags
 2. `charge_schedule.js` - Integrated state management, components, and performance optimizations
 
 ---

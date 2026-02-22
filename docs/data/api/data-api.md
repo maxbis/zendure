@@ -10,7 +10,7 @@ The `type` parameter in the query string determines which file or logic is acces
 
 ### 1. Price Data (`type=price`)
 * **Filename Pattern:** `priceYYYYMMDD.json` (e.g., `price20241222.json`)
-* **Storage Location:** `data/price/YYYYMM/priceYYYYMMDD.json` (organized by year-month)
+* **Storage Location:** `main/data/price/YYYYMM/priceYYYYMMDD.json` (organized by year-month)
 * **Operations:**
     * `GET`: Read prices for a specific date (requires `&date=YYYYMMDD`).
     * `POST`: Write/Update prices for a specific date.
@@ -44,12 +44,12 @@ The `type` parameter in the query string determines which file or logic is acces
 
 ## Discovery & Listing
 
-To see existing files in the `/data/` directory:
+To see existing files in the `/main/data/` directory:
 
 | Action | Endpoint |
 | :--- | :--- |
-| **List All Files** | `GET /data/api/data_api.php?type=list` |
-| **Filter by Pattern** | `GET /data/api/data_api.php?type=list&pattern=price*.json` |
+| **List All Files** | `GET /main/data/api/data_api.php?type=list` |
+| **Filter by Pattern** | `GET /main/data/api/data_api.php?type=list&pattern=price*.json` |
 
 ---
 
@@ -58,7 +58,7 @@ To see existing files in the `/data/` directory:
 Files are created on the first **Write (POST)** request. Ensure the web server has permission to write to the data directory:
 
 ```bash
-sudo chown -R www-data:www-data /var/www/html/data/
+sudo chown -R www-data:www-data /var/www/html/main/data/
 ```
 
 ---
@@ -66,8 +66,8 @@ sudo chown -R www-data:www-data /var/www/html/data/
 ## Overview
 
 The Data API consists of two main files:
-- `data_api.php` - Main API endpoint handler (REST API)
-- `data_functions.php` - Helper functions used by the API
+- `main/data/api/data_api.php` - Main API endpoint handler (REST API)
+- `main/data/api/data_functions.php` - Helper functions used by the API
 
 ## Functions in `data_functions.php`
 
