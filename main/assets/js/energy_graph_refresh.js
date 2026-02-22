@@ -154,7 +154,10 @@
                 var i = context.dataIndex;
                 if (context.datasetIndex === 1) {
                     var pct = cd.electricLevels[i];
-                    return pct == null ? 'Battery: n/a' : ('Battery: ' + pct.toFixed(0) + '%');
+                    if (pct == null) return 'Battery: n/a';
+                    var prevPct = i > 0 ? cd.electricLevels[i - 1] : null;
+                    if (prevPct == null) return 'Battery: ' + pct.toFixed(0) + '%';
+                    return 'Battery: ' + prevPct.toFixed(0) + '%-' + pct.toFixed(0) + '%';
                 }
                 var v = cd.originalValues[i] || 0;
                 var whLabel = v.toFixed(0) + ' Wh';

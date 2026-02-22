@@ -184,11 +184,11 @@ try {
                     // Return response in old endpoint format
                     $response = [
                         'success' => true,
-                        'resolved' => $resolved,
+                        'date' => $date,
                         'currentHour' => date('H') . '00',
                         'currentTime' => date('Hi'),
+                        'resolved' => $resolved,
                         'entries' => $uiEntries,
-                        'date' => $date
                     ];
                 } else {
                     // Standard response format
