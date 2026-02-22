@@ -40,6 +40,7 @@ automate/data/status_updates.db
 /data/*.json
 /data/**/*.json
 /main/data/*.json
+/main/data/charge_schedule.json
 /main/data/price/
 /config/*
 config.json
