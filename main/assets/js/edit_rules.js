@@ -11,6 +11,11 @@
         rulesTbody: document.getElementById('rules-tbody'),
         form: document.getElementById('rule-form'),
         editorTitle: document.getElementById('editor-title'),
+        rawJsonCard: document.getElementById('raw-json-card'),
+        rawJsonTextarea: document.getElementById('raw-json-textarea'),
+        btnRawJson: document.getElementById('btn-raw-json'),
+        btnCopyRawJson: document.getElementById('btn-copy-raw-json'),
+        btnCloseRawJson: document.getElementById('btn-close-raw-json'),
         btnReload: document.getElementById('btn-reload'),
         btnNew: document.getElementById('btn-new'),
         btnAddCondition: document.getElementById('btn-add-condition'),
@@ -36,6 +41,11 @@
     function setStatus(text, type) {
         els.status.className = 'status ' + (type || '');
         els.status.textContent = text || '';
+    }
+
+    function renderRawJson() {
+        if (!els.rawJsonTextarea) return;
+        els.rawJsonTextarea.value = JSON.stringify(state.rules, null, 2);
     }
 
     function normalizeRule(rule) {
@@ -91,6 +101,7 @@
             ].join('');
             els.rulesTbody.appendChild(tr);
         });
+        renderRawJson();
     }
 
     function escapeHtml(s) {
@@ -334,6 +345,24 @@
     }
 
     function attachEvents() {
+        els.btnRawJson.addEventListener('click', function () {
+            renderRawJson();
+            els.rawJsonCard.hidden = false;
+        });
+
+        els.btnCloseRawJson.addEventListener('click', function () {
+            els.rawJsonCard.hidden = true;
+        });
+
+        els.btnCopyRawJson.addEventListener('click', async function () {
+            try {
+                await navigator.clipboard.writeText(els.rawJsonTextarea.value || '');
+                setStatus('Raw JSON copied.', 'ok');
+            } catch (e) {
+                setStatus('Failed to copy raw JSON.', 'error');
+            }
+        });
+
         els.btnReload.addEventListener('click', loadRules);
 
         els.btnNew.addEventListener('click', function () {

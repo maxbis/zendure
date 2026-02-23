@@ -211,6 +211,24 @@ form {
     gap: 8px;
 }
 
+.raw-json-card {
+    min-width: 1200px;
+}
+
+.raw-json-card textarea {
+    margin-top: 10px;
+    width: 80%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #5c5c5c;
+    color: var(--text);
+    padding: 10px;
+    resize: vertical;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
 .condition-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1.1fr 1.1fr auto;

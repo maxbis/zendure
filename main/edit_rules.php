@@ -187,11 +187,23 @@ if ($isApi) {
             <h1>Condition Rules Editor</h1>
             <div class="actions">
                 <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
+                <button id="btn-raw-json" type="button">Raw JSON</button>
                 <button id="btn-reload" type="button">Reload</button>
             </div>
         </div>
         <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>
         <div id="status" class="status"></div>
+    </section>
+
+    <section class="card raw-json-card" id="raw-json-card" hidden>
+        <div class="card-header-row">
+            <h2>Raw JSON</h2>
+            <div class="actions">
+                <button id="btn-copy-raw-json" type="button">Copy</button>
+                <button id="btn-close-raw-json" type="button">Close</button>
+            </div>
+        </div>
+        <textarea id="raw-json-textarea" rows="12" readonly spellcheck="false"></textarea>
     </section>
 
     <section class="grid">
