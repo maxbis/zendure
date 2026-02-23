@@ -85,11 +85,16 @@ function normalizeRules(array $rules): array
         if (!is_array($rule) || !array_key_exists('value', $rule)) {
             continue;
         }
+        $name = isset($rule['name']) ? trim((string) $rule['name']) : '';
+        if ($name === '') {
+            continue;
+        }
         if (!validateValue($rule['value'])) {
             continue;
         }
 
         $normalized = [];
+        $normalized['name'] = $name;
         $normalized['value'] = is_numeric($rule['value']) ? (int) $rule['value'] : (string) $rule['value'];
 
         if (isset($rule['key']) && is_string($rule['key']) && $rule['key'] !== '') {
@@ -199,7 +204,7 @@ if ($isApi) {
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Summary</th>
+                        <th>Name</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -211,8 +216,8 @@ if ($isApi) {
             <h2 id="editor-title">Rule Editor</h2>
             <form id="rule-form">
                 <div class="row">
-                    <label>Key (optional)</label>
-                    <input id="inp-key" type="text" placeholder="************">
+                    <label>Name</label>
+                    <input id="inp-name" type="text" placeholder="Rule name" required>
                 </div>
 
                 <div class="row split">

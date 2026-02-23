@@ -15,7 +15,7 @@
         btnNew: document.getElementById('btn-new'),
         btnAddCondition: document.getElementById('btn-add-condition'),
         btnCancel: document.getElementById('btn-cancel'),
-        inpKey: document.getElementById('inp-key'),
+        inpName: document.getElementById('inp-name'),
         inpValueMode: document.getElementById('inp-value-mode'),
         inpFixedValue: document.getElementById('inp-fixed-value'),
         inpMonth: document.getElementById('inp-month'),
@@ -40,6 +40,7 @@
 
     function normalizeRule(rule) {
         const out = {};
+        out.name = String(rule.name || '').trim();
         out.value = rule.value;
         if (rule.key) out.key = String(rule.key);
         if (rule.month) out.month = String(rule.month);
@@ -66,19 +67,6 @@
         return out;
     }
 
-    function ruleSummary(rule) {
-        const parts = [];
-        parts.push('value=' + rule.value);
-        if (rule.key) parts.push('key=' + rule.key);
-        if (rule.month) parts.push('month=' + rule.month);
-        if (rule.hour) parts.push('hour=' + rule.hour);
-        if (rule.min_time) parts.push('min_time=' + rule.min_time);
-        if (rule.max_time) parts.push('max_time=' + rule.max_time);
-        const condCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0;
-        parts.push('conditions=' + condCount);
-        return parts.join(' | ');
-    }
-
     function renderTable() {
         els.rulesTbody.innerHTML = '';
         if (state.rules.length === 0) {
@@ -92,7 +80,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = [
                 '<td>' + (idx + 1) + '</td>',
-                '<td><code>' + escapeHtml(ruleSummary(rule)) + '</code></td>',
+                '<td><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></td>',
                 '<td class="table-actions">',
                 '<button type="button" data-action="edit" data-idx="' + idx + '">Edit</button>',
                 '<button type="button" data-action="dup" data-idx="' + idx + '">Duplicate</button>',
@@ -171,7 +159,7 @@
         state.editIndex = null;
         els.editorTitle.textContent = 'Rule Editor';
         els.form.reset();
-        els.inpKey.value = '';
+        els.inpName.value = '';
         els.inpMonth.value = '';
         els.inpHour.value = '';
         els.inpMinTime.value = '';
@@ -184,8 +172,8 @@
     function fillEditor(rule, idx) {
         state.editIndex = idx;
         els.editorTitle.textContent = 'Editing Rule #' + (idx + 1);
+        els.inpName.value = rule.name || '';
 
-        els.inpKey.value = rule.key || '';
         if (rule.value === 'netzero' || rule.value === 'netzero+') {
             els.inpValueMode.value = rule.value;
             els.inpFixedValue.value = '';
@@ -251,9 +239,12 @@
             value = Math.trunc(n);
         }
 
-        const rule = { value: value };
-        const key = els.inpKey.value.trim();
-        if (key) rule.key = key;
+        const name = els.inpName.value.trim();
+        if (!name) {
+            throw new Error('Name is required.');
+        }
+
+        const rule = { name: name, value: value };
 
         const month = els.inpMonth.value.trim();
         if (month) rule.month = month;
@@ -411,6 +402,12 @@
             try {
                 const rule = readRuleFromForm();
                 const isNew = state.editIndex === null;
+                if (!isNew) {
+                    const existing = state.rules[state.editIndex];
+                    if (existing && existing.key) {
+                        rule.key = existing.key;
+                    }
+                }
                 const ok = await mutateAndPersist(function () {
                     if (isNew) {
                         state.rules.push(rule);
