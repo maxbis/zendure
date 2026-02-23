@@ -8,4 +8,10 @@ set -e
 BASE_URL="${1:-https://zendure.qool.ovh}"
 URL="${BASE_URL}/main/data/api/data_api.php?type=schedule&resolved=1"
 
-curl -sS --fail "$URL"
+curl -sS --fail "$URL" 2> /dev/null
+if [ $? -ne 0 ]; then
+    echo "Error fetching schedule API"
+    exit 1
+fi
+echo "Schedule API fetched successfully"
+exit 0
