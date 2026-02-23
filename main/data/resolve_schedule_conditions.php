@@ -16,7 +16,9 @@
 // - Always attempts today + tomorrow (Europe/Amsterdam)
 // - Includes a date only when a corresponding price file exists
 // - Missing/invalid hour price => condition false for that hour (skip hour)
-// - Supports conditions: price, min_time, max_time
+// - Supports conditions: price, ranking, min_time, max_time, month, hour
+// - Supports dynamic references via condition.value_ref:
+//   min_price, max_price, min_price_hour, max_price_hour, spread_price
 
 date_default_timezone_set('Europe/Amsterdam');
 
@@ -222,17 +224,105 @@ function compareNumeric(float $left, string $op, float $right): bool
     return false;
 }
 
+/**
+ * Build numeric context values derived from daily price data.
+ *
+ * Prices are interpreted as EUR/kWh in source files and normalized to cents/kWh
+ * for condition evaluation to match existing "price >= 25" usage.
+ *
+ * @param array $priceByHour
+ * @return array{min_price:?float,max_price:?float,min_price_hour:?int,max_price_hour:?int,spread_price:?float,ranking_by_hour:array<int,int>}
+ */
+function buildPriceContext(array $priceByHour): array
+{
+    $minPrice = null;
+    $maxPrice = null;
+    $minHour = null;
+    $maxHour = null;
+    $pairs = [];
+
+    for ($hour = 0; $hour < 24; $hour++) {
+        $hourKey = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
+        if (!array_key_exists($hourKey, $priceByHour) || !is_numeric($priceByHour[$hourKey])) {
+            continue;
+        }
+        $priceCents = ((float) $priceByHour[$hourKey]) * 100.0;
+        $pairs[] = ['hour' => $hour, 'price' => $priceCents];
+
+        if ($minPrice === null || $priceCents < $minPrice) {
+            $minPrice = $priceCents;
+            $minHour = $hour;
+        }
+        if ($maxPrice === null || $priceCents > $maxPrice) {
+            $maxPrice = $priceCents;
+            $maxHour = $hour;
+        }
+    }
+
+    usort($pairs, function ($a, $b) {
+        if ($a['price'] < $b['price']) {
+            return -1;
+        }
+        if ($a['price'] > $b['price']) {
+            return 1;
+        }
+        // Within equal price, earlier hour gets lower rank.
+        return $a['hour'] - $b['hour'];
+    });
+
+    $rankingByHour = [];
+    foreach ($pairs as $idx => $pair) {
+        $rankingByHour[(int) $pair['hour']] = $idx + 1; // 1-based rank
+    }
+
+    return [
+        'min_price' => $minPrice,
+        'max_price' => $maxPrice,
+        'min_price_hour' => $minHour,
+        'max_price_hour' => $maxHour,
+        'spread_price' => ($minPrice !== null && $maxPrice !== null) ? ($maxPrice - $minPrice) : null,
+        'ranking_by_hour' => $rankingByHour,
+    ];
+}
+
+/**
+ * Resolve right-side operand from condition value or value_ref.
+ *
+ * @param array $condition
+ * @param array $ctx
+ * @return float|null
+ */
+function resolveConditionOperand(array $condition, array $ctx): ?float
+{
+    if (isset($condition['value_ref'])) {
+        $ref = (string) $condition['value_ref'];
+        if (!array_key_exists($ref, $ctx) || $ctx[$ref] === null || !is_numeric($ctx[$ref])) {
+            return null;
+        }
+        return (float) $ctx[$ref];
+    }
+
+    $value = $condition['value'] ?? null;
+    if (!is_numeric($value)) {
+        return null;
+    }
+    return (float) $value;
+}
+
 /** @return bool */
-function conditionMatchesPrice(array $condition, array $priceByHour, int $hour): bool
+function conditionMatchesPrice(array $condition, array $priceByHour, int $hour, array $ctx): bool
 {
     $op = isset($condition['op']) ? (string) $condition['op'] : '==';
-    $value = $condition['value'] ?? null;
+    $right = resolveConditionOperand($condition, $ctx);
+    if ($right === null) {
+        return false;
+    }
     $hourKey = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
     if (!array_key_exists($hourKey, $priceByHour) || !is_numeric($priceByHour[$hourKey])) {
         return false;
     }
     $priceCents = ((float) $priceByHour[$hourKey]) * 100.0;
-    return is_numeric($value) && compareNumeric($priceCents, $op, (float) $value);
+    return compareNumeric($priceCents, $op, $right);
 }
 
 /** @return bool */
@@ -260,15 +350,58 @@ function conditionMatchesMonth(array $condition, string $yyyymmdd): bool
 }
 
 /** @return bool */
-function conditionMatchesHour(array $condition, int $hour): bool
+function conditionMatchesHour(array $condition, int $hour, array $ctx): bool
 {
-    $hours = parseHourList($condition['value'] ?? null);
-    return $hours !== null && in_array($hour, $hours, true);
+    $op = isset($condition['op']) ? (string) $condition['op'] : 'in';
+    if ($op === 'in') {
+        $hours = parseHourList($condition['value'] ?? null);
+        return $hours !== null && in_array($hour, $hours, true);
+    }
+
+    // Numeric comparison, e.g. hour < min_price_hour (via value_ref).
+    $right = resolveConditionOperand($condition, $ctx);
+    return $right !== null && compareNumeric((float) $hour, $op, $right);
+}
+
+/** @return bool */
+function conditionMatchesRanking(array $condition, int $hour, array $ctx): bool
+{
+    $op = isset($condition['op']) ? (string) $condition['op'] : '==';
+    if (!isset($ctx['ranking_by_hour']) || !is_array($ctx['ranking_by_hour'])) {
+        return false;
+    }
+    if (!array_key_exists($hour, $ctx['ranking_by_hour']) || !is_numeric($ctx['ranking_by_hour'][$hour])) {
+        return false;
+    }
+    $rank = (float) $ctx['ranking_by_hour'][$hour];
+    $right = resolveConditionOperand($condition, $ctx);
+    if ($right === null) {
+        return false;
+    }
+    return compareNumeric($rank, $op, $right);
+}
+
+/** @return bool */
+function conditionMatchesContextNumber(array $condition, array $ctx): bool
+{
+    if (!isset($condition['field'])) {
+        return false;
+    }
+    $field = (string) $condition['field'];
+    $op = isset($condition['op']) ? (string) $condition['op'] : '==';
+    if (!array_key_exists($field, $ctx) || $ctx[$field] === null || !is_numeric($ctx[$field])) {
+        return false;
+    }
+    $right = resolveConditionOperand($condition, $ctx);
+    if ($right === null) {
+        return false;
+    }
+    return compareNumeric((float) $ctx[$field], $op, $right);
 }
 
 /**
  * Evaluate rule conditions for a single hour.
- * Supports: price, min_time, max_time, month, hour.
+ * Supports: price, ranking, min_time, max_time, month, hour.
  *
  * @param array $rule
  * @param array $priceByHour
@@ -276,7 +409,7 @@ function conditionMatchesHour(array $condition, int $hour): bool
  * @param string $yyyymmdd
  * @return bool
  */
-function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string $yyyymmdd): bool
+function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string $yyyymmdd, array $ctx): bool
 {
     $conditions = isset($rule['conditions']) && is_array($rule['conditions']) ? $rule['conditions'] : [];
     if (array_key_exists('min_time', $rule)) {
@@ -297,11 +430,13 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string 
             return false;
         }
         $field = (string) $condition['field'];
-        $value = $condition['value'] ?? null;
-
         $match = false;
         if ($field === 'price') {
-            $match = conditionMatchesPrice($condition, $priceByHour, $hour);
+            $match = conditionMatchesPrice($condition, $priceByHour, $hour, $ctx);
+        } elseif ($field === 'ranking') {
+            $match = conditionMatchesRanking($condition, $hour, $ctx);
+        } elseif ($field === 'min_price' || $field === 'max_price' || $field === 'min_price_hour' || $field === 'max_price_hour' || $field === 'spread_price') {
+            $match = conditionMatchesContextNumber($condition, $ctx);
         } elseif ($field === 'min_time') {
             $match = conditionMatchesMinTime($condition, $hour);
         } elseif ($field === 'max_time') {
@@ -309,7 +444,7 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string 
         } elseif ($field === 'month') {
             $match = conditionMatchesMonth($condition, $yyyymmdd);
         } elseif ($field === 'hour') {
-            $match = conditionMatchesHour($condition, $hour);
+            $match = conditionMatchesHour($condition, $hour, $ctx);
         }
         if (!$match) {
             return false;
@@ -400,11 +535,13 @@ function normalizeRules(array $raw): array
 function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour): array
 {
     $items = [];
+    $ctx = buildPriceContext($priceByHour);
+
     for ($hour = 0; $hour < 24; $hour++) {
         $hourStr = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
         $slotKey = $yyyymmdd . $hourStr . '00';
         foreach ($rules as $rule) {
-            if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd)) {
+            if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd, $ctx)) {
                 continue;
             }
             $items[] = ['time' => $hourStr . '00', 'value' => $rule['value']];

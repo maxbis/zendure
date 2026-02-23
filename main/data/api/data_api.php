@@ -20,10 +20,32 @@ define('DATA_DIR', __DIR__ . '/..');
 define('ALLOWED_TYPES', ['price', 'zendure', 'zendure_p1', 'schedule', 'automation_status', 'file', 'list']);
 define('PRICE_RETENTION_DAYS', 4);
 define('PRICE_ARCHIVE_DIR', DATA_DIR . '/price_archive');
-
-define('include_conditions', true);
+define('MAIN_CONFIG_PATH', __DIR__ . '/../../config/config.json');
 define('SCHEDULE_FUNCTIONS_PATH', __DIR__ . '/../../api/charge_schedule_functions.php');
 define('CONDITIONAL_SCHEDULE_RESOLVER_PATH', __DIR__ . '/../resolve_schedule_conditions.php');
+
+function loadMainConfig() {
+    if (!file_exists(MAIN_CONFIG_PATH) || !is_readable(MAIN_CONFIG_PATH)) {
+        return [];
+    }
+    $raw = file_get_contents(MAIN_CONFIG_PATH);
+    if ($raw === false) {
+        return [];
+    }
+    $cfg = json_decode($raw, true);
+    return is_array($cfg) ? $cfg : [];
+}
+
+function getIncludeConditionsFlag() {
+    $cfg = loadMainConfig();
+    if (!array_key_exists('include_conditions', $cfg)) {
+        return false;
+    }
+    $parsed = filter_var($cfg['include_conditions'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    return $parsed === null ? false : $parsed;
+}
+
+define('include_conditions', getIncludeConditionsFlag());
 
 function buildWriteFailureMessage($context, $filePath) {
     $details = function_exists('getLastWriteDataFileAtomicError')

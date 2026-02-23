@@ -85,6 +85,16 @@ button {
     cursor: pointer;
 }
 
+.btn-link {
+    display: inline-block;
+    border: 1px solid var(--line);
+    background: #1f2937;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 10px;
+    text-decoration: none;
+}
+
 button.primary {
     background: var(--primary);
     border-color: #1d4ed8;
@@ -97,6 +107,16 @@ button.danger {
 
 button:hover {
     filter: brightness(1.07);
+}
+
+.btn-link:hover {
+    filter: brightness(1.07);
+}
+
+.btn-link-icon {
+    padding: 5px 8px;
+    line-height: 1;
+    font-size: 0.95rem;
 }
 
 .status {
@@ -186,7 +206,7 @@ form {
 
 .condition-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto;
+    grid-template-columns: 1fr 1fr 1.1fr 1.1fr auto;
     gap: 8px;
 }
 
@@ -198,4 +218,3 @@ form {
         grid-template-columns: 1fr;
     }
 }
-

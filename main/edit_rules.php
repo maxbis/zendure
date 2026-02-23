@@ -53,17 +53,26 @@ function validateValue($value): bool
 
 function validateCondition(array $condition): bool
 {
-    if (!isset($condition['field'], $condition['op']) || !array_key_exists('value', $condition)) {
+    if (!isset($condition['field'], $condition['op'])) {
+        return false;
+    }
+    $hasValue = array_key_exists('value', $condition);
+    $hasValueRef = isset($condition['value_ref']) && $condition['value_ref'] !== '';
+    if (!$hasValue && !$hasValueRef) {
         return false;
     }
     $field = (string) $condition['field'];
     $op = (string) $condition['op'];
-    $validFields = ['price', 'min_time', 'max_time', 'month', 'hour'];
+    $validFields = ['price', 'ranking', 'min_time', 'max_time', 'month', 'hour', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
     $validOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
+    $validValueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
     if (!in_array($field, $validFields, true)) {
         return false;
     }
     if (!in_array($op, $validOps, true)) {
+        return false;
+    }
+    if ($hasValueRef && !in_array((string) $condition['value_ref'], $validValueRefs, true)) {
         return false;
     }
     return true;
@@ -101,8 +110,13 @@ function normalizeRules(array $rules): array
                 $conditions[] = [
                     'field' => (string) $condition['field'],
                     'op' => (string) $condition['op'],
-                    'value' => $condition['value'],
                 ];
+                if (array_key_exists('value', $condition)) {
+                    $conditions[count($conditions) - 1]['value'] = $condition['value'];
+                }
+                if (isset($condition['value_ref']) && $condition['value_ref'] !== '') {
+                    $conditions[count($conditions) - 1]['value_ref'] = (string) $condition['value_ref'];
+                }
             }
             if (!empty($conditions)) {
                 $normalized['conditions'] = $conditions;
@@ -167,8 +181,8 @@ if ($isApi) {
         <div class="card-header-row">
             <h1>Condition Rules Editor</h1>
             <div class="actions">
+                <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
                 <button id="btn-reload" type="button">Reload</button>
-                <button id="btn-save-file" type="button" class="primary">Save File</button>
             </div>
         </div>
         <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>

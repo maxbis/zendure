@@ -12,7 +12,6 @@
         form: document.getElementById('rule-form'),
         editorTitle: document.getElementById('editor-title'),
         btnReload: document.getElementById('btn-reload'),
-        btnSaveFile: document.getElementById('btn-save-file'),
         btnNew: document.getElementById('btn-new'),
         btnAddCondition: document.getElementById('btn-add-condition'),
         btnCancel: document.getElementById('btn-cancel'),
@@ -26,8 +25,9 @@
         conditionsList: document.getElementById('conditions-list'),
     };
 
-    const conditionFields = ['price', 'month', 'hour', 'min_time', 'max_time'];
+    const conditionFields = ['price', 'ranking', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'month', 'hour', 'min_time', 'max_time'];
     const conditionOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
+    const valueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -53,7 +53,12 @@
         if (Array.isArray(rule.conditions)) {
             out.conditions = rule.conditions
                 .filter(Boolean)
-                .map((c) => ({ field: c.field, op: c.op, value: c.value }));
+                .map((c) => {
+                    const cc = { field: c.field, op: c.op };
+                    if (c.value !== undefined) cc.value = c.value;
+                    if (c.value_ref !== undefined && c.value_ref !== '') cc.value_ref = c.value_ref;
+                    return cc;
+                });
             if (out.conditions.length === 0) {
                 delete out.conditions;
             }
@@ -130,8 +135,21 @@
 
         const valueInp = document.createElement('input');
         valueInp.type = 'text';
-        valueInp.placeholder = 'value';
+        valueInp.placeholder = 'value (optional)';
         valueInp.value = condition?.value !== undefined ? String(condition.value) : '';
+
+        const valueRefSel = document.createElement('select');
+        const valueRefNone = document.createElement('option');
+        valueRefNone.value = '';
+        valueRefNone.textContent = 'value_ref (none)';
+        valueRefSel.appendChild(valueRefNone);
+        valueRefs.forEach((r) => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = r;
+            valueRefSel.appendChild(opt);
+        });
+        valueRefSel.value = condition?.value_ref || '';
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -144,6 +162,7 @@
         row.appendChild(fieldSel);
         row.appendChild(opSel);
         row.appendChild(valueInp);
+        row.appendChild(valueRefSel);
         row.appendChild(delBtn);
         return row;
     }
@@ -195,15 +214,22 @@
             const field = inputs[0].value;
             const op = inputs[1].value;
             const valueRaw = inputs[2].value.trim();
-            if (!valueRaw) {
+            const valueRef = inputs[3].value;
+            if (!valueRaw && !valueRef) {
                 continue;
             }
-            const isNumber = /^-?\d+(\.\d+)?$/.test(valueRaw);
-            conditions.push({
+            const condition = {
                 field: field,
                 op: op,
-                value: isNumber ? Number(valueRaw) : valueRaw,
-            });
+            };
+            if (valueRaw) {
+                const isNumber = /^-?\d+(\.\d+)?$/.test(valueRaw);
+                condition.value = isNumber ? Number(valueRaw) : valueRaw;
+            }
+            if (valueRef) {
+                condition.value_ref = valueRef;
+            }
+            conditions.push(condition);
         }
         return conditions;
     }
@@ -280,6 +306,29 @@
         return data;
     }
 
+    async function saveRulesToFile(successMessage) {
+        try {
+            const result = await apiSave();
+            setStatus(successMessage || (result.message + ' (' + result.count + ' rules)'), 'ok');
+            return true;
+        } catch (e) {
+            setStatus(e.message, 'error');
+            return false;
+        }
+    }
+
+    async function mutateAndPersist(mutator, successMessage) {
+        const before = cloneDeep(state.rules);
+        mutator();
+        renderTable();
+        const ok = await saveRulesToFile(successMessage);
+        if (!ok) {
+            state.rules = before;
+            renderTable();
+        }
+        return ok;
+    }
+
     async function loadRules() {
         setStatus('Loading rules...', '');
         try {
@@ -295,16 +344,6 @@
 
     function attachEvents() {
         els.btnReload.addEventListener('click', loadRules);
-
-        els.btnSaveFile.addEventListener('click', async function () {
-            setStatus('Saving rules...', '');
-            try {
-                const result = await apiSave();
-                setStatus(result.message + ' (' + result.count + ' rules)', 'ok');
-            } catch (e) {
-                setStatus(e.message, 'error');
-            }
-        });
 
         els.btnNew.addEventListener('click', function () {
             clearEditor();
@@ -327,7 +366,7 @@
             clearEditor();
         });
 
-        els.rulesTbody.addEventListener('click', function (e) {
+        els.rulesTbody.addEventListener('click', async function (e) {
             const btn = e.target.closest('button[data-action]');
             if (!btn) return;
             const action = btn.getAttribute('data-action');
@@ -339,41 +378,49 @@
                 return;
             }
             if (action === 'dup') {
-                state.rules.splice(idx + 1, 0, cloneDeep(state.rules[idx]));
-                renderTable();
-                setStatus('Rule duplicated.', 'ok');
+                await mutateAndPersist(function () {
+                    state.rules.splice(idx + 1, 0, cloneDeep(state.rules[idx]));
+                }, 'Rule duplicated and saved.');
                 return;
             }
             if (action === 'del') {
                 if (!window.confirm('Delete rule #' + (idx + 1) + '?')) return;
-                state.rules.splice(idx, 1);
-                renderTable();
-                clearEditor();
-                setStatus('Rule deleted.', 'ok');
+                const ok = await mutateAndPersist(function () {
+                    state.rules.splice(idx, 1);
+                }, 'Rule deleted and saved.');
+                if (ok) {
+                    clearEditor();
+                }
                 return;
             }
             if (action === 'up') {
-                moveRule(idx, -1);
+                await mutateAndPersist(function () {
+                    moveRule(idx, -1);
+                }, 'Rule order updated and saved.');
                 return;
             }
             if (action === 'down') {
-                moveRule(idx, 1);
+                await mutateAndPersist(function () {
+                    moveRule(idx, 1);
+                }, 'Rule order updated and saved.');
             }
         });
 
-        els.form.addEventListener('submit', function (e) {
+        els.form.addEventListener('submit', async function (e) {
             e.preventDefault();
             try {
                 const rule = readRuleFromForm();
-                if (state.editIndex === null) {
-                    state.rules.push(rule);
-                    setStatus('Rule added.', 'ok');
-                } else {
-                    state.rules[state.editIndex] = rule;
-                    setStatus('Rule updated.', 'ok');
+                const isNew = state.editIndex === null;
+                const ok = await mutateAndPersist(function () {
+                    if (isNew) {
+                        state.rules.push(rule);
+                    } else {
+                        state.rules[state.editIndex] = rule;
+                    }
+                }, isNew ? 'Rule added and saved.' : 'Rule updated and saved.');
+                if (ok) {
+                    clearEditor();
                 }
-                renderTable();
-                clearEditor();
             } catch (err) {
                 setStatus(err.message || 'Invalid rule.', 'error');
             }
