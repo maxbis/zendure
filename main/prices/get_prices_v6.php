@@ -245,6 +245,7 @@ function savePriceFile(string $dateStr, array $prices): string|false {
     if ($json === false) {
         return false;
     }
+    umask(0002);
     if (file_put_contents($filePath, $json, LOCK_EX) === false) {
         error_log('get_prices_v6: Failed to write ' . $filePath);
         return false;
