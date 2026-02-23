@@ -45,6 +45,33 @@ function readJsonFileAsArray(string $path): ?array
     return is_array($data) ? $data : null;
 }
 
+/**
+ * Read a JSON file and return data plus an error message if something fails.
+ *
+ * @return array{data:?array, error:?string}
+ */
+function readJsonFileWithError(string $path): array
+{
+    if (!file_exists($path)) {
+        return ['data' => null, 'error' => 'File not found: ' . basename($path)];
+    }
+    if (!is_readable($path)) {
+        return ['data' => null, 'error' => 'File not readable: ' . basename($path)];
+    }
+    $raw = file_get_contents($path);
+    if ($raw === false) {
+        return ['data' => null, 'error' => 'Failed to read file: ' . basename($path)];
+    }
+    $data = json_decode($raw, true);
+    if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
+        return ['data' => null, 'error' => 'Invalid JSON: ' . json_last_error_msg() . ' (' . basename($path) . ')'];
+    }
+    if (!is_array($data)) {
+        return ['data' => null, 'error' => 'JSON root is not an array: ' . basename($path)];
+    }
+    return ['data' => $data, 'error' => null];
+}
+
 function isValidRuleKey(string $key): bool
 {
     return strlen($key) === 12 && preg_match('/^[\d\*]{12}$/', $key) === 1;
@@ -394,10 +421,11 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour): arr
  */
 function runResolve(): array
 {
-    $rawRules = readJsonFileAsArray(CONDITIONS_FILE);
-    if ($rawRules === null) {
-        return ['success' => false, 'error' => 'Unable to read or parse charge_schedule_conditions.json'];
+    $conditionsResult = readJsonFileWithError(CONDITIONS_FILE);
+    if ($conditionsResult['error'] !== null) {
+        return ['success' => false, 'error' => $conditionsResult['error']];
     }
+    $rawRules = $conditionsResult['data'];
 
     $rules = normalizeRules($rawRules);
     $tz = new DateTimeZone('Europe/Amsterdam');

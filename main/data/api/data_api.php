@@ -20,8 +20,8 @@ define('DATA_DIR', __DIR__ . '/..');
 define('ALLOWED_TYPES', ['price', 'zendure', 'zendure_p1', 'schedule', 'automation_status', 'file', 'list']);
 define('PRICE_RETENTION_DAYS', 4);
 define('PRICE_ARCHIVE_DIR', DATA_DIR . '/price_archive');
-define('include_conditions', true);
 
+define('include_conditions', true);
 define('SCHEDULE_FUNCTIONS_PATH', __DIR__ . '/../../api/charge_schedule_functions.php');
 define('CONDITIONAL_SCHEDULE_RESOLVER_PATH', __DIR__ . '/../resolve_schedule_conditions.php');
 
@@ -130,6 +130,7 @@ function mergeResolvedWithConditional($resolved, $date) {
         if (array_key_exists($slotTime, $byTime)) {
             $slot['value'] = $byTime[$slotTime];
             $slot['key'] = null;
+            $slot['source'] = 'condition';
         }
     }
     unset($slot);
