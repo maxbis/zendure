@@ -109,6 +109,7 @@ function ensurePriceGraphPopup() {
         <div class="price-graph-popup-price"></div>
         <div class="price-graph-popup-spot-price"></div>
         <div class="price-graph-popup-schedule"></div>
+        <div class="price-graph-popup-source"></div>
     `;
     document.body.appendChild(popup);
 
@@ -160,6 +161,7 @@ function ensurePriceGraphMobilePopup() {
                 <div class="price-graph-popup-price"></div>
                 <div class="price-graph-popup-spot-price"></div>
                 <div class="price-graph-popup-schedule"></div>
+                <div class="price-graph-popup-source"></div>
             </div>
             <div class="price-graph-mobile-popup-footer">
                 <div style="display:flex; gap:8px; align-items:center;">
@@ -203,6 +205,7 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
     const priceEl = popup.querySelector('.price-graph-popup-price');
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+    const sourceEl = popup.querySelector('.price-graph-popup-source');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
     const timeRange = formatHourRange(hourValue);
@@ -218,10 +221,20 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
 
+    const scheduleSource = bar.dataset.scheduleSource;
+    const hasSource = scheduleSource !== undefined &&
+        scheduleSource !== null &&
+        scheduleSource !== '' &&
+        scheduleSource !== 'null' &&
+        scheduleSource !== 'undefined';
+
     titleEl.textContent = `Time slot ${timeRange || '—'}`;
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+    if (sourceEl) {
+        sourceEl.textContent = hasSource ? `Source: ${scheduleSource}` : '';
+    }
 
     const close = () => {
         hidePriceGraphMobilePopup();
@@ -305,6 +318,7 @@ function showPriceGraphPopup(bar, container) {
     const priceEl = popup.querySelector('.price-graph-popup-price');
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+    const sourceEl = popup.querySelector('.price-graph-popup-source');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
     const timeRange = formatHourRange(hourValue);
@@ -320,10 +334,20 @@ function showPriceGraphPopup(bar, container) {
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
 
+    const scheduleSource = bar.dataset.scheduleSource;
+    const hasSource = scheduleSource !== undefined &&
+        scheduleSource !== null &&
+        scheduleSource !== '' &&
+        scheduleSource !== 'null' &&
+        scheduleSource !== 'undefined';
+
     timeEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+    if (sourceEl) {
+        sourceEl.textContent = hasSource ? `Source: ${scheduleSource}` : '';
+    }
 
     popup.style.display = 'block';
     popup.style.visibility = 'hidden';
@@ -388,7 +412,50 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         return expanded;
     };
 
+    /**
+     * Build an expanded hour -> source map from resolved schedule slots.
+     * Propagates the last non-null source forward across the day.
+     */
+    const buildExpandedSourceMap = (resolved) => {
+        if (!Array.isArray(resolved) || resolved.length === 0) return null;
+
+        const baseSourceMap = {};
+        let lastSource = undefined;
+
+        resolved.forEach((slot) => {
+            if (!slot || slot.time === undefined) return;
+            const hour = parseInt(String(slot.time).substring(0, 2), 10);
+            if (Number.isNaN(hour)) return;
+
+            if (Object.prototype.hasOwnProperty.call(slot, 'source') && slot.source !== undefined && slot.source !== null) {
+                lastSource = slot.source;
+            }
+
+            if (lastSource !== undefined) {
+                baseSourceMap[hour] = lastSource;
+            }
+        });
+
+        if (Object.keys(baseSourceMap).length === 0) {
+            return null;
+        }
+
+        const expanded = {};
+        let currentSource = undefined;
+        for (let h = 0; h < 24; h++) {
+            if (Object.prototype.hasOwnProperty.call(baseSourceMap, h)) {
+                currentSource = baseSourceMap[h];
+            }
+            if (currentSource !== undefined) {
+                expanded[h] = currentSource;
+            }
+        }
+
+        return expanded;
+    };
+
     const scheduleHourMapByDate = {};
+    const scheduleSourceMapByDate = {};
 
     // Build a map of schedule entries for quick lookup
     const scheduleMap = {};
@@ -459,15 +526,31 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         });
     }
 
-    const getActiveScheduleValue = (dateStr, hourKey) => {
+    const getActiveScheduleInfo = (dateStr, hourKey) => {
         const hourMap = scheduleHourMapByDate[dateStr];
+        const sourceMap = scheduleSourceMapByDate[dateStr];
+        const hourIndex = parseInt(hourKey, 10);
+
+        let value;
+        let source;
+
         if (hourMap) {
-            const hourIndex = parseInt(hourKey, 10);
-            return hourMap[hourIndex];
+            value = hourMap[hourIndex];
         }
+        if (sourceMap) {
+            source = sourceMap[hourIndex];
+        }
+
+        if (value !== undefined || source !== undefined) {
+            return { value, source };
+        }
+
         const entries = scheduleByDate[dateStr];
-        if (!entries || entries.length === 0) return undefined;
-        let activeValue;
+        if (!entries || entries.length === 0) {
+            return { value: undefined, source: undefined };
+        }
+
+        let activeValue = undefined;
         for (const entry of entries) {
             const entryHour = entry.key.slice(8, 10);
             if (entryHour <= hourKey) {
@@ -476,7 +559,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 break;
             }
         }
-        return activeValue;
+        return { value: activeValue, source: undefined };
     };
 
     // Extract price data
@@ -577,7 +660,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hourTime = hourKey + '00';
             const key = dateStr + hourTime;
             
-            const scheduledValue = getActiveScheduleValue(dateStr, hourKey);
+            const { value: scheduledValue, source: scheduledSource } = getActiveScheduleInfo(dateStr, hourKey);
 
             // Create bar element
             const barDiv = document.createElement('div');
@@ -593,6 +676,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 barDiv.classList.add('has-schedule');
                 barDiv.dataset.scheduleType = scheduleType;
                 barDiv.dataset.scheduleValue = scheduledValue;
+            }
+            if (scheduledSource !== undefined && scheduledSource !== null && scheduledSource !== '') {
+                barDiv.dataset.scheduleSource = String(scheduledSource);
             }
             barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             
@@ -657,6 +743,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     }
     if (tomorrowHourMap) {
         scheduleHourMapByDate[tomorrowDateStr] = tomorrowHourMap;
+    }
+    const todaySourceMap = buildExpandedSourceMap(resolvedToday);
+    const tomorrowSourceMap = buildExpandedSourceMap(resolvedTomorrow);
+    if (todaySourceMap) {
+        scheduleSourceMapByDate[currentDate] = todaySourceMap;
+    }
+    if (tomorrowSourceMap) {
+        scheduleSourceMapByDate[tomorrowDateStr] = tomorrowSourceMap;
     }
     
     // Render today

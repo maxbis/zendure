@@ -129,7 +129,6 @@ function mergeResolvedWithConditional($resolved, $date) {
         $slotTime = str_pad((string) $slot['time'], 4, '0', STR_PAD_LEFT);
         if (array_key_exists($slotTime, $byTime)) {
             $slot['value'] = $byTime[$slotTime];
-            $slot['key'] = null;
             $slot['source'] = 'condition';
         }
     }
