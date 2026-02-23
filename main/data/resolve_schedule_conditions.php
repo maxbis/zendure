@@ -20,27 +20,6 @@
 
 date_default_timezone_set('Europe/Amsterdam');
 
-$method = $_SERVER['REQUEST_METHOD'] ?? 'CLI';
-
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
-
-if ($method === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
-if ($method !== 'GET' && $method !== 'CLI') {
-    http_response_code(405);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Method not allowed. Use GET.',
-    ]);
-    exit();
-}
-
 const CONDITIONS_FILE = __DIR__ . '/charge_schedule_conditions.json';
 const PRICE_DIR = __DIR__ . '/price';
 
@@ -135,6 +114,64 @@ function parseHourBound($raw): ?int
     return null;
 }
 
+function parseMonthList($raw): ?array
+{
+    $parts = [];
+    if (is_string($raw)) {
+        $parts = explode(',', $raw);
+    } elseif (is_array($raw)) {
+        $parts = $raw;
+    } elseif (is_int($raw) || is_float($raw)) {
+        $parts = [(string) $raw];
+    } else {
+        return null;
+    }
+
+    $months = [];
+    foreach ($parts as $part) {
+        $m = trim((string) $part);
+        if ($m === '' || preg_match('/^\d{1,2}$/', $m) !== 1) {
+            return null;
+        }
+        $mi = (int) $m;
+        if ($mi < 1 || $mi > 12) {
+            return null;
+        }
+        $months[$mi] = true;
+    }
+
+    return empty($months) ? null : array_keys($months);
+}
+
+function parseHourList($raw): ?array
+{
+    $parts = [];
+    if (is_string($raw)) {
+        $parts = explode(',', $raw);
+    } elseif (is_array($raw)) {
+        $parts = $raw;
+    } elseif (is_int($raw) || is_float($raw)) {
+        $parts = [(string) $raw];
+    } else {
+        return null;
+    }
+
+    $hours = [];
+    foreach ($parts as $part) {
+        $h = trim((string) $part);
+        if ($h === '' || preg_match('/^\d{1,2}$/', $h) !== 1) {
+            return null;
+        }
+        $hi = (int) $h;
+        if ($hi < 0 || $hi > 23) {
+            return null;
+        }
+        $hours[$hi] = true;
+    }
+
+    return empty($hours) ? null : array_keys($hours);
+}
+
 function compareNumeric(float $left, string $op, float $right): bool
 {
     if ($op === '>') {
@@ -158,31 +195,74 @@ function compareNumeric(float $left, string $op, float $right): bool
     return false;
 }
 
+/** @return bool */
+function conditionMatchesPrice(array $condition, array $priceByHour, int $hour): bool
+{
+    $op = isset($condition['op']) ? (string) $condition['op'] : '==';
+    $value = $condition['value'] ?? null;
+    $hourKey = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
+    if (!array_key_exists($hourKey, $priceByHour) || !is_numeric($priceByHour[$hourKey])) {
+        return false;
+    }
+    $priceCents = ((float) $priceByHour[$hourKey]) * 100.0;
+    return is_numeric($value) && compareNumeric($priceCents, $op, (float) $value);
+}
+
+/** @return bool */
+function conditionMatchesMinTime(array $condition, int $hour): bool
+{
+    $minHour = parseHourBound($condition['value'] ?? null);
+    return $minHour !== null && $hour >= $minHour;
+}
+
+/** @return bool */
+function conditionMatchesMaxTime(array $condition, int $hour): bool
+{
+    $maxHour = parseHourBound($condition['value'] ?? null);
+    return $maxHour !== null && $hour <= $maxHour;
+}
+
+/** @return bool */
+function conditionMatchesMonth(array $condition, string $yyyymmdd): bool
+{
+    $months = parseMonthList($condition['value'] ?? null);
+    if ($months === null) {
+        return false;
+    }
+    return in_array((int) substr($yyyymmdd, 4, 2), $months, true);
+}
+
+/** @return bool */
+function conditionMatchesHour(array $condition, int $hour): bool
+{
+    $hours = parseHourList($condition['value'] ?? null);
+    return $hours !== null && in_array($hour, $hours, true);
+}
+
 /**
  * Evaluate rule conditions for a single hour.
- * Supports condition fields:
- * - price
- * - min_time
- * - max_time
+ * Supports: price, min_time, max_time, month, hour.
  *
  * @param array $rule
  * @param array $priceByHour
  * @param int $hour
+ * @param string $yyyymmdd
  * @return bool
  */
-function ruleConditionsMatch(array $rule, array $priceByHour, int $hour): bool
+function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string $yyyymmdd): bool
 {
-    $conditions = [];
-    if (isset($rule['conditions']) && is_array($rule['conditions'])) {
-        $conditions = $rule['conditions'];
-    }
-
-    // Support min_time/max_time as top-level shorthand.
+    $conditions = isset($rule['conditions']) && is_array($rule['conditions']) ? $rule['conditions'] : [];
     if (array_key_exists('min_time', $rule)) {
         $conditions[] = ['field' => 'min_time', 'op' => '>=', 'value' => $rule['min_time']];
     }
     if (array_key_exists('max_time', $rule)) {
         $conditions[] = ['field' => 'max_time', 'op' => '<=', 'value' => $rule['max_time']];
+    }
+    if (array_key_exists('month', $rule)) {
+        $conditions[] = ['field' => 'month', 'op' => 'in', 'value' => $rule['month']];
+    }
+    if (array_key_exists('hour', $rule)) {
+        $conditions[] = ['field' => 'hour', 'op' => 'in', 'value' => $rule['hour']];
     }
 
     foreach ($conditions as $condition) {
@@ -190,51 +270,56 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour): bool
             return false;
         }
         $field = (string) $condition['field'];
-        $op = isset($condition['op']) ? (string) $condition['op'] : '==';
         $value = $condition['value'] ?? null;
 
+        $match = false;
         if ($field === 'price') {
-            $hourKey = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
-            if (!array_key_exists($hourKey, $priceByHour) || !is_numeric($priceByHour[$hourKey])) {
-                return false; // missing/invalid price => false
-            }
-
-            // Prices are stored in EUR/kWh (e.g. 0.2012).
-            // Compare in cents/kWh so rules like price >= 25 are intuitive.
-            $priceCents = ((float) $priceByHour[$hourKey]) * 100.0;
-            if (!is_numeric($value) || !compareNumeric($priceCents, $op, (float) $value)) {
-                return false;
-            }
-            continue;
+            $match = conditionMatchesPrice($condition, $priceByHour, $hour);
+        } elseif ($field === 'min_time') {
+            $match = conditionMatchesMinTime($condition, $hour);
+        } elseif ($field === 'max_time') {
+            $match = conditionMatchesMaxTime($condition, $hour);
+        } elseif ($field === 'month') {
+            $match = conditionMatchesMonth($condition, $yyyymmdd);
+        } elseif ($field === 'hour') {
+            $match = conditionMatchesHour($condition, $hour);
         }
-
-        if ($field === 'min_time') {
-            $minHour = parseHourBound($value);
-            if ($minHour === null) {
-                return false;
-            }
-            if ($hour < $minHour) {
-                return false;
-            }
-            continue;
+        if (!$match) {
+            return false;
         }
-
-        if ($field === 'max_time') {
-            $maxHour = parseHourBound($value);
-            if ($maxHour === null) {
-                return false;
-            }
-            if ($hour > $maxHour) {
-                return false;
-            }
-            continue;
-        }
-
-        // Unknown fields are treated as non-matching for now.
-        return false;
     }
-
     return true;
+}
+
+/**
+ * Build one normalized rule from an entry array and key string.
+ *
+ * @param array $entry
+ * @param string $keyStr
+ * @param int $order
+ * @return array{key:string,value:mixed,conditions:array,_order:int,...}
+ */
+function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
+{
+    $rule = [
+        'key' => $keyStr,
+        'value' => normalizeRuleValue($entry['value']),
+        'conditions' => isset($entry['conditions']) && is_array($entry['conditions']) ? $entry['conditions'] : [],
+        '_order' => $order,
+    ];
+    if (array_key_exists('min_time', $entry)) {
+        $rule['min_time'] = $entry['min_time'];
+    }
+    if (array_key_exists('max_time', $entry)) {
+        $rule['max_time'] = $entry['max_time'];
+    }
+    if (array_key_exists('month', $entry)) {
+        $rule['month'] = $entry['month'];
+    }
+    if (array_key_exists('hour', $entry)) {
+        $rule['hour'] = $entry['hour'];
+    }
+    return $rule;
 }
 
 /**
@@ -246,77 +331,26 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour): bool
 function normalizeRules(array $raw): array
 {
     $rules = [];
-
-    // Supported input formats:
-    // 1) Map format:
-    //    { "************": { "value": "...", "conditions": [...] } }
-    // 2) List format:
-    //    [ { "value": "...", "conditions": [...], "min_time": "10", ... } ]
-    //    Optional per-item "key" defaults to ************.
     $isListFormat = array_keys($raw) === range(0, count($raw) - 1);
 
     if ($isListFormat) {
         foreach ($raw as $idx => $entry) {
-            if (!is_array($entry) || !array_key_exists('value', $entry)) {
+            if (!is_array($entry) || !array_key_exists('value', $entry) || !isValidRuleValue($entry['value'])) {
                 continue;
             }
-            if (!isValidRuleValue($entry['value'])) {
-                continue;
-            }
-
             $keyStr = isset($entry['key']) ? (string) $entry['key'] : '************';
             if (!isValidRuleKey($keyStr)) {
                 continue;
             }
-
-            $rule = [
-                'key' => $keyStr,
-                'value' => normalizeRuleValue($entry['value']),
-                'conditions' => [],
-                '_order' => (int) $idx,
-            ];
-            if (isset($entry['conditions']) && is_array($entry['conditions'])) {
-                $rule['conditions'] = $entry['conditions'];
-            }
-            if (array_key_exists('min_time', $entry)) {
-                $rule['min_time'] = $entry['min_time'];
-            }
-            if (array_key_exists('max_time', $entry)) {
-                $rule['max_time'] = $entry['max_time'];
-            }
-
-            $rules[] = $rule;
+            $rules[] = buildRuleFromEntry($entry, $keyStr, (int) $idx);
         }
     } else {
         foreach ($raw as $key => $entry) {
             $keyStr = (string) $key;
-            if (!isValidRuleKey($keyStr)) {
+            if (!isValidRuleKey($keyStr) || !is_array($entry) || !array_key_exists('value', $entry) || !isValidRuleValue($entry['value'])) {
                 continue;
             }
-            if (!is_array($entry) || !array_key_exists('value', $entry)) {
-                continue;
-            }
-            if (!isValidRuleValue($entry['value'])) {
-                continue;
-            }
-
-            $rule = [
-                'key' => $keyStr,
-                'value' => normalizeRuleValue($entry['value']),
-                'conditions' => [],
-                '_order' => count($rules),
-            ];
-            if (isset($entry['conditions']) && is_array($entry['conditions'])) {
-                $rule['conditions'] = $entry['conditions'];
-            }
-            if (array_key_exists('min_time', $entry)) {
-                $rule['min_time'] = $entry['min_time'];
-            }
-            if (array_key_exists('max_time', $entry)) {
-                $rule['max_time'] = $entry['max_time'];
-            }
-
-            $rules[] = $rule;
+            $rules[] = buildRuleFromEntry($entry, $keyStr, count($rules));
         }
     }
 
@@ -330,7 +364,6 @@ function normalizeRules(array $raw): array
         if ($keyCmp !== 0) {
             return $keyCmp;
         }
-        // Earlier file order wins for same specificity/key.
         return ($a['_order'] ?? 0) - ($b['_order'] ?? 0);
     });
 
@@ -340,66 +373,77 @@ function normalizeRules(array $raw): array
 function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour): array
 {
     $items = [];
-
     for ($hour = 0; $hour < 24; $hour++) {
         $hourStr = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
         $slotKey = $yyyymmdd . $hourStr . '00';
-
         foreach ($rules as $rule) {
-            if (!matchesKeyPattern($rule['key'], $slotKey)) {
+            if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd)) {
                 continue;
             }
-            if (!ruleConditionsMatch($rule, $priceByHour, $hour)) {
-                continue;
-            }
-
-            $items[] = [
-                'time' => $hourStr . '00',
-                'value' => $rule['value'],
-            ];
-            // First matching rule wins based on pre-sorted priority.
+            $items[] = ['time' => $hourStr . '00', 'value' => $rule['value']];
             break;
         }
     }
-
     return $items;
 }
 
-$rawRules = readJsonFileAsArray(CONDITIONS_FILE);
-if ($rawRules === null) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Unable to read or parse charge_schedule_conditions.json',
-    ]);
+/**
+ * Load conditions, resolve for today and tomorrow, return response payload.
+ *
+ * @return array{success:bool, resolved?:array, error?:string}
+ */
+function runResolve(): array
+{
+    $rawRules = readJsonFileAsArray(CONDITIONS_FILE);
+    if ($rawRules === null) {
+        return ['success' => false, 'error' => 'Unable to read or parse charge_schedule_conditions.json'];
+    }
+
+    $rules = normalizeRules($rawRules);
+    $tz = new DateTimeZone('Europe/Amsterdam');
+    $today = new DateTimeImmutable('now', $tz);
+    $dates = [
+        $today->format('Ymd'),
+        $today->modify('+1 day')->format('Ymd'),
+    ];
+
+    $resolved = [];
+    foreach ($dates as $dateYmd) {
+        $pricePath = buildPriceFilePath($dateYmd);
+        $priceData = readJsonFileAsArray($pricePath);
+        if ($priceData === null) {
+            continue;
+        }
+        $resolved[] = [
+            'date' => $dateYmd,
+            'items' => resolveForDate($dateYmd, $rules, $priceData),
+        ];
+    }
+
+    return ['success' => true, 'resolved' => $resolved];
+}
+
+// --- Request handling ---
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'CLI';
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
+
+if ($method === 'OPTIONS') {
+    http_response_code(200);
     exit();
 }
 
-$rules = normalizeRules($rawRules);
-
-$tz = new DateTimeZone('Europe/Amsterdam');
-$today = new DateTimeImmutable('now', $tz);
-$dates = [
-    $today->format('Ymd'),
-    $today->modify('+1 day')->format('Ymd'),
-];
-
-$resolved = [];
-foreach ($dates as $dateYmd) {
-    $pricePath = buildPriceFilePath($dateYmd);
-    $priceData = readJsonFileAsArray($pricePath);
-    if ($priceData === null) {
-        continue; // only include dates that have prices
-    }
-
-    $items = resolveForDate($dateYmd, $rules, $priceData);
-    $resolved[] = [
-        'date' => $dateYmd,
-        'items' => $items,
-    ];
+if ($method !== 'GET' && $method !== 'CLI') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed. Use GET.']);
+    exit();
 }
 
-echo json_encode([
-    'success' => true,
-    'resolved' => $resolved,
-], JSON_PRETTY_PRINT);
+$output = runResolve();
+if (!$output['success']) {
+    http_response_code(500);
+}
+echo json_encode($output, JSON_PRETTY_PRINT);
