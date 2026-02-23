@@ -215,7 +215,10 @@ if (isset($_COOKIE['validation']) && $validation_hash === null && $_SERVER['REQU
         <?php if ($validation_hash): ?>
             <div class="validation-display">
                 <label>Validation Hash (shown once):</label>
-                <div class="validation-hash"><?php echo htmlspecialchars($validation_hash); ?></div>
+                <div class="validation-hash" onclick="window.location.href='..';" style="cursor:pointer;"><?php echo htmlspecialchars($validation_hash); ?></div>
+                <button type="button" onclick="window.location.href='..';"  style="margin-top:16px; padding:8px 14px; border-radius:4px; border:1px solid #2563eb; background:#2563eb; color:white; font-weight:bold; cursor:pointer;">
+                    Continue...
+                </button>
             </div>
         <?php endif; ?>
     </div>

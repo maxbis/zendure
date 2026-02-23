@@ -532,10 +532,12 @@ function normalizeRules(array $raw): array
     return $rules;
 }
 
-function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour): array
+function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?array $ctx = null): array
 {
     $items = [];
-    $ctx = buildPriceContext($priceByHour);
+    if ($ctx === null) {
+        $ctx = buildPriceContext($priceByHour);
+    }
 
     for ($hour = 0; $hour < 24; $hour++) {
         $hourStr = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
@@ -579,9 +581,15 @@ function runResolve(): array
         if ($priceData === null) {
             continue;
         }
+        $ctx = buildPriceContext($priceData);
         $resolved[] = [
             'date' => $dateYmd,
-            'items' => resolveForDate($dateYmd, $rules, $priceData),
+            'min_price' => $ctx['min_price'],
+            'max_price' => $ctx['max_price'],
+            'min_price_hour' => $ctx['min_price_hour'],
+            'max_price_hour' => $ctx['max_price_hour'],
+            'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
+            'items' => resolveForDate($dateYmd, $rules, $priceData, $ctx),
         ];
     }
 

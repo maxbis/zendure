@@ -8,7 +8,8 @@
 date_default_timezone_set('Europe/Amsterdam');
 
 // Validate user access
-require_once __DIR__ . '/login/validate.php';
+$validateFile = __DIR__ . '/../login/validate.php';
+require_once $validateFile;
 
 require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include centralized configuration loader
