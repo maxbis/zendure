@@ -150,6 +150,13 @@ function mergeResolvedWithConditional($resolved, $date) {
         }
         $slotTime = str_pad((string) $slot['time'], 4, '0', STR_PAD_LEFT);
         if (array_key_exists($slotTime, $byTime)) {
+            $slotKey = isset($slot['key']) ? (string) $slot['key'] : '';
+            $isManualNonWildcard = $slotKey !== '' && strpos($slotKey, '*') === false;
+            // Priority model:
+            // base schedule -> conditions may override wildcard/empty -> manual non-wildcard wins
+            if ($isManualNonWildcard) {
+                continue;
+            }
             $slot['value'] = $byTime[$slotTime];
             $slot['source'] = 'condition';
         }
