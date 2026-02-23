@@ -16,6 +16,18 @@ get_prices_v6 is a PHP script that:
 - If no file exists for tomorrow and current time (NL) is **≥ 14:00**: fetches tomorrow from ENTSO-E, saves, and returns it
 - Can be used over **HTTP** (JSON response with CORS headers) or in **CLI** (JSON to stdout)
 
+### Configuration
+
+The ENTSO-E API requires a security token. Place it in **`main/prices/config.json`** (git-ignored):
+
+```json
+{
+    "ENTSOE_SECURITY_TOKEN": "your-entsoe-api-token"
+}
+```
+
+Create this file locally; it is not committed to the repository.
+
 ---
 
 ## API usage

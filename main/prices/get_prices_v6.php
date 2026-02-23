@@ -11,8 +11,9 @@ declare(strict_types=1);
  * If no file for tomorrow and time (NL) >= 14:00: fetches tomorrow from ENTSO-E, saves, returns data.
  */
 
+require_once __DIR__ . '/entsoe_config.php';
+
 const ENTSOE_BASE_URL = 'https://web-api.tp.entsoe.eu/api?documentType=A44&in_Domain=10YNL----------L&out_Domain=10YNL----------L';
-const ENTSOE_SECURITY_TOKEN = '4b813a09-87ad-4ae8-8f3d-d15b635d7f96';
 const TIMEZONE_NL = 'Europe/Amsterdam';
 const INKOOPVERGOEDING = 0.0219;
 const BELASTING = 0.08980;
@@ -91,7 +92,7 @@ function buildEntsoeUrlForDate(string $dateStr): ?string {
     $endUtc = $endNl->setTimezone($tzUtc);
     $periodStart = $startUtc->format('Ymd') . $startUtc->format('Hi');
     $periodEnd = $endUtc->format('Ymd') . $endUtc->format('Hi');
-    return ENTSOE_BASE_URL . '&periodStart=' . $periodStart . '&periodEnd=' . $periodEnd . '&securityToken=' . ENTSOE_SECURITY_TOKEN;
+    return ENTSOE_BASE_URL . '&periodStart=' . $periodStart . '&periodEnd=' . $periodEnd . '&securityToken=' . getEntsoeSecurityToken();
 }
 
 function fetchXml(string $url): ?string {

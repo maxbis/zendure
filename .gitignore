@@ -37,6 +37,8 @@ desktop.ini
 
 # Project-specific
 automate/data/status_updates.db
+# Prices ENTSO-E token (secrets)
+main/prices/config.json
 # All JSON files (data, caches, generated) - keep out of git
 *.json
 **/*.json
