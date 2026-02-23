@@ -208,18 +208,11 @@ if ($isApi) {
 
     <section class="grid">
         <section class="card">
-            <div class="card-header-row">
-                <h2>Rules</h2>
-                <button id="btn-new" type="button">New Rule</button>
-            </div>
             <table class="rules-table">
-                <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Actions</th>
+                        <td colspan="2"><h2>Rules</h2></td>
+                        <td><button id="btn-new" type="button">+ New Rule</button></td>
                     </tr>
-                </thead>
                 <tbody id="rules-tbody"></tbody>
             </table>
         </section>

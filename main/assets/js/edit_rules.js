@@ -92,16 +92,32 @@
                 '<td>' + (idx + 1) + '</td>',
                 '<td><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></td>',
                 '<td class="table-actions">',
-                '<button type="button" data-action="edit" data-idx="' + idx + '">Edit</button>',
-                '<button type="button" data-action="dup" data-idx="' + idx + '">Duplicate</button>',
-                '<button type="button" data-action="up" data-idx="' + idx + '">Up</button>',
-                '<button type="button" data-action="down" data-idx="' + idx + '">Down</button>',
-                '<button type="button" data-action="del" data-idx="' + idx + '" class="danger">Delete</button>',
+                '<div class="rule-actions-menu">',
+                '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false">Actions</button>',
+                '<div class="rule-actions-popover" role="menu">',
+                '<button type="button" data-action="edit" data-idx="' + idx + '" role="menuitem">Edit</button>',
+                '<button type="button" data-action="dup" data-idx="' + idx + '" role="menuitem">Duplicate</button>',
+                '<button type="button" data-action="up" data-idx="' + idx + '" role="menuitem">Move Up</button>',
+                '<button type="button" data-action="down" data-idx="' + idx + '" role="menuitem">Move Down</button>',
+                '<button type="button" data-action="del" data-idx="' + idx + '" class="danger" role="menuitem">Delete</button>',
+                '</div>',
+                '</div>',
                 '</td>',
             ].join('');
             els.rulesTbody.appendChild(tr);
         });
         renderRawJson();
+    }
+
+    function closeActionMenus() {
+        const menus = els.rulesTbody.querySelectorAll('.rule-actions-menu.open');
+        menus.forEach(function (menu) {
+            menu.classList.remove('open');
+            const toggle = menu.querySelector('[data-menu-toggle]');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        });
     }
 
     function escapeHtml(s) {
@@ -387,8 +403,21 @@
         });
 
         els.rulesTbody.addEventListener('click', async function (e) {
+            const toggleBtn = e.target.closest('button[data-menu-toggle]');
+            if (toggleBtn) {
+                const menu = toggleBtn.closest('.rule-actions-menu');
+                const isOpen = menu && menu.classList.contains('open');
+                closeActionMenus();
+                if (menu && !isOpen) {
+                    menu.classList.add('open');
+                    toggleBtn.setAttribute('aria-expanded', 'true');
+                }
+                return;
+            }
+
             const btn = e.target.closest('button[data-action]');
             if (!btn) return;
+            closeActionMenus();
             const action = btn.getAttribute('data-action');
             const idx = Number(btn.getAttribute('data-idx'));
             if (!Number.isInteger(idx)) return;
@@ -423,6 +452,18 @@
                 await mutateAndPersist(function () {
                     moveRule(idx, 1);
                 }, 'Rule order updated and saved.');
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.rule-actions-menu')) {
+                closeActionMenus();
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeActionMenus();
             }
         });
 
