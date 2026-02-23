@@ -52,6 +52,7 @@
         const out = {};
         out.name = String(rule.name || '').trim();
         out.value = rule.value;
+        out.enabled = rule.enabled !== false;
         if (rule.key) out.key = String(rule.key);
         if (rule.month) out.month = String(rule.month);
         if (rule.hour) out.hour = String(rule.hour);
@@ -81,14 +82,16 @@
         els.rulesTbody.innerHTML = '';
         if (state.rules.length === 0) {
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td colspan="3" class="muted">No rules yet.</td>';
+            tr.innerHTML = '<td colspan="4" class="muted">No rules yet.</td>';
             els.rulesTbody.appendChild(tr);
             return;
         }
 
         state.rules.forEach((rule, idx) => {
+            const enabledAttr = rule.enabled === false ? '' : ' checked';
             const tr = document.createElement('tr');
             tr.innerHTML = [
+                '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
                 '<td><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></td>',
                 '<td class="table-actions">',
@@ -455,6 +458,18 @@
             }
         });
 
+        els.rulesTbody.addEventListener('change', async function (e) {
+            const toggle = e.target.closest('input[data-action="toggle-enabled"]');
+            if (!toggle) return;
+            const idx = Number(toggle.getAttribute('data-idx'));
+            if (!Number.isInteger(idx)) return;
+            const nextEnabled = !!toggle.checked;
+            await mutateAndPersist(function () {
+                if (!state.rules[idx]) return;
+                state.rules[idx].enabled = nextEnabled;
+            }, nextEnabled ? 'Rule enabled and saved.' : 'Rule disabled and saved.');
+        });
+
         document.addEventListener('click', function (e) {
             if (!e.target.closest('.rule-actions-menu')) {
                 closeActionMenus();
@@ -476,6 +491,9 @@
                     const existing = state.rules[state.editIndex];
                     if (existing && existing.key) {
                         rule.key = existing.key;
+                    }
+                    if (existing) {
+                        rule.enabled = existing.enabled !== false;
                     }
                 }
                 const ok = await mutateAndPersist(function () {

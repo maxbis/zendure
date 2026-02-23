@@ -469,6 +469,9 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
         'conditions' => isset($entry['conditions']) && is_array($entry['conditions']) ? $entry['conditions'] : [],
         '_order' => $order,
     ];
+    if (array_key_exists('enabled', $entry)) {
+        $rule['enabled'] = (bool) $entry['enabled'];
+    }
     if (array_key_exists('min_time', $entry)) {
         $rule['min_time'] = $entry['min_time'];
     }
@@ -543,6 +546,10 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
         $hourStr = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
         $slotKey = $yyyymmdd . $hourStr . '00';
         foreach ($rules as $rule) {
+            // Rules are enabled by default; only explicit boolean false disables evaluation.
+            if (array_key_exists('enabled', $rule) && $rule['enabled'] === false) {
+                continue;
+            }
             if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd, $ctx)) {
                 continue;
             }

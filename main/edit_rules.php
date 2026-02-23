@@ -96,6 +96,7 @@ function normalizeRules(array $rules): array
         $normalized = [];
         $normalized['name'] = $name;
         $normalized['value'] = is_numeric($rule['value']) ? (int) $rule['value'] : (string) $rule['value'];
+        $normalized['enabled'] = !array_key_exists('enabled', $rule) ? true : (bool) $rule['enabled'];
 
         if (isset($rule['key']) && is_string($rule['key']) && $rule['key'] !== '') {
             $normalized['key'] = $rule['key'];
@@ -210,7 +211,7 @@ if ($isApi) {
         <section class="card">
             <table class="rules-table">
                     <tr>
-                        <td colspan="2"><h2>Rules</h2></td>
+                        <td colspan="3"><h2>Rules</h2></td>
                         <td><button id="btn-new" type="button">+ New Rule</button></td>
                     </tr>
                 <tbody id="rules-tbody"></tbody>

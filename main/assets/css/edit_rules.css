@@ -150,6 +150,17 @@ button:hover {
     vertical-align: top;
 }
 
+.enabled-cell {
+    width: 42px;
+    text-align: center !important;
+}
+
+.enabled-cell input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 .rules-table th {
     color: var(--muted);
     font-weight: 600;
