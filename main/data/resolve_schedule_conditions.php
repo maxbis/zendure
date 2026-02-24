@@ -231,7 +231,7 @@ function compareNumeric(float $left, string $op, float $right): bool
  * for condition evaluation to match existing "price >= 25" usage.
  *
  * @param array $priceByHour
- * @return array{min_price:?float,max_price:?float,min_price_hour:?int,max_price_hour:?int,spread_price:?float,ranking_by_hour:array<int,int>}
+ * @return array{min_price:?float,max_price:?float,min_price_hour:?int,max_price_hour:?int,spread_price:?float,ranking_by_hour:array<int,int>,rank_to_hour:array<int,int>}
  */
 function buildPriceContext(array $priceByHour): array
 {
@@ -271,8 +271,12 @@ function buildPriceContext(array $priceByHour): array
     });
 
     $rankingByHour = [];
+    $rankToHour = [];
     foreach ($pairs as $idx => $pair) {
-        $rankingByHour[(int) $pair['hour']] = $idx + 1; // 1-based rank
+        $rank = $idx + 1; // 1-based rank from lowest to highest price
+        $hourVal = (int) $pair['hour'];
+        $rankingByHour[$hourVal] = $rank; // hour -> rank
+        $rankToHour[$rank] = $hourVal;    // rank -> hour
     }
 
     return [
@@ -282,6 +286,7 @@ function buildPriceContext(array $priceByHour): array
         'max_price_hour' => $maxHour,
         'spread_price' => ($minPrice !== null && $maxPrice !== null) ? ($maxPrice - $minPrice) : null,
         'ranking_by_hour' => $rankingByHour,
+        'rank_to_hour' => $rankToHour,
     ];
 }
 
@@ -553,7 +558,15 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
             if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd, $ctx)) {
                 continue;
             }
-            $items[] = ['time' => $hourStr . '00', 'value' => $rule['value']];
+            $ranking = null;
+            if (isset($ctx['ranking_by_hour']) && is_array($ctx['ranking_by_hour']) && array_key_exists($hour, $ctx['ranking_by_hour']) && is_numeric($ctx['ranking_by_hour'][$hour])) {
+                $ranking = (int) $ctx['ranking_by_hour'][$hour];
+            }
+            $items[] = [
+                'time' => $hourStr . '00',
+                'value' => $rule['value'],
+                'ranking' => $ranking,
+            ];
             break;
         }
     }
@@ -596,6 +609,8 @@ function runResolve(): array
             'min_price_hour' => $ctx['min_price_hour'],
             'max_price_hour' => $ctx['max_price_hour'],
             'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
+            // ranking: key = rank (1 = cheapest), value = hour (0-23)
+            'ranking' => $ctx['rank_to_hour'],
             'items' => resolveForDate($dateYmd, $rules, $priceData, $ctx),
         ];
     }
