@@ -246,7 +246,7 @@ function buildPriceContext(array $priceByHour): array
         if (!array_key_exists($hourKey, $priceByHour) || !is_numeric($priceByHour[$hourKey])) {
             continue;
         }
-        $priceCents = ((float) $priceByHour[$hourKey]) * 100.0;
+        $priceCents = $priceByHour[$hourKey] * 100.00;
         $pairs[] = ['hour' => $hour, 'price' => $priceCents];
 
         if ($minPrice === null || $priceCents < $minPrice) {
