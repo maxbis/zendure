@@ -172,17 +172,17 @@ function loadPriceFile(string $dateStr): ?array {
     return $decoded;
 }
 
-function buildJeroenUrl(string $period): ?string {
+function buildJeroenUrl(string $period, ?string &$reason = null): ?string {
+    $reason = null;
     if ($period !== 'vandaag' && $period !== 'morgen') {
-        echo "Invalid period: " . $period;
+        $reason = 'invalid_period';
         return null;
     }
     $key = getJeroenSecurityKey();
     if ($key === '') {
-        echo "No Jeroen security key found";
+        $reason = 'missing_jeroen_security_key';
         return null;
     }
-    echo JEROEN_BASE_URL . '&period=' . rawurlencode($period) . '&key=' . rawurlencode($key);
     return JEROEN_BASE_URL . '&period=' . rawurlencode($period) . '&key=' . rawurlencode($key);
 }
 
@@ -382,9 +382,11 @@ function fetchJeroenForPeriod(string $period, string $expectedDateStr, array &$d
         'status' => 'started',
     ];
 
-    $url = buildJeroenUrl($period);
+    $buildUrlReason = null;
+    $url = buildJeroenUrl($period, $buildUrlReason);
     if ($url === null) {
         $diagnostics['status'] = 'build_url_failed';
+        $diagnostics['buildUrlReason'] = $buildUrlReason;
         return null;
     }
 
