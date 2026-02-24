@@ -167,11 +167,11 @@ function ensurePriceGraphMobilePopup() {
                 <div style="display:flex; gap:8px; align-items:center;">
                     <button type="button"
                             class="btn btn-outline price-graph-mobile-popup-netzero">
-                        🔌 netZero
+                        🔌&nbsp;netZero
                     </button>
                     <button type="button"
                             class="btn btn-outline price-graph-mobile-popup-netzero-plus">
-                        ☀️ netZero+
+                        ☀️&nbsp;netZero+
                     </button>
                 </div>              
                 <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>

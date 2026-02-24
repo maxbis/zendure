@@ -924,14 +924,12 @@ code {
     font-size: 1.1rem;
 }
 
-.price-graph-popup-spot-price {
-    font-size: 0.8rem;
+.price-graph-popup-spot-price,
+.price-graph-popup-schedule,
+.price-graph-popup-source {
+    font-size: 0.85rem;
     color: var(--text-secondary);
     margin-bottom: 4px;
-}
-
-.price-graph-popup-schedule {
-    font-size: 0.75rem;
 }
 
 /* Price graph mobile tap popup (info + Edit) */
@@ -1000,16 +998,10 @@ code {
     margin-bottom: 2px;
 }
 
-.price-graph-mobile-popup-body .price-graph-popup-spot-price {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-}
-
+/* .price-graph-mobile-popup-body .price-graph-popup-spot-price,
 .price-graph-mobile-popup-body .price-graph-popup-schedule {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-}
+    font-size: 0.85rem;
+} */
 
 .price-graph-mobile-popup-footer {
     padding: 9px 12px;
