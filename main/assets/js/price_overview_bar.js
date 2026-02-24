@@ -801,25 +801,75 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
 
 /**
  * Fetches price data from API and renders the graph
- * @param {string} priceApiUrl - URL to price API endpoint
+ * @param {string|string[]} priceApiUrl - URL or list of URLs to price API endpoint(s)
  * @param {Array} scheduleEntries - Array of schedule entries for lookup
  * @param {Object} editModal - Edit modal instance for click handlers
  */
 async function fetchAndRenderPrices(priceApiUrl, scheduleEntries, editModal) {
+    const normalizeUrls = (input) => {
+        if (Array.isArray(input)) {
+            return input
+                .filter((u) => typeof u === 'string')
+                .map((u) => u.trim())
+                .filter((u) => u.length > 0);
+        }
+        if (typeof input === 'string' && input.trim().length > 0) {
+            return [input.trim()];
+        }
+        return [];
+    };
+
+    const shuffle = (arr) => {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = copy[i];
+            copy[i] = copy[j];
+            copy[j] = tmp;
+        }
+        return copy;
+    };
+
+    const candidateUrls = shuffle(normalizeUrls(priceApiUrl));
+
     try {
-        const response = await fetch(priceApiUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (candidateUrls.length === 0) {
+            throw new Error('No price API URL configured');
         }
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Non-JSON response from price API:', text.substring(0, 200));
-            throw new Error('Server returned non-JSON response. Check console for details.');
+
+        let lastError = null;
+        let priceData = null;
+
+        for (const url of candidateUrls) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} from ${url}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response from price API:', url, text.substring(0, 200));
+                    throw new Error(`Non-JSON response from ${url}`);
+                }
+
+                const parsed = await response.json();
+                if (!parsed || typeof parsed !== 'object' || !('today' in parsed) || !('tomorrow' in parsed)) {
+                    throw new Error(`Invalid price payload from ${url}`);
+                }
+
+                priceData = parsed;
+                break;
+            } catch (err) {
+                lastError = err;
+                console.warn('Price API candidate failed:', url, err);
+            }
         }
-        
-        const priceData = await response.json();
+
+        if (!priceData) {
+            throw (lastError || new Error('All price API URLs failed'));
+        }
         
         // Get current hour
         const now = new Date();
