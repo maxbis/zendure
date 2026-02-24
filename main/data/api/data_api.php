@@ -396,6 +396,27 @@ function handlePostSchedule($input) {
         }
         return ['success' => true, 'count' => $result['count']];
     }
+    if (isset($input['action']) && $input['action'] === 'clear_non_wildcard') {
+        $schedule = readDataFile($filePath);
+        $schedule = $schedule === null ? [] : normalizeScheduleKeys($schedule);
+
+        $beforeCount = count($schedule);
+        $filteredSchedule = [];
+        foreach ($schedule as $entryKey => $entryValue) {
+            if (strpos((string) $entryKey, '*') !== false) {
+                $filteredSchedule[$entryKey] = $entryValue;
+            }
+        }
+
+        $keptCount = count($filteredSchedule);
+        $removedCount = $beforeCount - $keptCount;
+
+        if (!writeDataFileAtomic($filePath, $filteredSchedule)) {
+            throw new Exception(buildWriteFailureMessage('POST schedule action=clear_non_wildcard', $filePath));
+        }
+
+        return ['success' => true, 'removed' => $removedCount, 'kept' => $keptCount];
+    }
     if (count($input) === 2 && isset($input['key']) && isset($input['value'])) {
         $key = (string) $input['key'];
         $val = $input['value'];

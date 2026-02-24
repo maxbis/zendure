@@ -64,9 +64,37 @@ try {
     } elseif ($method === 'PUT' || $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
 
+            if (
+                $method === 'POST' &&
+                is_array($input) &&
+                isset($input['action']) &&
+                $input['action'] === 'clear_non_wildcard'
+            ) {
+                $beforeCount = count($schedule);
+                $filteredSchedule = [];
+
+                foreach ($schedule as $entryKey => $entryValue) {
+                    if (strpos((string) $entryKey, '*') !== false) {
+                        $filteredSchedule[$entryKey] = $entryValue;
+                    }
+                }
+
+                $keptCount = count($filteredSchedule);
+                $removedCount = $beforeCount - $keptCount;
+
+                if (writeScheduleAtomic($dataFile, $filteredSchedule)) {
+                    $response = [
+                        'success' => true,
+                        'removed' => $removedCount,
+                        'kept' => $keptCount
+                    ];
+                } else {
+                    throw new Exception(buildScheduleWriteFailureMessage('charge_schedule_api clear_non_wildcard', $dataFile));
+                }
+            } else {
             // PUT/POST handles both add and edit operations
             // Validate required fields
-            if (!isset($input['key']) || !isset($input['value'])) {
+            if (!is_array($input) || !isset($input['key']) || !isset($input['value'])) {
                 throw new Exception("Missing key or value");
             }
             
@@ -114,6 +142,7 @@ try {
                 $response = ['success' => true];
             } else {
                 throw new Exception(buildScheduleWriteFailureMessage('charge_schedule_api PUT/POST', $dataFile));
+            }
             }
     } elseif ($method === 'DELETE') {
         $input = json_decode(file_get_contents('php://input'), true);

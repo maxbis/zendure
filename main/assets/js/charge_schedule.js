@@ -260,6 +260,43 @@ async function handleAutoClick() {
     }
 }
 
+/**
+ * Handle clear button click (clear non-wildcard entries only)
+ */
+async function handleClearClick() {
+    try {
+        const confirmed = await confirmDialog.show(
+            "This clears all schedule entries without a wildcard. Any key containing '*' will stay. Continue?",
+            'Clear Schedule Entries',
+            'OK',
+            'btn-danger'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const clearData = await clearNonWildcardScheduleEntries(API_URL);
+        if (!clearData.success) {
+            throw new Error(clearData.error || 'Failed to clear non-wildcard entries');
+        }
+
+        const removed = Number.isFinite(clearData.removed) ? clearData.removed : 0;
+        if (window.notifications) {
+            window.notifications.success(`Cleared ${removed} non-wildcard entries`);
+        }
+
+        await refreshScheduleAndPricesImmediate();
+    } catch (error) {
+        console.error('Error in clear button handler:', error);
+        if (window.notifications) {
+            window.notifications.error('Error clearing schedule entries: ' + error.message);
+        } else {
+            alert('Error: ' + error.message);
+        }
+    }
+}
+
 // Global instances
 let editModal;
 let confirmDialog;
@@ -325,6 +362,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoBtn = document.getElementById('auto-entry-btn');
     if (autoBtn) {
         autoBtn.addEventListener('click', debounce(handleAutoClick, 500));
+    }
+
+    // Add click handler for Clear button
+    const clearBtn = document.getElementById('clear-entry-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', debounce(handleClearClick, 500));
     }
 
     // Lazy load heavy sections

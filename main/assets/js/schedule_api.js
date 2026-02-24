@@ -196,6 +196,47 @@ async function deleteScheduleEntry(apiUrl, key) {
 }
 
 /**
+ * Clear all non-wildcard schedule entries (keep keys containing '*')
+ * @param {string} apiUrl - The API URL
+ * @returns {Promise<Object>} - Promise resolving to result object
+ */
+async function clearNonWildcardScheduleEntries(apiUrl) {
+    try {
+        const urlParts = apiUrl.split('?');
+        const baseUrl = urlParts[0];
+        const existingParamsStr = urlParts[1] || '';
+        const endpoint = existingParamsStr ? `?${existingParamsStr}` : '';
+        const client = getApiClient(baseUrl);
+        return await client.post(endpoint, { action: 'clear_non_wildcard' });
+    } catch (error) {
+        // Fallback to original implementation if ApiClient not available
+        if (typeof ApiClient === 'undefined') {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'clear_non_wildcard' })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text.substring(0, 200));
+                throw new Error('Server returned non-JSON response. Check console for details.');
+            }
+
+            return await response.json();
+        }
+        throw error;
+    }
+}
+
+/**
  * Fetch automation status data
  * @param {string} apiUrl - The automation status API URL
  * @returns {Promise<Object>} - Promise resolving to automation status data

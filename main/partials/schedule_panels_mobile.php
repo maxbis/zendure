@@ -148,7 +148,10 @@ function getValueLabel($val)
         <div class="schedule-mobile-tab-panel" data-tab="entries" role="tabpanel" aria-hidden="true">
             <div class="schedule-entries-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h3 class="card-header">🧾 Schedule Entries</h3>
-                <button class="btn btn-add" id="add-entry-btn">Add</button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-danger" id="clear-entry-btn">Clr</button>
+                    <button class="btn btn-add" id="add-entry-btn">Add</button>
+                </div>
             </div>
             <div class="status-bar" id="status-bar" style="margin-top:6px; font-size:0.75rem; color:var(--text-tertiary);">
                 <span><?php echo count($schedule); ?> entries loaded.</span>
