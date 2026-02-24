@@ -4,17 +4,27 @@ This document describes the automation script with built-in HTTP API for charge 
 
 ## Overview
 
-`automate_www.py` is the OOP automation script that runs continuously, checks the charge schedule API, applies power settings to the Zendure battery, and **exposes an HTTP API** on port 1611. It supports the same interactive keyboard commands as `automate.py`.
+`automate_www.py` is the OOP automation script that runs continuously, checks the charge schedule API, applies power settings to the Zendure battery, and **exposes an HTTP API** on port 1611. It supports interactive keyboard commands for live control.
 
-### Differences from `automate.py`
+### Differences from legacy `automate.py`
 
-| Aspect | `automate.py` | `automate_www.py` |
-|--------|---------------|-------------------|
-| **Status updates** | POST to external `statusApiUrl` | Stores in SQLite (`data/status_updates.db`) + in-memory; no external POST |
-| **HTTP API** | None | Built-in server on port 1611 with multiple endpoints |
-| **Wh-per-hour** | N/A | Computed from SQLite for `/api/wh_per_hour` |
-| **Loop interval default** | 30 seconds | 20 seconds |
-| **Power step limiting** | N/A | Max delta per step (configurable `POWER_FEED_MAX_DELTA`) |
+The current repository only contains `automate_www.py`. Compared with legacy `automate.py`:
+
+- Status updates:
+  - Legacy: POST to external `statusApiUrl`.
+  - `automate_www.py`: stores in SQLite (`data/status_updates.db`) and in-memory cache.
+- HTTP API:
+  - Legacy: no built-in HTTP API.
+  - `automate_www.py`: serves multiple endpoints on port 1611.
+- Wh-per-hour:
+  - Legacy: not available.
+  - `automate_www.py`: computed from SQLite via `/api/wh_per_hour`.
+- Loop interval default:
+  - Legacy: 30 seconds.
+  - `automate_www.py`: 20 seconds.
+- Power step limiting:
+  - Legacy: not available.
+  - `automate_www.py`: max delta per step (`POWER_FEED_MAX_DELTA`).
 
 ## Files and Classes
 
@@ -24,22 +34,38 @@ This document describes the automation script with built-in HTTP API for charge 
 
 - **Data classes**: `P1Readings`, `ZendureReadings`, `StatusChange`, `ApiState` — shared state for HTTP API responses.
 - **HTTP API**: `compute_wh_per_hour()`, `AutomationTCPServer`, `ApiTestHandler` — serve JSON endpoints.
-- **Logger**: Same as `automate.py` — wrapper around device controller logging.
+- **Logger**: Wrapper around device controller logging.
 - **StatusApi**: Stores status updates in SQLite and invokes an `on_update` callback (updates `api_state.last_status`); does **not** POST to an external API.
-- **InputHandler**: Same as `automate.py` — cross-platform keyboard input.
-- **CommandHandler**: Same commands as `automate.py`, implemented via a command dispatch dict and `_cmd_*` methods.
+- **InputHandler**: Cross-platform keyboard input.
+- **CommandHandler**: Command dispatch dict with `_cmd_*` handlers.
 - **AutomationApp**: Main orchestrator; runs the loop, starts the HTTP server, and coordinates all components.
 
 ### Configuration constants (module-level)
 
-| Constant | Default | Config key override | Description |
-|----------|---------|---------------------|-------------|
-| `LOOP_INTERVAL_SECONDS` | 20 | `LOOP_INTERVAL_SECONDS` | Seconds between loop iterations (clamped 5–300) |
-| `API_REFRESH_INTERVAL_SECONDS` | 300 | `API_REFRESH_INTERVAL_SECONDS` | Schedule refresh interval (clamped 60–3600) |
-| `ZERO_COUNT_THRESHOLD_STANDBY` | 21 | `ZERO_COUNT_THRESHOLD_STANDBY` | Consecutive 0-power iterations before standby (clamped 1–100) |
-| `HTTP_API_PORT` | 1611 | — | HTTP API listen port |
-| `WH_PER_HOUR_TIMEZONE` | `"Europe/Amsterdam"` | — | Timezone for Wh-per-hour calculation |
-| `WH_PER_HOUR_DAYS_DEFAULT` | 3 | — | Default days for Wh-per-hour API |
+- `LOOP_INTERVAL_SECONDS`
+  - Default: `20`
+  - Config override: `LOOP_INTERVAL_SECONDS`
+  - Meaning: seconds between loop iterations (clamped 5-300)
+- `API_REFRESH_INTERVAL_SECONDS`
+  - Default: `300`
+  - Config override: `API_REFRESH_INTERVAL_SECONDS`
+  - Meaning: schedule refresh interval (clamped 60-3600)
+- `ZERO_COUNT_THRESHOLD_STANDBY`
+  - Default: `21`
+  - Config override: `ZERO_COUNT_THRESHOLD_STANDBY`
+  - Meaning: consecutive 0-power iterations before standby (clamped 1-100)
+- `HTTP_API_PORT`
+  - Default: `1611`
+  - Config override: none
+  - Meaning: HTTP API listen port
+- `WH_PER_HOUR_TIMEZONE`
+  - Default: `"Europe/Amsterdam"`
+  - Config override: none
+  - Meaning: timezone for Wh-per-hour calculation
+- `WH_PER_HOUR_DAYS_DEFAULT`
+  - Default: `3`
+  - Config override: none
+  - Meaning: default days for Wh-per-hour API
 
 Additional config keys used: `dataDir`, `statusUpdatesRetentionDays`, `POWER_FEED_MAX_DELTA` (default 2400).
 
@@ -47,28 +73,48 @@ Additional config keys used: `dataDir`, `statusUpdatesRetentionDays`, `POWER_FEE
 
 The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All responses are JSON unless noted.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/test` | GET | Health check. Returns `{"status": "ok", "message": "API is up and running"}`. |
-| `/api/p1` | GET | Latest P1 meter readings with timestamp. |
-| `/api/zendure` | GET | Latest Zendure device readings with timestamp. |
-| `/api/status` | GET | Last status change event (eventType, oldValue, newValue, timestamp). |
-| `/api/all` | GET | Combined response: `p1`, `zendure`, and `status`. |
-| `/api/automation_status` | GET | Automation status entries from in-memory last-per-type cache. Returns all cached types (no params). |
-| `/api/wh_per_hour` | GET | Watt-hours charged/discharged per calendar hour for the last N days. Uses SQLite `status_updates` table. Returns `{"YYYY-MM-DD": [{"hour": "HH", "charged_wh": float, "discharged_wh": float, "electric_level": int|null}, ...], ...}`. |
-| `/api/refresh` | GET | Triggers a schedule refresh: fetches from schedule API and posts a Rescan status update. Returns `{"ok": true}` on success, `{"ok": false, "error": "..."}` on failure (500). |
+1. `GET /api/test`
+- Health check.
+- Returns `{"status": "ok", "message": "API is up and running"}`.
+
+2. `GET /api/p1`
+- Latest P1 meter readings with timestamp.
+- Optional query params: `max_age` or `maxAge` (default `60` seconds, `0` means always refresh).
+
+3. `GET /api/zendure`
+- Latest Zendure device readings with timestamp.
+- Optional query params: `max_age` or `maxAge` (default `60` seconds, `0` means always refresh).
+
+4. `GET /api/status`
+- Last status change event (`eventType`, `oldValue`, `newValue`, `timestamp`).
+
+5. `GET /api/all`
+- Combined response with `p1`, `zendure`, and `status`.
+
+6. `GET /api/automation_status`
+- Automation status entries from in-memory last-per-type cache.
+- Returns all cached types (no params).
+
+7. `GET /api/wh_per_hour`
+- Watt-hours charged/discharged per calendar hour for the last N days.
+- Uses SQLite `status_updates` table.
+- Returns `{"YYYY-MM-DD": [{"hour": "HH", "charged_wh": float, "discharged_wh": float, "electric_level": int|null}, ...], ...}`.
+
+8. `GET /api/refresh`
+- Triggers a schedule refresh: fetch from schedule API and post a `Rescan` status update.
+- Returns `{"ok": true}` on success, or `{"ok": false, "error": "..."}` with status 500 on failure.
 
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.
 
 ## How It Works
 
-1. **Configuration**: Reads `config.json` from `../config/config.json` or `./config/config.json` (same as `automate.py`).
+1. **Configuration**: Reads `config.json` from `../config/config.json` or `./config/config.json`.
 
 2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (SQLite + callback), `InputHandler`, `CommandHandler`, sets up signal handlers, and loads loop config via `_load_loop_config()`.
 
 3. **HTTP server**: Starts `AutomationTCPServer` in a daemon thread; shares `api_state`, `db_path`, `schedule_controller`, and `status_api` with the request handler.
 
-4. **Main loop** (same overall flow as `automate.py`):
+4. **Main loop**:
    - Sleep with interrupt for input
    - Accumulate P1 data and update `api_state.last_p1`
    - Check keyboard input and process via `CommandHandler`
@@ -95,19 +141,17 @@ The script runs in the foreground. Use a process manager (e.g. systemd, supervis
 
 ### Keyboard commands
 
-Same as `automate.py`:
+Supported commands:
 
-| Command | Description |
-|---------|-------------|
-| `h`, `help` | Show available commands |
-| `s`, `status` | Show current status (power, battery, schedule) |
-| `a`, `accumulators` | Print accumulator status |
-| `r`, `refresh` | Force refresh schedule from API |
-| `p <value>` | Set power manually (e.g. `p 500`, `p netzero`) |
-| `z`, `zero` | Set power to 0 |
-| `nz`, `netzero` | Set power to netzero mode |
-| `nzp`, `netzero+` | Set power to netzero+ mode |
-| `q`, `quit` | Quit gracefully |
+- `h`, `help`: show available commands
+- `s`, `status`: show current status (power, battery, schedule)
+- `a`, `accumulators`: print accumulator status
+- `r`, `refresh`: force refresh schedule from API
+- `p <value>`: set power manually (example: `p 500`, `p netzero`)
+- `z`, `zero`: set power to 0
+- `nz`, `netzero`: set power to netzero mode
+- `nzp`, `netzero+`: set power to netzero+ mode
+- `q`, `quit`: quit gracefully
 
 ### Example HTTP usage
 
@@ -127,13 +171,13 @@ curl http://localhost:1611/api/refresh
 
 ## API Calls (External)
 
-`automate_www.py` uses the same external APIs as `automate.py` for the Zendure device, P1 meter, schedule, and data storage — except for the **automation status API**. Status updates are stored locally in SQLite; there is no POST to `statusApiUrl` for start/stop/change/Rescan events.
+`automate_www.py` uses the same external APIs for the Zendure device, P1 meter, schedule, and data storage as described in the overview, except for the **automation status API**. Status updates are stored locally in SQLite; there is no POST to `statusApiUrl` for start/stop/change/Rescan events.
 
-See [automate-overview.md](automate-overview.md#api-calls-used-by-automatpy) for the full list of schedule, Zendure, P1, and data API calls. The status API (item 2 in that list) does **not** apply to `automate_www.py`.
+See [automate-overview.md](automate-overview.md#api-calls-used-by-automate_wwwpy) for the full list of schedule, Zendure, P1, and data API calls. The status API (item 2 in that list) does **not** apply to `automate_www.py`.
 
 ## Power Control Logic
 
-Identical to `automate.py`. See [automate-overview.md](automate-overview.md#power-control-logic--behavior) for manual power, NetZero/NetZero+ modes, battery limits, and standby behavior.
+See [automate-overview.md](automate-overview.md#power-control-logic--behavior) for manual power, NetZero/NetZero+ modes, battery limits, and standby behavior.
 
 ## Wh-per-hour Calculation
 

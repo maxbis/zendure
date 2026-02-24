@@ -46,10 +46,10 @@ The `type` parameter in the query string determines which file or logic is acces
 
 To see existing files in the `/main/data/` directory:
 
-| Action | Endpoint |
-| :--- | :--- |
-| **List All Files** | `GET /main/data/api/data_api.php?type=list` |
-| **Filter by Pattern** | `GET /main/data/api/data_api.php?type=list&pattern=price*.json` |
+- List all files:
+  - `GET /main/data/api/data_api.php?type=list`
+- Filter by pattern:
+  - `GET /main/data/api/data_api.php?type=list&pattern=price*.json`
 
 ---
 

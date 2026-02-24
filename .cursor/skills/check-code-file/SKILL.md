@@ -1,11 +1,45 @@
 ---
 name: check-code-file
-description: Runs a structured code check on a given file: dead code, unused variables, syntax and structure, control flow, undefined/uninitialized vars, complexity, resources, error messages, and CSS-specific checks. Use when the user asks to check the code for a file, review file xxx, or audit code in a specific file.
+description: Run a structured static-style code check on a named file and report findings by group with location, severity, confidence, and short fix suggestions. Use when the user asks to check/review/audit a specific file (e.g. "check code for file X", "review file Y", "audit this CSS/JS/Python file").
 ---
 
 # Check Code for File
 
-When the user asks to **check the code for file [xxx]** (or similar), run through the following checklist in order. Report findings by group; mark each group as ✅ (nothing found) or list issues with file location (line/column or symbol) and a short fix suggestion. Don't make any changes, only report.
+When the user asks to **check code for file [xxx]** (or similar), perform a read-only review and report findings by group.
+Do not modify files.
+
+## Review rules
+
+- Use this execution order:
+  1. Syntax & structure
+  2. Returns & control flow
+  3. Dead/unused + undefined/uninitialized
+  4. Resources & exceptions
+  5. Error messages
+  6. Complexity & maintainability
+  7. CSS-specific checks (if applicable)
+- Apply a **false-positive guard**: report an issue only when there is concrete in-file evidence.
+- Prefer precise locations:
+  - First choice: line/column.
+  - Fallback: symbol/function/class/selector name.
+- Keep checks language-aware:
+  - Do not flag optional semicolons in JS/TS unless the project or file clearly requires them.
+  - Run only checks relevant to the target file type.
+- For very large files, cap output to the top 20 highest-impact findings and state that truncation in Summary.
+
+## Weighted prioritization
+
+Use a weighted score for each issue to rank fixes:
+
+- Severity weight: `P0=4`, `P1=3`, `P2=2`, `P3=1`
+- Confidence weight: `high=1.0`, `medium=0.7`, `low=0.4`
+- Effort multiplier: `S=1.0`, `M=0.8`, `L=0.6`
+- `priority_score = severity_weight * confidence_weight * effort_multiplier`
+
+Interpretation:
+- Higher score = fix earlier.
+- Prefer high-score + low-effort issues as quick wins.
+- If scores tie, prioritize by higher severity, then higher confidence.
 
 ## 1. Dead & unused code
 
@@ -50,6 +84,7 @@ When the user asks to **check the code for file [xxx]** (or similar), run throug
 ## 8. CSS-specific (when the file is CSS or contains CSS)
 
 - [ ] **Duplicate classes** — Same class name defined more than once (merge selectors or remove duplicate rules).
+- [ ] **Duplicate declarations in one block** — Same property repeated within a selector block where earlier values are unintentionally overridden.
 - [ ] **Combining/simplifying classes** — Selectors that can be merged (e.g. same rules in multiple classes), or opportunities to use a single class instead of several.
 - [ ] **Simplifying CSS structure** — Overly specific selectors, redundant rules, or structure that can be simplified (e.g. fewer nesting levels, fewer overrides).
 
@@ -63,10 +98,21 @@ For each group, either:
 or  
 - **[Group name]**  
   - **Issue:** Short description.  
-    **Where:** File, line/symbol.  
+    **Where:** File, line/column or symbol.  
+    **Severity:** P0 (critical), P1 (high), P2 (medium), or P3 (low).  
+    **Confidence:** high, medium, or low.  
+    **Effort:** S (small), M (medium), or L (large).  
+    **Risk type:** runtime, security, data-loss, correctness, or maintainability.  
+    **Priority score:** numeric score using the weighted formula.  
     **Suggest:** One-line fix or refactor hint.
 
-At the end, add a **Summary**: total number of issues by group and, if relevant, a single sentence on the highest-priority fix.
+At the end, add a **Summary** with:
+- total issues by group,
+- total by severity (P0/P1/P2/P3),
+- top 3 quick wins (highest score with `Effort: S`),
+- recommended fix order (top 3 by score),
+- note if findings were truncated,
+- one sentence on the highest-priority fix.
 
 ## Scope
 

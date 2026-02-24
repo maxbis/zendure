@@ -142,7 +142,7 @@ The Charge Schedule Manager (`charge_schedule_mobile.php`) is a comprehensive da
 - File: `/data/automation_status.json`
 - API: `main/api/automation_status_api.php`
 - Loaded server-side on page load
-- Updated by automation process (`automate/automate.py`) when commands are sent
+- Updated by automation runtime (`automate/automate_www.py`) when commands are sent
 - Entries older than 3 days are automatically cleaned up
 
 ---
@@ -232,7 +232,7 @@ External Price API → data_api.php → price_YYYYMMDD.json → Page (client-sid
 
 ### Automation Status
 ```
-automate.py → automation_status_api.php → automation_status.json → Page (server-side)
+automate_www.py → automation_status_api.php → automation_status.json → Page (server-side)
 ```
 
 ### Battery Status

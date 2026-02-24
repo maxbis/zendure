@@ -132,12 +132,44 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 
 ## Summary Table
 
-| Function | Schedule | Bar graph | Price graph | Wh per hour | Automation | Charge status |
-|----------|----------|-----------|-------------|-------------|------------|---------------|
-| `refreshScheduleAndPrices` / `refreshScheduleAndPricesImmediate` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| `refreshStatus` | ✗ | indicators only | indicators only | ✗ | ✓ | ✓ |
-| `performNormalRefresh` | ✗ | ✗ | ✗ | ✗ | ✓ (calls `refreshStatus`) | ✓ |
-| `SchedulePanelComponent.refresh` | ✓ (panel only) | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `updateGraphTimeIndicators` | ✗ | indicators only | indicators only | ✗ | ✗ | ✗ |
+1. `refreshScheduleAndPrices` / `refreshScheduleAndPricesImmediate`
+- Schedule: yes
+- Bar graph: yes
+- Price graph: yes
+- Wh per hour: yes
+- Automation: no
+- Charge status: no
+
+2. `refreshStatus`
+- Schedule: no
+- Bar graph: indicators only
+- Price graph: indicators only
+- Wh per hour: no
+- Automation: yes
+- Charge status: yes
+
+3. `performNormalRefresh`
+- Schedule: no
+- Bar graph: no
+- Price graph: no
+- Wh per hour: no
+- Automation: yes (calls `refreshStatus`)
+- Charge status: yes
+
+4. `SchedulePanelComponent.refresh`
+- Schedule: yes (panel only)
+- Bar graph: no
+- Price graph: no
+- Wh per hour: no
+- Automation: no
+- Charge status: no
+
+5. `updateGraphTimeIndicators`
+- Schedule: no
+- Bar graph: indicators only
+- Price graph: indicators only
+- Wh per hour: no
+- Automation: no
+- Charge status: no
 
 Two main refresh flows: **schedule and prices** (debounced + immediate + on visibility, including Wh per hour) and **status** (20 s interval + visibility + manual button).

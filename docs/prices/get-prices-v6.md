@@ -51,12 +51,18 @@ The response is a single object with four top-level keys.
 
 ### Top-level structure
 
-| Key             | Type   | Description |
-|-----------------|--------|-------------|
-| `today`         | object \| null | Hourly consumer prices for today (see [Hour map](#hour-map)). `null` if unavailable. |
-| `tomorrow`      | object \| null | Hourly consumer prices for tomorrow. `null` if not yet available or on failure. |
-| `dates`         | object | Dates for which `today` and `tomorrow` apply (YYYYMMDD strings). |
-| `updateResults` | object | Whether today/tomorrow were **newly fetched** from ENTSO-E in this request. |
+- `today`
+  - Type: `object | null`
+  - Description: hourly consumer prices for today (see [Hour map](#hour-map)); `null` if unavailable.
+- `tomorrow`
+  - Type: `object | null`
+  - Description: hourly consumer prices for tomorrow; `null` if not yet available or on failure.
+- `dates`
+  - Type: `object`
+  - Description: dates for which `today` and `tomorrow` apply (YYYYMMDD strings).
+- `updateResults`
+  - Type: `object`
+  - Description: whether today/tomorrow were newly fetched from ENTSO-E in this request.
 
 ### Hour map (`today` / `tomorrow`)
 
@@ -86,17 +92,21 @@ There are up to 24 entries per day; keys may be in any order (often sorted when 
 
 ### `dates` object
 
-| Key       | Type   | Description |
-|-----------|--------|-------------|
-| `today`   | string | Date for `today` in **YYYYMMDD** (e.g. `"20260219"`). |
-| `tomorrow`| string \| null | Date for `tomorrow` in **YYYYMMDD**, or `null` if tomorrow’s data is not returned. |
+- `today`
+  - Type: `string`
+  - Description: date for `today` in `YYYYMMDD` (example: `"20260219"`).
+- `tomorrow`
+  - Type: `string | null`
+  - Description: date for `tomorrow` in `YYYYMMDD`, or `null` if tomorrow data is not returned.
 
 ### `updateResults` object
 
-| Key       | Type | Description |
-|-----------|------|-------------|
-| `today`   | bool | `true` if today’s data was **fetched from ENTSO-E** in this request and saved; `false` if it was **loaded from an existing file**. |
-| `tomorrow`| bool | `true` if tomorrow’s data was **fetched from ENTSO-E** in this request and saved; `false` otherwise (e.g. loaded from file or not requested). |
+- `today`
+  - Type: `bool`
+  - Description: `true` if today data was fetched from ENTSO-E in this request and saved; `false` if loaded from existing file.
+- `tomorrow`
+  - Type: `bool`
+  - Description: `true` if tomorrow data was fetched from ENTSO-E in this request and saved; `false` otherwise (loaded from file or not requested).
 
 ---
 
@@ -189,10 +199,8 @@ Example: `main/data/price/202602/price20260219.json`
 
 ## Update logic
 
-| Data      | When it is fetched from ENTSO-E |
-|-----------|----------------------------------|
-| **Today** | When there is **no** existing file for today’s date. |
-| **Tomorrow** | When the current hour (Europe/Amsterdam) is **≥ 14** and there is **no** existing file for tomorrow’s date. |
+- **Today**: fetched from ENTSO-E when there is no existing file for today’s date.
+- **Tomorrow**: fetched from ENTSO-E when current hour (Europe/Amsterdam) is >= 14 and there is no existing file for tomorrow’s date.
 
 Otherwise the script only reads from the existing price files and does not call ENTSO-E.
 
