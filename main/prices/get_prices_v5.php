@@ -24,15 +24,105 @@ function isRunningInCLI(): bool {
     return php_sapi_name() === 'cli' || php_sapi_name() === 'phpdbg';
 }
 
-function sendJsonResponse(array $data, int $statusCode = 200): void {
-    if (!isRunningInCLI()) {
-        http_response_code($statusCode);
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
-        header('Content-Type: application/json');
+function encodeJsonPayload(array $data): string {
+    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($json !== false) {
+        return $json . PHP_EOL;
     }
-    echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+
+    $fallback = [
+        'error' => 'json_encode_failed',
+        'message' => json_last_error_msg(),
+    ];
+    $fallbackJson = json_encode($fallback, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($fallbackJson !== false) {
+        return $fallbackJson . PHP_EOL;
+    }
+
+    return "{\"error\":\"json_encode_failed_unrecoverable\"}\n";
+}
+
+function clearOutputBuffers(): void {
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+}
+
+function sendJsonResponse(array $data, int $statusCode = 200): void {
+    clearOutputBuffers();
+
+    if (!isRunningInCLI()) {
+        if (!headers_sent()) {
+            http_response_code($statusCode);
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type');
+            header('Content-Type: application/json; charset=utf-8');
+        }
+    }
+
+    $GLOBALS['__get_prices_v5_response_sent'] = true;
+    echo encodeJsonPayload($data);
+}
+
+function initializeRuntimeResilience(): void {
+    if (($GLOBALS['__get_prices_v5_runtime_initialized'] ?? false) === true) {
+        return;
+    }
+    $GLOBALS['__get_prices_v5_runtime_initialized'] = true;
+    $GLOBALS['__get_prices_v5_response_sent'] = false;
+
+    if (!isRunningInCLI()) {
+        @ini_set('display_errors', '0');
+        @ini_set('html_errors', '0');
+        @ini_set('log_errors', '1');
+    }
+
+    if (ob_get_level() === 0) {
+        ob_start();
+    }
+
+    register_shutdown_function(static function (): void {
+        if (($GLOBALS['__get_prices_v5_response_sent'] ?? false) === true) {
+            return;
+        }
+
+        $lastError = error_get_last();
+        if (!is_array($lastError)) {
+            return;
+        }
+
+        $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR];
+        if (!in_array($lastError['type'], $fatalTypes, true)) {
+            return;
+        }
+
+        $tzNl = new DateTimeZone(TIMEZONE_NL);
+        $nowNl = new DateTimeImmutable('now', $tzNl);
+        $todayStr = $nowNl->format('Ymd');
+        $tomorrowStr = $nowNl->modify('+1 day')->format('Ymd');
+
+        sendJsonResponse([
+            'today' => null,
+            'tomorrow' => null,
+            'dates' => [
+                'today' => $todayStr,
+                'tomorrow' => $tomorrowStr,
+            ],
+            'updateResults' => [
+                'today' => false,
+                'tomorrow' => false,
+            ],
+            'diagnostics' => [
+                'fatal' => [
+                    'type' => $lastError['type'] ?? null,
+                    'message' => $lastError['message'] ?? null,
+                    'file' => $lastError['file'] ?? null,
+                    'line' => $lastError['line'] ?? null,
+                ],
+            ],
+        ], 500);
+    });
 }
 
 function getJeroenSecurityKey(): string {
@@ -417,5 +507,6 @@ function getPriceData(): array {
     ];
 }
 
+initializeRuntimeResilience();
 $result = getPriceData();
 sendJsonResponse($result, 200);
