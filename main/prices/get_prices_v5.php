@@ -174,12 +174,15 @@ function loadPriceFile(string $dateStr): ?array {
 
 function buildJeroenUrl(string $period): ?string {
     if ($period !== 'vandaag' && $period !== 'morgen') {
+        echo "Invalid period: " . $period;
         return null;
     }
     $key = getJeroenSecurityKey();
     if ($key === '') {
+        echo "No Jeroen security key found";
         return null;
     }
+    echo JEROEN_BASE_URL . '&period=' . rawurlencode($period) . '&key=' . rawurlencode($key);
     return JEROEN_BASE_URL . '&period=' . rawurlencode($period) . '&key=' . rawurlencode($key);
 }
 
