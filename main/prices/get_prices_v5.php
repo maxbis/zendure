@@ -93,12 +93,24 @@ function buildJeroenUrl(string $period): ?string {
     return JEROEN_BASE_URL . '&period=' . rawurlencode($period) . '&key=' . rawurlencode($key);
 }
 
+function maskApiKeyInUrl(string $url): string {
+    return (string)preg_replace('/([?&]key=)[^&]*/', '$1***', $url);
+}
+
 /**
  * @return array<int, array<string, mixed>>|null
  */
-function fetchJson(string $url): ?array {
+function fetchJson(string $url, array &$httpMeta = []): ?array {
+    $httpMeta = [
+        'url' => maskApiKeyInUrl($url),
+        'httpCode' => null,
+        'curlErrno' => null,
+        'curlError' => null,
+    ];
+
     $ch = curl_init($url);
     if ($ch === false) {
+        $httpMeta['curlError'] = 'curl_init_failed';
         error_log('get_prices_v5: Failed to initialize cURL');
         return null;
     }
@@ -112,11 +124,16 @@ function fetchJson(string $url): ?array {
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErrno = curl_errno($ch);
     $curlError = curl_error($ch);
     curl_close($ch);
 
+    $httpMeta['httpCode'] = $httpCode;
+    $httpMeta['curlErrno'] = $curlErrno;
+    $httpMeta['curlError'] = $curlError !== '' ? $curlError : null;
+
     if ($response === false || $curlError !== '') {
-        error_log('get_prices_v5: cURL error: ' . $curlError);
+        error_log('get_prices_v5: cURL error (' . $curlErrno . '): ' . $curlError);
         return null;
     }
     if ($httpCode !== 200) {
@@ -264,24 +281,37 @@ function savePriceFile(string $dateStr, array $prices): string|false {
  *
  * @return array<string, float>|null Hour "00"-"23" => consumer price, or null on failure
  */
-function fetchJeroenForPeriod(string $period, string $expectedDateStr): ?array {
+function fetchJeroenForPeriod(string $period, string $expectedDateStr, array &$diagnostics = []): ?array {
+    $diagnostics = [
+        'period' => $period,
+        'expectedDate' => $expectedDateStr,
+        'source' => 'api',
+        'status' => 'started',
+    ];
+
     $url = buildJeroenUrl($period);
     if ($url === null) {
+        $diagnostics['status'] = 'build_url_failed';
         return null;
     }
 
-    $rows = fetchJson($url);
+    $httpMeta = [];
+    $rows = fetchJson($url, $httpMeta);
+    $diagnostics['request'] = $httpMeta;
     if ($rows === null || empty($rows)) {
+        $diagnostics['status'] = 'fetch_failed_or_empty';
         return null;
     }
 
     $hours = parseHourlyPrices($rows);
     if (empty($hours)) {
+        $diagnostics['status'] = 'parse_failed_or_empty';
         return null;
     }
 
     $byDate = buildPriceFilesByDate($hours);
     if (empty($byDate)) {
+        $diagnostics['status'] = 'no_hourly_prices_built';
         return null;
     }
 
@@ -293,20 +323,28 @@ function fetchJeroenForPeriod(string $period, string $expectedDateStr): ?array {
         sort($dates);
         $selectedDateYmd = $dates[0] ?? '';
         if ($selectedDateYmd === '') {
+            $diagnostics['status'] = 'no_date_selected';
             return null;
         }
     }
 
     $hourPrices = $byDate[$selectedDateYmd] ?? null;
     if ($hourPrices === null || count($hourPrices) < 24) {
+        $diagnostics['status'] = 'insufficient_hour_data';
+        $diagnostics['hoursFound'] = is_array($hourPrices) ? count($hourPrices) : 0;
         return null;
     }
 
     $selectedDateStr = str_replace('-', '', $selectedDateYmd);
     if (savePriceFile($selectedDateStr, $hourPrices) === false) {
+        $diagnostics['status'] = 'save_failed';
+        $diagnostics['selectedDate'] = $selectedDateStr;
         return null;
     }
 
+    $diagnostics['status'] = 'ok';
+    $diagnostics['selectedDate'] = $selectedDateStr;
+    $diagnostics['hoursFound'] = count($hourPrices);
     return $hourPrices;
 }
 
@@ -324,19 +362,44 @@ function getPriceData(): array {
     $tomorrowData = null;
     $updateToday = false;
     $updateTomorrow = false;
+    $diagnostics = [
+        'today' => ['source' => null, 'status' => null],
+        'tomorrow' => ['source' => null, 'status' => null],
+    ];
 
     if (priceFileExists($todayStr)) {
         $todayData = loadPriceFile($todayStr);
+        $diagnostics['today'] = [
+            'source' => 'cache',
+            'status' => 'cache_hit',
+            'date' => $todayStr,
+        ];
     } else {
-        $todayData = fetchJeroenForPeriod('vandaag', $todayStr);
+        $todayFetchDiagnostics = [];
+        $todayData = fetchJeroenForPeriod('vandaag', $todayStr, $todayFetchDiagnostics);
         $updateToday = $todayData !== null;
+        $diagnostics['today'] = $todayFetchDiagnostics;
     }
 
     if (priceFileExists($tomorrowStr)) {
         $tomorrowData = loadPriceFile($tomorrowStr);
+        $diagnostics['tomorrow'] = [
+            'source' => 'cache',
+            'status' => 'cache_hit',
+            'date' => $tomorrowStr,
+        ];
     } elseif ($hourNl >= TOMORROW_FETCH_HOUR) {
-        $tomorrowData = fetchJeroenForPeriod('morgen', $tomorrowStr);
+        $tomorrowFetchDiagnostics = [];
+        $tomorrowData = fetchJeroenForPeriod('morgen', $tomorrowStr, $tomorrowFetchDiagnostics);
         $updateTomorrow = $tomorrowData !== null;
+        $diagnostics['tomorrow'] = $tomorrowFetchDiagnostics;
+    } else {
+        $diagnostics['tomorrow'] = [
+            'source' => 'api',
+            'status' => 'not_attempted_before_fetch_hour',
+            'currentHourNl' => $hourNl,
+            'fetchHourNl' => TOMORROW_FETCH_HOUR,
+        ];
     }
 
     return [
@@ -350,6 +413,7 @@ function getPriceData(): array {
             'today' => $updateToday,
             'tomorrow' => $updateTomorrow,
         ],
+        'diagnostics' => $diagnostics,
     ];
 }
 
