@@ -79,6 +79,57 @@ class PowerResult:
     error: Optional[str] = None
 
 
+class ReversalRampGuard:
+    """
+    Apply a simple ramp-to-zero strategy when reversal is detected.
+
+    The guard is intentionally isolated from control math:
+    - input: previous power, desired power, and optional reversal hint
+    - output: guarded power
+    """
+
+    def __init__(self, enabled: bool = True, divisor: int = 2, min_abs_power: int = 30):
+        self.enabled = bool(enabled)
+        self.divisor = max(2, int(divisor))
+        self.min_abs_power = max(0, int(min_abs_power))
+
+    @staticmethod
+    def _sign(value: int) -> int:
+        if value > 0:
+            return 1
+        if value < 0:
+            return -1
+        return 0
+
+    def _ramp_toward_zero(self, previous_power: int) -> int:
+        ramped = int(previous_power / self.divisor)
+        if abs(ramped) < self.min_abs_power:
+            return 0
+        return ramped
+
+    def apply(
+        self,
+        previous_power: Optional[int],
+        desired_power: int,
+        reversal_hint: bool = False,
+    ) -> int:
+        if not self.enabled or not isinstance(desired_power, int):
+            return desired_power
+        if not isinstance(previous_power, int):
+            return desired_power
+
+        # Explicit hint allows guarding transitions that intentionally map to 0 in netzero mode.
+        if reversal_hint:
+            return self._ramp_toward_zero(previous_power)
+
+        # Generic sign flip guard for int->int transitions.
+        if self._sign(previous_power) != 0 and self._sign(desired_power) != 0:
+            if self._sign(previous_power) != self._sign(desired_power):
+                return self._ramp_toward_zero(previous_power)
+
+        return desired_power
+
+
 class BaseDeviceController:
     """
     Base class for device controllers that share common functionality.
@@ -534,6 +585,19 @@ class AutomateController(BaseDeviceController):
         self.device_sn = device_sn
         self.previous_power = None  # Track the last successfully set power value (internal convention)
         self.limit_state = 0  # Battery limit state: -1 (MIN), 0 (OK), 1 (MAX)
+        try:
+            reversal_divisor = int(self.config.get("REVERSAL_RAMP_DIVISOR", 2))
+        except (TypeError, ValueError):
+            reversal_divisor = 2
+        try:
+            reversal_min_abs = int(self.config.get("REVERSAL_RAMP_MIN_ABS_POWER", self.power_feed_min_threshold))
+        except (TypeError, ValueError):
+            reversal_min_abs = self.power_feed_min_threshold
+        self.reversal_ramp_guard = ReversalRampGuard(
+            enabled=bool(self.config.get("REVERSAL_RAMP_ENABLED", True)),
+            divisor=reversal_divisor,
+            min_abs_power=reversal_min_abs,
+        )
 
         # Initialize power accumulator
         self.accumulator = PowerAccumulator(
@@ -847,15 +911,7 @@ class AutomateController(BaseDeviceController):
             electric_level=electric_level,
         )
 
-        # if charging and requested to discharge or when netzero and requested to charge, we might have a lag in measurements
-        if  (mode == 'netzero' and new_input > 0):
-            self.log('warning', f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, we might have a lag in measurements")
-            self.log('warning', f"  we'll return the previous power ({self.previous_power}) to avoid oscilating")
-            # return old value to avoid oscilating
-            return self.previous_power
-
-
-        # Convert to CLI convention (positive=charge, negative=discharge)
+        # Convert to controller convention (positive=charge, negative=discharge)
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
             # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
@@ -869,10 +925,30 @@ class AutomateController(BaseDeviceController):
             #     # Charging or stopped - if stopped (0), return 1 to avoid standby
             #     return new_input if new_input > 0 else 0
 
-        # if netzero mode, return the discharge (output) value as neagtive value
-        if new_output > 0:
-            return -new_output
-        return 0
+        # netzero mode: use discharge when needed, otherwise stop.
+        raw_target_power = -new_output if new_output > 0 else 0
+        reversal_hint = new_input > 0
+        if reversal_hint:
+            self.log(
+                'warning',
+                f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, "
+                "reversal detected (possible measurement lag)"
+            )
+
+        guarded_power = self.reversal_ramp_guard.apply(
+            previous_power=self.previous_power,
+            desired_power=raw_target_power,
+            reversal_hint=reversal_hint,
+        )
+
+        if guarded_power != raw_target_power:
+            self.log(
+                'warning',
+                f"  reversal ramp active: previous={self.previous_power}, "
+                f"raw_target={raw_target_power}, guarded_target={guarded_power}"
+            )
+
+        return guarded_power
 
             # # Regular netzero mode
             # if new_output > 0: # Discharging is requested?
