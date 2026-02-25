@@ -74,9 +74,11 @@ API_PATH_ALL = "/api/all"
 API_PATH_AUTOMATION_STATUS = "/api/automation_status"
 API_PATH_WH_PER_HOUR = "/api/wh_per_hour"
 API_PATH_REFRESH = "/api/refresh"
+API_PATH_RESTART = "/api/restart"
 
 # Shutdown behavior
 SHUTDOWN_FORCE_EXIT_SECONDS = 5.0
+RESTART_EXIT_CODE = 75
 
 # ============================================================================
 # API READINGS DATA CLASSES
@@ -392,6 +394,8 @@ def compute_automation_status_from_state(api_state: ApiState, type_filter: str, 
 class AutomationTCPServer(socketserver.ThreadingTCPServer):
     """TCPServer that holds api_state for the request handler."""
     allow_reuse_address = True  # avoid "Address already in use" when restarting quickly
+    daemon_threads = True  # don't wait for request threads during shutdown/restart
+    block_on_close = False  # avoid hanging on persistent client connections
 
     def __init__(self, server_address, request_handler_class):
         super().__init__(server_address, request_handler_class)
@@ -401,10 +405,12 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         self.status_api: Optional["StatusApi"] = None
         self.refresh_p1_callback: Optional[Callable[[], None]] = None
         self.refresh_zendure_callback: Optional[Callable[[], None]] = None
+        self.restart_callback: Optional[Callable[[], None]] = None
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all, /api/wh_per_hour, /api/refresh with JSON responses."""
+    protocol_version = "HTTP/1.0"  # close per-request to avoid keep-alive restart hangs
 
     def _send_json(self, data, status=200, sort_keys=True):
         """Send JSON response."""
@@ -412,8 +418,10 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
+        self.close_connection = True
 
     def _parse_max_age(self, parsed) -> int:
         """Parse max_age (or maxAge) from query string; default 60. Returns non-negative int."""
@@ -476,6 +484,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                 {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
                 {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
                 {"path": API_PATH_REFRESH, "optional_params": []},
+                {"path": API_PATH_RESTART, "optional_params": []},
             ],
         }
 
@@ -508,6 +517,20 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             schedule_controller.fetch_schedule()
             status_api.post_update(EVENT_TYPE_RESCAN, None, None)
             self._send_json({"ok": True})
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+        return True
+
+    def _handle_restart(self, path: str) -> bool:
+        if path != API_PATH_RESTART:
+            return False
+        restart_cb = getattr(self.server, "restart_callback", None)
+        if restart_cb is None:
+            self._send_json({"ok": False, "error": "Restart not available"}, 503)
+            return True
+        try:
+            restart_cb()
+            self._send_json({"ok": True, "message": "Restart requested"})
         except Exception as e:
             self._send_json({"ok": False, "error": str(e)}, 500)
         return True
@@ -577,6 +600,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return
         if self._handle_refresh(parsed.path):
             return
+        if self._handle_restart(parsed.path):
+            return
         api_state = getattr(self.server, "api_state", None)
         if api_state is None:
             self._send_json({"error": "API state not initialized"}, 503)
@@ -590,6 +615,13 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if self._handle_status(parsed.path, api_state):
             return
         if self._handle_all(parsed.path, api_state):
+            return
+        self.send_error(404, "Not Found")
+
+    def do_POST(self):
+        """Handle HTTP POST requests for the automation API server."""
+        parsed = urlparse(self.path)
+        if self._handle_restart(parsed.path):
             return
         self.send_error(404, "Not Found")
 
@@ -1026,6 +1058,7 @@ class AutomationApp:
 
     def __init__(self):
         self.shutdown_requested = False
+        self.restart_requested = False
         self._shutdown_signal_count = 0
         self._first_shutdown_signal_at: Optional[float] = None
 
@@ -1201,11 +1234,21 @@ class AutomationApp:
             self.http_server.status_api = self.status_api
             self.http_server.refresh_p1_callback = self._refresh_p1_for_api
             self.http_server.refresh_zendure_callback = self._refresh_zendure_for_api
+            self.http_server.restart_callback = self.request_restart
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
         except OSError as e:
             self.logger.warning(f"Failed to start HTTP API server: {e}")
+
+    def request_restart(self):
+        """Request graceful shutdown and in-process restart."""
+        if self.restart_requested:
+            return
+        self.restart_requested = True
+        self.shutdown_requested = True
+        if self.logger:
+            self.logger.warning("Restart requested via API; shutting down for restart")
 
     # ------------------------------------------------------------------------
     # MAIN LOGIC HELPERS
@@ -1515,10 +1558,10 @@ class AutomationApp:
         self._handle_standby_check()
         return True
 
-    def run(self):
+    def run(self) -> int:
         """Main execution method."""
         if not self.initialize():
-            return
+            return 1
 
         self.status_api.post_update(EVENT_TYPE_START)
         self._log_startup()
@@ -1537,15 +1580,20 @@ class AutomationApp:
             if self.status_api:
                 self.stop_posted = True
                 self.status_api.post_update(EVENT_TYPE_STOP, self.value, None, p1_total_power=self.last_p1_total_power)
-            raise
+            return 1
         finally:
             self._shutdown()
+        return RESTART_EXIT_CODE if self.restart_requested else 0
 
 
 def main():
-    app = AutomationApp()
-    app.run()
+    while True:
+        app = AutomationApp()
+        exit_code = app.run()
+        if exit_code == RESTART_EXIT_CODE:
+            continue
+        return exit_code
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
