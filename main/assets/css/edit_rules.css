@@ -211,6 +211,18 @@ button:hover {
     margin-right: 6px;
 }
 
+.rule-name-button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.rule-name-button:hover code {
+    text-decoration: underline;
+}
+
 label {
     display: block;
     font-size: 0.87rem;

@@ -104,7 +104,7 @@
             tr.innerHTML = [
                 '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
-                '<td><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></td>',
+                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
                 '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false">Actions</button>',
