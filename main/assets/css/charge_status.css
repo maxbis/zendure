@@ -404,10 +404,10 @@
 .charge-power-bar-marker-commanded {
     position: absolute;
     top: 0;
-    width: 2px;
+    width: 2px;g
     height: 100%;
     background: transparent;
-    border-left: 2px dashed #9e9e9e;
+    border-left: 2px dashed #d6c317;
     z-index: 3;
     pointer-events: none;
 }
