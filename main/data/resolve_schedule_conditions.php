@@ -596,6 +596,9 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
         'conditions' => isset($entry['conditions']) && is_array($entry['conditions']) ? $entry['conditions'] : [],
         '_order' => $order,
     ];
+    if (array_key_exists('name', $entry) && is_string($entry['name']) && trim($entry['name']) !== '') {
+        $rule['name'] = trim((string) $entry['name']);
+    }
     if (array_key_exists('enabled', $entry)) {
         $rule['enabled'] = (bool) $entry['enabled'];
     }
@@ -692,6 +695,12 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
                 'value' => $rule['value'],
                 'ranking' => $ranking,
             ];
+            if (array_key_exists('name', $rule) && is_string($rule['name']) && $rule['name'] !== '') {
+                $items[count($items) - 1]['rule_name'] = $rule['name'];
+            }
+            if (array_key_exists('_order', $rule) && is_numeric($rule['_order'])) {
+                $items[count($items) - 1]['rule_index'] = ((int) $rule['_order']) + 1;
+            }
             $splitConditions = splitRuleConditions($rule);
             if (!empty($splitConditions['runtime'])) {
                 $items[count($items) - 1]['runtime_conditions'] = array_values($splitConditions['runtime']);

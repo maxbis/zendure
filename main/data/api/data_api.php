@@ -143,6 +143,12 @@ function mergeResolvedWithConditional($resolved, $date) {
                 ? array_values($item['runtime_conditions'])
                 : null,
             'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
+            'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
+                ? trim((string) $item['rule_name'])
+                : null,
+            'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
+                ? ((int) $item['rule_index'])
+                : null,
         ];
     }
 
@@ -175,6 +181,16 @@ function mergeResolvedWithConditional($resolved, $date) {
                 $slot['fallback_value'] = $slotMeta['fallback_value'];
             } else {
                 unset($slot['fallback_value']);
+            }
+            if ($slotMeta['rule_name'] !== null) {
+                $slot['rule_name'] = $slotMeta['rule_name'];
+            } else {
+                unset($slot['rule_name']);
+            }
+            if ($slotMeta['rule_index'] !== null) {
+                $slot['rule_index'] = $slotMeta['rule_index'];
+            } else {
+                unset($slot['rule_index']);
             }
         }
     }

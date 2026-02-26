@@ -227,10 +227,23 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
         scheduleSource !== '' &&
         scheduleSource !== 'null' &&
         scheduleSource !== 'undefined';
+    const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
+    const ruleNameRaw = bar.dataset.ruleName;
+    const hasRuleName = ruleNameRaw !== undefined &&
+        ruleNameRaw !== null &&
+        String(ruleNameRaw).trim() !== '';
+    const ruleIndexRaw = bar.dataset.ruleIndex;
+    const hasRuleIndex = ruleIndexRaw !== undefined &&
+        ruleIndexRaw !== null &&
+        String(ruleIndexRaw).trim() !== '';
+    const ruleLabel = hasRuleName
+        ? `${hasRuleIndex ? ('#' + String(ruleIndexRaw).trim() + ' ') : ''}${String(ruleNameRaw).trim()}`
+        : '';
+    const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
     const sourceLabel = hasRuntimeCondition
-        ? 'runtime condition'
-        : (hasSource ? scheduleSource : '');
+        ? (ruleLabel ? `runtime condition (${ruleLabel})` : 'runtime condition')
+        : (ruleLabel ? ruleLabel : plainSourceLabel);
 
     titleEl.textContent = `Time slot ${timeRange || '—'}`;
     priceEl.textContent = priceDisplay;
@@ -343,10 +356,23 @@ function showPriceGraphPopup(bar, container) {
         scheduleSource !== '' &&
         scheduleSource !== 'null' &&
         scheduleSource !== 'undefined';
+    const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
+    const ruleNameRaw = bar.dataset.ruleName;
+    const hasRuleName = ruleNameRaw !== undefined &&
+        ruleNameRaw !== null &&
+        String(ruleNameRaw).trim() !== '';
+    const ruleIndexRaw = bar.dataset.ruleIndex;
+    const hasRuleIndex = ruleIndexRaw !== undefined &&
+        ruleIndexRaw !== null &&
+        String(ruleIndexRaw).trim() !== '';
+    const ruleLabel = hasRuleName
+        ? `${hasRuleIndex ? ('#' + String(ruleIndexRaw).trim() + ' ') : ''}${String(ruleNameRaw).trim()}`
+        : '';
+    const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
     const sourceLabel = hasRuntimeCondition
-        ? 'runtime condition'
-        : (hasSource ? scheduleSource : '');
+        ? (ruleLabel ? `runtime condition (${ruleLabel})` : 'runtime condition')
+        : (ruleLabel ? ruleLabel : plainSourceLabel);
 
     timeEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
@@ -434,13 +460,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hour = parseInt(String(slot.time).substring(0, 2), 10);
             if (Number.isNaN(hour)) return;
 
-            if (Object.prototype.hasOwnProperty.call(slot, 'source') && slot.source !== undefined && slot.source !== null) {
-                lastSource = slot.source;
+            if (Object.prototype.hasOwnProperty.call(slot, 'source')) {
+                if (slot.source !== undefined && slot.source !== null && String(slot.source).trim() !== '') {
+                    lastSource = slot.source;
+                } else {
+                    lastSource = undefined;
+                }
             }
-
-            if (lastSource !== undefined) {
-                baseSourceMap[hour] = lastSource;
-            }
+            baseSourceMap[hour] = lastSource;
         });
 
         if (Object.keys(baseSourceMap).length === 0) {
@@ -453,9 +480,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             if (Object.prototype.hasOwnProperty.call(baseSourceMap, h)) {
                 currentSource = baseSourceMap[h];
             }
-            if (currentSource !== undefined) {
-                expanded[h] = currentSource;
-            }
+            expanded[h] = currentSource;
         }
 
         return expanded;
@@ -502,9 +527,60 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         return expanded;
     };
 
+    /**
+     * Build an expanded hour -> rule metadata map from resolved schedule slots.
+     * Propagates last known rule_name/rule_index forward across the day.
+     */
+    const buildExpandedRuleMetaMap = (resolved) => {
+        if (!Array.isArray(resolved) || resolved.length === 0) return null;
+
+        const baseRuleMap = {};
+        let lastRuleMeta = undefined;
+
+        resolved.forEach((slot) => {
+            if (!slot || slot.time === undefined) return;
+            const hour = parseInt(String(slot.time).substring(0, 2), 10);
+            if (Number.isNaN(hour)) return;
+
+            const hasRuleName = Object.prototype.hasOwnProperty.call(slot, 'rule_name') &&
+                slot.rule_name !== undefined &&
+                slot.rule_name !== null &&
+                String(slot.rule_name).trim() !== '';
+            const hasRuleIndex = Object.prototype.hasOwnProperty.call(slot, 'rule_index') &&
+                slot.rule_index !== undefined &&
+                slot.rule_index !== null &&
+                !Number.isNaN(Number(slot.rule_index));
+
+            if (hasRuleName || hasRuleIndex) {
+                lastRuleMeta = {
+                    ruleName: hasRuleName ? String(slot.rule_name).trim() : undefined,
+                    ruleIndex: hasRuleIndex ? String(parseInt(slot.rule_index, 10)) : undefined
+                };
+            } else {
+                lastRuleMeta = undefined;
+            }
+            baseRuleMap[hour] = lastRuleMeta;
+        });
+
+        if (Object.keys(baseRuleMap).length === 0) {
+            return null;
+        }
+
+        const expanded = {};
+        let currentMeta = undefined;
+        for (let h = 0; h < 24; h++) {
+            if (Object.prototype.hasOwnProperty.call(baseRuleMap, h)) {
+                currentMeta = baseRuleMap[h];
+            }
+            expanded[h] = currentMeta;
+        }
+        return expanded;
+    };
+
     const scheduleHourMapByDate = {};
     const scheduleSourceMapByDate = {};
     const scheduleRuntimeConditionMapByDate = {};
+    const scheduleRuleMetaMapByDate = {};
 
     // Build a map of schedule entries for quick lookup
     const scheduleMap = {};
@@ -579,11 +655,14 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         const hourMap = scheduleHourMapByDate[dateStr];
         const sourceMap = scheduleSourceMapByDate[dateStr];
         const runtimeConditionMap = scheduleRuntimeConditionMapByDate[dateStr];
+        const ruleMetaMap = scheduleRuleMetaMapByDate[dateStr];
         const hourIndex = parseInt(hourKey, 10);
 
         let value;
         let source;
         let hasRuntimeCondition;
+        let ruleName;
+        let ruleIndex;
 
         if (hourMap) {
             value = hourMap[hourIndex];
@@ -594,14 +673,18 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         if (runtimeConditionMap) {
             hasRuntimeCondition = runtimeConditionMap[hourIndex];
         }
+        if (ruleMetaMap && Object.prototype.hasOwnProperty.call(ruleMetaMap, hourIndex) && ruleMetaMap[hourIndex]) {
+            ruleName = ruleMetaMap[hourIndex].ruleName;
+            ruleIndex = ruleMetaMap[hourIndex].ruleIndex;
+        }
 
-        if (value !== undefined || source !== undefined || hasRuntimeCondition !== undefined) {
-            return { value, source, hasRuntimeCondition };
+        if (value !== undefined || source !== undefined || hasRuntimeCondition !== undefined || ruleName !== undefined || ruleIndex !== undefined) {
+            return { value, source, hasRuntimeCondition, ruleName, ruleIndex };
         }
 
         const entries = scheduleByDate[dateStr];
         if (!entries || entries.length === 0) {
-            return { value: undefined, source: undefined, hasRuntimeCondition: undefined };
+            return { value: undefined, source: undefined, hasRuntimeCondition: undefined, ruleName: undefined, ruleIndex: undefined };
         }
 
         let activeValue = undefined;
@@ -613,7 +696,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 break;
             }
         }
-        return { value: activeValue, source: undefined, hasRuntimeCondition: undefined };
+        return { value: activeValue, source: undefined, hasRuntimeCondition: undefined, ruleName: undefined, ruleIndex: undefined };
     };
 
     // Extract price data
@@ -714,7 +797,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hourTime = hourKey + '00';
             const key = dateStr + hourTime;
             
-            const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition } = getActiveScheduleInfo(dateStr, hourKey);
+            const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition, ruleName, ruleIndex } = getActiveScheduleInfo(dateStr, hourKey);
 
             // Create bar element
             const barDiv = document.createElement('div');
@@ -737,6 +820,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             if (scheduledSource !== undefined && scheduledSource !== null && scheduledSource !== '') {
                 barDiv.dataset.scheduleSource = String(scheduledSource);
+            }
+            if (ruleName !== undefined && ruleName !== null && String(ruleName).trim() !== '') {
+                barDiv.dataset.ruleName = String(ruleName);
+            }
+            if (ruleIndex !== undefined && ruleIndex !== null && String(ruleIndex).trim() !== '') {
+                barDiv.dataset.ruleIndex = String(ruleIndex);
             }
             barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             
@@ -806,6 +895,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const tomorrowSourceMap = buildExpandedSourceMap(resolvedTomorrow);
     const todayRuntimeConditionMap = buildExpandedRuntimeConditionMap(resolvedToday);
     const tomorrowRuntimeConditionMap = buildExpandedRuntimeConditionMap(resolvedTomorrow);
+    const todayRuleMetaMap = buildExpandedRuleMetaMap(resolvedToday);
+    const tomorrowRuleMetaMap = buildExpandedRuleMetaMap(resolvedTomorrow);
     if (todaySourceMap) {
         scheduleSourceMapByDate[currentDate] = todaySourceMap;
     }
@@ -817,6 +908,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     }
     if (tomorrowRuntimeConditionMap) {
         scheduleRuntimeConditionMapByDate[tomorrowDateStr] = tomorrowRuntimeConditionMap;
+    }
+    if (todayRuleMetaMap) {
+        scheduleRuleMetaMapByDate[currentDate] = todayRuleMetaMap;
+    }
+    if (tomorrowRuleMetaMap) {
+        scheduleRuleMetaMapByDate[tomorrowDateStr] = tomorrowRuleMetaMap;
     }
     
     // Render today
