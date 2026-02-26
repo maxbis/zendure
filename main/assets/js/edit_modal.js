@@ -9,7 +9,6 @@ class EditModal {
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.confirmResolve = null;
-        this.limit1HourInput = document.getElementById('inp-limit-1-hour');
         
         this.init();
     }
@@ -188,9 +187,6 @@ class EditModal {
                 document.getElementById('inp-watts').value = value || '';
             }
         }
-        if (this.limit1HourInput) {
-            this.limit1HourInput.checked = true;
-        }
         this.modal.classList.add('active');
         
         // Auto-focus on first input for quicker editing
@@ -308,17 +304,13 @@ class EditModal {
         const key = d + t;
         const payload = { key, value: val };
 
-        if (this.limit1HourInput && this.limit1HourInput.checked && key.indexOf('*') === -1) {
-            payload.limit1hour = true;
-        }
-
         // Use PUT for both add and edit (originalKey is optional)
         // POST is still supported on the backend for backward compatibility
         if (this.currentOriginalKey) {
             payload.originalKey = this.currentOriginalKey;
         }
 
-        console.log('[EditModal] handleSave payload:', payload, 'limit1hour checkbox:', this.limit1HourInput?.checked);
+        console.log('[EditModal] handleSave payload:', payload);
         await this.submitPayload(payload);
     }
 
@@ -334,9 +326,6 @@ class EditModal {
         }
 
         const payload = { key, value: val };
-        if (options.limit1hour && key.indexOf('*') === -1) {
-            payload.limit1hour = true;
-        }
         if (options.originalKey) {
             payload.originalKey = options.originalKey;
         }

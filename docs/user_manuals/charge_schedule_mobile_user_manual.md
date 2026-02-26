@@ -54,7 +54,6 @@ Use the schedule section to manage entries.
 Notes:
 
 - Wildcards are supported in both date and time patterns.
-- `limit1hour` behavior can auto-restore the next hour for concrete keys.
 
 ## 5. Price Graph Behavior
 
@@ -115,4 +114,3 @@ If schedule changes do not appear:
 ## 10. Related Manuals
 
 - Rules editor manual: `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/edit_rules_user_manual.md`
-

@@ -16,7 +16,8 @@
 // - Always attempts today + tomorrow (Europe/Amsterdam)
 // - Includes a date only when a corresponding price file exists
 // - Missing/invalid hour price => condition false for that hour (skip hour)
-// - Supports conditions: price, ranking, min_time, max_time, month, hour
+// - Supports static conditions: price, ranking, min_time, max_time, month, hour
+// - Runtime-only conditions (e.g. electricity_level) are passed through as metadata
 // - Supports dynamic references via condition.value_ref:
 //   min_price, max_price, min_price_hour, max_price_hour, spread_price
 
@@ -404,6 +405,51 @@ function conditionMatchesContextNumber(array $condition, array $ctx): bool
     return compareNumeric((float) $ctx[$field], $op, $right);
 }
 
+function isRuntimeOnlyConditionField(string $field): bool
+{
+    return in_array($field, ['electricity_level', 'electric_level', 'electricLevel'], true);
+}
+
+/**
+ * Split rule conditions into static and runtime-only groups.
+ *
+ * @param array $rule
+ * @return array{static:array,runtime:array}
+ */
+function splitRuleConditions(array $rule): array
+{
+    $staticConditions = [];
+    $runtimeConditions = [];
+
+    $conditions = isset($rule['conditions']) && is_array($rule['conditions']) ? $rule['conditions'] : [];
+    foreach ($conditions as $condition) {
+        if (!is_array($condition) || !isset($condition['field'])) {
+            continue;
+        }
+        $field = (string) $condition['field'];
+        if (isRuntimeOnlyConditionField($field)) {
+            $runtimeConditions[] = $condition;
+            continue;
+        }
+        $staticConditions[] = $condition;
+    }
+
+    if (array_key_exists('min_time', $rule)) {
+        $staticConditions[] = ['field' => 'min_time', 'op' => '>=', 'value' => $rule['min_time']];
+    }
+    if (array_key_exists('max_time', $rule)) {
+        $staticConditions[] = ['field' => 'max_time', 'op' => '<=', 'value' => $rule['max_time']];
+    }
+    if (array_key_exists('month', $rule)) {
+        $staticConditions[] = ['field' => 'month', 'op' => 'in', 'value' => $rule['month']];
+    }
+    if (array_key_exists('hour', $rule)) {
+        $staticConditions[] = ['field' => 'hour', 'op' => 'in', 'value' => $rule['hour']];
+    }
+
+    return ['static' => $staticConditions, 'runtime' => $runtimeConditions];
+}
+
 /**
  * Evaluate rule conditions for a single hour.
  * Supports: price, ranking, min_time, max_time, month, hour.
@@ -416,19 +462,8 @@ function conditionMatchesContextNumber(array $condition, array $ctx): bool
  */
 function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string $yyyymmdd, array $ctx): bool
 {
-    $conditions = isset($rule['conditions']) && is_array($rule['conditions']) ? $rule['conditions'] : [];
-    if (array_key_exists('min_time', $rule)) {
-        $conditions[] = ['field' => 'min_time', 'op' => '>=', 'value' => $rule['min_time']];
-    }
-    if (array_key_exists('max_time', $rule)) {
-        $conditions[] = ['field' => 'max_time', 'op' => '<=', 'value' => $rule['max_time']];
-    }
-    if (array_key_exists('month', $rule)) {
-        $conditions[] = ['field' => 'month', 'op' => 'in', 'value' => $rule['month']];
-    }
-    if (array_key_exists('hour', $rule)) {
-        $conditions[] = ['field' => 'hour', 'op' => 'in', 'value' => $rule['hour']];
-    }
+    $splitConditions = splitRuleConditions($rule);
+    $conditions = $splitConditions['static'];
 
     foreach ($conditions as $condition) {
         if (!is_array($condition) || !isset($condition['field'])) {
@@ -488,6 +523,9 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
     }
     if (array_key_exists('hour', $entry)) {
         $rule['hour'] = $entry['hour'];
+    }
+    if (array_key_exists('fallback_value', $entry) && isValidRuleValue($entry['fallback_value'])) {
+        $rule['fallback_value'] = normalizeRuleValue($entry['fallback_value']);
     }
     return $rule;
 }
@@ -567,6 +605,13 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
                 'value' => $rule['value'],
                 'ranking' => $ranking,
             ];
+            $splitConditions = splitRuleConditions($rule);
+            if (!empty($splitConditions['runtime'])) {
+                $items[count($items) - 1]['runtime_conditions'] = array_values($splitConditions['runtime']);
+            }
+            if (array_key_exists('fallback_value', $rule)) {
+                $items[count($items) - 1]['fallback_value'] = $rule['fallback_value'];
+            }
             break;
         }
     }

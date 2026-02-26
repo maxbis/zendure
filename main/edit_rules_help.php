@@ -85,6 +85,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>hour</code> (optional)</td><td>Hour filter list; accepts string list, array, or single value.</td><td><code>"hour": "1,2,17,18"</code></td></tr>
                 <tr><td><code>min_time</code> (optional)</td><td>Lower bound hour (inclusive).</td><td><code>"min_time": "10"</code></td></tr>
                 <tr><td><code>max_time</code> (optional)</td><td>Upper bound hour (inclusive).</td><td><code>"max_time": "11"</code></td></tr>
+                <tr><td><code>fallback_value</code> (optional)</td><td>Optional fallback power used by runtime integrations when runtime conditions fail. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"fallback_value": 0</code></td></tr>
                 <tr><td><code>conditions</code></td><td>Array of condition objects. All conditions are combined with AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
             </tbody>
         </table>
@@ -108,6 +109,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>hour</code></td><td>Current hour check, either list (<code>in</code>) or numeric compare (<code>&lt;, &gt;</code>) with <code>value_ref</code>.</td></tr>
                 <tr><td><code>min_time</code></td><td>Equivalent to hour &gt;= bound.</td></tr>
                 <tr><td><code>max_time</code></td><td>Equivalent to hour &lt;= bound.</td></tr>
+                <tr><td><code>electricity_level</code></td><td>Battery SoC percent condition for runtime evaluation. It is stored in rules and emitted as runtime metadata in resolved output; static resolver does not evaluate this field.</td></tr>
             </tbody>
         </table>
     </section>
@@ -116,6 +118,11 @@ date_default_timezone_set('Europe/Amsterdam');
         <h2>Operators</h2>
         <p><code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>==</code>, <code>!=</code>, <code>in</code></p>
         <p class="muted"><code>in</code> is intended for list-like values such as <code>hour</code> and <code>month</code>.</p>
+    </section>
+
+    <section>
+        <h2>Runtime Metadata</h2>
+        <p>Rules using <code>electricity_level</code> are saved as normal rules. In resolved schedule output, those conditions are exposed under <code>runtime_conditions</code> while <code>value</code> remains unchanged for backward compatibility.</p>
     </section>
 
     <section>
@@ -155,6 +162,15 @@ date_default_timezone_set('Europe/Amsterdam');
   ]
 }</pre>
         <p class="muted">Because ranks are 1..24, <code>ranking &gt;= 21</code> selects 4 hours.</p>
+
+<pre>{
+  "value": 1200,
+  "fallback_value": 0,
+  "conditions": [
+    { "field": "price", "op": "<", "value": 18 },
+    { "field": "electricity_level", "op": "<", "value": 60 }
+  ]
+}</pre>
     </section>
 </main>
 </body>

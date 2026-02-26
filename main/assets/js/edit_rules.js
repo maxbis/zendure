@@ -27,10 +27,11 @@
         inpHour: document.getElementById('inp-hour'),
         inpMinTime: document.getElementById('inp-min-time'),
         inpMaxTime: document.getElementById('inp-max-time'),
+        inpFallbackValue: document.getElementById('inp-fallback-value'),
         conditionsList: document.getElementById('conditions-list'),
     };
 
-    const conditionFields = ['price', 'ranking', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'month', 'hour', 'min_time', 'max_time'];
+    const conditionFields = ['price', 'ranking', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'month', 'hour', 'min_time', 'max_time', 'electricity_level'];
     const conditionOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
     const valueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
 
@@ -61,6 +62,9 @@
         }
         if (rule.max_time !== undefined && rule.max_time !== null && rule.max_time !== '') {
             out.max_time = String(rule.max_time);
+        }
+        if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
+            out.fallback_value = rule.fallback_value;
         }
         if (Array.isArray(rule.conditions)) {
             out.conditions = rule.conditions
@@ -194,6 +198,7 @@
         els.inpHour.value = '';
         els.inpMinTime.value = '';
         els.inpMaxTime.value = '';
+        els.inpFallbackValue.value = '';
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
         els.conditionsList.innerHTML = '';
@@ -217,6 +222,7 @@
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
+        els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
 
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
@@ -287,6 +293,19 @@
 
         const maxTime = els.inpMaxTime.value.trim();
         if (maxTime) rule.max_time = maxTime;
+
+        const fallbackRaw = els.inpFallbackValue.value.trim();
+        if (fallbackRaw) {
+            if (fallbackRaw === 'netzero' || fallbackRaw === 'netzero+') {
+                rule.fallback_value = fallbackRaw;
+            } else {
+                const fallbackNumber = Number(fallbackRaw);
+                if (!Number.isFinite(fallbackNumber)) {
+                    throw new Error('Fallback value must be numeric, netzero, or netzero+.');
+                }
+                rule.fallback_value = Math.trunc(fallbackNumber);
+            }
+        }
 
         const conditions = readConditionRows();
         if (conditions.length > 0) {

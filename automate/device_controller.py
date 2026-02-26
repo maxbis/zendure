@@ -1368,11 +1368,14 @@ class ScheduleController(BaseDeviceController):
                 return None
 
             _, matching_entry = max(valid_entries_with_int_time, key=lambda x: x[0])
-            # Store a compact snapshot of the matching entry for other components (e.g. PowerAccumulator).
+            # Store a compact snapshot of the matching entry for other components
+            # (e.g. PowerAccumulator and runtime-condition evaluation in automate_www.py).
             self.last_schedule_entry = {
                 'time': matching_entry.get('time'),
                 'value': matching_entry.get('value'),
                 'key': matching_entry.get('key'),
+                'runtime_conditions': matching_entry.get('runtime_conditions'),
+                'fallback_value': matching_entry.get('fallback_value'),
             }
 
             return matching_entry.get('value')

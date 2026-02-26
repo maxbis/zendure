@@ -36,14 +36,7 @@
             </div>
             <div class="form-group" id="group-watts">
                 <label>Watts (Positive = Charge, Negative = Discharge)</label>
-                <div class="watts-limit-row">
-                    <input type="number" id="inp-watts" placeholder="0">
-                    <label for="inp-limit-1-hour" class="edit-modal-toggle edit-modal-toggle-checkbox limit-1h-row">
-                        <span class="edit-modal-toggle-label">Limit 1 hour</span>
-                        <input type="checkbox" id="inp-limit-1-hour" name="limit1hour" checked>
-                        <span class="edit-modal-toggle-check" aria-hidden="true">✓</span>
-                    </label>
-                </div>
+                <input type="number" id="inp-watts" placeholder="0" step="50">
             </div>
         </div>
         <div class="modal-footer">

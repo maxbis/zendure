@@ -63,7 +63,7 @@ function validateCondition(array $condition): bool
     }
     $field = (string) $condition['field'];
     $op = (string) $condition['op'];
-    $validFields = ['price', 'ranking', 'min_time', 'max_time', 'month', 'hour', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
+    $validFields = ['price', 'ranking', 'min_time', 'max_time', 'month', 'hour', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'electricity_level'];
     $validOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
     $validValueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
     if (!in_array($field, $validFields, true)) {
@@ -105,6 +105,9 @@ function normalizeRules(array $rules): array
             if (array_key_exists($k, $rule) && $rule[$k] !== '' && $rule[$k] !== null) {
                 $normalized[$k] = $rule[$k];
             }
+        }
+        if (array_key_exists('fallback_value', $rule) && $rule['fallback_value'] !== '' && $rule['fallback_value'] !== null && validateValue($rule['fallback_value'])) {
+            $normalized['fallback_value'] = is_numeric($rule['fallback_value']) ? (int) $rule['fallback_value'] : (string) $rule['fallback_value'];
         }
 
         if (isset($rule['conditions']) && is_array($rule['conditions'])) {
@@ -261,6 +264,11 @@ if ($isApi) {
                         <label>Max Time (optional)</label>
                         <input id="inp-max-time" type="text" placeholder="11">
                     </div>
+                </div>
+
+                <div class="row">
+                    <label>Fallback Value (optional)</label>
+                    <input id="inp-fallback-value" type="text" placeholder="0, netzero, netzero+">
                 </div>
 
                 <div class="row">

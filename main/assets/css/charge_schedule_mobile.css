@@ -581,6 +581,10 @@ body.mobile-dark {
     background: #f44336;
 }
 
+.price-graph-row-mobile .price-graph-bar.has-schedule.has-runtime-condition::after {
+    background: #cbe100;
+}
+
 .price-graph-row-mobile .price-graph-bar:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-2px);
@@ -1129,10 +1133,6 @@ code {
     border-color: #1e88e5;
     color: #ffffff;
 }
-.edit-modal-toggle-checkbox {
-    justify-content: space-between;
-    min-width: 170px;
-}
 #edit-modal input::selection {
     background: #1976d2;
     color: #fff;
@@ -1150,27 +1150,11 @@ code {
     font-size: 1rem;
     box-sizing: border-box;
 }
-.watts-limit-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 4px;
-}
-.watts-limit-row input[type="number"] {
-    width: 45%;
-    max-width: 45%;
+#edit-modal #inp-watts {
+    width: 220px;
+    max-width: 100%;
     min-height: 44px;
     padding: 10px 12px;
     font-size: 1rem;
     box-sizing: border-box;
-}
-.watts-limit-row .limit-1h-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    margin-left: auto;
-}
-.watts-limit-row .limit-1h-row input {
-    width: auto;
 }

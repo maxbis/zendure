@@ -137,7 +137,13 @@ function mergeResolvedWithConditional($resolved, $date) {
             continue;
         }
         $time = str_pad((string) $item['time'], 4, '0', STR_PAD_LEFT);
-        $byTime[$time] = $item['value'];
+        $byTime[$time] = [
+            'value' => $item['value'],
+            'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
+                ? array_values($item['runtime_conditions'])
+                : null,
+            'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
+        ];
     }
 
     if (empty($byTime)) {
@@ -157,8 +163,19 @@ function mergeResolvedWithConditional($resolved, $date) {
             if ($isManualNonWildcard) {
                 continue;
             }
-            $slot['value'] = $byTime[$slotTime];
+            $slotMeta = $byTime[$slotTime];
+            $slot['value'] = $slotMeta['value'];
             $slot['source'] = 'condition';
+            if (is_array($slotMeta['runtime_conditions']) && !empty($slotMeta['runtime_conditions'])) {
+                $slot['runtime_conditions'] = $slotMeta['runtime_conditions'];
+            } else {
+                unset($slot['runtime_conditions']);
+            }
+            if ($slotMeta['fallback_value'] !== null) {
+                $slot['fallback_value'] = $slotMeta['fallback_value'];
+            } else {
+                unset($slot['fallback_value']);
+            }
         }
     }
     unset($slot);
@@ -344,15 +361,7 @@ function applyScheduleEntryAndWrite($filePath, $key, $val, $orig, $input) {
     if ($orig !== null && $orig !== $key) {
         unset($schedule[$orig]);
     }
-    $limit1HourRestoreEntry = null;
-    if (!empty($input['limit1hour']) && strpos($key, '*') === false && file_exists(SCHEDULE_FUNCTIONS_PATH)) {
-        require_once SCHEDULE_FUNCTIONS_PATH;
-        $limit1HourRestoreEntry = getLimit1HourRestoreEntry($schedule, $key);
-    }
     $schedule[$key] = $val;
-    if ($limit1HourRestoreEntry !== null) {
-        $schedule[$limit1HourRestoreEntry['key']] = $limit1HourRestoreEntry['value'];
-    }
     if (!function_exists('cleanOutdatedScheduleEntries') && file_exists(SCHEDULE_FUNCTIONS_PATH)) {
         require_once SCHEDULE_FUNCTIONS_PATH;
     }

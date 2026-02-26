@@ -942,7 +942,7 @@ class CommandHandler:
         self.print_help()
         return True
 
-    def _cmd_status(self, args: list) -> bool:
+    def _cmd_status(self) -> bool:
         self.logger.info("=== Current Status ===")
         try:
             desired_power = self.schedule_controller.get_desired_power(refresh=False)
@@ -962,11 +962,11 @@ class CommandHandler:
             self.logger.warning(f"Could not read Zendure data: {e}")
         return True
 
-    def _cmd_accumulators(self, args: list) -> bool:
+    def _cmd_accumulators(self) -> bool:
         self.logger.info("Accumulator debug output has been removed.")
         return True
 
-    def _cmd_refresh(self, args: list) -> bool:
+    def _cmd_refresh(self) -> bool:
         self.logger.info("Forcing schedule refresh...")
         try:
             api_url = self.schedule_controller.config.get("apiUrl")
@@ -1009,7 +1009,7 @@ class CommandHandler:
             self.logger.error(f"Invalid power value: {power_arg}")
         return True
 
-    def _cmd_zero(self, args: list) -> bool:
+    def _cmd_zero(self) -> bool:
         self.logger.info("Setting power to 0")
         result = self.controller.set_power(0)
         if result.success:
@@ -1019,7 +1019,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_netzero(self, args: list) -> bool:
+    def _cmd_netzero(self) -> bool:
         self.logger.info("Setting power to netzero")
         result = self.controller.set_power(POWER_MODE_NETZERO)
         if result.success:
@@ -1029,7 +1029,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_netzero_plus(self, args: list) -> bool:
+    def _cmd_netzero_plus(self) -> bool:
         self.logger.info("Setting power to netzero+")
         result = self.controller.set_power(POWER_MODE_NETZERO_PLUS)
         if result.success:
@@ -1039,7 +1039,7 @@ class CommandHandler:
             self.logger.error(f"Failed to set power: {result.error}")
         return True
 
-    def _cmd_quit(self, args: list) -> bool:
+    def _cmd_quit(self) -> bool:
         self.logger.info("Quit command received")
         return False
 
@@ -1091,8 +1091,6 @@ class AutomationApp:
         self.power_feed_max_delta = 2400
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self.zero_count_threshold_standby = ZERO_COUNT_THRESHOLD_STANDBY
-        self._runtime_condition_warning_cache: set[str] = set()
-        self._last_runtime_decision_signature: Optional[str] = None
 
 
     def initialize(self) -> bool:
@@ -1334,167 +1332,9 @@ class AutomationApp:
                 pass
             return 0
 
-    def _warn_runtime_condition_once(self, key: str, message: str) -> None:
-        if key in self._runtime_condition_warning_cache:
-            return
-        self._runtime_condition_warning_cache.add(key)
-        self.logger.warning(message)
-
-    def _get_current_electricity_level(self) -> Optional[int]:
-        try:
-            reader = get_reader(self.controller.config_path)
-            zendure_data = getattr(reader, "last_zendure_data", None)
-            if not isinstance(zendure_data, dict):
-                return None
-            properties = zendure_data.get("properties") or {}
-            if not isinstance(properties, dict):
-                return None
-            raw_level = properties.get("electricLevel")
-            if raw_level is None:
-                return None
-            return int(raw_level)
-        except Exception:
-            return None
-
-    def _compare_runtime_condition(self, left: float, op: str, right: float) -> Optional[bool]:
-        if op == '>':
-            return left > right
-        if op == '>=':
-            return left >= right
-        if op == '<':
-            return left < right
-        if op == '<=':
-            return left <= right
-        if op == '==':
-            return left == right
-        if op == '!=':
-            return left != right
-        return None
-
-    def _normalize_fallback_value(self, fallback_value: Any) -> Optional[Any]:
-        if fallback_value is None:
-            return None
-        if isinstance(fallback_value, str):
-            normalized = fallback_value.strip().lower()
-            if normalized in (POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS):
-                return normalized
-            if normalized.lstrip('-').isdigit():
-                return int(normalized)
-            return None
-        if isinstance(fallback_value, (int, float)) and not isinstance(fallback_value, bool):
-            return int(fallback_value)
-        return None
-
-    def _apply_runtime_conditions(self, desired_power: Any) -> Any:
-        schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
-        if not isinstance(schedule_entry, dict):
-            self._last_runtime_decision_signature = None
-            return desired_power
-
-        runtime_conditions = schedule_entry.get("runtime_conditions")
-        if not isinstance(runtime_conditions, list) or len(runtime_conditions) == 0:
-            self._last_runtime_decision_signature = None
-            return desired_power
-
-        electricity_level = self._get_current_electricity_level()
-        slot_time = schedule_entry.get("time")
-        if electricity_level is None:
-            self._warn_runtime_condition_once(
-                f"runtime-missing-level:{slot_time}",
-                f"Runtime conditions present for slot {slot_time}, but electricLevel is unavailable; keeping base value"
-            )
-            self._last_runtime_decision_signature = None
-            return desired_power
-
-        valid_conditions = 0
-        all_valid_conditions_match = True
-
-        for idx, condition in enumerate(runtime_conditions):
-            condition_key = f"slot={slot_time},idx={idx}"
-            if not isinstance(condition, dict):
-                self._warn_runtime_condition_once(
-                    f"runtime-invalid-shape:{condition_key}",
-                    f"Invalid runtime condition ({condition_key}): expected object, got {type(condition).__name__}; skipping"
-                )
-                continue
-
-            field = str(condition.get("field", "")).strip()
-            op = str(condition.get("op", "")).strip()
-            value = condition.get("value")
-
-            if field in ("electric_level", "electricLevel"):
-                field = "electricity_level"
-
-            if field != "electricity_level":
-                self._warn_runtime_condition_once(
-                    f"runtime-invalid-field:{condition_key}:{field}",
-                    f"Unsupported runtime field '{field}' ({condition_key}); skipping"
-                )
-                continue
-
-            try:
-                right = float(value)
-            except (TypeError, ValueError):
-                self._warn_runtime_condition_once(
-                    f"runtime-invalid-value:{condition_key}",
-                    f"Invalid runtime condition value for field '{field}' ({condition_key}); skipping"
-                )
-                continue
-
-            match = self._compare_runtime_condition(float(electricity_level), op, right)
-            if match is None:
-                self._warn_runtime_condition_once(
-                    f"runtime-invalid-op:{condition_key}:{op}",
-                    f"Unsupported runtime operator '{op}' ({condition_key}); skipping"
-                )
-                continue
-
-            valid_conditions += 1
-            if not match:
-                all_valid_conditions_match = False
-
-        if valid_conditions == 0:
-            signature = f"{slot_time}|{desired_power}|no-valid|{electricity_level}"
-            if self._last_runtime_decision_signature != signature:
-                self.logger.info(
-                    f"Runtime conditions present for slot {slot_time}, but none are valid; keeping base value {desired_power}"
-                )
-                self._last_runtime_decision_signature = signature
-            return desired_power
-
-        if all_valid_conditions_match:
-            signature = f"{slot_time}|{desired_power}|matched|{electricity_level}"
-            if self._last_runtime_decision_signature != signature:
-                self.logger.info(
-                    f"Runtime conditions matched for slot {slot_time} (electricity_level={electricity_level}); using base value {desired_power}"
-                )
-                self._last_runtime_decision_signature = signature
-            return desired_power
-
-        fallback_value = self._normalize_fallback_value(schedule_entry.get("fallback_value"))
-        if fallback_value is None:
-            signature = f"{slot_time}|{desired_power}|no-fallback|{electricity_level}"
-            if self._last_runtime_decision_signature != signature:
-                self._warn_runtime_condition_once(
-                    f"runtime-missing-fallback:{slot_time}",
-                    f"Runtime conditions failed for slot {slot_time}, but fallback_value is missing/invalid; keeping base value {desired_power}"
-                )
-                self._last_runtime_decision_signature = signature
-            return desired_power
-
-        signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
-        if self._last_runtime_decision_signature != signature:
-            self.logger.info(
-                f"Runtime conditions failed for slot {slot_time} (electricity_level={electricity_level}); "
-                f"using fallback_value {fallback_value} instead of base value {desired_power}"
-            )
-            self._last_runtime_decision_signature = signature
-        return fallback_value
-
-    def _check_battery_limits(self, desired_power: any, prechecked: bool = False) -> any:
+    def _check_battery_limits(self, desired_power: any) -> any:
         """Check availability and modify desired power if limited."""
-        if not prechecked:
-            self.controller.check_battery_limits()
+        self.controller.check_battery_limits()
 
         validation_power = desired_power
         if desired_power == POWER_MODE_NETZERO:
@@ -1706,10 +1546,8 @@ class AutomationApp:
         self.old_value = self.value
         desired_power = self._calculate_desired_power()
 
-        # 4. Battery limits + runtime conditions + state updates
-        self.controller.check_battery_limits()
-        desired_power = self._apply_runtime_conditions(desired_power)
-        desired_power = self._check_battery_limits(desired_power, prechecked=True)
+        # 4. Battery limits + state updates
+        desired_power = self._check_battery_limits(desired_power)
         self._update_zendure_state()
         desired_power = self._limit_delta_step(desired_power)
 
