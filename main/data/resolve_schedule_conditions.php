@@ -20,11 +20,16 @@
 // - Runtime-only conditions (e.g. electricity_level) are passed through as metadata
 // - Supports dynamic references via condition.value_ref:
 //   min_price, max_price, min_price_hour, max_price_hour, spread_price
+// - Supports sun context for static conditions:
+//   sunrise_hour (floor), sunset_hour (ceil), and dynamic offset fields
 
 date_default_timezone_set('Europe/Amsterdam');
 
 const CONDITIONS_FILE = __DIR__ . '/charge_schedule_conditions.json';
 const PRICE_DIR = __DIR__ . '/price';
+const MAIN_CONFIG_FILE = __DIR__ . '/../config/config.json';
+const DEFAULT_LATITUDE = 52.3676;
+const DEFAULT_LONGITUDE = 4.9041;
 
 function buildPriceFilePath(string $yyyymmdd): string
 {
@@ -46,6 +51,61 @@ function readJsonFileAsArray(string $path): ?array
         return null;
     }
     return is_array($data) ? $data : null;
+}
+
+function loadMainConfig(): array
+{
+    $cfg = readJsonFileAsArray(MAIN_CONFIG_FILE);
+    return is_array($cfg) ? $cfg : [];
+}
+
+function getConfigFloat(array $cfg, string $key, float $default): float
+{
+    if (!array_key_exists($key, $cfg) || !is_numeric($cfg[$key])) {
+        return $default;
+    }
+    return (float) $cfg[$key];
+}
+
+function clampHour(int $hour): int
+{
+    return max(0, min(23, $hour));
+}
+
+function getSunContextForDate(string $yyyymmdd, float $latitude, float $longitude, DateTimeZone $tz): array
+{
+    $dateLocal = DateTimeImmutable::createFromFormat('Ymd H:i:s', $yyyymmdd . ' 12:00:00', $tz);
+    if (!$dateLocal) {
+        return [];
+    }
+
+    $sunInfo = @date_sun_info($dateLocal->getTimestamp(), $latitude, $longitude);
+    if (!is_array($sunInfo) || !isset($sunInfo['sunrise'], $sunInfo['sunset'])) {
+        return [];
+    }
+
+    $sunriseTs = is_numeric($sunInfo['sunrise']) ? (int) $sunInfo['sunrise'] : null;
+    $sunsetTs = is_numeric($sunInfo['sunset']) ? (int) $sunInfo['sunset'] : null;
+    if ($sunriseTs === null || $sunsetTs === null || $sunriseTs <= 0 || $sunsetTs <= 0) {
+        return [];
+    }
+
+    $sunriseDt = (new DateTimeImmutable('@' . $sunriseTs))->setTimezone($tz);
+    $sunsetDt = (new DateTimeImmutable('@' . $sunsetTs))->setTimezone($tz);
+    $sunriseFloatHour = ((int) $sunriseDt->format('H')) + (((int) $sunriseDt->format('i')) / 60.0);
+    $sunsetFloatHour = ((int) $sunsetDt->format('H')) + (((int) $sunsetDt->format('i')) / 60.0);
+
+    $sunriseHour = clampHour((int) floor($sunriseFloatHour));
+    $sunsetHour = clampHour((int) ceil($sunsetFloatHour));
+
+    return [
+        'sunrise_ts' => $sunriseTs,
+        'sunset_ts' => $sunsetTs,
+        'sunrise_time' => $sunriseDt->format('H:i'),
+        'sunset_time' => $sunsetDt->format('H:i'),
+        'sunrise_hour' => $sunriseHour,
+        'sunset_hour' => $sunsetHour,
+    ];
 }
 
 /**
@@ -405,6 +465,24 @@ function conditionMatchesContextNumber(array $condition, array $ctx): bool
     return compareNumeric((float) $ctx[$field], $op, $right);
 }
 
+/** @return bool */
+function conditionMatchesSunOffsetHour(array $condition, int $hour, array $ctx, string $anchorField): bool
+{
+    $op = isset($condition['op']) ? (string) $condition['op'] : '==';
+    if (!array_key_exists($anchorField, $ctx) || !is_numeric($ctx[$anchorField])) {
+        return false;
+    }
+
+    $offset = resolveConditionOperand($condition, $ctx);
+    if ($offset === null) {
+        return false;
+    }
+
+    $anchor = (int) $ctx[$anchorField];
+    $targetHour = clampHour((int) round($anchor + $offset));
+    return compareNumeric((float) $hour, $op, (float) $targetHour);
+}
+
 function isRuntimeOnlyConditionField(string $field): bool
 {
     return in_array($field, ['electricity_level', 'electric_level', 'electricLevel'], true);
@@ -475,8 +553,17 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string 
             $match = conditionMatchesPrice($condition, $priceByHour, $hour, $ctx);
         } elseif ($field === 'ranking') {
             $match = conditionMatchesRanking($condition, $hour, $ctx);
-        } elseif ($field === 'min_price' || $field === 'max_price' || $field === 'min_price_hour' || $field === 'max_price_hour' || $field === 'spread_price') {
+        } elseif (
+            $field === 'min_price' || $field === 'max_price' ||
+            $field === 'min_price_hour' || $field === 'max_price_hour' ||
+            $field === 'spread_price' ||
+            $field === 'sunrise_hour' || $field === 'sunset_hour'
+        ) {
             $match = conditionMatchesContextNumber($condition, $ctx);
+        } elseif ($field === 'sunrise_offset_hour') {
+            $match = conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunrise_hour');
+        } elseif ($field === 'sunset_offset_hour') {
+            $match = conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunset_hour');
         } elseif ($field === 'min_time') {
             $match = conditionMatchesMinTime($condition, $hour);
         } elseif ($field === 'max_time') {
@@ -633,6 +720,9 @@ function runResolve(): array
 
     $rules = normalizeRules($rawRules);
     $tz = new DateTimeZone('Europe/Amsterdam');
+    $cfg = loadMainConfig();
+    $latitude = getConfigFloat($cfg, 'latitude', DEFAULT_LATITUDE);
+    $longitude = getConfigFloat($cfg, 'longitude', DEFAULT_LONGITUDE);
     $today = new DateTimeImmutable('now', $tz);
     $dates = [
         $today->format('Ymd'),
@@ -647,7 +737,11 @@ function runResolve(): array
             continue;
         }
         $ctx = buildPriceContext($priceData);
-        $resolved[] = [
+        $sunCtx = getSunContextForDate($dateYmd, $latitude, $longitude, $tz);
+        if (!empty($sunCtx)) {
+            $ctx = array_merge($ctx, $sunCtx);
+        }
+        $group = [
             'date' => $dateYmd,
             'min_price' => $ctx['min_price'],
             'max_price' => $ctx['max_price'],
@@ -658,6 +752,17 @@ function runResolve(): array
             'ranking' => $ctx['rank_to_hour'],
             'items' => resolveForDate($dateYmd, $rules, $priceData, $ctx),
         ];
+        foreach ([
+            'sunrise_time',
+            'sunset_time',
+            'sunrise_hour',
+            'sunset_hour',
+        ] as $sunKey) {
+            if (array_key_exists($sunKey, $ctx)) {
+                $group[$sunKey] = $ctx[$sunKey];
+            }
+        }
+        $resolved[] = $group;
     }
 
     return ['success' => true, 'resolved' => $resolved];

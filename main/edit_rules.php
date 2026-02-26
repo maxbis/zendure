@@ -63,9 +63,17 @@ function validateCondition(array $condition): bool
     }
     $field = (string) $condition['field'];
     $op = (string) $condition['op'];
-    $validFields = ['price', 'ranking', 'min_time', 'max_time', 'month', 'hour', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'electricity_level'];
+    $validFields = [
+        'price', 'ranking', 'min_time', 'max_time', 'month', 'hour',
+        'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
+        'sunrise_hour', 'sunset_hour', 'sunrise_offset_hour', 'sunset_offset_hour',
+        'electricity_level'
+    ];
     $validOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
-    $validValueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
+    $validValueRefs = [
+        'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
+        'sunrise_hour', 'sunset_hour'
+    ];
     if (!in_array($field, $validFields, true)) {
         return false;
     }

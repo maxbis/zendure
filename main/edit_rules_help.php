@@ -105,6 +105,10 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>spread_price</code></td><td>Daily spread: <code>max_price - min_price</code> (cents/kWh).</td></tr>
                 <tr><td><code>min_price_hour</code></td><td>Hour (0-23) when min price occurs (first occurrence).</td></tr>
                 <tr><td><code>max_price_hour</code></td><td>Hour (0-23) when max price occurs (first occurrence).</td></tr>
+                <tr><td><code>sunrise_hour</code></td><td>Sunrise hour derived per rendered date using configured latitude/longitude. Rounded with <code>floor</code>.</td></tr>
+                <tr><td><code>sunset_hour</code></td><td>Sunset hour derived per rendered date using configured latitude/longitude. Rounded with <code>ceil</code>.</td></tr>
+                <tr><td><code>sunrise_offset_hour</code></td><td>Compares current hour to <code>sunrise_hour + offset</code>. Provide offset as numeric <code>value</code> (e.g. <code>-2</code>, <code>+1</code>).</td></tr>
+                <tr><td><code>sunset_offset_hour</code></td><td>Compares current hour to <code>sunset_hour + offset</code>. Provide offset as numeric <code>value</code>.</td></tr>
                 <tr><td><code>month</code></td><td>Current month number check, usually with <code>in</code>.</td></tr>
                 <tr><td><code>hour</code></td><td>Current hour check, either list (<code>in</code>) or numeric compare (<code>&lt;, &gt;</code>) with <code>value_ref</code>.</td></tr>
                 <tr><td><code>min_time</code></td><td>Equivalent to hour &gt;= bound.</td></tr>
@@ -128,7 +132,12 @@ date_default_timezone_set('Europe/Amsterdam');
     <section>
         <h2>value / value_ref</h2>
         <p>A condition can use a literal <code>value</code>, a dynamic <code>value_ref</code>, or both.</p>
-        <p>Supported <code>value_ref</code>: <code>min_price</code>, <code>max_price</code>, <code>spread_price</code>, <code>min_price_hour</code>, <code>max_price_hour</code>.</p>
+        <p>Supported <code>value_ref</code>: <code>min_price</code>, <code>max_price</code>, <code>spread_price</code>, <code>min_price_hour</code>, <code>max_price_hour</code>, <code>sunrise_hour</code>, <code>sunset_hour</code>.</p>
+    </section>
+
+    <section>
+        <h2>Sun Rules</h2>
+        <p>Sunrise/sunset are calculated in the resolver for each rendered date using latitude/longitude from <code>main/config/config.json</code>. Rounding policy: <code>sunrise_hour = floor</code>, <code>sunset_hour = ceil</code>.</p>
     </section>
 
     <section>
@@ -169,6 +178,14 @@ date_default_timezone_set('Europe/Amsterdam');
   "conditions": [
     { "field": "price", "op": "<", "value": 18 },
     { "field": "electricity_level", "op": "<", "value": 60 }
+  ]
+}</pre>
+
+<pre>{
+  "value": "netzero+",
+  "conditions": [
+    { "field": "sunset_offset_hour", "op": ">=", "value": -2 },
+    { "field": "sunset_offset_hour", "op": "<=", "value": 0 }
   ]
 }</pre>
     </section>

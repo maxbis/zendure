@@ -32,6 +32,8 @@ MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
 TEST_DESCRIPTIONS = [
     ("test_resolver_wildcard_and_specific_rule_precedence", "Checks wildcard base rule and specific-hour override precedence."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
+    ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
+    ("test_sun_offset_condition_matches_from_dynamic_offset_field", "Checks sunset_offset_hour conditions apply using numeric offsets."),
     ("test_data_api_manual_override_wins_over_condition_if_include_conditions_enabled", "Checks manual concrete schedule entries win over condition merge when include_conditions=true."),
     ("test_runtime_condition_true_keeps_base_value", "Checks runtime condition true keeps base value."),
     ("test_runtime_condition_false_uses_fallback", "Checks runtime condition false uses fallback_value."),
@@ -72,6 +74,37 @@ def _run_php_json(cmd: list[str]) -> dict:
     if not raw:
         raise RuntimeError("PHP command returned empty output")
     return json.loads(raw)
+
+
+def _load_lat_lon_from_main_config() -> tuple[float, float]:
+    if MAIN_CONFIG_FILE.exists():
+        cfg = json.loads(MAIN_CONFIG_FILE.read_text(encoding="utf-8"))
+    else:
+        cfg = {}
+    lat = cfg.get("latitude", 52.3676)
+    lon = cfg.get("longitude", 4.9041)
+    return float(lat), float(lon)
+
+
+def _php_expected_sun_hours(yyyymmdd: str, lat: float, lon: float) -> dict:
+    php_code = (
+        '$tz=new DateTimeZone("Europe/Amsterdam");'
+        f'$dt=DateTimeImmutable::createFromFormat("Ymd H:i:s","{yyyymmdd} 12:00:00",$tz);'
+        f'$info=date_sun_info($dt->getTimestamp(),{lat},{lon});'
+        '$sunrise=(new DateTimeImmutable("@".$info["sunrise"]))->setTimezone($tz);'
+        '$sunset=(new DateTimeImmutable("@".$info["sunset"]))->setTimezone($tz);'
+        '$sunriseFloat=((int)$sunrise->format("H"))+((int)$sunrise->format("i"))/60.0;'
+        '$sunsetFloat=((int)$sunset->format("H"))+((int)$sunset->format("i"))/60.0;'
+        '$sunriseHour=max(0,min(23,(int)floor($sunriseFloat)));'
+        '$sunsetHour=max(0,min(23,(int)ceil($sunsetFloat)));'
+        'echo json_encode(['
+        '"sunrise_time"=>$sunrise->format("H:i"),'
+        '"sunset_time"=>$sunset->format("H:i"),'
+        '"sunrise_hour"=>$sunriseHour,'
+        '"sunset_hour"=>$sunsetHour'
+        ']);'
+    )
+    return _run_php_json(["php", "-r", php_code])
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +193,59 @@ def test_resolver_emits_runtime_condition_metadata(backup_and_restore_price_file
     assert slot["fallback_value"] == 0
     assert isinstance(slot["runtime_conditions"], list)
     assert slot["runtime_conditions"][0]["field"] == "electricity_level"
+
+
+def test_resolver_emits_sun_context_with_expected_rounding(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(CONDITIONS_FILE, [{"name": "default", "key": "************", "value": 0, "enabled": True}])
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+
+    lat, lon = _load_lat_lon_from_main_config()
+    expected = _php_expected_sun_hours(today, lat, lon)
+
+    assert today_group.get("sunrise_time") == expected["sunrise_time"]
+    assert today_group.get("sunset_time") == expected["sunset_time"]
+    assert today_group.get("sunrise_hour") == expected["sunrise_hour"]
+    assert today_group.get("sunset_hour") == expected["sunset_hour"]
+
+
+def test_sun_offset_condition_matches_from_dynamic_offset_field(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "sun-window",
+                "key": "************",
+                "value": "netzero",
+                "conditions": [
+                    {"field": "sunset_offset_hour", "op": ">=", "value": -2},
+                    {"field": "sunset_offset_hour", "op": "<=", "value": 0},
+                ],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    sunset_hour = int(today_group["sunset_hour"])
+    start_h = max(0, sunset_hour - 2)
+    end_h = sunset_hour
+    items = today_group.get("items", [])
+    slot_hours = sorted(int(str(item.get("time"))[:2]) for item in items)
+    expected_hours = list(range(start_h, end_h + 1))
+    assert slot_hours == expected_hours
 
 
 def test_data_api_manual_override_wins_over_condition_if_include_conditions_enabled(backup_and_restore_price_files):

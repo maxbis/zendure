@@ -31,9 +31,16 @@
         conditionsList: document.getElementById('conditions-list'),
     };
 
-    const conditionFields = ['price', 'ranking', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price', 'month', 'hour', 'min_time', 'max_time', 'electricity_level'];
+    const conditionFields = [
+        'price', 'ranking', 'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
+        'sunrise_hour', 'sunset_hour', 'sunrise_offset_hour', 'sunset_offset_hour',
+        'month', 'hour', 'min_time', 'max_time', 'electricity_level'
+    ];
     const conditionOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
-    const valueRefs = ['min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price'];
+    const valueRefs = [
+        'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
+        'sunrise_hour', 'sunset_hour'
+    ];
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
