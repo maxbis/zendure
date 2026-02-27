@@ -5,7 +5,6 @@
     --text: #e5e7eb;
     --line: #374151;
     --primary: #2563eb;
-    --danger: #b91c1c;
     --ok: #166534;
     --error: #991b1b;
 }
@@ -100,8 +99,8 @@ button.primary {
     border-color: #1d4ed8;
 }
 
-button.danger {
-    background: var(--danger);
+.rule-actions-popover button.danger {
+    background: #b91c1c;
     border-color: #7f1d1d;
 }
 
@@ -142,6 +141,10 @@ button:hover {
     margin-top: 10px;
 }
 
+.rules-list-header #btn-new {
+    white-space: nowrap;
+}
+
 .rules-table th,
 .rules-table td {
     border-bottom: 1px solid var(--line);
@@ -178,7 +181,14 @@ button:hover {
 }
 
 .rule-actions-toggle {
-    min-width: 92px;
+    min-width: 40px;
+    width: 40px;
+    height: 36px;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    line-height: 1;
+    text-align: center;
 }
 
 .rule-actions-popover {
@@ -190,19 +200,32 @@ button:hover {
     background: #111b2e;
     border: 1px solid var(--line);
     border-radius: 10px;
-    padding: 6px;
+    padding: 5px;
     display: none;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .rule-actions-menu.open .rule-actions-popover {
     display: grid;
-    gap: 6px;
+    gap: 4px;
 }
 
 .rule-actions-popover button {
     width: 100%;
     text-align: left;
+    padding: 6px 10px;
+}
+
+.rule-actions-popover button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: none;
+}
+
+.rule-actions-separator {
+    height: 1px;
+    background: var(--line);
+    margin: 2px 0 4px 0;
 }
 
 .rule-name-inline {
@@ -221,6 +244,24 @@ button:hover {
 
 .rule-name-button:hover code {
     text-decoration: underline;
+}
+
+#rules-tbody tr {
+    cursor: pointer;
+}
+
+#rules-tbody tr:hover {
+    background: color-mix(in srgb, #1f2937 30%, transparent);
+}
+
+#rules-tbody tr.is-selected {
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+    box-shadow: inset 4px 0 0 var(--primary);
+}
+
+#rules-tbody tr.is-selected code {
+    color: #ffffff;
+    font-weight: 600;
 }
 
 label {
@@ -286,8 +327,37 @@ form {
 
 .condition-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.1fr 1.1fr auto;
+    grid-template-columns: minmax(150px, 1fr) 60px 60px minmax(130px, 1fr) auto;
     gap: 8px;
+}
+
+.condition-remove-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 40px;
+    padding: 0;
+    border-radius: 10px;
+    display: inline-grid;
+    place-items: center;
+}
+
+button.danger.condition-remove-btn {
+    border-color: #a61b1b;
+    background: #7f1d1d;
+}
+
+button.danger.condition-remove-btn:hover {
+    filter: brightness(1.08);
+}
+
+.condition-remove-icon {
+    width: 16px;
+    height: 16px;
+    stroke: #ffffff;
+    stroke-width: 1.9;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 @media (max-width: 960px) {

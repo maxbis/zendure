@@ -41,6 +41,16 @@
         'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
         'sunrise_hour', 'sunset_hour'
     ];
+    const editorHelpTexts = {
+        'inp-name': 'Rule name shown in the rules list and source labels.',
+        'inp-value-mode': 'Select output mode: fixed watts, netzero, or netzero+.',
+        'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
+        'inp-month': 'Optional month filter. Comma-separated values 1-12 (e.g. 10,11,12,1,2,3).',
+        'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
+        'inp-min-time': 'Optional lower time bound in hour format (0-23).',
+        'inp-max-time': 'Optional upper time bound in hour format (0-23).',
+        'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
+    };
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -54,6 +64,20 @@
     function renderRawJson() {
         if (!els.rawJsonTextarea) return;
         els.rawJsonTextarea.value = JSON.stringify(state.rules, null, 2);
+    }
+
+    function applyEditorHelpTooltips() {
+        Object.entries(editorHelpTexts).forEach(function (entry) {
+            const inputId = entry[0];
+            const helpText = entry[1];
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.title = helpText;
+            const label = document.querySelector('label[for="' + inputId + '"]');
+            if (label) {
+                label.title = helpText;
+            }
+        });
     }
 
     function normalizeRule(rule) {
@@ -100,19 +124,28 @@
 
         state.rules.forEach((rule, idx) => {
             const enabledAttr = rule.enabled === false ? '' : ' checked';
+            const isFirst = idx === 0;
+            const isLast = idx === state.rules.length - 1;
+            const upDisabled = isFirst ? ' disabled aria-disabled="true" title="Already first rule"' : '';
+            const downDisabled = isLast ? ' disabled aria-disabled="true" title="Already last rule"' : '';
             const tr = document.createElement('tr');
+            tr.setAttribute('data-row-idx', String(idx));
+            if (state.editIndex === idx) {
+                tr.classList.add('is-selected');
+            }
             tr.innerHTML = [
                 '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
                 '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
-                '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false">Actions</button>',
+                '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
                 '<div class="rule-actions-popover" role="menu">',
                 '<button type="button" data-action="edit" data-idx="' + idx + '" role="menuitem">Edit</button>',
                 '<button type="button" data-action="dup" data-idx="' + idx + '" role="menuitem">Duplicate</button>',
-                '<button type="button" data-action="up" data-idx="' + idx + '" role="menuitem">Move Up</button>',
-                '<button type="button" data-action="down" data-idx="' + idx + '" role="menuitem">Move Down</button>',
+                '<button type="button" data-action="up" data-idx="' + idx + '" role="menuitem"' + upDisabled + '>Move Up</button>',
+                '<button type="button" data-action="down" data-idx="' + idx + '" role="menuitem"' + downDisabled + '>Move Down</button>',
+                '<div class="rule-actions-separator" role="separator" aria-hidden="true"></div>',
                 '<button type="button" data-action="del" data-idx="' + idx + '" class="danger" role="menuitem">Delete</button>',
                 '</div>',
                 '</div>',
@@ -152,6 +185,7 @@
             fieldSel.appendChild(opt);
         });
         fieldSel.value = condition?.field || 'price';
+        fieldSel.title = 'Condition field to evaluate (price, ranking, electricity_level, sun fields, etc.).';
 
         const opSel = document.createElement('select');
         conditionOps.forEach((o) => {
@@ -161,11 +195,13 @@
             opSel.appendChild(opt);
         });
         opSel.value = condition?.op || '>=';
+        opSel.title = 'Comparison operator used for this condition.';
 
         const valueInp = document.createElement('input');
         valueInp.type = 'text';
         valueInp.placeholder = 'value (optional)';
         valueInp.value = condition?.value !== undefined ? String(condition.value) : '';
+        valueInp.title = 'Static value to compare against. Leave empty when using value_ref.';
 
         const valueRefSel = document.createElement('select');
         const valueRefNone = document.createElement('option');
@@ -179,11 +215,22 @@
             valueRefSel.appendChild(opt);
         });
         valueRefSel.value = condition?.value_ref || '';
+        valueRefSel.title = 'Optional dynamic reference value (for example min_price or sunset_hour).';
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
-        delBtn.className = 'danger';
-        delBtn.textContent = 'Remove';
+        delBtn.className = 'danger condition-remove-btn';
+        delBtn.setAttribute('aria-label', 'Remove condition');
+        delBtn.innerHTML = [
+            '<svg class="condition-remove-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+            '<path d="M3 6h18" />',
+            '<path d="M8 6V4h8v2" />',
+            '<path d="M6 6l1 14h10l1-14" />',
+            '<path d="M10 10v7" />',
+            '<path d="M14 10v7" />',
+            '</svg>',
+        ].join('');
+        delBtn.title = 'Remove this condition row.';
         delBtn.addEventListener('click', function () {
             row.remove();
         });
@@ -209,11 +256,13 @@
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
         els.conditionsList.innerHTML = '';
+        renderTable();
     }
 
     function fillEditor(rule, idx) {
         state.editIndex = idx;
-        els.editorTitle.textContent = 'Editing Rule #' + (idx + 1);
+        const safeName = String(rule?.name || '').trim();
+        els.editorTitle.textContent = safeName ? ('Editing Rule #' + (idx + 1) + ' · ' + safeName) : ('Editing Rule #' + (idx + 1));
         els.inpName.value = rule.name || '';
 
         if (rule.value === 'netzero' || rule.value === 'netzero+') {
@@ -235,6 +284,7 @@
         (rule.conditions || []).forEach((condition) => {
             els.conditionsList.appendChild(createConditionRow(condition));
         });
+        renderTable();
     }
 
     function readConditionRows() {
@@ -390,6 +440,8 @@
     }
 
     function attachEvents() {
+        applyEditorHelpTooltips();
+
         els.btnRawJson.addEventListener('click', function () {
             renderRawJson();
             els.rawJsonCard.hidden = false;
@@ -444,6 +496,20 @@
                 return;
             }
 
+            const row = e.target.closest('tr[data-row-idx]');
+            if (
+                row &&
+                !e.target.closest('button[data-action]') &&
+                !e.target.closest('input[data-action="toggle-enabled"]') &&
+                !e.target.closest('.rule-actions-popover')
+            ) {
+                const rowIdx = Number(row.getAttribute('data-row-idx'));
+                if (Number.isInteger(rowIdx) && state.rules[rowIdx]) {
+                    fillEditor(state.rules[rowIdx], rowIdx);
+                    return;
+                }
+            }
+
             const btn = e.target.closest('button[data-action]');
             if (!btn) return;
             closeActionMenus();
@@ -462,7 +528,8 @@
                 return;
             }
             if (action === 'del') {
-                if (!window.confirm('Delete rule #' + (idx + 1) + '?')) return;
+                const ruleName = state.rules[idx]?.name ? (' "' + state.rules[idx].name + '"') : '';
+                if (!window.confirm('Delete rule #' + (idx + 1) + ruleName + '?')) return;
                 const ok = await mutateAndPersist(function () {
                     state.rules.splice(idx, 1);
                 }, 'Rule deleted and saved.');
@@ -530,7 +597,11 @@
                     }
                 }, isNew ? 'Rule added and saved.' : 'Rule updated and saved.');
                 if (ok) {
-                    clearEditor();
+                    if (isNew) {
+                        clearEditor();
+                    } else {
+                        fillEditor(state.rules[state.editIndex], state.editIndex);
+                    }
                 }
             } catch (err) {
                 setStatus(err.message || 'Invalid rule.', 'error');

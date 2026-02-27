@@ -220,11 +220,11 @@ if ($isApi) {
 
     <section class="grid">
         <section class="card">
+            <div class="card-header-row rules-list-header">
+                <h2>Rules</h2>
+                <button id="btn-new" type="button">+ New Rule</button>
+            </div>
             <table class="rules-table">
-                    <tr>
-                        <td colspan="3"><h2>Rules</h2></td>
-                        <td><button id="btn-new" type="button">+ New Rule</button></td>
-                    </tr>
                 <tbody id="rules-tbody"></tbody>
             </table>
         </section>
@@ -233,13 +233,13 @@ if ($isApi) {
             <h2 id="editor-title">Rule Editor</h2>
             <form id="rule-form">
                 <div class="row">
-                    <label>Name</label>
+                    <label for="inp-name">Name</label>
                     <input id="inp-name" type="text" placeholder="Rule name" required>
                 </div>
 
                 <div class="row split">
                     <div>
-                        <label>Value Mode</label>
+                        <label for="inp-value-mode">Value Mode</label>
                         <select id="inp-value-mode">
                             <option value="fixed">Fixed</option>
                             <option value="netzero">netzero</option>
@@ -247,42 +247,42 @@ if ($isApi) {
                         </select>
                     </div>
                     <div>
-                        <label>Fixed Value (W)</label>
+                        <label for="inp-fixed-value">Fixed Value (W)</label>
                         <input id="inp-fixed-value" type="number" step="1" placeholder="500">
                     </div>
                 </div>
 
                 <div class="row split">
                     <div>
-                        <label>Month (optional)</label>
+                        <label for="inp-month">Month (optional)</label>
                         <input id="inp-month" type="text" placeholder="10,11,12,1,2,3">
                     </div>
                     <div>
-                        <label>Hour (optional)</label>
+                        <label for="inp-hour">Hour (optional)</label>
                         <input id="inp-hour" type="text" placeholder="1,2,17,18">
                     </div>
                 </div>
 
                 <div class="row split">
                     <div>
-                        <label>Min Time (optional)</label>
+                        <label for="inp-min-time">Min Time (optional)</label>
                         <input id="inp-min-time" type="text" placeholder="10">
                     </div>
                     <div>
-                        <label>Max Time (optional)</label>
+                        <label for="inp-max-time">Max Time (optional)</label>
                         <input id="inp-max-time" type="text" placeholder="11">
                     </div>
                 </div>
 
                 <div class="row">
-                    <label>Fallback Value (optional)</label>
+                    <label for="inp-fallback-value">Fallback Value (optional)</label>
                     <input id="inp-fallback-value" type="text" placeholder="0, netzero, netzero+">
                 </div>
 
                 <div class="row">
                     <div class="conditions-header">
-                        <label>Conditions</label>
-                        <button id="btn-add-condition" type="button">Add Condition</button>
+                        <label title="All listed conditions must be true (AND).">Conditions</label>
+                        <button id="btn-add-condition" type="button" title="Add a new condition row.">Add Condition</button>
                     </div>
                     <div id="conditions-list"></div>
                 </div>
