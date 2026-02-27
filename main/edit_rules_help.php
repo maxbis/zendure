@@ -138,6 +138,28 @@ date_default_timezone_set('Europe/Amsterdam');
     <section>
         <h2>Sun Rules</h2>
         <p>Sunrise/sunset are calculated in the resolver for each rendered date using latitude/longitude from <code>main/config/config.json</code>. Rounding policy: <code>sunrise_hour = floor</code>, <code>sunset_hour = ceil</code>.</p>
+        <p><code>sunrise_offset_hour</code> and <code>sunset_offset_hour</code> use the condition <code>value</code> as an offset in hours relative to sunrise/sunset:</p>
+        <ul>
+            <li><strong>Negative value</strong>: hours <em>before</em> sunrise/sunset (example: <code>-2</code> means 2 hours before).</li>
+            <li><strong>Zero</strong>: exactly the sunrise/sunset anchor hour.</li>
+            <li><strong>Positive value</strong>: hours <em>after</em> sunrise/sunset (example: <code>+1</code> means 1 hour after).</li>
+        </ul>
+        <p class="muted">The resolver compares the current slot hour against <code>sunrise_hour + offset</code> or <code>sunset_hour + offset</code> (clamped to 0..23).</p>
+    </section>
+
+    <section>
+        <h2>Resolution Order</h2>
+        <p>Schedule output is built in two stages:</p>
+        <ol>
+            <li><strong>Base schedule resolve</strong> from <code>charge_schedule.json</code> (manual entries and wildcards).</li>
+            <li><strong>Condition merge</strong> from <code>charge_schedule_conditions.json</code>.</li>
+        </ol>
+        <p>Priority at merge time:</p>
+        <ul>
+            <li><code>manual non-wildcard key</code> (no <code>*</code>) wins and is not overridden by condition rules.</li>
+            <li>Wildcard/empty base slots may be overridden by condition rules.</li>
+        </ul>
+        <p class="muted">When available, UI source labels show the originating condition rule as <code>#&lt;index&gt; &lt;name&gt;</code>.</p>
     </section>
 
     <section>
@@ -188,6 +210,15 @@ date_default_timezone_set('Europe/Amsterdam');
     { "field": "sunset_offset_hour", "op": "<=", "value": 0 }
   ]
 }</pre>
+
+<pre>{
+  "value": "netzero",
+  "conditions": [
+    { "field": "sunrise_offset_hour", "op": ">=", "value": 0 },
+    { "field": "sunrise_offset_hour", "op": "<=", "value": 2 }
+  ]
+}</pre>
+        <p class="muted">Example above: apply from sunrise hour up to 2 hours after sunrise.</p>
     </section>
 </main>
 </body>
