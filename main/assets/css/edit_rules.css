@@ -55,6 +55,7 @@ h1, h2 {
 
 h1 {
     font-size: 1.25rem;
+    line-height: 1.1;
 }
 
 h2 {
@@ -75,6 +76,32 @@ code {
     flex-wrap: wrap;
 }
 
+.card-hero {
+    display: grid;
+    gap: 10px;
+}
+
+.hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.hero-title {
+    min-width: 0;
+}
+
+.hero-subtitle {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.hero-actions {
+    justify-content: flex-end;
+}
+
 button {
     border: 1px solid var(--line);
     background: #1f2937;
@@ -85,7 +112,9 @@ button {
 }
 
 .btn-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--line);
     background: #1f2937;
     color: var(--text);
@@ -118,11 +147,37 @@ button:hover {
     font-size: 0.95rem;
 }
 
+.file-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-label {
+    font-size: 0.96rem;
+    font-weight: 600;
+}
+
+.file-path {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #d1d5db;
+}
+
 .status {
-    min-height: 24px;
-    margin-top: 8px;
+    min-height: 0;
+    margin-top: 4px;
     border-radius: 8px;
-    padding: 6px 8px;
+    padding: 6px 10px;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.status:empty {
+    display: none;
 }
 
 .status.ok {
@@ -366,5 +421,74 @@ button.danger.condition-remove-btn:hover {
     }
     .condition-row {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .rules-page {
+        padding: 0 12px;
+        margin: 12px auto;
+        gap: 12px;
+    }
+
+    .card {
+        padding: 12px;
+    }
+
+    .hero-top {
+        display: grid;
+        gap: 10px;
+    }
+
+    .hero-actions {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hero-actions > button,
+    .hero-actions > .btn-link {
+        width: 100%;
+        min-height: 42px;
+        font-size: 1rem;
+    }
+
+    .hero-actions > .btn-link:first-child {
+        grid-column: 1 / -1;
+    }
+
+    h1 {
+        font-size: 1.7rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.05rem;
+    }
+
+    .file-row {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "label label"
+            "path copy";
+        gap: 6px 8px;
+    }
+
+    .file-label {
+        grid-area: label;
+        font-size: 1rem;
+    }
+
+    .file-path {
+        grid-area: path;
+        font-size: 1.05rem;
+    }
+
+    #btn-copy-file-path {
+        grid-area: copy;
+        min-height: 42px;
+    }
+
+    .status {
+        font-size: 1rem;
     }
 }

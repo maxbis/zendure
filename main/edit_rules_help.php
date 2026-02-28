@@ -29,6 +29,27 @@ date_default_timezone_set('Europe/Amsterdam');
             display: grid;
             gap: 14px;
         }
+        .top-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .btn-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            color: var(--text);
+            text-decoration: none;
+            background: #0b1324;
+        }
+        .btn-link:hover,
+        .btn-link:focus-visible {
+            background: #13203b;
+        }
         section {
             background: color-mix(in srgb, var(--card) 92%, black);
             border: 1px solid var(--line);
@@ -56,6 +77,10 @@ date_default_timezone_set('Europe/Amsterdam');
             width: 100%;
             border-collapse: collapse;
         }
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         th, td {
             border-bottom: 1px solid var(--line);
             text-align: left;
@@ -63,17 +88,51 @@ date_default_timezone_set('Europe/Amsterdam');
             padding: 7px;
         }
         th { color: var(--muted); }
+        @media (max-width: 700px) {
+            main {
+                margin: 12px auto;
+                padding: 0 10px 16px;
+                gap: 10px;
+            }
+            section {
+                padding: 10px;
+            }
+            body {
+                font-size: 18px;
+            }
+            h1 { font-size: 1.45rem; }
+            h2 { font-size: 1.2rem; }
+            p, li {
+                line-height: 1.55;
+            }
+            th, td {
+                padding: 8px;
+                font-size: 1rem;
+            }
+            pre {
+                padding: 10px;
+                font-size: 0.98rem;
+            }
+            .btn-link {
+                padding: 10px 14px;
+                font-size: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
 <main>
     <section>
+        <div class="top-links">
+            <a class="btn-link" href="edit_rules.php">Back to Rule Editor</a>
+        </div>
         <h1>Condition Rules Help</h1>
         <p class="muted">This page describes all fields supported by <code>main/data/charge_schedule_conditions.json</code> and the editor.</p>
     </section>
 
     <section>
         <h2>Rule Fields</h2>
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr><th>Field</th><th>Description</th><th>Example</th></tr>
@@ -89,10 +148,12 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>conditions</code></td><td>Array of condition objects. All conditions are combined with AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
             </tbody>
         </table>
+        </div>
     </section>
 
     <section>
         <h2>Condition Fields</h2>
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr><th><code>field</code></th><th>Meaning</th></tr>
@@ -116,6 +177,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>electricity_level</code></td><td>Battery SoC percent condition for runtime evaluation. It is stored in rules and emitted as runtime metadata in resolved output; static resolver does not evaluate this field.</td></tr>
             </tbody>
         </table>
+        </div>
     </section>
 
     <section>

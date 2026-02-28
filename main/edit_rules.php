@@ -196,11 +196,11 @@ if ($isApi) {
 <main class="rules-page">
     <section class="card">
         <div class="card-header-row">
-            <h1>Condition Rules Editor</h1>
+            <h1>⚡ Zendure Rules Editor</h1>
             <div class="actions">
-                <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
                 <button id="btn-raw-json" type="button">Raw JSON</button>
                 <button id="btn-reload" type="button">Reload</button>
+                <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
             </div>
         </div>
         <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>

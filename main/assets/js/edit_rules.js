@@ -13,8 +13,10 @@
         editorTitle: document.getElementById('editor-title'),
         rawJsonCard: document.getElementById('raw-json-card'),
         rawJsonTextarea: document.getElementById('raw-json-textarea'),
+        rulesFilePath: document.getElementById('rules-file-path'),
         btnRawJson: document.getElementById('btn-raw-json'),
         btnCopyRawJson: document.getElementById('btn-copy-raw-json'),
+        btnCopyFilePath: document.getElementById('btn-copy-file-path'),
         btnCloseRawJson: document.getElementById('btn-close-raw-json'),
         btnReload: document.getElementById('btn-reload'),
         btnNew: document.getElementById('btn-new'),
@@ -459,6 +461,19 @@
                 setStatus('Failed to copy raw JSON.', 'error');
             }
         });
+
+        if (els.btnCopyFilePath && els.rulesFilePath) {
+            els.btnCopyFilePath.addEventListener('click', async function () {
+                const filePath = (els.rulesFilePath.textContent || '').trim();
+                if (!filePath) return;
+                try {
+                    await navigator.clipboard.writeText(filePath);
+                    setStatus('File path copied.', 'ok');
+                } catch (e) {
+                    setStatus('Failed to copy file path.', 'error');
+                }
+            });
+        }
 
         els.btnReload.addEventListener('click', loadRules);
 
