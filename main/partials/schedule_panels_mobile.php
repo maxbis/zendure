@@ -29,6 +29,7 @@ function getValueLabel($val)
     <div class="schedule-mobile-tabs" role="tablist">
         <button type="button" class="schedule-mobile-tab active" data-tab="schedule" role="tab" aria-selected="true">Schedule</button>
         <button type="button" class="schedule-mobile-tab" data-tab="entries" role="tab" aria-selected="false">Entries</button>
+        <button type="button" class="schedule-mobile-tab" data-tab="rules" role="tab" aria-selected="false">Rules</button>
     </div>
     <div class="schedule-mobile-tab-panels">
         <!-- Tab 1: Today's and Tomorrow's Schedule -->
@@ -226,12 +227,136 @@ function getValueLabel($val)
                 </table>
             </div>
         </div>
+
+        <!-- Tab 3: Rules list (toggle enabled/disabled only) -->
+        <div class="schedule-mobile-tab-panel" data-tab="rules" role="tabpanel" aria-hidden="true">
+            <div class="schedule-rules-header">
+                <h3 class="card-header">⚙️ Rules</h3>
+                <button type="button" class="btn btn-outline" id="rules-refresh-btn">Reload</button>
+            </div>
+            <div class="schedule-rules-status" id="rules-status"></div>
+            <div class="schedule-rules-list-wrap">
+                <ul class="schedule-rules-list" id="rules-list" aria-live="polite"></ul>
+            </div>
+        </div>
     </div>
 </div>
 <script>
 (function() {
     var tabs = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab');
     var panels = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab-panel');
+    var rulesApiUrl = 'edit_rules.php?api=1';
+    var rulesRefreshBtn = document.getElementById('rules-refresh-btn');
+    var rulesStatus = document.getElementById('rules-status');
+    var rulesList = document.getElementById('rules-list');
+    var rulesLoaded = false;
+    var rulesLoading = false;
+    var rulesState = [];
+
+    function setRulesStatus(text, type) {
+        if (!rulesStatus) return;
+        rulesStatus.className = 'schedule-rules-status' + (type ? (' ' + type) : '');
+        rulesStatus.textContent = text || '';
+    }
+
+    function renderRulesList() {
+        if (!rulesList) return;
+        rulesList.innerHTML = '';
+        if (!Array.isArray(rulesState) || rulesState.length === 0) {
+            var empty = document.createElement('li');
+            empty.className = 'schedule-rules-empty';
+            empty.textContent = 'No rules found.';
+            rulesList.appendChild(empty);
+            return;
+        }
+
+        rulesState.forEach(function(rule, idx) {
+            var li = document.createElement('li');
+            li.className = 'schedule-rules-item';
+
+            var label = document.createElement('label');
+            label.className = 'schedule-rules-toggle';
+
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = rule && rule.enabled !== false;
+            checkbox.setAttribute('data-rule-idx', String(idx));
+            checkbox.setAttribute('aria-label', 'Enable rule ' + String((rule && rule.name) || ('#' + (idx + 1))));
+
+            var name = document.createElement('span');
+            name.className = 'schedule-rules-name';
+            name.textContent = (rule && rule.name) ? String(rule.name) : ('Rule #' + (idx + 1));
+
+            label.appendChild(checkbox);
+            label.appendChild(name);
+            li.appendChild(label);
+            rulesList.appendChild(li);
+        });
+    }
+
+    async function fetchRules() {
+        var res = await fetch(rulesApiUrl, { method: 'GET' });
+        var data = await res.json();
+        if (!res.ok || !data.success || !Array.isArray(data.rules)) {
+            throw new Error((data && data.error) ? data.error : 'Failed to load rules.');
+        }
+        return data.rules;
+    }
+
+    async function saveRules() {
+        var res = await fetch(rulesApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rules: rulesState })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error((data && data.error) ? data.error : 'Failed to save rules.');
+        }
+        return data;
+    }
+
+    async function loadRules(forceReload) {
+        if (!rulesList || rulesLoading) return;
+        if (!forceReload && rulesLoaded) return;
+        rulesLoading = true;
+        setRulesStatus('Loading rules...', '');
+        if (rulesRefreshBtn) rulesRefreshBtn.disabled = true;
+        try {
+            var rules = await fetchRules();
+            rulesState = rules.map(function(rule) {
+                var out = Object.assign({}, rule || {});
+                out.enabled = out.enabled !== false;
+                return out;
+            });
+            renderRulesList();
+            setRulesStatus('Loaded ' + rulesState.length + ' rules.', 'ok');
+            rulesLoaded = true;
+        } catch (e) {
+            setRulesStatus(e.message || 'Failed to load rules.', 'error');
+        } finally {
+            rulesLoading = false;
+            if (rulesRefreshBtn) rulesRefreshBtn.disabled = false;
+        }
+    }
+
+    async function toggleRule(index, enabled, checkbox) {
+        if (!Array.isArray(rulesState) || !rulesState[index]) return;
+        var prev = rulesState[index].enabled !== false;
+        rulesState[index].enabled = !!enabled;
+        setRulesStatus('Saving...', '');
+        if (checkbox) checkbox.disabled = true;
+        try {
+            await saveRules();
+            setRulesStatus((enabled ? 'Enabled' : 'Disabled') + ' "' + String(rulesState[index].name || ('Rule #' + (index + 1))) + '".', 'ok');
+        } catch (e) {
+            rulesState[index].enabled = prev;
+            if (checkbox) checkbox.checked = prev;
+            setRulesStatus(e.message || 'Failed to save rule toggle.', 'error');
+        } finally {
+            if (checkbox) checkbox.disabled = false;
+        }
+    }
     var daySwipe = document.getElementById('schedule-days-swipe');
     var dayPanels = daySwipe ? daySwipe.querySelectorAll('.schedule-day[data-day-panel]') : [];
     var dayChips = document.querySelectorAll('.schedule-mobile-card [data-day-chip]');
@@ -287,6 +412,23 @@ function getValueLabel($val)
     if (daySwipe) {
         initDaySwipe();
     }
+
+    if (rulesRefreshBtn) {
+        rulesRefreshBtn.addEventListener('click', function() {
+            loadRules(true);
+        });
+    }
+
+    if (rulesList) {
+        rulesList.addEventListener('change', function(e) {
+            var checkbox = e.target.closest('input[type="checkbox"][data-rule-idx]');
+            if (!checkbox) return;
+            var index = Number(checkbox.getAttribute('data-rule-idx'));
+            if (!Number.isInteger(index)) return;
+            toggleRule(index, checkbox.checked, checkbox);
+        });
+    }
+
     if (!tabs.length || !panels.length) return;
     tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
@@ -300,6 +442,9 @@ function getValueLabel($val)
                 panel.classList.toggle('active', isActive);
                 panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
             });
+            if (targetTab === 'rules') {
+                loadRules(false);
+            }
         });
     });
 })();
