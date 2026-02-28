@@ -1473,14 +1473,15 @@ class AutomationApp:
 
         fallback_value = self._normalize_fallback_value(schedule_entry.get("fallback_value"))
         if fallback_value is None:
-            signature = f"{slot_time}|{desired_power}|no-fallback|{electricity_level}"
+            fallback_value = 0
+            signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
             if self._last_runtime_decision_signature != signature:
                 self._warn_runtime_condition_once(
                     f"runtime-missing-fallback:{slot_time}",
-                    f"Runtime conditions failed for slot {slot_time}, but fallback_value is missing/invalid; keeping base value {desired_power}"
+                    f"Runtime conditions failed for slot {slot_time}, but fallback_value is missing/invalid; using default fallback 0"
                 )
                 self._last_runtime_decision_signature = signature
-            return desired_power
+            return fallback_value
 
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
