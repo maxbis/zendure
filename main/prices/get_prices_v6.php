@@ -77,22 +77,36 @@ function buildEntsoeUrlForDate(string $dateStr): ?string {
     if (strlen($dateStr) !== 8) {
         return null;
     }
-    $tzNl = new DateTimeZone(TIMEZONE_NL);
-    $tzUtc = new DateTimeZone('UTC');
+
     $y = substr($dateStr, 0, 4);
     $m = substr($dateStr, 4, 2);
     $d = substr($dateStr, 6, 2);
+
     try {
-        $startNl = new DateTimeImmutable($y . '-' . $m . '-' . $d . ' 00:00:00', $tzNl);
-        $endNl = $startNl->modify('+1 day');
+        // Always treat delivery date as UTC midnight
+        $startUtc = new DateTimeImmutable(
+            $y . '-' . $m . '-' . $d . ' 00:00:00',
+            new DateTimeZone('UTC')
+        );
+
+        $endUtc = $startUtc->modify('+1 day');
+
     } catch (Exception $e) {
         return null;
     }
-    $startUtc = $startNl->setTimezone($tzUtc);
-    $endUtc = $endNl->setTimezone($tzUtc);
-    $periodStart = $startUtc->format('Ymd') . $startUtc->format('Hi');
-    $periodEnd = $endUtc->format('Ymd') . $endUtc->format('Hi');
-    return ENTSOE_BASE_URL . '&periodStart=' . $periodStart . '&periodEnd=' . $periodEnd . '&securityToken=' . getEntsoeSecurityToken();
+
+    $periodStart = $startUtc->format('YmdHi'); // e.g. 202602280000
+    $periodEnd   = $endUtc->format('YmdHi');   // e.g. 202603010000
+
+    // echo 'periodStart: ' . $periodStart . ', periodEnd: ' . $periodEnd . ', securityToken: ' . getEntsoeSecurityToken();
+    // echo '<br>';
+    // echo '<br>';
+    // exit;   
+    
+    return ENTSOE_BASE_URL
+        . '&periodStart=' . $periodStart
+        . '&periodEnd='   . $periodEnd
+        . '&securityToken=' . getEntsoeSecurityToken();
 }
 
 function fetchXml(string $url): ?string {

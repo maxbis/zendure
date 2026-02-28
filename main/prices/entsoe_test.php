@@ -242,12 +242,17 @@ function run(): array {
 
     $url = buildEntsoeUrl($todayStart, $dayAfterTomorrowStart);
 
+    // Debug: print API endpoint (JSON response + error log)
+    $debug = ['api_endpoint' => $url];
+    error_log('entsoe_test: API endpoint: ' . $url);
+
     $xmlContent = fetchXml($url);
     if ($xmlContent === null) {
         return [
             'ok' => false,
             'error' => 'Failed to fetch ENTSO-E XML data',
             'source_url' => $url,
+            'debug' => $debug,
         ];
     }
 
@@ -257,6 +262,7 @@ function run(): array {
             'ok' => false,
             'error' => 'No PT15M points found in response',
             'source_url' => $url,
+            'debug' => $debug,
         ];
     }
 
@@ -273,6 +279,7 @@ function run(): array {
     return [
         'ok' => true,
         'source_url' => $url,
+        'debug' => $debug,
         'timezone' => TIMEZONE_NL,
         'period_start_nl' => $todayStart->format('Y-m-d H:i:s'),
         'period_end_nl' => $dayAfterTomorrowStart->format('Y-m-d H:i:s'),
