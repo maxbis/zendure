@@ -149,7 +149,7 @@ body.mobile-dark {
 
 .schedule-item {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) 180px;
+    grid-template-columns: 64px minmax(0, 1fr) 150px;
     column-gap: 10px;
     row-gap: 0;
     align-items: center;
