@@ -149,7 +149,7 @@ body.mobile-dark {
 
 .schedule-item {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) 132px;
+    grid-template-columns: 64px minmax(0, 1fr) 180px;
     column-gap: 10px;
     row-gap: 0;
     align-items: center;
@@ -157,11 +157,11 @@ body.mobile-dark {
     border-radius: 6px;
     border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
     transition: all 0.2s;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
     background: color-mix(in srgb, var(--bg-tertiary) 88%, #0b1222);
     color: var(--text-primary);
     min-width: 0;
-    min-height: 46px;
+    min-height: 40px;
     position: relative;
     overflow: hidden;
 }
@@ -216,6 +216,7 @@ body.mobile-dark {
     display: flex;
     align-items: center;
     gap: 5px;
+    width: 100%;
     min-width: 0;
     justify-self: start;
 }
@@ -235,7 +236,7 @@ body.mobile-dark {
 }
 
 .schedule-item-rule-name {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-width: 0;
     font-size: 0.69rem;
     color: var(--text-secondary);
@@ -1217,7 +1218,7 @@ code {
     
     .schedule-item {
         padding: 8px 10px;
-        grid-template-columns: 58px minmax(0, 1fr) 112px;
+        grid-template-columns: 58px minmax(0, 1fr) 200px;
         column-gap: 8px;
         row-gap: 0;
         min-height: 42px;
