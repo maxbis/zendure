@@ -31,8 +31,10 @@ $zendureFetchApiUrl = ConfigLoader::getWithLocation('zendureFetchApiUrl');
 $schedule = loadSchedule($dataFile);
 $today = isset($_GET['initial_date']) ? $_GET['initial_date'] : date('Ymd');
 $tomorrow = date('Ymd', strtotime($today . ' +1 day'));
-$resolvedToday = resolveScheduleForDate($schedule, $today);
-$resolvedTomorrow = resolveScheduleForDate($schedule, $tomorrow);
+$includeConditions = filter_var(ConfigLoader::get('include_conditions', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+$includeConditions = ($includeConditions === null) ? false : $includeConditions;
+$resolvedToday = resolveScheduleForDateWithConditions($schedule, $today, $includeConditions);
+$resolvedTomorrow = resolveScheduleForDateWithConditions($schedule, $tomorrow, $includeConditions);
 $currentHour = date('H') . '00';
 $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
 

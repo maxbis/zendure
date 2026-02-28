@@ -174,6 +174,166 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
 }
 
 /**
+ * Read include_conditions flag from config/config.json.
+ */
+function cs_getIncludeConditionsConfigFlag()
+{
+    $configPath = __DIR__ . '/../config/config.json';
+    if (!file_exists($configPath) || !is_readable($configPath)) {
+        return false;
+    }
+    $raw = file_get_contents($configPath);
+    if ($raw === false) {
+        return false;
+    }
+    $cfg = json_decode($raw, true);
+    if (!is_array($cfg) || !array_key_exists('include_conditions', $cfg)) {
+        return false;
+    }
+    $parsed = filter_var($cfg['include_conditions'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    return $parsed === null ? false : $parsed;
+}
+
+/**
+ * Resolve condition rules for a specific date by invoking the standalone resolver.
+ *
+ * @return array|null list of resolved items for the date, or null when unavailable
+ */
+function cs_getConditionalResolvedForDate($dateYYYYMMDD)
+{
+    $resolverPath = __DIR__ . '/../data/resolve_schedule_conditions.php';
+    if (!file_exists($resolverPath)) {
+        return null;
+    }
+
+    $cmd = 'php ' . escapeshellarg($resolverPath) . ' 2>/dev/null';
+    $raw = @shell_exec($cmd);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || empty($decoded['success']) || !isset($decoded['resolved']) || !is_array($decoded['resolved'])) {
+        return null;
+    }
+
+    foreach ($decoded['resolved'] as $group) {
+        if (!is_array($group) || !isset($group['date']) || !isset($group['items']) || !is_array($group['items'])) {
+            continue;
+        }
+        if ((string) $group['date'] !== (string) $dateYYYYMMDD) {
+            continue;
+        }
+        return $group['items'];
+    }
+
+    return null;
+}
+
+/**
+ * Merge base schedule resolution with condition-rule output for a date.
+ */
+function cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD)
+{
+    if (!is_array($resolved)) {
+        return $resolved;
+    }
+
+    $conditionalItems = cs_getConditionalResolvedForDate($dateYYYYMMDD);
+    if (!is_array($conditionalItems) || empty($conditionalItems)) {
+        return $resolved;
+    }
+
+    $byTime = [];
+    foreach ($conditionalItems as $item) {
+        if (!is_array($item) || !isset($item['time']) || !array_key_exists('value', $item)) {
+            continue;
+        }
+        $time = str_pad((string) $item['time'], 4, '0', STR_PAD_LEFT);
+        $byTime[$time] = [
+            'value' => $item['value'],
+            'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
+                ? array_values($item['runtime_conditions'])
+                : null,
+            'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
+            'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
+                ? trim((string) $item['rule_name'])
+                : null,
+            'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
+                ? ((int) $item['rule_index'])
+                : null,
+        ];
+    }
+
+    if (empty($byTime)) {
+        return $resolved;
+    }
+
+    foreach ($resolved as &$slot) {
+        if (!is_array($slot) || !isset($slot['time'])) {
+            continue;
+        }
+        $slotTime = str_pad((string) $slot['time'], 4, '0', STR_PAD_LEFT);
+        if (!array_key_exists($slotTime, $byTime)) {
+            continue;
+        }
+
+        $slotKey = isset($slot['key']) ? (string) $slot['key'] : '';
+        $isManualNonWildcard = $slotKey !== '' && strpos($slotKey, '*') === false;
+        // Preserve manual exact entries; conditions can override wildcard/empty slots.
+        if ($isManualNonWildcard) {
+            continue;
+        }
+
+        $slotMeta = $byTime[$slotTime];
+        $slot['value'] = $slotMeta['value'];
+        $slot['source'] = 'condition';
+        if (is_array($slotMeta['runtime_conditions']) && !empty($slotMeta['runtime_conditions'])) {
+            $slot['runtime_conditions'] = $slotMeta['runtime_conditions'];
+        } else {
+            unset($slot['runtime_conditions']);
+        }
+        if ($slotMeta['fallback_value'] !== null) {
+            $slot['fallback_value'] = $slotMeta['fallback_value'];
+        } else {
+            unset($slot['fallback_value']);
+        }
+        if ($slotMeta['rule_name'] !== null) {
+            $slot['rule_name'] = $slotMeta['rule_name'];
+        } else {
+            unset($slot['rule_name']);
+        }
+        if ($slotMeta['rule_index'] !== null) {
+            $slot['rule_index'] = $slotMeta['rule_index'];
+        } else {
+            unset($slot['rule_index']);
+        }
+    }
+    unset($slot);
+
+    return $resolved;
+}
+
+/**
+ * Resolve schedule for a date and optionally merge conditional rule output.
+ */
+function resolveScheduleForDateWithConditions($schedule, $dateYYYYMMDD, $includeConditions = null)
+{
+    if ($includeConditions === null) {
+        $includeConditions = cs_getIncludeConditionsConfigFlag();
+    } else {
+        $parsed = filter_var($includeConditions, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $includeConditions = ($parsed === null) ? false : $parsed;
+    }
+
+    $resolved = resolveScheduleForDate($schedule, $dateYYYYMMDD);
+    if ($includeConditions) {
+        $resolved = cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD);
+    }
+    return $resolved;
+}
+
+/**
  * Extract date part from key (first 8 characters)
  * @param string $key - The schedule key (12 characters: YYYYMMDDHHmm)
  * @return string - Date part (YYYYMMDD)

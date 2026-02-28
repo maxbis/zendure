@@ -51,7 +51,7 @@ try {
             return strcmp($a['key'], $b['key']);
         });
 
-        $resolved = resolveScheduleForDate($schedule, $date);
+        $resolved = resolveScheduleForDateWithConditions($schedule, $date);
 
         $response = [
             'success' => true,

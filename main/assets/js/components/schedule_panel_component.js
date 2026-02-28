@@ -103,15 +103,18 @@ class SchedulePanelComponent extends Component {
         }
         
         let prevVal = null;
+        let prevRuleName = null;
         const displayedSlots = [];
         
         // First pass: collect displayed slots
         resolved.forEach(slot => {
             const val = slot.value;
-            if (prevVal !== null && val === prevVal) {
+            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+            if (prevVal !== null && val === prevVal && ruleName === prevRuleName) {
                 return;
             }
             prevVal = val;
+            prevRuleName = ruleName;
             displayedSlots.push(slot);
         });
         
@@ -135,14 +138,19 @@ class SchedulePanelComponent extends Component {
             const bgClass = getTimeClass(h);
             const valDisplay = getValueLabel(slot.value);
             const valClass = getValueClass(slot.value);
+            const isConditionSlot = slot && slot.source === 'condition';
+            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
             // Don't render key column in mobile (it's hidden via CSS anyway)
             const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
             div.innerHTML = `
-                <div class="schedule-item-time">${formatTime(time)}</div>
-                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                <div class="schedule-item-main">
+                    <div class="schedule-item-time">${formatTime(time)}</div>
+                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                </div>
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
                 ${!isMobile && slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
             `;
             container.appendChild(div);
@@ -162,15 +170,18 @@ class SchedulePanelComponent extends Component {
         }
         
         let prevVal = null;
+        let prevRuleName = null;
         const displayedSlots = [];
         
         // First pass: collect displayed slots
         resolvedTomorrow.forEach(slot => {
             const val = slot.value;
-            if (prevVal !== null && val === prevVal) {
+            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+            if (prevVal !== null && val === prevVal && ruleName === prevRuleName) {
                 return;
             }
             prevVal = val;
+            prevRuleName = ruleName;
             displayedSlots.push(slot);
         });
         
@@ -182,14 +193,19 @@ class SchedulePanelComponent extends Component {
             const bgClass = getTimeClass(h);
             const valDisplay = getValueLabel(slot.value);
             const valClass = getValueClass(slot.value);
+            const isConditionSlot = slot && slot.source === 'condition';
+            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass}`;
             // Don't render key column in mobile
             const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
             div.innerHTML = `
-                <div class="schedule-item-time">${formatTime(time)}</div>
-                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                <div class="schedule-item-main">
+                    <div class="schedule-item-time">${formatTime(time)}</div>
+                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                </div>
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
             `;
             container.appendChild(div);
         });

@@ -17,19 +17,22 @@ function renderToday(resolved, currentHour, currentTime) {
     container.innerHTML = '';
 
     let prevVal = null;
+    let prevRuleName = null;
 
     // First pass: collect displayed slots to find the active one
     const displayedSlots = [];
     resolved.forEach(slot => {
         const val = slot.value;
+        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
         // Filter logic: Only show changes or first item
         if (prevVal !== null &&
-            ((val === prevVal) ||
-                (val === 'netzero' && prevVal === 'netzero') ||
-                (val === 'netzero+' && prevVal === 'netzero+'))) {
+            ((val === prevVal && ruleName === prevRuleName) ||
+                (val === 'netzero' && prevVal === 'netzero' && ruleName === prevRuleName) ||
+                (val === 'netzero+' && prevVal === 'netzero+' && ruleName === prevRuleName))) {
             return;
         }
         prevVal = val;
+        prevRuleName = ruleName;
         displayedSlots.push(slot);
     });
 
@@ -46,16 +49,19 @@ function renderToday(resolved, currentHour, currentTime) {
 
     // Second pass: render the displayed slots
     prevVal = null;
+    prevRuleName = null;
     resolved.forEach(slot => {
         const val = slot.value;
+        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
         // Filter logic: Only show changes or first item
         if (prevVal !== null &&
-            ((val === prevVal) ||
-                (val === 'netzero' && prevVal === 'netzero') ||
-                (val === 'netzero+' && prevVal === 'netzero+'))) {
+            ((val === prevVal && ruleName === prevRuleName) ||
+                (val === 'netzero' && prevVal === 'netzero' && ruleName === prevRuleName) ||
+                (val === 'netzero+' && prevVal === 'netzero+' && ruleName === prevRuleName))) {
             return;
         }
         prevVal = val;
+        prevRuleName = ruleName;
 
         const time = String(slot.time);
         const h = parseInt(time.substring(0, 2));
@@ -64,12 +70,16 @@ function renderToday(resolved, currentHour, currentTime) {
         const bgClass = getTimeClass(h);
         const valDisplay = getValueLabel(val);
         const valClass = getValueClass(val);
+        const isConditionSlot = slot && slot.source === 'condition';
 
         const div = document.createElement('div');
         div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
         div.innerHTML = `
-            <div class="schedule-item-time">${formatTime(time)}</div>
-            <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+            <div class="schedule-item-main">
+                <div class="schedule-item-time">${formatTime(time)}</div>
+                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+            </div>
+            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
             ${slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
         `;
         container.appendChild(div);
@@ -92,12 +102,15 @@ function renderTomorrow(resolved) {
     }
 
     let prevVal = null;
+    let prevRuleName = null;
     const displayedSlots = [];
 
     resolved.forEach(slot => {
         const val = slot.value;
-        if (prevVal !== null && val === prevVal) return;
+        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+        if (prevVal !== null && val === prevVal && ruleName === prevRuleName) return;
         prevVal = val;
+        prevRuleName = ruleName;
         displayedSlots.push(slot);
     });
 
@@ -107,12 +120,17 @@ function renderTomorrow(resolved) {
         const bgClass = getTimeClass(h);
         const valDisplay = getValueLabel(slot.value);
         const valClass = getValueClass(slot.value);
+        const isConditionSlot = slot && slot.source === 'condition';
+        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
 
         const div = document.createElement('div');
         div.className = `schedule-item ${bgClass}`;
         div.innerHTML = `
-            <div class="schedule-item-time">${formatTime(time)}</div>
-            <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+            <div class="schedule-item-main">
+                <div class="schedule-item-time">${formatTime(time)}</div>
+                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+            </div>
+            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
         `;
         container.appendChild(div);
     });

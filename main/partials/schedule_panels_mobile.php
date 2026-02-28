@@ -28,29 +28,36 @@ function getValueLabel($val)
     <h3 class="card-header">Schedule</h3>
     <div class="schedule-mobile-tabs" role="tablist">
         <button type="button" class="schedule-mobile-tab active" data-tab="schedule" role="tab" aria-selected="true">Schedule</button>
-        <button type="button" class="schedule-mobile-tab" data-tab="entries" role="tab" aria-selected="false">Schedule entries</button>
+        <button type="button" class="schedule-mobile-tab" data-tab="entries" role="tab" aria-selected="false">Entries</button>
     </div>
     <div class="schedule-mobile-tab-panels">
         <!-- Tab 1: Today's and Tomorrow's Schedule -->
         <div class="schedule-mobile-tab-panel active" data-tab="schedule" role="tabpanel" aria-hidden="false">
-            <div class="schedule-days-container">
+            <div class="schedule-day-switcher" role="tablist" aria-label="Schedule day">
+                <button type="button" class="schedule-day-dot active" data-day-chip="today" role="tab" aria-selected="true" aria-label="Show Today"></button>
+                <button type="button" class="schedule-day-dot" data-day-chip="tomorrow" role="tab" aria-selected="false" aria-label="Show Tomorrow"></button>
+            </div>
+            <div class="schedule-days-container" id="schedule-days-swipe">
                 <!-- Today's Schedule (Left) -->
-                <div class="schedule-day">
+                <div class="schedule-day" data-day-panel="today">
                     <div class="schedule-day-header">
                         <h3 class="card-header">Today <?php echo substr($today, -2); ?></h3>
                     </div>
                     <div class="schedule-list" id="today-schedule-grid">
                         <?php
                         $prevVal = null;
+                        $prevRuleName = null;
                         // First pass: collect displayed slots to find the active one
                         $displayedSlots = [];
                         foreach ($resolvedToday as $slot) {
                             $val = $slot['value'];
+                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
                             // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal) {
+                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
                                 continue;
                             }
                             $prevVal = $val;
+                            $prevRuleName = $ruleName;
                             $displayedSlots[] = $slot;
                         }
 
@@ -72,6 +79,8 @@ function getValueLabel($val)
                             $h = intval(substr($time, 0, 2));
                             $isCurrent = ($time === $currentActiveTime);
                             $bgClass = getTimeClass($h);
+                            $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
                             $catClass = 'neutral';
@@ -84,33 +93,44 @@ function getValueLabel($val)
                             }
                             ?>
                             <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isCurrent ? 'slot-current' : ''; ?>">
-                                <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                                <div class="schedule-item-main">
+                                    <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                                    </div>
+                                    <div class="schedule-item-value <?php echo $catClass; ?>">
+                                        <?php echo htmlspecialchars($valDisplay); ?>
+                                    </div>
                                 </div>
-                                <div class="schedule-item-value <?php echo $catClass; ?>">
-                                    <?php echo htmlspecialchars($valDisplay); ?>
-                                </div>
+                                <?php if ($isConditionSlot && $ruleName !== ''): ?>
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
+                                        <span class="schedule-rule-badge">Rule</span>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
 
                 <!-- Tomorrow's Schedule (Right) -->
-                <div class="schedule-day">
+                <div class="schedule-day" data-day-panel="tomorrow">
                     <div class="schedule-day-header">
                         <h3 class="card-header">Tomorrow <?php echo substr($tomorrow, -2); ?></h3>
                     </div>
                     <div class="schedule-list" id="tomorrow-schedule-grid">
                         <?php
                         $prevVal = null;
+                        $prevRuleName = null;
                         // First pass: collect displayed slots
                         $displayedSlots = [];
                         foreach ($resolvedTomorrow as $slot) {
                             $val = $slot['value'];
+                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
                             // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal) {
+                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
                                 continue;
                             }
                             $prevVal = $val;
+                            $prevRuleName = $ruleName;
                             $displayedSlots[] = $slot;
                         }
 
@@ -120,6 +140,8 @@ function getValueLabel($val)
                             $time = $slot['time'];
                             $h = intval(substr($time, 0, 2));
                             $bgClass = getTimeClass($h);
+                            $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
                             $catClass = 'neutral';
@@ -132,11 +154,19 @@ function getValueLabel($val)
                             }
                             ?>
                             <div class="schedule-item <?php echo $bgClass; ?>">
-                                <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                                <div class="schedule-item-main">
+                                    <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
+                                    </div>
+                                    <div class="schedule-item-value <?php echo $catClass; ?>">
+                                        <?php echo htmlspecialchars($valDisplay); ?>
+                                    </div>
                                 </div>
-                                <div class="schedule-item-value <?php echo $catClass; ?>">
-                                    <?php echo htmlspecialchars($valDisplay); ?>
-                                </div>
+                                <?php if ($isConditionSlot && $ruleName !== ''): ?>
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
+                                        <span class="schedule-rule-badge">Rule</span>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -202,6 +232,61 @@ function getValueLabel($val)
 (function() {
     var tabs = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab');
     var panels = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab-panel');
+    var daySwipe = document.getElementById('schedule-days-swipe');
+    var dayPanels = daySwipe ? daySwipe.querySelectorAll('.schedule-day[data-day-panel]') : [];
+    var dayChips = document.querySelectorAll('.schedule-mobile-card [data-day-chip]');
+
+    function setActiveDay(day) {
+        if (!dayChips.length) return;
+        dayChips.forEach(function(chip) {
+            var isActive = chip.getAttribute('data-day-chip') === day;
+            chip.classList.toggle('active', isActive);
+            chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+    }
+
+    function initDaySwipe() {
+        if (!daySwipe || !dayPanels.length || !dayChips.length) return;
+
+        dayChips.forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                var day = this.getAttribute('data-day-chip');
+                var target = daySwipe.querySelector('.schedule-day[data-day-panel="' + day + '"]');
+                if (!target) return;
+                daySwipe.scrollTo({
+                    left: target.offsetLeft,
+                    behavior: 'smooth'
+                });
+                setActiveDay(day);
+            });
+        });
+
+        var ticking = false;
+        daySwipe.addEventListener('scroll', function() {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(function() {
+                var closestDay = 'today';
+                var closestDistance = Number.POSITIVE_INFINITY;
+                dayPanels.forEach(function(panel) {
+                    var day = panel.getAttribute('data-day-panel');
+                    var dist = Math.abs(panel.offsetLeft - daySwipe.scrollLeft);
+                    if (dist < closestDistance) {
+                        closestDistance = dist;
+                        closestDay = day;
+                    }
+                });
+                setActiveDay(closestDay);
+                ticking = false;
+            });
+        }, { passive: true });
+
+        setActiveDay('today');
+    }
+
+    if (daySwipe) {
+        initDaySwipe();
+    }
     if (!tabs.length || !panels.length) return;
     tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
