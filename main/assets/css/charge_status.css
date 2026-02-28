@@ -404,7 +404,7 @@
 .charge-power-bar-marker-commanded {
     position: absolute;
     top: 0;
-    width: 2px;g
+    width: 2px;
     height: 100%;
     background: transparent;
     border-left: 2px dashed #d6c317;
