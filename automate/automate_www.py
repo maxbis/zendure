@@ -1934,7 +1934,7 @@ class AutomationApp:
 
     def _log_startup(self) -> None:
         self.logger.info("🚀 Starting charge schedule automation script")
-        self.logger.info(f"ℹ️  Log level: {getattr(self.controller, 'log_level', 'INFO')}")
+        self.logger.info(f"ℹ  LOG LEVEL: {getattr(self.controller, 'log_level', 'INFO')}")
         # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning(
