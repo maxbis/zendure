@@ -47,6 +47,11 @@ def _parse_numeric_json(value):
             return None
     if isinstance(parsed, (int, float)):
         return float(parsed)
+    if isinstance(parsed, str):
+        try:
+            return float(parsed.strip())
+        except (TypeError, ValueError):
+            return None
     return None
 
 
