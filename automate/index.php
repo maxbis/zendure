@@ -1,4 +1,4 @@
 <?php
-header("Location: /../control");
+header("Location: ./control/index.php");
 exit();
 ?>
