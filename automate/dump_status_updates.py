@@ -57,7 +57,7 @@ def _parse_numeric_json(value):
 
 def _accumulate_segment_by_day(day_totals, tz, t_start, t_end, power_w):
     """Accumulate one [t_start, t_end) segment into per-day charged/discharged totals."""
-    if t_end <= t_start or power_w == 0:
+    if t_end <= t_start:
         return
     cur = t_start
     while cur < t_end:
@@ -71,11 +71,12 @@ def _accumulate_segment_by_day(day_totals, tz, t_start, t_end, power_w):
             bucket = day_totals.setdefault(
                 date_key, {"charged_wh": 0.0, "discharged_wh": 0.0}
             )
-            wh = abs(power_w) * seconds / 3600
-            if power_w > 0:
-                bucket["charged_wh"] += wh
-            else:
-                bucket["discharged_wh"] += wh
+            if power_w != 0:
+                wh = abs(power_w) * seconds / 3600
+                if power_w > 0:
+                    bucket["charged_wh"] += wh
+                else:
+                    bucket["discharged_wh"] += wh
         cur = seg_end
 
 
@@ -107,6 +108,10 @@ def calculate_energy_totals(rows):
     last_ts = max(int(r["timestamp"]) for r in rows if r["timestamp"] is not None)
 
     day_totals = {}
+    for ts, _, _ in points:
+        date_key = datetime.fromtimestamp(ts, tz=tz).strftime("%Y-%m-%d")
+        day_totals.setdefault(date_key, {"charged_wh": 0.0, "discharged_wh": 0.0})
+
     for idx, (t_start, power, _) in enumerate(points):
         if idx < len(points) - 1:
             t_end = points[idx + 1][0]
