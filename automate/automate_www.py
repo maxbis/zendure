@@ -733,6 +733,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             }, 400)
             return True
         controller.log_level = desired
+        # Always print log level changes (independent of current log level)
+        print(f"[loglevel] Log level changed via API to: {desired}")
         self._send_json({
             "ok": True,
             "level": desired,
