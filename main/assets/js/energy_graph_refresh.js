@@ -201,7 +201,7 @@
                         label: 'Battery %',
                         data: [],
                         yAxisID: 'yPercent',
-                        borderColor: 'rgba(100, 181, 246, 0.95)',
+                        borderColor: 'rgba(136, 207, 254, 0.95)',
                         backgroundColor: 'rgba(100, 181, 246, 0.25)',
                         borderWidth: 1,
                         pointRadius: 0,

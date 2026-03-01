@@ -30,6 +30,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
 | **TEST_MODE** | boolean | If `true`, the automation runs in test mode: power/charge actions are simulated and not applied to the device. | `device_controller.py` (`BaseDeviceController`): sets `test_mode` at init; Zendure and P1 logic respect it. Startup messages in `automate.py` / `automate_www.py` show test mode. |
+| **LOG_LEVEL** | string | Minimum log severity to emit. Supported values: `DEBUG`, `INFO`, `WARNING`, `ERROR` (default `INFO`). | `device_controller.py` (`BaseDeviceController.log`): filters all controller/app logs; `SUCCESS` is treated as `INFO`. |
 | **deviceIp** | string | IP address of the Zendure device on the local network. | `device_controller.py`: `ZendureDeviceController` (device control) and `DeviceDataReader` (device data + P1 meter API base). Required. |
 | **deviceSn** | string | Serial number of the Zendure device. | `device_controller.py`: `ZendureDeviceController` only. Required. |
 

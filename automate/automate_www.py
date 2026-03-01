@@ -24,6 +24,7 @@ import http.server
 import socketserver
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from warnings import simplefilter
 from zoneinfo import ZoneInfo
 from typing import Optional, Any, Callable
 from urllib.parse import urlparse, parse_qs
@@ -75,6 +76,8 @@ API_PATH_AUTOMATION_STATUS = "/api/automation_status"
 API_PATH_WH_PER_HOUR = "/api/wh_per_hour"
 API_PATH_REFRESH = "/api/refresh"
 API_PATH_RESTART = "/api/restart"
+API_PATH_PAUSE = "/api/pause"
+API_PATH_LOG_LEVEL = "/api/loglevel"
 
 # Shutdown behavior
 SHUTDOWN_FORCE_EXIT_SECONDS = 5.0
@@ -406,6 +409,8 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         self.refresh_p1_callback: Optional[Callable[[], None]] = None
         self.refresh_zendure_callback: Optional[Callable[[], None]] = None
         self.restart_callback: Optional[Callable[[], None]] = None
+        self.pause_getter: Optional[Callable[[], bool]] = None
+        self.pause_setter: Optional[Callable[[bool], None]] = None
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
@@ -485,8 +490,100 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                 {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
                 {"path": API_PATH_REFRESH, "optional_params": []},
                 {"path": API_PATH_RESTART, "optional_params": []},
+                {
+                    "path": API_PATH_PAUSE,
+                    "optional_params": [
+                        {
+                            "name": "state",
+                            "type": "string",
+                            "allowed": ["on", "off", "true", "false", "1", "0"],
+                            "description": "POST only: set pause override state",
+                        },
+                    ],
+                },
+                {
+                    "path": API_PATH_LOG_LEVEL,
+                    "optional_params": [
+                        {
+                            "name": "level",
+                            "alt": "loglevel|log_level",
+                            "type": "string",
+                            "allowed": ["DEBUG", "INFO", "WARNING", "ERROR"],
+                            "description": "POST only: set runtime log level",
+                        },
+                    ],
+                },
             ],
         }
+
+    def _control_help_payload(self) -> dict:
+        return {
+            "ok": True,
+            "message": "Automation control API help",
+            "commands": [
+                {
+                    "name": "status",
+                    "method": "GET",
+                    "path": API_PATH_PAUSE,
+                    "description": "Get current pause override state",
+                    "example": f"{API_PATH_PAUSE}",
+                },
+                {
+                    "name": "pause_on",
+                    "method": "POST",
+                    "path": API_PATH_PAUSE,
+                    "description": "Enable pause override (forces desired power to 0)",
+                    "example": f"{API_PATH_PAUSE}?state=on",
+                },
+                {
+                    "name": "pause_off",
+                    "method": "POST",
+                    "path": API_PATH_PAUSE,
+                    "description": "Disable pause override (resume schedule control)",
+                    "example": f"{API_PATH_PAUSE}?state=off",
+                },
+                {
+                    "name": "restart",
+                    "method": "POST",
+                    "path": API_PATH_RESTART,
+                    "description": "Request graceful restart of automation process",
+                    "example": f"{API_PATH_RESTART}",
+                },
+                {
+                    "name": "refresh_schedule",
+                    "method": "GET",
+                    "path": API_PATH_REFRESH,
+                    "description": "Force schedule refresh from API",
+                    "example": f"{API_PATH_REFRESH}",
+                },
+                {
+                    "name": "log_level_status",
+                    "method": "GET",
+                    "path": API_PATH_LOG_LEVEL,
+                    "description": "Get current runtime log level",
+                    "example": f"{API_PATH_LOG_LEVEL}",
+                },
+                {
+                    "name": "log_level_set",
+                    "method": "POST",
+                    "path": API_PATH_LOG_LEVEL,
+                    "description": "Set runtime log level (DEBUG|INFO|WARNING|ERROR)",
+                    "example": f"{API_PATH_LOG_LEVEL}?level=info",
+                },
+            ],
+            "note": "Use /api/test for full endpoint inventory.",
+        }
+
+    def _handle_api_help(self, parsed) -> bool:
+        if parsed.path not in ("/", "/api"):
+            return False
+        self._send_json({
+            "ok": True,
+            "message": "Automation API help",
+            "endpoints": self._test_payload().get("endpoints", []),
+            "control": self._control_help_payload().get("commands", []),
+        })
+        return True
 
     def _handle_test(self, path: str) -> bool:
         if path != API_PATH_TEST:
@@ -533,6 +630,114 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True, "message": "Restart requested"})
         except Exception as e:
             self._send_json({"ok": False, "error": str(e)}, 500)
+        return True
+
+    def _parse_pause_state(self, parsed) -> Optional[bool]:
+        query = parse_qs(parsed.query)
+        raw = None
+        for key in ("state", "pause", "mode", "action"):
+            if key in query and query[key]:
+                raw = str(query[key][0]).strip().lower()
+                break
+        if raw is None:
+            return None
+        if raw in ("on", "pause", "true", "1", "start"):
+            return True
+        if raw in ("off", "resume", "false", "0", "stop"):
+            return False
+        return None
+
+    def _handle_pause_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_PAUSE:
+            return False
+        pause_getter = getattr(self.server, "pause_getter", None)
+        if pause_getter is None:
+            self._send_json({"ok": False, "error": "Pause override not available"}, 503)
+            return True
+        try:
+            active = bool(pause_getter())
+            self._send_json({"ok": True, "pauseActive": active})
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+        return True
+
+    def _handle_pause_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_PAUSE:
+            return False
+        pause_setter = getattr(self.server, "pause_setter", None)
+        pause_getter = getattr(self.server, "pause_getter", None)
+        if pause_setter is None or pause_getter is None:
+            self._send_json({"ok": False, "error": "Pause override not available"}, 503)
+            return True
+        desired = self._parse_pause_state(parsed)
+        if desired is None:
+            self._send_json(self._control_help_payload())
+            return True
+        try:
+            pause_setter(desired)
+            active = bool(pause_getter())
+            self._send_json({"ok": True, "pauseActive": active})
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+        return True
+
+    def _allowed_runtime_log_levels(self) -> list[str]:
+        allowed = [
+            level
+            for level in BaseDeviceController._LOG_LEVEL_PRIORITY.keys()
+            if level in ("DEBUG", "INFO", "WARNING", "ERROR")
+        ]
+        return allowed if allowed else ["DEBUG", "INFO", "WARNING", "ERROR"]
+
+    def _parse_log_level(self, parsed) -> Optional[str]:
+        query = parse_qs(parsed.query)
+        raw = None
+        for key in ("level", "loglevel", "log_level"):
+            if key in query and query[key]:
+                raw = str(query[key][0]).strip().upper()
+                break
+        if not raw:
+            return None
+        return raw if raw in self._allowed_runtime_log_levels() else None
+
+    def _handle_loglevel_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_LOG_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "Log level control not available"}, 503)
+            return True
+        current_level = str(getattr(controller, "log_level", "INFO")).upper()
+        allowed = self._allowed_runtime_log_levels()
+        if current_level not in allowed:
+            current_level = "INFO"
+        self._send_json({
+            "ok": True,
+            "level": current_level,
+            "allowedLevels": allowed,
+        })
+        return True
+
+    def _handle_loglevel_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_LOG_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "Log level control not available"}, 503)
+            return True
+        desired = self._parse_log_level(parsed)
+        if desired is None:
+            self._send_json({
+                "ok": False,
+                "error": "Invalid log level. Use DEBUG|INFO|WARNING|ERROR.",
+            }, 400)
+            return True
+        controller.log_level = desired
+        self._send_json({
+            "ok": True,
+            "level": desired,
+            "message": f"Log level set to {desired}",
+        })
         return True
 
     def _handle_automation_status(self, path: str, api_state: ApiState) -> bool:
@@ -594,6 +799,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         returns a 503 error with an explanation. Unrecognized paths result in a 404 error response.
         """
         parsed = urlparse(self.path)
+        if self._handle_api_help(parsed):
+            return
         if self._handle_test(parsed.path):
             return
         if self._handle_wh_per_hour(parsed.path):
@@ -601,6 +808,10 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if self._handle_refresh(parsed.path):
             return
         if self._handle_restart(parsed.path):
+            return
+        if self._handle_pause_get(parsed):
+            return
+        if self._handle_loglevel_get(parsed):
             return
         api_state = getattr(self.server, "api_state", None)
         if api_state is None:
@@ -621,7 +832,13 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         """Handle HTTP POST requests for the automation API server."""
         parsed = urlparse(self.path)
+        if self._handle_api_help(parsed):
+            return
         if self._handle_restart(parsed.path):
+            return
+        if self._handle_pause_post(parsed):
+            return
+        if self._handle_loglevel_post(parsed):
             return
         self.send_error(404, "Not Found")
 
@@ -663,6 +880,13 @@ class Logger:
             self.controller.log('warning', message, include_timestamp)
         else:
             print(f"WARNING: {message}")
+
+    def debug(self, message: str, include_timestamp: bool = True):
+        """Log debug message."""
+        if self.controller:
+            self.controller.log('debug', message, include_timestamp)
+        else:
+            print(f"DEBUG: {message}")
 
     def error(self, message: str, include_timestamp: bool = True):
         """Log error message."""
@@ -860,7 +1084,9 @@ class CommandHandler:
     """
 
     def __init__(self, controller: AutomateController, schedule_controller: ScheduleController,
-                 status_api: StatusApi, logger: Logger):
+                 status_api: StatusApi, logger: Logger,
+                 on_pause_change: Optional[Callable[[bool], None]] = None,
+                 is_pause_active: Optional[Callable[[], bool]] = None):
         """
         Initialize command handler.
 
@@ -874,6 +1100,8 @@ class CommandHandler:
         self.schedule_controller = schedule_controller
         self.status_api = status_api
         self.logger = logger
+        self.on_pause_change = on_pause_change
+        self.is_pause_active = is_pause_active
         self._command_handlers = {
             "h": self._cmd_help,
             "help": self._cmd_help,
@@ -890,6 +1118,10 @@ class CommandHandler:
             "netzero": self._cmd_netzero,
             "nzp": self._cmd_netzero_plus,
             "netzero+": self._cmd_netzero_plus,
+            "pause": self._cmd_pause,
+            "pauze": self._cmd_pause,
+            "resume": self._cmd_resume,
+            "unpause": self._cmd_resume,
             "q": self._cmd_quit,
             "quit": self._cmd_quit,
         }
@@ -907,6 +1139,9 @@ class CommandHandler:
         print("  z, zero          - Set power to 0")
         print("  nz, netzero      - Set power to netzero mode")
         print("  nzp, netzero+    - Set power to netzero+ mode")
+        print("  pause on|off     - Pause automation (force 0) or resume schedule")
+        print("  pause status     - Show pause override status")
+        print("  resume, unpause  - Resume schedule control")
         print("  q, quit          - Quit gracefully")
         print("="*60 + "\n")
 
@@ -932,7 +1167,7 @@ class CommandHandler:
             handler = self._command_handlers.get(cmd)
             if handler is not None:
                 return handler(args)
-            self.logger.warning(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
+            self.logger.info(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
             return True
         except Exception as e:
             self.logger.error(f"Error executing command: {e}")
@@ -963,7 +1198,7 @@ class CommandHandler:
         return True
 
     def _cmd_accumulators(self, args: list) -> bool:
-        self.logger.info("Accumulator debug output has been removed.")
+        self.logger.debug("Accumulator debug output has been removed.")
         return True
 
     def _cmd_refresh(self, args: list) -> bool:
@@ -986,7 +1221,7 @@ class CommandHandler:
 
     def _cmd_power(self, args: list) -> bool:
         if not args:
-            self.logger.error("Power command requires a value (e.g., 'p 500' or 'p netzero')")
+            self.logger.warning("Power command requires a value (e.g., 'p 500' or 'p netzero')")
             return True
         power_arg = args[0]
         try:
@@ -995,7 +1230,7 @@ class CommandHandler:
             elif power_arg in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS]:
                 power_value = power_arg
             else:
-                self.logger.error(f"Invalid power value: {power_arg}")
+                self.logger.warning(f"Invalid power value: {power_arg}")
                 self.logger.info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
                 return True
             self.logger.info(f"Manually setting power to: {power_value}")
@@ -1006,7 +1241,7 @@ class CommandHandler:
             else:
                 self.logger.error(f"Failed to set power: {result.error}")
         except ValueError:
-            self.logger.error(f"Invalid power value: {power_arg}")
+            self.logger.warning(f"Invalid power value: {power_arg}")
         return True
 
     def _cmd_zero(self, args: list) -> bool:
@@ -1042,6 +1277,57 @@ class CommandHandler:
     def _cmd_quit(self, args: list) -> bool:
         self.logger.info("Quit command received")
         return False
+
+    def _set_pause(self, active: bool) -> bool:
+        if self.on_pause_change is None:
+            self.logger.error("Pause override is not available in this runtime.")
+            return False
+        try:
+            self.on_pause_change(active)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to change pause override: {e}")
+            return False
+
+    def _pause_status(self) -> Optional[bool]:
+        if self.is_pause_active is None:
+            return None
+        try:
+            return bool(self.is_pause_active())
+        except Exception:
+            return None
+
+    def _cmd_pause(self, args: list) -> bool:
+        if not args:
+            status = self._pause_status()
+            if status is None:
+                self.logger.warning("Pause override status unavailable.")
+            else:
+                self.logger.info(f"Pause override is {'ON' if status else 'OFF'}.")
+            self.logger.info("Usage: pause on|off|status")
+            return True
+
+        action = str(args[0]).strip().lower()
+        if action in ("on", "1", "true", "start"):
+            self._set_pause(True)
+            return True
+        if action in ("off", "0", "false", "stop"):
+            self._set_pause(False)
+            return True
+        if action == "status":
+            status = self._pause_status()
+            if status is None:
+                self.logger.warning("Pause override status unavailable.")
+            else:
+                self.logger.info(f"Pause override is {'ON' if status else 'OFF'}.")
+            return True
+
+        self.logger.warning("Invalid pause command. Use: pause on|off|status")
+        return True
+
+    def _cmd_resume(self, args: list) -> bool:
+        self._set_pause(False)
+        return True
 
 
 # ============================================================================
@@ -1084,6 +1370,7 @@ class AutomationApp:
         self.old_value = None
         self.value = 0
         self.zero_count = 0
+        self.pause_override_active = False
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
         self.stop_posted = False
         self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
@@ -1134,7 +1421,9 @@ class AutomationApp:
                 self.controller,
                 self.schedule_controller,
                 self.status_api,
-                self.logger
+                self.logger,
+                on_pause_change=self._set_pause_override,
+                is_pause_active=lambda: self.pause_override_active,
             )
 
             # Set up signal handlers
@@ -1206,7 +1495,7 @@ class AutomationApp:
         # If a second signal arrives during shutdown (or many in a short window),
         # exit immediately so a blocked network/device call cannot hang the process.
         if self._shutdown_signal_count >= 2:
-            self.logger.warning(f"Received {signal_name} again, forcing immediate exit...")
+            self.logger.error(f"Received {signal_name} again, forcing immediate exit...")
             os._exit(130)
 
     def _on_status_update(self, event_type: str, old_value: Any, new_value: Any,
@@ -1237,11 +1526,14 @@ class AutomationApp:
             self.http_server.refresh_p1_callback = self._refresh_p1_for_api
             self.http_server.refresh_zendure_callback = self._refresh_zendure_for_api
             self.http_server.restart_callback = self.request_restart
+            self.http_server.pause_getter = lambda: self.pause_override_active
+            self.http_server.pause_setter = self._set_pause_override
+            self.http_server.controller = self.controller
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
         except OSError as e:
-            self.logger.warning(f"Failed to start HTTP API server: {e}")
+            self.logger.error(f"Failed to start HTTP API server: {e}")
 
     def request_restart(self):
         """Request graceful shutdown and in-process restart."""
@@ -1250,7 +1542,7 @@ class AutomationApp:
         self.restart_requested = True
         self.shutdown_requested = True
         if self.logger:
-            self.logger.warning("Restart requested via API; shutting down for restart")
+            self.logger.info("Restart requested via API; shutting down for restart")
 
     # ------------------------------------------------------------------------
     # MAIN LOGIC HELPERS
@@ -1265,7 +1557,7 @@ class AutomationApp:
             if p1_data:
                 if p1_data["total_power_import_kwh"] is not None and p1_data["total_power_export_kwh"] is not None:
                     import_delta, export_delta = self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"])
-                    self.logger.info(f"P1 deltas: import_delta={int(import_delta*1000)} Wh, export_delta={int(export_delta*1000)} Wh, actual power={p1_data['total_power']} W")
+                    self.logger.debug(f"P1 deltas: import_delta={int(import_delta*1000)} Wh, export_delta={int(export_delta*1000)} Wh, actual power={p1_data['total_power']} W")
         except Exception as e:
             self.logger.warning(f"Failed to read P1 for accumulation: {e}")
         return p1_data
@@ -1323,7 +1615,7 @@ class AutomationApp:
                 pass
 
             if desired_power is None:
-                self.logger.info("Schedule value is None, setting desired power to 0")
+                self.logger.debug("Schedule value is None, setting desired power to 0")
                 return 0
             return desired_power
         except Exception as e:
@@ -1333,6 +1625,17 @@ class AutomationApp:
             except Exception:
                 pass
             return 0
+
+    def _set_pause_override(self, active: bool) -> None:
+        active = bool(active)
+        if active == self.pause_override_active:
+            self.logger.info(f"Pause override already {'ON' if active else 'OFF'}.")
+            return
+        self.pause_override_active = active
+        if active:
+            self.logger.info("Pause override enabled: forcing power to 0 until pause is cancelled.")
+        else:
+            self.logger.info("Pause override disabled: schedule control resumed.")
 
     def _warn_runtime_condition_once(self, key: str, message: str) -> None:
         if key in self._runtime_condition_warning_cache:
@@ -1456,7 +1759,7 @@ class AutomationApp:
         if valid_conditions == 0:
             signature = f"{slot_time}|{desired_power}|no-valid|{electricity_level}"
             if self._last_runtime_decision_signature != signature:
-                self.logger.info(
+                self.logger.debug(
                     f"Runtime conditions present for slot {slot_time}, but none are valid; keeping base value {desired_power}"
                 )
                 self._last_runtime_decision_signature = signature
@@ -1465,7 +1768,7 @@ class AutomationApp:
         if all_valid_conditions_match:
             signature = f"{slot_time}|{desired_power}|matched|{electricity_level}"
             if self._last_runtime_decision_signature != signature:
-                self.logger.info(
+                self.logger.debug(
                     f"Runtime conditions matched for slot {slot_time} (electricity_level={electricity_level}); using base value {desired_power}"
                 )
                 self._last_runtime_decision_signature = signature
@@ -1631,6 +1934,7 @@ class AutomationApp:
 
     def _log_startup(self) -> None:
         self.logger.info("🚀 Starting charge schedule automation script")
+        self.logger.info(f"ℹ️  Log level: {getattr(self.controller, 'log_level', 'INFO')}")
         # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning(
@@ -1705,14 +2009,16 @@ class AutomationApp:
         # 3. Schedule Logic
         self._refresh_schedule_if_needed()
         self.old_value = self.value
-        desired_power = self._calculate_desired_power()
+        desired_power = 0 if self.pause_override_active else self._calculate_desired_power()
 
         # 4. Battery limits + runtime conditions + state updates
-        self.controller.check_battery_limits()
-        desired_power = self._apply_runtime_conditions(desired_power)
-        desired_power = self._check_battery_limits(desired_power, prechecked=True)
+        if not self.pause_override_active:
+            self.controller.check_battery_limits()
+            desired_power = self._apply_runtime_conditions(desired_power)
+            desired_power = self._check_battery_limits(desired_power, prechecked=True)
         self._update_zendure_state()
-        desired_power = self._limit_delta_step(desired_power)
+        if not self.pause_override_active:
+            desired_power = self._limit_delta_step(desired_power)
 
         # 5. Apply settings
         self._apply_power_settings(desired_power, p1_data)

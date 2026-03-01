@@ -139,6 +139,14 @@ class BaseDeviceController:
 
     # Network settings
     REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
+    _DEFAULT_LOG_LEVEL = "INFO"
+    _LOG_LEVEL_PRIORITY = {
+        "DEBUG": 10,
+        "INFO": 20,
+        "SUCCESS": 20,
+        "WARNING": 30,
+        "ERROR": 40,
+    }
 
     def __init__(self, config_path: Optional[Path] = None):
         """
@@ -154,6 +162,12 @@ class BaseDeviceController:
         """
         self.config_path = config_path or self._find_config_file()
         self.config = self._load_config(self.config_path)
+        raw_log_level = str(self.config.get("LOG_LEVEL", self._DEFAULT_LOG_LEVEL)).upper()
+        self.log_level = (
+            raw_log_level
+            if raw_log_level in self._LOG_LEVEL_PRIORITY
+            else self._DEFAULT_LOG_LEVEL
+        )
 
         # Apply config-driven test mode once at initialization.
         # We keep both an instance attribute and the legacy global for existing code paths.
@@ -243,6 +257,16 @@ class BaseDeviceController:
         }
 
         level_lower = level.lower()
+        level_upper = level_lower.upper()
+        if level_upper not in self._LOG_LEVEL_PRIORITY:
+            level_upper = 'INFO'
+            level_lower = 'info'
+
+        # Log level filter from config (LOG_LEVEL).
+        # Priority order: DEBUG < INFO/SUCCESS < WARNING < ERROR.
+        if self._LOG_LEVEL_PRIORITY[level_upper] < self._LOG_LEVEL_PRIORITY[self.log_level]:
+            return
+
         emoji = emoji_map.get(level_lower, '')
 
         # Format timestamp if needed
@@ -438,7 +462,7 @@ class PowerAccumulator:
                 'export_kwh': float(export_kwh)
             }
             self.p1_hourly_last_reset_hour = current_hour
-            self._log('info', f"P1 hourly reference set: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
+            self._log('debug', f"P1 hourly reference set: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
             # Save initial state
             self._save_p1_hourly_data()
             return 0.0, 0.0
@@ -505,7 +529,7 @@ class PowerAccumulator:
                 'schedule_key': schedule_key,
             }
 
-            self._log('info', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
+            self._log('debug', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
                     f"import_delta={int(last_hour_delta_import*1000)} Wh, export_delta={int(last_hour_delta_export*1000)} Wh")
 
             # Reset reference values to current values
@@ -515,7 +539,7 @@ class PowerAccumulator:
             }
             self.p1_hourly_last_reset_hour = current_hour
 
-            self._log('info', f"P1 hourly reference reset at {current_hour:02d}:00 - "
+            self._log('debug', f"P1 hourly reference reset at {current_hour:02d}:00 - "
                     f"new reference: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
 
             # Save data after reset
@@ -725,7 +749,7 @@ class AutomateController(BaseDeviceController):
 
         # Check if the new power value is the same as the previous one
         if self.previous_power is not None and power_feed == self.previous_power:
-            self.log('info', f"Power value unchanged ({power_feed} W), skipping device update")
+            self.log('debug', f"Power value unchanged ({power_feed} W), skipping device update")
             # Still accumulate since power is being maintained (operation is successful)
             return (True, None, power_feed)
 
@@ -736,11 +760,11 @@ class AutomateController(BaseDeviceController):
         payload = {"sn": self.device_sn, "properties": properties}
 
         if self.test_mode:
-            self.log('info', f"TEST MODE: Would set power feed to {power_feed} W")
+            self.log('debug', f"TEST MODE: Would set power feed to {power_feed} W")
             return (True, None, power_feed)
 
         try:
-            self.log('info', f"Setting power feed to {power_feed} W...")
+            self.log('debug', f"Setting power feed to {power_feed} W...")
             response = requests.post(
                 url,
                 json=payload,
@@ -886,7 +910,7 @@ class AutomateController(BaseDeviceController):
         if p1_power is None:
             raise ValueError("P1 meter data missing 'total_power' field")
 
-        self.log('debug', f"P1 power (grid-status): {p1_power}")
+        self.log('info', f"P1 power (grid-status): {p1_power}")
 
         # Read Zendure state
         zendure_data = reader.read_zendure(update_json=True)
