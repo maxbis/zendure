@@ -1389,6 +1389,10 @@ class AutomationApp:
             self.controller = AutomateController()
             self.schedule_controller = ScheduleController()
 
+            # Startup: print CWD and config path for debugging
+            print(f"[startup] CWD: {os.getcwd()}")
+            print(f"[startup] config file: {os.path.abspath(str(self.controller.config_path))}")
+
             # Initialize shared DeviceDataReader early (fail fast on config issues)
             get_reader(self.controller.config_path)
 
