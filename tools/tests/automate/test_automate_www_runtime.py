@@ -310,6 +310,7 @@ def _build_app_with_slot(slot: dict, electric_level: int):
         info=lambda msg: logs.append(("info", str(msg))),
         warning=lambda msg: logs.append(("warning", str(msg))),
         error=lambda msg: logs.append(("error", str(msg))),
+        debug=lambda msg: logs.append(("debug", str(msg))),
     )
     app.schedule_controller = SimpleNamespace(last_schedule_entry=slot)
     app.controller = SimpleNamespace(config_path=Path("/tmp/config.jsonc"))

@@ -50,6 +50,8 @@ HTTP_API_PORT = 1611
 # Wh-per-hour API: timezone and default days
 WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
 WH_PER_HOUR_DAYS_DEFAULT = 3
+# Cap last segment so we don't extrapolate one power reading to "now" for days (avoids inflated totals)
+WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS = 3600  # 1 hour
 
 # Shared timezone for status timestamps
 STATUS_TIMEZONE = "Europe/Amsterdam"
@@ -279,7 +281,11 @@ def _integrate_wh_points(
 ) -> dict[str, dict[str, dict[str, float]]]:
     wh_by_date_hour: dict[str, dict[str, dict[str, float]]] = {}
     for idx, (t_start, power) in enumerate(points):
-        t_end = points[idx + 1][0] if idx < len(points) - 1 else now
+        if idx < len(points) - 1:
+            t_end = points[idx + 1][0]
+        else:
+            t_end = now
+        t_end = min(t_end, t_start + WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS)
         _accumulate_wh_segment(
             wh_by_date_hour=wh_by_date_hour,
             allowed_dates=allowed_dates,
