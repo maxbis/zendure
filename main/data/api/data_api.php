@@ -164,9 +164,15 @@ function mergeResolvedWithConditional($resolved, $date) {
         if (array_key_exists($slotTime, $byTime)) {
             $slotKey = isset($slot['key']) ? (string) $slot['key'] : '';
             $isManualNonWildcard = $slotKey !== '' && strpos($slotKey, '*') === false;
+            // A slot value of 0 (integer) is treated as "transparent" (auto) and may be
+            // overridden by conditions, even when it originates from an exact-date key.
+            // This lets users use 0 as a "bookend / reset to auto" marker.
+            // Any other explicit non-wildcard value blocks condition override.
+            $slotValue = array_key_exists('value', $slot) ? $slot['value'] : null;
+            $isZeroValue = is_numeric($slotValue) && (int) $slotValue === 0;
             // Priority model:
-            // base schedule -> conditions may override wildcard/empty -> manual non-wildcard wins
-            if ($isManualNonWildcard) {
+            // base schedule -> conditions may override wildcard/empty/zero -> manual non-wildcard non-zero wins
+            if ($isManualNonWildcard && !$isZeroValue) {
                 continue;
             }
             $slotMeta = $byTime[$slotTime];

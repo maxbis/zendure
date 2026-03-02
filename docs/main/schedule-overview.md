@@ -2,7 +2,7 @@
 
 A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The active entrypoint in this repository is `main/charge_schedule_mobile.php`, which uses the shared schedule JS modules.
 
-**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [docs/mobile/api-dependencies.md](../mobile/api-dependencies.md) (mobile API usage).
+**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [docs/mobile/api-dependencies.md](../mobile/api-dependencies.md) (mobile API usage), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).
 
 ## Architecture Overview
 
