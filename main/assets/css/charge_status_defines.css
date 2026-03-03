@@ -6,13 +6,13 @@
 :root {
     /* Charging state - Green */
     --charge-status-charging: #66bb6a;
-    
+
     /* Discharging state - Red */
     --charge-status-discharging: #ef5350;
-    
+
     /* Standby state - Grey (also used for battery level bar when in standby) */
     --charge-status-standby: #9e9e9e;
-    
+
     /* Refresh button hover color - Blue */
     --charge-status-refresh-hover: #64b5f6;
 }
@@ -24,31 +24,30 @@
  * ============================================================ */
 
 @keyframes power-bar-pending-stripes {
-    from { background-position: 0 0; }
-    to   { background-position: 28px 0; }
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 28px 0;
+    }
 }
 
-/* Stripe overlay on the bar fill – keeps original colour but adds moving diagonals */
+/*
+ * Stripe overlay painted directly on the fill element.
+ * background-image sits on top of the background-color from .charging/.discharging
+ * so the original green/red is still visible through the transparent gaps.
+ * background-size must be set so the repeating-linear-gradient tiles correctly.
+ */
 .charge-power-bar-fill.power-pending {
-    position: relative;
-    opacity: 0.65;
-}
-
-.charge-power-bar-fill.power-pending::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background-image: repeating-linear-gradient(
-        -45deg,
-        transparent            0px,
-        transparent            6px,
-        rgba(255,255,255,0.35) 6px,
-        rgba(255,255,255,0.35) 10px
-    );
+    background-image: repeating-linear-gradient(-45deg,
+            transparent 0px,
+            transparent 6px,
+            rgba(255, 255, 255, 0.40) 6px,
+            rgba(255, 255, 255, 0.40) 10px);
     background-size: 28px 28px;
+    opacity: 0.72;
     animation: power-bar-pending-stripes 0.8s linear infinite;
-    pointer-events: none;
 }
 
 /* Small label shown next to the power value */
@@ -56,13 +55,21 @@
     display: inline-block;
     margin-left: 6px;
     font-size: 0.72rem;
-    color: #ffd54f;       /* amber – visible on dark background */
+    color: #ffd54f;
+    /* amber – visible on dark background */
     font-weight: 500;
     vertical-align: middle;
     animation: pending-label-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes pending-label-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.45; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.45;
+    }
 }
