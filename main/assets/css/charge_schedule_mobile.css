@@ -657,8 +657,8 @@ body.mobile-dark {
     top: -6px;
     left: 50%;
     transform: translateX(-50%);
-    width: 4px;
-    height: 4px;
+    width: 8px;
+    height: 2px;
     border-radius: 0;
     background: #9e9e9e;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
@@ -666,11 +666,15 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero"]::after {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: #f44336;
 }
 
 .price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-plus"]::after {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: #4caf50;
 }
