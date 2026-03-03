@@ -6,7 +6,7 @@
  * and forwards whitelisted commands to the automation HTTP API.
  */
 
-require_once __DIR__ . '/../login/validate.php';
+require_once __DIR__ . '/../../login/validate.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/commands.php';
 

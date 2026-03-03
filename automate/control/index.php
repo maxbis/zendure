@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../login/validate.php';
+
+require_once __DIR__ . '/../../login/validate.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/commands.php';
 
@@ -51,9 +52,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>⚡Zendure Energy Manager</title>
-  <link rel="stylesheet" href="../main/assets/css/general_mobile.css">
-  <link rel="stylesheet" href="../main/assets/css/charge_schedule_mobile.css">
-  <link rel="stylesheet" href="../main/assets/css/charge_status_defines.css">
+  <link rel="stylesheet" href="../../main/assets/css/general_mobile.css">
+  <link rel="stylesheet" href="../../main/assets/css/charge_schedule_mobile.css">
+  <link rel="stylesheet" href="../../main/assets/css/charge_status_defines.css">
   <style>
     body.mobile-dark { align-items: flex-start; }
     .control-wrap { width: 100%; }
