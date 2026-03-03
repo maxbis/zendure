@@ -1947,6 +1947,14 @@ class AutomationApp:
     def _log_startup(self) -> None:
         self.logger.info("🚀 Starting charge schedule automation script")
         self.logger.info(f"ℹ  LOG LEVEL: {getattr(self.controller, 'log_level', 'INFO')}")
+        # Show config path and charge level limits derived from config.jsonc
+        self.logger.info(
+            f"   Config file: {os.path.abspath(str(self.controller.config_path))}"
+        )
+        self.logger.info(
+            f"   Battery SoC limits: MIN_CHARGE_LEVEL={self.controller.min_charge_level}%, "
+            f"MAX_CHARGE_LEVEL={self.controller.max_charge_level}%"
+        )
         # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning(

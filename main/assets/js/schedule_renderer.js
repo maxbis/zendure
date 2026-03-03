@@ -524,7 +524,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     }
     // Properties can be at zendureData.data.properties or zendureData.properties
     const properties = zendureData.data?.properties || zendureData.properties;
-    
+
     if (!properties) {
         const emptyEl = document.createElement('div');
         emptyEl.id = 'charge-status-empty';
@@ -666,7 +666,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
                         <div class="charge-power-bar-label center" style="font-size: 0.6rem;">0</div>
                         <div class="charge-power-bar-label right" style="font-size: 0.6rem;">${maxPower}</div>
                         <div class="charge-power-bar-center"></div>
-                        ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
+                        ${barWidth > 0 ? `<div id="charge-power-bar-fill" class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : '<div id="charge-power-bar-fill" class="charge-power-bar-fill" style="width:0;"></div>'}
                         ${commandedMarkerHtml}
                     </div>
                 </div>
@@ -784,7 +784,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
                     <div class="charge-power-bar-label center">0</div>
                     <div class="charge-power-bar-label right">${maxPower} W</div>
                     <div class="charge-power-bar-center"></div>
-                    ${barWidth > 0 ? `<div class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : ''}
+                    ${barWidth > 0 ? `<div id="charge-power-bar-fill" class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : '<div id="charge-power-bar-fill" class="charge-power-bar-fill" style="width:0;"></div>'}
                     ${commandedMarkerHtml}
                 </div>
             </div>
@@ -810,6 +810,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const contentEl = document.createElement('div');
     contentEl.id = 'charge-status-content';
     contentEl.className = isMobile ? 'charge-status-mobile' : 'charge-status-content';
+    contentEl.dataset.actualPower = chargeDischargeValue;  // used by applyPendingPowerState()
     if (isMobile) {
         contentEl.style.display = 'grid';
         contentEl.style.gridTemplateColumns = 'minmax(0, 0.5fr) minmax(0, 1.5fr)';
@@ -1050,7 +1051,7 @@ function convertHyperTmpJS(hyperTmp) {
 function getTempColorEnhancedJS(temp) {
     // Clamp temperature to range
     temp = Math.max(-10, Math.min(40, temp));
-    
+
     if (temp <= 0) {
         return '#4fc3f7'; // Blue
     } else if (temp <= 5) {
@@ -1192,7 +1193,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const wifiValue = wifiDisplay.querySelector('.charge-battery-value');
         const wifiBarFill = wifiDisplay.querySelector('.charge-battery-bar-fill');
-        
+
         if (wifiValue) {
             wifiValue.textContent = `${rssiScore.toFixed(1)}/10 (${rssi.toLocaleString()} dBm)`;
         }
@@ -1214,7 +1215,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const systemTempValue = systemTempDisplay.querySelector('.charge-battery-value');
         const systemTempBarFill = systemTempDisplay.querySelector('.charge-battery-bar-fill');
-        
+
         if (systemTempValue) {
             const systemHeatIcon = systemHeatState == 1 ? '🔥' : '❄️';
             systemTempValue.textContent = `${systemTempCelsius.toFixed(1)}°C ${systemHeatIcon}`;
@@ -1236,7 +1237,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const battery1BarFill = battery1LevelDisplay.querySelector('.charge-battery-bar-fill');
         const battery1MinMarker = battery1LevelDisplay.querySelector('.charge-battery-bar-marker.min');
         const battery1MaxMarker = battery1LevelDisplay.querySelector('.charge-battery-bar-marker.max');
-        
+
         if (battery1Value) {
             battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1UsableNetKwh.toFixed(2)} kWh - ${pack1RoomToChargeKwh.toFixed(2)} kWh)`;
         }
@@ -1265,7 +1266,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const battery1TempValue = battery1TempDisplay.querySelector('.charge-battery-value');
         const battery1TempBarFill = battery1TempDisplay.querySelector('.charge-battery-bar-fill');
-        
+
         if (battery1TempValue) {
             const pack1HeatIcon = pack1HeatState == 1 ? '🔥' : '❄️';
             battery1TempValue.textContent = `${pack1TempCelsius.toFixed(1)}°C ${pack1HeatIcon}`;
@@ -1287,7 +1288,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const battery2BarFill = battery2LevelDisplay.querySelector('.charge-battery-bar-fill');
         const battery2MinMarker = battery2LevelDisplay.querySelector('.charge-battery-bar-marker.min');
         const battery2MaxMarker = battery2LevelDisplay.querySelector('.charge-battery-bar-marker.max');
-        
+
         if (battery2Value) {
             battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2UsableNetKwh.toFixed(2)} kWh - ${pack2RoomToChargeKwh.toFixed(2)} kWh)`;
         }
@@ -1316,7 +1317,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
 
         const battery2TempValue = battery2TempDisplay.querySelector('.charge-battery-value');
         const battery2TempBarFill = battery2TempDisplay.querySelector('.charge-battery-bar-fill');
-        
+
         if (battery2TempValue) {
             const pack2HeatIcon = pack2HeatState == 1 ? '🔥' : '❄️';
             battery2TempValue.textContent = `${pack2TempCelsius.toFixed(1)}°C ${pack2HeatIcon}`;

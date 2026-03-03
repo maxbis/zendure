@@ -16,3 +16,53 @@
     /* Refresh button hover color - Blue */
     --charge-status-refresh-hover: #64b5f6;
 }
+
+/* ============================================================
+ * Pending Power State
+ * Applied when a command was issued but device hasn't confirmed yet.
+ * Uses animated diagonal stripes over the existing bar colour.
+ * ============================================================ */
+
+@keyframes power-bar-pending-stripes {
+    from { background-position: 0 0; }
+    to   { background-position: 28px 0; }
+}
+
+/* Stripe overlay on the bar fill – keeps original colour but adds moving diagonals */
+.charge-power-bar-fill.power-pending {
+    position: relative;
+    opacity: 0.65;
+}
+
+.charge-power-bar-fill.power-pending::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent            0px,
+        transparent            6px,
+        rgba(255,255,255,0.35) 6px,
+        rgba(255,255,255,0.35) 10px
+    );
+    background-size: 28px 28px;
+    animation: power-bar-pending-stripes 0.8s linear infinite;
+    pointer-events: none;
+}
+
+/* Small label shown next to the power value */
+.charge-power-bar-pending-label {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.72rem;
+    color: #ffd54f;       /* amber – visible on dark background */
+    font-weight: 500;
+    vertical-align: middle;
+    animation: pending-label-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pending-label-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}

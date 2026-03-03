@@ -68,7 +68,7 @@ function indicateAutoRefresh() {
  */
 function updateGraphTimeIndicators() {
     const now = new Date();
-    
+
     // Get current date in YYYYMMDD format (using the same logic as the graphs)
     let currentDate;
     if (typeof formatDateYYYYMMDD === 'function') {
@@ -79,22 +79,22 @@ function updateGraphTimeIndicators() {
             String(now.getMonth() + 1).padStart(2, '0') +
             String(now.getDate()).padStart(2, '0');
     }
-    
+
     const currentHour = now.getHours();
-    
+
     // Update price graph bars (handle both price-graph-bar.price-current and price-bar.price-bar-current)
     // Remove current class from all price bars
     const priceCurrentBars = document.querySelectorAll('.price-graph-bar.price-current, .price-bar.price-bar-current');
     priceCurrentBars.forEach(bar => {
         bar.classList.remove('price-current', 'price-bar-current');
     });
-    
+
     // Find and mark the current hour bar in price graph
     const priceBars = document.querySelectorAll('.price-graph-bar[data-date], .price-bar[data-date]');
     priceBars.forEach(bar => {
         const barDate = bar.dataset.date;
         const barHour = parseInt(bar.dataset.hour, 10);
-        
+
         if (barDate === currentDate && barHour === currentHour) {
             // Add appropriate class based on which type of bar it is
             if (bar.classList.contains('price-graph-bar')) {
@@ -104,7 +104,7 @@ function updateGraphTimeIndicators() {
             }
         }
     });
-    
+
     // Update schedule bar graph (only if it exists - desktop only)
     const barGraphContainer = document.getElementById('bar-graph-today');
     if (barGraphContainer) {
@@ -113,13 +113,13 @@ function updateGraphTimeIndicators() {
         scheduleCurrentBars.forEach(bar => {
             bar.classList.remove('bar-current');
         });
-        
+
         // Find and mark the current hour bar in schedule bar graph
         const scheduleBars = document.querySelectorAll('.bar-graph-bar[data-date]');
         scheduleBars.forEach(bar => {
             const barDate = bar.dataset.date;
             const barHour = parseInt(bar.dataset.hour, 10);
-            
+
             if (barDate === currentDate && barHour === currentHour) {
                 bar.classList.add('bar-current');
             }
@@ -168,9 +168,9 @@ async function refreshStatus(isAutoRefresh = false) {
     if (DEBUG_MODE) {
         console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
     }
-    
+
     const apisCalled = [];
-    
+
     // Fetch both automation status and charge status in parallel
 
     // Fetch automation status
@@ -179,13 +179,13 @@ async function refreshStatus(isAutoRefresh = false) {
         // Detect config key based on URL pattern (localhost = local, otherwise remote)
         const isLocalUrl = AUTOMATION_STATUS_API_URL.includes('localhost') || AUTOMATION_STATUS_API_URL.includes('127.0.0.1');
         const statusConfigKey = 'statusApiUrl' + (isLocalUrl ? '-local' : '');
-        
+
         apisCalled.push({
             name: 'Automation Status API',
             url: AUTOMATION_STATUS_API_URL,
             configKey: statusConfigKey
         });
-        
+
         automationPromise = fetchAutomationStatus(AUTOMATION_STATUS_API_URL)
             .then(data => {
                 renderAutomationStatus(data);
@@ -250,18 +250,155 @@ async function refreshStatus(isAutoRefresh = false) {
             console.log(`    Config key: ${api.configKey}`);
         });
     }
-    
-    // Wait for both to complete (they run in parallel)
-    await Promise.all([automationPromise, chargePromise]);
-    
+
+    // Wait for both to complete (they run in parallel), then cross-check for pending state
+    const [automationData] = await Promise.all([automationPromise, chargePromise]);
+    applyPendingPowerState(automationData);
+
     // Update current time indicators in graphs during auto-refresh
     if (isAutoRefresh) {
         updateGraphTimeIndicators();
     }
-    
+
     const timestamp = new Date().toLocaleTimeString();
     console.log(`✅ Refresh completed [${timestamp}]`);
 }
+
+// ─── Pending power state ────────────────────────────────────────────────────
+
+/**
+ * How long (seconds) after a command is issued we consider the bar "pending".
+ * Worst case lag: one automation loop (20 s) + one browser refresh (20 s) = 40 s.
+ * Using 35 s gives one full loop interval with a small buffer.
+ */
+const PENDING_WINDOW_SECONDS = 35;
+
+/**
+ * Tolerance (W) when comparing commanded vs actual power.
+ * Prevents flicker on netzero modes where the exact watt value varies each cycle.
+ */
+const PENDING_MATCH_TOLERANCE_W = 50;
+
+/**
+ * Parse an automation newValue (number, string-number, 'netzero', 'netzero+')
+ * into a numeric watt value for comparison.
+ * Returns null if the value cannot be compared numerically.
+ */
+function parsePendingCommandedPower(newValue) {
+    if (newValue === null || newValue === undefined) return null;
+
+    // netzero modes: use the same validation thresholds as automate_www.py
+    if (newValue === 'netzero') {
+        // Validation power is -250 W (POWER_MODE_NETZERO_VALIDATION_W)
+        return -250;
+    }
+    if (newValue === 'netzero+') {
+        // Validation power is +250 W (POWER_MODE_NETZERO_PLUS_VALIDATION_W)
+        return 250;
+    }
+
+    const parsed = Number(newValue);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Cross-check the latest automation status change against the actual device
+ * reading rendered in the power bar.  When a command was issued recently and
+ * the device hasn't yet confirmed the new level, we add the 'power-pending'
+ * class (animated stripes) to the bar fill and show a small "⏳ Pending…" label
+ * next to the power value.  When the device confirms, both are removed.
+ *
+ * @param {Object|null} automationData - Data returned by fetchAutomationStatus()
+ */
+function applyPendingPowerState(automationData) {
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    /** Remove pending visual from bar fill and label. */
+    function clearPendingState() {
+        const fill = document.getElementById('charge-power-bar-fill');
+        if (fill) fill.classList.remove('power-pending');
+
+        const label = document.querySelector('.charge-power-bar-pending-label');
+        if (label) label.remove();
+    }
+
+    /** Apply pending visual to bar fill and insert/update label next to power value. */
+    function setPendingState() {
+        // Stripe the bar fill
+        const fill = document.getElementById('charge-power-bar-fill');
+        if (fill) fill.classList.add('power-pending');
+
+        // Label: insert after the .charge-power-value span if not already present
+        const powerValueEl = document.querySelector('.charge-power-value');
+        if (powerValueEl && !powerValueEl.querySelector('.charge-power-bar-pending-label')) {
+            const lbl = document.createElement('span');
+            lbl.className = 'charge-power-bar-pending-label';
+            lbl.textContent = '⏳ Pending…';
+            powerValueEl.appendChild(lbl);
+        }
+    }
+
+    // ── guard: no automation data ────────────────────────────────────────────
+    if (!automationData || !automationData.success) {
+        clearPendingState();
+        return;
+    }
+
+    // ── find latest 'change' entry ────────────────────────────────────────────
+    const changes = (automationData.lastChanges || []).filter(e => e.type === 'change');
+    if (changes.length === 0) {
+        clearPendingState();
+        return;
+    }
+
+    // lastChanges is already sorted newest-first by the backend
+    const latest = changes[0];
+    const entryAge = Math.floor(Date.now() / 1000) - (latest.timestamp || 0);
+
+    if (entryAge > PENDING_WINDOW_SECONDS) {
+        // Command is old enough that the device must have responded (or failed)
+        clearPendingState();
+        return;
+    }
+
+    // ── parse commanded power ─────────────────────────────────────────────────
+    const commandedW = parsePendingCommandedPower(latest.newValue);
+    if (commandedW === null) {
+        // Cannot compare (e.g. unknown string), don't show pending
+        clearPendingState();
+        return;
+    }
+
+    // ── read actual power from DOM (set by renderChargeStatus via data-actual-power) ───
+    const contentEl = document.getElementById('charge-status-content');
+    if (!contentEl) {
+        clearPendingState();
+        return;
+    }
+    const actualW = Number(contentEl.dataset.actualPower);
+    if (!Number.isFinite(actualW)) {
+        clearPendingState();
+        return;
+    }
+
+    // ── compare with tolerance ────────────────────────────────────────────────
+    const withinTolerance = Math.abs(commandedW - actualW) <= PENDING_MATCH_TOLERANCE_W;
+
+    if (withinTolerance) {
+        // Device has confirmed the new power level — remove pending state
+        if (DEBUG_MODE) {
+            console.log(`✅ Power confirmed: commanded=${commandedW} W, actual=${actualW} W`);
+        }
+        clearPendingState();
+    } else {
+        // Device hasn't caught up yet — show pending state
+        if (DEBUG_MODE) {
+            console.log(`⏳ Power pending: commanded=${commandedW} W, actual=${actualW} W, age=${entryAge}s`);
+        }
+        setPendingState();
+    }
+}
+
 
 /**
  * Toggle the collapsible section in charge status details
@@ -305,7 +442,7 @@ function startAutoRefresh() {
         clearInterval(autoRefreshIntervalId);
         autoRefreshIntervalId = null;
     }
-    
+
     // Only start interval if page is visible
     if (!document.hidden) {
         // Do immediate refresh first
@@ -313,7 +450,7 @@ function startAutoRefresh() {
             indicateAutoRefresh();
             refreshStatus(true);
         }
-        
+
         // Then set up interval for periodic refresh
         autoRefreshIntervalId = setInterval(() => {
             // Double-check page is still visible before refreshing
@@ -339,7 +476,7 @@ function startAutoRefresh() {
                 }
             }
         }, AUTO_REFRESH_INTERVAL);
-        
+
         console.log('⏰ Auto-refresh interval started (every ' + (AUTO_REFRESH_INTERVAL / 1000) + ' seconds)');
     }
 }
@@ -368,16 +505,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Track initial state
     wasPageHidden = document.hidden;
-    
+
     // Start auto-refresh if page is visible on initial load
     if (!document.hidden) {
         startAutoRefresh();
     }
-    
+
     // Handle visibility changes
     document.addEventListener('visibilitychange', () => {
         const isHidden = document.hidden;
-        
+
         if (isHidden) {
             // Page became hidden - stop auto-refresh
             stopAutoRefresh();
