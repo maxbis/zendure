@@ -40,14 +40,9 @@
  * background-size must be set so the repeating-linear-gradient tiles correctly.
  */
 .charge-power-bar-fill.power-pending {
-    background-image: repeating-linear-gradient(-45deg,
-            transparent 0px,
-            transparent 6px,
-            rgba(255, 255, 255, 0.40) 6px,
-            rgba(255, 255, 255, 0.40) 10px);
-    background-size: 28px 28px;
-    opacity: 0.72;
-    animation: power-bar-pending-stripes 0.8s linear infinite;
+
+    opacity: 0.35;
+
 }
 
 /* Small label shown next to the power value */
