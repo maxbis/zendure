@@ -85,6 +85,11 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
         </div>
 
+        <!-- 5. Automation Status -->
+        <div class="automation-status-wrapper">
+            <?php include __DIR__ . '/partials/automation_status.php'; ?>
+        </div>
+
         <!-- Schedule Panels -->
         <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
 
@@ -95,12 +100,6 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <!-- No Back-end Dialog (502) -->
         <?php include __DIR__ . '/partials/no_backend_dialog.php'; ?>
 
-
-
-        <!-- 5. Automation Status -->
-        <div class="automation-status-wrapper">
-            <?php include __DIR__ . '/partials/automation_status.php'; ?>
-        </div>
 
         <script>
             // Inject API URL from PHP config
