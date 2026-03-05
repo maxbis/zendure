@@ -284,8 +284,10 @@ def _integrate_wh_points(
         if idx < len(points) - 1:
             t_end = points[idx + 1][0]
         else:
-            t_end = now
-        t_end = min(t_end, t_start + WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS)
+            # Only cap the open-ended tail segment (last known value -> now).
+            # Historical segments between two explicit change points should be
+            # integrated over their full duration.
+            t_end = min(now, t_start + WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS)
         _accumulate_wh_segment(
             wh_by_date_hour=wh_by_date_hour,
             allowed_dates=allowed_dates,
