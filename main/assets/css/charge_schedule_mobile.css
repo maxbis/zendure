@@ -980,6 +980,31 @@ body.mobile-dark {
     margin-bottom: 8px;
 }
 
+.schedule-rules-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.schedule-rules-link {
+    font-size: 0.76rem;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    opacity: 0.72;
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 3px 8px;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.schedule-rules-link:hover,
+.schedule-rules-link:focus-visible {
+    opacity: 1;
+    border-color: var(--border-color);
+    outline: none;
+}
+
 .schedule-rules-status {
     min-height: 22px;
     font-size: 0.75rem;

@@ -232,7 +232,10 @@ function getValueLabel($val)
         <div class="schedule-mobile-tab-panel" data-tab="rules" role="tabpanel" aria-hidden="true">
             <div class="schedule-rules-header">
                 <h3 class="card-header">⚙️ Rules</h3>
-                <button type="button" class="btn btn-outline" id="rules-refresh-btn">Reload</button>
+                <div class="schedule-rules-actions">
+                    <a class="schedule-rules-link" href="edit_rules.php" title="Open full rules editor">Edit</a>
+                    <button type="button" class="btn btn-outline" id="rules-refresh-btn">Reload</button>
+                </div>
             </div>
             <div class="schedule-rules-status" id="rules-status"></div>
             <div class="schedule-rules-list-wrap">
