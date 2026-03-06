@@ -5,6 +5,8 @@
 
 /** 24 cent – used for bar height when no price data; bars stay grey and tooltip says no data */
 const PRICE_PROXY_NO_DATA = 0.24;
+const POPUP_POWER_EFFICIENCY = 0.9;
+const POPUP_NETZERO_REFERENCE_W = 250;
 
 /**
  * Interpolates between two RGB colors
@@ -97,6 +99,53 @@ function formatHourRange(hourValue) {
     const startHour = String(hour).padStart(2, '0');
     const endHour = String((hour + 1) % 24).padStart(2, '0');
     return `${startHour}:00 - ${endHour}:00`;
+}
+
+function getBaseWhForPopup() {
+    const fallback = 5760;
+    if (typeof BASE_WH === 'undefined') return fallback;
+    const parsed = Number(BASE_WH);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return parsed;
+}
+
+function powerToCapacityPercent(powerW) {
+    const baseWh = getBaseWhForPopup();
+    const onePercentUsableWh = (baseWh / 100) * POPUP_POWER_EFFICIENCY;
+    if (!Number.isFinite(onePercentUsableWh) || onePercentUsableWh <= 0) return null;
+    return Math.abs(powerW) / onePercentUsableWh;
+}
+
+function formatPopupPercent(pct, opts) {
+    if (pct == null || !Number.isFinite(pct)) return '';
+    const decimals = (opts && Number.isInteger(opts.decimals)) ? opts.decimals : 1;
+    const prefix = (opts && typeof opts.prefix === 'string') ? opts.prefix : '';
+    return ` (${prefix}${pct.toFixed(decimals)}%)`;
+}
+
+function formatScheduleDisplayWithPercent(scheduleValue) {
+    if (scheduleValue === undefined || scheduleValue === null || scheduleValue === '') {
+        return '—';
+    }
+
+    const raw = String(scheduleValue).trim();
+    if (raw === '') return '—';
+
+    const normalized = raw.toLowerCase();
+    if (normalized === 'netzero' || normalized === 'net zero') {
+        const pct = powerToCapacityPercent(POPUP_NETZERO_REFERENCE_W);
+        return `netzero${formatPopupPercent(pct, { prefix: '\u00b1' })}`;
+    }
+    if (normalized === 'netzero+' || normalized === 'net zero+') {
+        return 'netzero+';
+    }
+
+    const num = Number(raw);
+    if (Number.isFinite(num)) {
+        const pct = powerToCapacityPercent(num);
+        return `${raw}${formatPopupPercent(pct)}`;
+    }
+    return raw;
 }
 
 function ensurePriceGraphPopup() {
@@ -219,7 +268,7 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
-    const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
+    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasSource = scheduleSource !== undefined &&
@@ -348,7 +397,7 @@ function showPriceGraphPopup(bar, container) {
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
-    const scheduleDisplay = scheduleValue !== undefined && scheduleValue !== '' ? scheduleValue : '—';
+    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasSource = scheduleSource !== undefined &&
