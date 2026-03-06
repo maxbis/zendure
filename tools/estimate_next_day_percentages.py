@@ -35,7 +35,7 @@ EVENT_TYPE_CHANGE = "change"
 DEFAULT_TZ = "Europe/Amsterdam"
 DEFAULT_BASE_WH = 5760.0
 DEFAULT_EFFICIENCY = 0.9
-DEFAULT_DB = os.path.join("automate", "data", "status_updates.db")
+DEFAULT_DB = os.path.join("..", "automate", "data", "status_updates.db")
 LAST_OPEN_SEGMENT_MAX_SECONDS = 3600
 
 
