@@ -193,6 +193,10 @@ function isPriceGraphMobile() {
 let priceGraphMobilePopup = null;
 let priceGraphMobilePopupEscapeHandler = null;
 let priceGraphMobilePopupResizeHandler = null;
+let priceGraphMobilePopupState = null;
+const PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX = 36;
+const PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX = 10;
+const PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO = 0.28;
 
 function ensurePriceGraphMobilePopup() {
     if (priceGraphMobilePopup) return priceGraphMobilePopup;
@@ -207,6 +211,8 @@ function ensurePriceGraphMobilePopup() {
                 <button type="button" class="modal-close price-graph-mobile-popup-close" aria-label="Close">&times;</button>
             </div>
             <div class="price-graph-mobile-popup-body">
+                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-prev" aria-label="Previous time slot"></button>
+                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-next" aria-label="Next time slot"></button>
                 <div class="price-graph-popup-price"></div>
                 <div class="price-graph-popup-spot-price"></div>
                 <div class="price-graph-popup-schedule"></div>
@@ -222,12 +228,87 @@ function ensurePriceGraphMobilePopup() {
                             class="btn btn-outline price-graph-mobile-popup-netzero-plus">
                         ☀️&nbsp;netZero+
                     </button>
-                </div>              
-                <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
+                </div>
+                <div class="price-graph-mobile-popup-actions">
+                    <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clr</button>
+                    <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
+                </div>
+                <div class="price-graph-mobile-popup-hint">Swipe or tap edge to browse hours</div>
             </div>
         </div>
     `;
     document.body.appendChild(backdrop);
+
+    const body = backdrop.querySelector('.price-graph-mobile-popup-body');
+    const prevNav = backdrop.querySelector('.price-graph-mobile-popup-nav-prev');
+    const nextNav = backdrop.querySelector('.price-graph-mobile-popup-nav-next');
+
+    if (prevNav) {
+        prevNav.onclick = (e) => {
+            e.stopPropagation();
+            navigatePriceGraphMobilePopup(-1);
+        };
+    }
+
+    if (nextNav) {
+        nextNav.onclick = (e) => {
+            e.stopPropagation();
+            navigatePriceGraphMobilePopup(1);
+        };
+    }
+
+    if (body) {
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        let pointerActive = false;
+        let pointerMoved = false;
+
+        body.addEventListener('touchstart', (e) => {
+            if (!e.touches || e.touches.length !== 1) return;
+            pointerActive = true;
+            pointerMoved = false;
+            pointerStartX = e.touches[0].clientX;
+            pointerStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        body.addEventListener('touchmove', (e) => {
+            if (!pointerActive || !e.touches || e.touches.length !== 1) return;
+            const deltaX = e.touches[0].clientX - pointerStartX;
+            const deltaY = e.touches[0].clientY - pointerStartY;
+            if (Math.abs(deltaX) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX ||
+                Math.abs(deltaY) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
+                pointerMoved = true;
+            }
+        }, { passive: true });
+
+        body.addEventListener('touchend', (e) => {
+            if (!pointerActive) return;
+            pointerActive = false;
+            const touch = e.changedTouches && e.changedTouches[0];
+            if (!touch) return;
+
+            const deltaX = touch.clientX - pointerStartX;
+            const deltaY = touch.clientY - pointerStartY;
+            if (Math.abs(deltaX) >= PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX &&
+                Math.abs(deltaX) > Math.abs(deltaY)) {
+                navigatePriceGraphMobilePopup(deltaX < 0 ? 1 : -1);
+                return;
+            }
+
+            if (!pointerMoved &&
+                Math.abs(deltaX) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX &&
+                Math.abs(deltaY) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
+                const rect = body.getBoundingClientRect();
+                const relativeX = touch.clientX - rect.left;
+                const tapZoneWidth = rect.width * PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO;
+                if (relativeX <= tapZoneWidth) {
+                    navigatePriceGraphMobilePopup(-1);
+                } else if (relativeX >= rect.width - tapZoneWidth) {
+                    navigatePriceGraphMobilePopup(1);
+                }
+            }
+        }, { passive: true });
+    }
 
     priceGraphMobilePopup = backdrop;
     return backdrop;
@@ -244,11 +325,49 @@ function hidePriceGraphMobilePopup() {
         window.removeEventListener('resize', priceGraphMobilePopupResizeHandler);
         priceGraphMobilePopupResizeHandler = null;
     }
+    priceGraphMobilePopupState = null;
 }
 
-function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
+function getPriceGraphMobilePopupBars(bar) {
+    const container = bar && bar.parentElement;
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.price-graph-bar'));
+}
+
+function getAdjacentPriceGraphMobilePopupBar(direction) {
+    if (!priceGraphMobilePopupState || !priceGraphMobilePopupState.bar) return null;
+    const bars = getPriceGraphMobilePopupBars(priceGraphMobilePopupState.bar);
+    const currentIndex = bars.indexOf(priceGraphMobilePopupState.bar);
+    if (currentIndex === -1) return null;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= bars.length) return null;
+    return bars[nextIndex];
+}
+
+function updatePriceGraphMobilePopupNavState(popup) {
+    if (!popup) return;
+    const prevNav = popup.querySelector('.price-graph-mobile-popup-nav-prev');
+    const nextNav = popup.querySelector('.price-graph-mobile-popup-nav-next');
+    const hasPrev = !!getAdjacentPriceGraphMobilePopupBar(-1);
+    const hasNext = !!getAdjacentPriceGraphMobilePopupBar(1);
+
+    if (prevNav) {
+        prevNav.disabled = !hasPrev;
+        prevNav.setAttribute('aria-hidden', hasPrev ? 'false' : 'true');
+    }
+    if (nextNav) {
+        nextNav.disabled = !hasNext;
+        nextNav.setAttribute('aria-hidden', hasNext ? 'false' : 'true');
+    }
+}
+
+function renderPriceGraphMobilePopupContent() {
     const popup = ensurePriceGraphMobilePopup();
-    if (!bar || !popup) return;
+    const state = priceGraphMobilePopupState;
+    if (!popup || !state || !state.bar) return;
+
+    const { bar, editModal, scheduleMap } = state;
+    const key = state.key || bar.dataset.key || '';
 
     const titleEl = popup.querySelector('.price-graph-mobile-popup-title');
     const priceEl = popup.querySelector('.price-graph-popup-price');
@@ -308,6 +427,7 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
 
     const netZeroBtn = popup.querySelector('.price-graph-mobile-popup-netzero');
     const netZeroPlusBtn = popup.querySelector('.price-graph-mobile-popup-netzero-plus');
+    const clearBtn = popup.querySelector('.price-graph-mobile-popup-clear');
     const editBtn = popup.querySelector('.price-graph-mobile-popup-edit');
     const closeBtn = popup.querySelector('.price-graph-mobile-popup-close');
 
@@ -320,17 +440,6 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
             await editModal.applyQuickMode(key, mode, {
                 originalKey: hasExistingEntry ? key : null
             });
-
-            // Ensure schedule panels and price graph are refreshed after a quick change,
-            // especially on the mobile page where the user expects immediate feedback.
-            if (typeof window !== 'undefined' &&
-                typeof window.refreshScheduleAndPricesImmediate === 'function') {
-                try {
-                    await window.refreshScheduleAndPricesImmediate();
-                } catch (e) {
-                    console.error('Failed to refresh schedule after quick mode change:', e);
-                }
-            }
         } else if (editModal) {
             if (existingValue !== undefined) {
                 editModal.open(key, existingValue);
@@ -342,6 +451,9 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
 
     netZeroBtn.onclick = () => applyQuickMode('netzero');
     netZeroPlusBtn.onclick = () => applyQuickMode('netzero+');
+    if (clearBtn) {
+        clearBtn.onclick = () => applyQuickMode('clear');
+    }
 
     editBtn.onclick = () => {
         close();
@@ -364,15 +476,46 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
         dialog.onclick = (e) => e.stopPropagation();
     }
 
+    if (priceGraphMobilePopupEscapeHandler) {
+        document.removeEventListener('keydown', priceGraphMobilePopupEscapeHandler);
+    }
     priceGraphMobilePopupEscapeHandler = (e) => {
         if (e.key === 'Escape') close();
     };
     document.addEventListener('keydown', priceGraphMobilePopupEscapeHandler);
 
+    if (priceGraphMobilePopupResizeHandler) {
+        window.removeEventListener('resize', priceGraphMobilePopupResizeHandler);
+    }
     priceGraphMobilePopupResizeHandler = close;
     window.addEventListener('resize', priceGraphMobilePopupResizeHandler);
 
+    updatePriceGraphMobilePopupNavState(popup);
     popup.classList.add('active');
+}
+
+function navigatePriceGraphMobilePopup(direction) {
+    const nextBar = getAdjacentPriceGraphMobilePopupBar(direction);
+    if (!nextBar || !priceGraphMobilePopupState) return;
+    priceGraphMobilePopupState = {
+        ...priceGraphMobilePopupState,
+        bar: nextBar,
+        key: nextBar.dataset.key || ''
+    };
+    renderPriceGraphMobilePopupContent();
+}
+
+function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
+    const popup = ensurePriceGraphMobilePopup();
+    if (!bar || !popup) return;
+
+    priceGraphMobilePopupState = {
+        bar,
+        editModal,
+        scheduleMap,
+        key: key || bar.dataset.key || ''
+    };
+    renderPriceGraphMobilePopupContent();
 }
 
 function showPriceGraphPopup(bar, container) {

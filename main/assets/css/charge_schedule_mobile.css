@@ -1209,6 +1209,7 @@ code {
 }
 
 .price-graph-mobile-popup-body {
+    position: relative;
     padding: 12px;
 }
 
@@ -1218,6 +1219,70 @@ code {
     color: #a6c400;
     /* color: var(--text-primary); */
     margin-bottom: 2px;
+}
+
+.price-graph-mobile-popup-nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28%;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    z-index: 1;
+    cursor: pointer;
+}
+
+.price-graph-mobile-popup-nav::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 18px;
+    opacity: 0.28;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.price-graph-mobile-popup-nav-prev {
+    left: 0;
+}
+
+.price-graph-mobile-popup-nav-prev::before {
+    left: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+}
+
+.price-graph-mobile-popup-nav-next {
+    right: 0;
+}
+
+.price-graph-mobile-popup-nav-next::before {
+    right: 0;
+    background: linear-gradient(270deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+}
+
+.price-graph-mobile-popup-nav:disabled {
+    cursor: default;
+}
+
+.price-graph-mobile-popup-nav:disabled::before {
+    opacity: 0.08;
+}
+
+.price-graph-mobile-popup-body .price-graph-popup-price,
+.price-graph-mobile-popup-body .price-graph-popup-spot-price,
+.price-graph-mobile-popup-body .price-graph-popup-schedule,
+.price-graph-mobile-popup-body .price-graph-popup-source {
+    position: relative;
+    z-index: 2;
+}
+
+.price-graph-mobile-popup-hint {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    text-align: center;
 }
 
 /* .price-graph-mobile-popup-body .price-graph-popup-spot-price,
@@ -1237,6 +1302,68 @@ code {
     width: 100%;
     padding: 7px 12px;
     font-size: 0.96rem;
+}
+
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero {
+    background: rgba(146, 86, 48, 0.22);
+    border-color: rgba(199, 129, 83, 0.48);
+    color: #efc4a0;
+}
+
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero:hover,
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero:focus-visible {
+    background: rgba(166, 98, 55, 0.3);
+    border-color: rgba(222, 148, 98, 0.62);
+    color: #ffd7b5;
+}
+
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero-plus {
+    background: rgba(63, 124, 79, 0.24);
+    border-color: rgba(102, 176, 122, 0.5);
+    color: #b8e0bf;
+}
+
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero-plus:hover,
+.price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero-plus:focus-visible {
+    background: rgba(73, 143, 91, 0.32);
+    border-color: rgba(123, 202, 144, 0.64);
+    color: #d2f2d7;
+}
+
+.price-graph-mobile-popup-actions {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-clear {
+    flex: 1 1 0;
+    min-width: 0;
+    background: rgba(140, 44, 44, 0.32);
+    border-color: rgba(191, 82, 82, 0.55);
+    color: #f1b3b3;
+}
+
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-clear:hover,
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-clear:focus-visible {
+    background: rgba(164, 52, 52, 0.42);
+    border-color: rgba(216, 97, 97, 0.7);
+    color: #ffd2d2;
+}
+
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-edit {
+    flex: 2 1 0;
+    min-width: 0;
+    background: linear-gradient(180deg, #4d88bf 0%, #3d73a9 100%);
+    border-color: rgba(124, 170, 214, 0.45);
+    color: #eef6ff;
+}
+
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-edit:hover,
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-edit:focus-visible {
+    background: linear-gradient(180deg, #5a95cb 0%, #467caf 100%);
+    border-color: rgba(156, 196, 234, 0.58);
+    color: #ffffff;
 }
 
 /* Responsive adjustments */

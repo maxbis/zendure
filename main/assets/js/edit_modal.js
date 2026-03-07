@@ -321,6 +321,8 @@ class EditModal {
             val = 'netzero';
         } else if (mode === 'netzero+') {
             val = 'netzero+';
+        } else if (mode === 'clear') {
+            val = 0;
         } else {
             return;
         }
