@@ -1178,14 +1178,18 @@ code {
 .price-graph-mobile-popup-dialog {
     background: var(--bg-secondary);
     border-radius: 10px;
-    width: 65%;
-    max-width: 260px;
+    width: 286px;
+    height: 320px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
     padding: 0;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
     border: 1px solid var(--border-color);
     transform: scale(0.9) translateY(-20px);
     opacity: 0;
     transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
 }
 
 .price-graph-mobile-popup.active .price-graph-mobile-popup-dialog {
@@ -1193,15 +1197,48 @@ code {
     opacity: 1;
 }
 
-.price-graph-mobile-popup-dialog.price-graph-mobile-popup-dialog-dragging {
-    transition: none;
-    will-change: transform, opacity;
+.price-graph-mobile-popup-title-wrap,
+.price-graph-mobile-popup-content {
+    transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.price-graph-mobile-popup-title-wrap {
+    display: inline-block;
+}
+
+.price-graph-mobile-popup-content {
+    position: relative;
+}
+
+.price-graph-mobile-popup-title-wrap.price-graph-mobile-popup-dialog-nav-prev-out,
+.price-graph-mobile-popup-content.price-graph-mobile-popup-dialog-nav-prev-out {
+    transform: translateX(18px);
+    opacity: 0.55;
+}
+
+.price-graph-mobile-popup-title-wrap.price-graph-mobile-popup-dialog-nav-prev-in,
+.price-graph-mobile-popup-content.price-graph-mobile-popup-dialog-nav-prev-in {
+    transform: translateX(-18px);
+    opacity: 0.55;
+}
+
+.price-graph-mobile-popup-title-wrap.price-graph-mobile-popup-dialog-nav-next-out,
+.price-graph-mobile-popup-content.price-graph-mobile-popup-dialog-nav-next-out {
+    transform: translateX(-18px);
+    opacity: 0.55;
+}
+
+.price-graph-mobile-popup-title-wrap.price-graph-mobile-popup-dialog-nav-next-in,
+.price-graph-mobile-popup-content.price-graph-mobile-popup-dialog-nav-next-in {
+    transform: translateX(18px);
+    opacity: 0.55;
 }
 
 .price-graph-mobile-popup-header {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 9px 12px;
     border-bottom: 1px solid var(--border-color);
 }
@@ -1209,13 +1246,23 @@ code {
 .price-graph-mobile-popup-title {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #e8e8e8;
     line-height: 1.2;
+    text-align: center;
+}
+
+.price-graph-mobile-popup-close {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .price-graph-mobile-popup-body {
     position: relative;
     padding: 12px;
+    flex: 1 1 auto;
+    overflow-y: auto;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-price {
@@ -1224,6 +1271,13 @@ code {
     color: #a6c400;
     /* color: var(--text-primary); */
     margin-bottom: 2px;
+}
+
+.price-graph-mobile-popup-body .price-graph-popup-spot-price,
+.price-graph-mobile-popup-body .price-graph-popup-schedule,
+.price-graph-mobile-popup-body .price-graph-popup-source {
+    margin-top: 6px;
+    line-height: 1.25;
 }
 
 .price-graph-mobile-popup-nav {
@@ -1285,8 +1339,8 @@ code {
 
 .price-graph-mobile-popup-hint {
     margin-top: 2px;
-    font-size: 0.72rem;
-    color: var(--text-tertiary);
+    font-size: 0.64rem;
+    color: rgba(255, 255, 255, 0.42);
     text-align: center;
 }
 
@@ -1296,11 +1350,15 @@ code {
 } */
 
 .price-graph-mobile-popup-footer {
-    padding: 9px 12px;
-    border-top: 1px solid var(--border-color);
+    padding: 14px 12px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(12, 12, 12, 0.34) 0%, rgba(6, 6, 6, 0.46) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 12px 22px rgba(0, 0, 0, 0.2);
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
 }
 
 .price-graph-mobile-popup-footer .btn {
@@ -1349,7 +1407,7 @@ code {
 
 .price-graph-mobile-popup-actions {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: stretch;
 }
 

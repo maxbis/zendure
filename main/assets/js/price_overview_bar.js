@@ -194,10 +194,10 @@ let priceGraphMobilePopup = null;
 let priceGraphMobilePopupEscapeHandler = null;
 let priceGraphMobilePopupResizeHandler = null;
 let priceGraphMobilePopupState = null;
-const PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX = 36;
 const PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX = 10;
 const PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO = 0.28;
-const PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX = 54;
+const PRICE_GRAPH_MOBILE_POPUP_NAV_OUT_MS = 90;
+const PRICE_GRAPH_MOBILE_POPUP_NAV_IN_MS = 140;
 
 function ensurePriceGraphMobilePopup() {
     if (priceGraphMobilePopup) return priceGraphMobilePopup;
@@ -208,16 +208,20 @@ function ensurePriceGraphMobilePopup() {
     backdrop.innerHTML = `
         <div class="price-graph-mobile-popup-dialog">
             <div class="price-graph-mobile-popup-header">
-                <span class="price-graph-mobile-popup-title"></span>
+                <span class="price-graph-mobile-popup-title-wrap">
+                    <span class="price-graph-mobile-popup-title"></span>
+                </span>
                 <button type="button" class="modal-close price-graph-mobile-popup-close" aria-label="Close">&times;</button>
             </div>
             <div class="price-graph-mobile-popup-body">
                 <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-prev" aria-label="Previous time slot"></button>
                 <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-next" aria-label="Next time slot"></button>
-                <div class="price-graph-popup-price"></div>
-                <div class="price-graph-popup-spot-price"></div>
-                <div class="price-graph-popup-schedule"></div>
-                <div class="price-graph-popup-source"></div>
+                <div class="price-graph-mobile-popup-content">
+                    <div class="price-graph-popup-price"></div>
+                    <div class="price-graph-popup-spot-price"></div>
+                    <div class="price-graph-popup-schedule"></div>
+                    <div class="price-graph-popup-source"></div>
+                </div>
             </div>
             <div class="price-graph-mobile-popup-footer">
                 <div style="display:flex; gap:8px; align-items:center;">
@@ -231,10 +235,10 @@ function ensurePriceGraphMobilePopup() {
                     </button>
                 </div>
                 <div class="price-graph-mobile-popup-actions">
-                    <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clr</button>
+                    <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clear</button>
                     <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
                 </div>
-                <div class="price-graph-mobile-popup-hint">Swipe or tap edge to browse hours</div>
+                <div class="price-graph-mobile-popup-hint">Tap left or right edge to browse hours</div>
             </div>
         </div>
     `;
@@ -243,8 +247,6 @@ function ensurePriceGraphMobilePopup() {
     const body = backdrop.querySelector('.price-graph-mobile-popup-body');
     const prevNav = backdrop.querySelector('.price-graph-mobile-popup-nav-prev');
     const nextNav = backdrop.querySelector('.price-graph-mobile-popup-nav-next');
-    const dialog = backdrop.querySelector('.price-graph-mobile-popup-dialog');
-
     if (prevNav) {
         prevNav.onclick = (e) => {
             e.stopPropagation();
@@ -264,36 +266,13 @@ function ensurePriceGraphMobilePopup() {
         let pointerStartY = 0;
         let pointerActive = false;
         let pointerMoved = false;
-        let dragDeltaX = 0;
-
-        const resetDialogDrag = (animate = true) => {
-            if (!dialog) return;
-            dialog.classList.toggle('price-graph-mobile-popup-dialog-dragging', !animate);
-            dialog.style.transform = '';
-            dialog.style.opacity = '';
-        };
-
-        const applyDialogDrag = (deltaX) => {
-            if (!dialog) return;
-            const clampedDeltaX = Math.max(
-                -PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX,
-                Math.min(PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX, deltaX)
-            );
-            const distanceRatio = Math.min(1, Math.abs(clampedDeltaX) / PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX);
-            dialog.classList.add('price-graph-mobile-popup-dialog-dragging');
-            dialog.style.transform = `translateX(${clampedDeltaX}px)`;
-            dialog.style.opacity = String(1 - (distanceRatio * 0.16));
-            dragDeltaX = clampedDeltaX;
-        };
 
         body.addEventListener('touchstart', (e) => {
             if (!e.touches || e.touches.length !== 1) return;
             pointerActive = true;
             pointerMoved = false;
-            dragDeltaX = 0;
             pointerStartX = e.touches[0].clientX;
             pointerStartY = e.touches[0].clientY;
-            resetDialogDrag(false);
         }, { passive: true });
 
         body.addEventListener('touchmove', (e) => {
@@ -303,9 +282,6 @@ function ensurePriceGraphMobilePopup() {
             if (Math.abs(deltaX) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX ||
                 Math.abs(deltaY) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
                 pointerMoved = true;
-            }
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                applyDialogDrag(deltaX);
             }
         }, { passive: true });
 
@@ -317,13 +293,6 @@ function ensurePriceGraphMobilePopup() {
 
             const deltaX = touch.clientX - pointerStartX;
             const deltaY = touch.clientY - pointerStartY;
-            if (Math.abs(deltaX) >= PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX &&
-                Math.abs(deltaX) > Math.abs(deltaY)) {
-                resetDialogDrag(true);
-                navigatePriceGraphMobilePopup(deltaX < 0 ? 1 : -1);
-                return;
-            }
-
             if (!pointerMoved &&
                 Math.abs(deltaX) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX &&
                 Math.abs(deltaY) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
@@ -331,24 +300,16 @@ function ensurePriceGraphMobilePopup() {
                 const relativeX = touch.clientX - rect.left;
                 const tapZoneWidth = rect.width * PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO;
                 if (relativeX <= tapZoneWidth) {
-                    resetDialogDrag(true);
                     navigatePriceGraphMobilePopup(-1);
                 } else if (relativeX >= rect.width - tapZoneWidth) {
-                    resetDialogDrag(true);
                     navigatePriceGraphMobilePopup(1);
-                } else {
-                    resetDialogDrag(true);
                 }
-            } else {
-                resetDialogDrag(true);
             }
         }, { passive: true });
 
         body.addEventListener('touchcancel', () => {
             pointerActive = false;
             pointerMoved = false;
-            dragDeltaX = 0;
-            resetDialogDrag(true);
         }, { passive: true });
     }
 
@@ -400,6 +361,22 @@ function updatePriceGraphMobilePopupNavState(popup) {
     if (nextNav) {
         nextNav.disabled = !hasNext;
         nextNav.setAttribute('aria-hidden', hasNext ? 'false' : 'true');
+    }
+}
+
+function setPriceGraphMobilePopupNavigationClass(popup, className) {
+    if (!popup) return;
+    const animatedEls = popup.querySelectorAll(
+        '.price-graph-mobile-popup-title-wrap, .price-graph-mobile-popup-content'
+    );
+    animatedEls.forEach((el) => el.classList.remove(
+        'price-graph-mobile-popup-dialog-nav-prev-out',
+        'price-graph-mobile-popup-dialog-nav-prev-in',
+        'price-graph-mobile-popup-dialog-nav-next-out',
+        'price-graph-mobile-popup-dialog-nav-next-in'
+    ));
+    if (className) {
+        animatedEls.forEach((el) => el.classList.add(className));
     }
 }
 
@@ -455,7 +432,7 @@ function renderPriceGraphMobilePopupContent() {
         ? (ruleLabel ? `runtime condition (${ruleLabel})` : 'runtime condition')
         : (ruleLabel ? ruleLabel : plainSourceLabel);
 
-    titleEl.textContent = `Time slot ${timeRange || '—'}`;
+    titleEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
@@ -538,13 +515,40 @@ function renderPriceGraphMobilePopupContent() {
 
 function navigatePriceGraphMobilePopup(direction) {
     const nextBar = getAdjacentPriceGraphMobilePopupBar(direction);
-    if (!nextBar || !priceGraphMobilePopupState) return;
+    if (!nextBar || !priceGraphMobilePopupState || priceGraphMobilePopupState.isNavigating) return;
+
+    const popup = ensurePriceGraphMobilePopup();
+    const outClass = direction < 0
+        ? 'price-graph-mobile-popup-dialog-nav-prev-out'
+        : 'price-graph-mobile-popup-dialog-nav-next-out';
+    const inClass = direction < 0
+        ? 'price-graph-mobile-popup-dialog-nav-prev-in'
+        : 'price-graph-mobile-popup-dialog-nav-next-in';
+
     priceGraphMobilePopupState = {
         ...priceGraphMobilePopupState,
-        bar: nextBar,
-        key: nextBar.dataset.key || ''
+        isNavigating: true
     };
-    renderPriceGraphMobilePopupContent();
+
+    setPriceGraphMobilePopupNavigationClass(popup, outClass);
+
+    window.setTimeout(() => {
+        priceGraphMobilePopupState = {
+            ...priceGraphMobilePopupState,
+            bar: nextBar,
+            key: nextBar.dataset.key || ''
+        };
+        renderPriceGraphMobilePopupContent();
+        setPriceGraphMobilePopupNavigationClass(popup, inClass);
+
+        window.setTimeout(() => {
+            setPriceGraphMobilePopupNavigationClass(popup, '');
+            priceGraphMobilePopupState = {
+                ...priceGraphMobilePopupState,
+                isNavigating: false
+            };
+        }, PRICE_GRAPH_MOBILE_POPUP_NAV_IN_MS);
+    }, PRICE_GRAPH_MOBILE_POPUP_NAV_OUT_MS);
 }
 
 function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
@@ -555,7 +559,8 @@ function showPriceGraphMobilePopup(bar, editModal, scheduleMap, key) {
         bar,
         editModal,
         scheduleMap,
-        key: key || bar.dataset.key || ''
+        key: key || bar.dataset.key || '',
+        isNavigating: false
     };
     renderPriceGraphMobilePopupContent();
 }
