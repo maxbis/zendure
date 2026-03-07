@@ -920,6 +920,78 @@ body.mobile-dark {
     font-style: italic;
 }
 
+.mobile-secondary-sections {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+}
+
+.mobile-secondary-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+    border-radius: 12px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, #101828), color-mix(in srgb, var(--bg-tertiary) 90%, #0b1222));
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mobile-secondary-toggle:hover,
+.mobile-secondary-toggle:focus-visible {
+    border-color: color-mix(in srgb, var(--accent-color, #64b5f6) 56%, var(--border-color));
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+    outline: none;
+}
+
+.mobile-secondary-toggle:active {
+    transform: translateY(1px);
+}
+
+.mobile-secondary-toggle-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.mobile-secondary-toggle-title {
+    font-size: 0.94rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.mobile-secondary-toggle-summary {
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--text-secondary);
+}
+
+.mobile-secondary-toggle-icon {
+    flex: 0 0 auto;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.mobile-secondary-toggle[aria-expanded="true"] .mobile-secondary-toggle-icon {
+    transform: rotate(180deg);
+    color: var(--text-primary);
+}
+
+.mobile-secondary-panels {
+    display: grid;
+    gap: 12px;
+}
+
+.mobile-secondary-panels[hidden] {
+    display: none;
+}
+
 /* Schedule Mobile Card - Tabs (Schedule | Schedule entries) */
 .schedule-mobile-card .schedule-mobile-tabs {
     display: flex;
