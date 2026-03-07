@@ -85,30 +85,13 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
         </div>
 
-        <div class="mobile-secondary-sections">
-            <button
-                type="button"
-                class="mobile-secondary-toggle"
-                id="mobile-secondary-toggle"
-                aria-expanded="false"
-                aria-controls="mobile-secondary-panels">
-                <span class="mobile-secondary-toggle-copy">
-                    <span class="mobile-secondary-toggle-title">Show automation and schedule</span>
-                    <span class="mobile-secondary-toggle-summary">Open the advanced status and editing panels only when needed.</span>
-                </span>
-                <span class="mobile-secondary-toggle-icon" aria-hidden="true">▾</span>
-            </button>
-
-            <div class="mobile-secondary-panels" id="mobile-secondary-panels" hidden>
-                <!-- 5. Automation Status -->
-                <div class="automation-status-wrapper">
-                    <?php include __DIR__ . '/partials/automation_status.php'; ?>
-                </div>
-
-                <!-- Schedule Panels -->
-                <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
-            </div>
+        <!-- 5. Automation Status -->
+        <div class="automation-status-wrapper">
+            <?php include __DIR__ . '/partials/automation_status.php'; ?>
         </div>
+
+        <!-- Schedule Panels -->
+        <?php include __DIR__ . '/partials/schedule_panels_mobile.php'; ?>
 
         <!-- Edit Modal -->
         <?php include __DIR__ . '/partials/edit_modal.php'; ?>
@@ -199,19 +182,6 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
             
             // Override or extend the price graph scroll functionality for mobile
             (function() {
-                const secondaryToggle = document.getElementById('mobile-secondary-toggle');
-                const secondaryPanels = document.getElementById('mobile-secondary-panels');
-
-                if (secondaryToggle && secondaryPanels) {
-                    secondaryToggle.addEventListener('click', () => {
-                        const isExpanded = secondaryToggle.getAttribute('aria-expanded') === 'true';
-                        const nextExpanded = !isExpanded;
-
-                        secondaryToggle.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
-                        secondaryPanels.hidden = !nextExpanded;
-                    });
-                }
-
                 const originalFetchAndRenderPrices = window.fetchAndRenderPrices;
                 if (originalFetchAndRenderPrices) {
                     window.fetchAndRenderPrices = async function(priceApiUrl, scheduleEntries, editModal) {
