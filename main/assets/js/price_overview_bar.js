@@ -197,6 +197,7 @@ let priceGraphMobilePopupState = null;
 const PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX = 36;
 const PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX = 10;
 const PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO = 0.28;
+const PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX = 54;
 
 function ensurePriceGraphMobilePopup() {
     if (priceGraphMobilePopup) return priceGraphMobilePopup;
@@ -242,6 +243,7 @@ function ensurePriceGraphMobilePopup() {
     const body = backdrop.querySelector('.price-graph-mobile-popup-body');
     const prevNav = backdrop.querySelector('.price-graph-mobile-popup-nav-prev');
     const nextNav = backdrop.querySelector('.price-graph-mobile-popup-nav-next');
+    const dialog = backdrop.querySelector('.price-graph-mobile-popup-dialog');
 
     if (prevNav) {
         prevNav.onclick = (e) => {
@@ -262,13 +264,36 @@ function ensurePriceGraphMobilePopup() {
         let pointerStartY = 0;
         let pointerActive = false;
         let pointerMoved = false;
+        let dragDeltaX = 0;
+
+        const resetDialogDrag = (animate = true) => {
+            if (!dialog) return;
+            dialog.classList.toggle('price-graph-mobile-popup-dialog-dragging', !animate);
+            dialog.style.transform = '';
+            dialog.style.opacity = '';
+        };
+
+        const applyDialogDrag = (deltaX) => {
+            if (!dialog) return;
+            const clampedDeltaX = Math.max(
+                -PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX,
+                Math.min(PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX, deltaX)
+            );
+            const distanceRatio = Math.min(1, Math.abs(clampedDeltaX) / PRICE_GRAPH_MOBILE_POPUP_MAX_DRAG_PX);
+            dialog.classList.add('price-graph-mobile-popup-dialog-dragging');
+            dialog.style.transform = `translateX(${clampedDeltaX}px)`;
+            dialog.style.opacity = String(1 - (distanceRatio * 0.16));
+            dragDeltaX = clampedDeltaX;
+        };
 
         body.addEventListener('touchstart', (e) => {
             if (!e.touches || e.touches.length !== 1) return;
             pointerActive = true;
             pointerMoved = false;
+            dragDeltaX = 0;
             pointerStartX = e.touches[0].clientX;
             pointerStartY = e.touches[0].clientY;
+            resetDialogDrag(false);
         }, { passive: true });
 
         body.addEventListener('touchmove', (e) => {
@@ -278,6 +303,9 @@ function ensurePriceGraphMobilePopup() {
             if (Math.abs(deltaX) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX ||
                 Math.abs(deltaY) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
                 pointerMoved = true;
+            }
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                applyDialogDrag(deltaX);
             }
         }, { passive: true });
 
@@ -291,6 +319,7 @@ function ensurePriceGraphMobilePopup() {
             const deltaY = touch.clientY - pointerStartY;
             if (Math.abs(deltaX) >= PRICE_GRAPH_MOBILE_POPUP_SWIPE_THRESHOLD_PX &&
                 Math.abs(deltaX) > Math.abs(deltaY)) {
+                resetDialogDrag(true);
                 navigatePriceGraphMobilePopup(deltaX < 0 ? 1 : -1);
                 return;
             }
@@ -302,11 +331,24 @@ function ensurePriceGraphMobilePopup() {
                 const relativeX = touch.clientX - rect.left;
                 const tapZoneWidth = rect.width * PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO;
                 if (relativeX <= tapZoneWidth) {
+                    resetDialogDrag(true);
                     navigatePriceGraphMobilePopup(-1);
                 } else if (relativeX >= rect.width - tapZoneWidth) {
+                    resetDialogDrag(true);
                     navigatePriceGraphMobilePopup(1);
+                } else {
+                    resetDialogDrag(true);
                 }
+            } else {
+                resetDialogDrag(true);
             }
+        }, { passive: true });
+
+        body.addEventListener('touchcancel', () => {
+            pointerActive = false;
+            pointerMoved = false;
+            dragDeltaX = 0;
+            resetDialogDrag(true);
         }, { passive: true });
     }
 

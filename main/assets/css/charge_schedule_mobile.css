@@ -1193,6 +1193,11 @@ code {
     opacity: 1;
 }
 
+.price-graph-mobile-popup-dialog.price-graph-mobile-popup-dialog-dragging {
+    transition: none;
+    will-change: transform, opacity;
+}
+
 .price-graph-mobile-popup-header {
     display: flex;
     align-items: center;
@@ -1302,6 +1307,18 @@ code {
     width: 100%;
     padding: 7px 12px;
     font-size: 0.96rem;
+}
+
+.price-graph-mobile-popup-netzero,
+.price-graph-mobile-popup-netzero-plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+    white-space: nowrap;
+    font-size: 0.9rem;
 }
 
 .price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero {
