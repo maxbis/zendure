@@ -76,6 +76,7 @@ API_PATH_STATUS = "/api/status"
 API_PATH_ALL = "/api/all"
 API_PATH_AUTOMATION_STATUS = "/api/automation_status"
 API_PATH_WH_PER_HOUR = "/api/wh_per_hour"
+API_PATH_STATUS_UPDATES_DELTA = "/api/status_updates_delta"
 API_PATH_REFRESH = "/api/refresh"
 API_PATH_RESTART = "/api/restart"
 API_PATH_PAUSE = "/api/pause"
@@ -451,6 +452,35 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                     pass
         return max_age
 
+    def _parse_non_negative_int_query(self, parsed, key: str, default: Optional[int] = None) -> Optional[int]:
+        """Parse a non-negative integer query param; returns default when absent/invalid."""
+        query = parse_qs(parsed.query)
+        if key not in query or not query[key]:
+            return default
+        try:
+            value = int(query[key][0])
+        except (ValueError, TypeError):
+            return default
+        if value < 0:
+            return default
+        return value
+
+    def _is_status_updates_delta_authorized(self, parsed) -> bool:
+        """Optional token auth for status_updates_delta endpoint."""
+        required_token = getattr(self.server, "status_updates_delta_token", None)
+        if not required_token:
+            return True
+
+        header_token = self.headers.get("X-API-Token")
+        if header_token and header_token == required_token:
+            return True
+
+        query = parse_qs(parsed.query)
+        query_token = query.get("token", [None])[0]
+        if query_token and query_token == required_token:
+            return True
+        return False
+
     def _maybe_refresh_reading(self, reading, max_age: int, refresh_cb) -> None:
         """If reading is missing or older than max_age seconds, call refresh_cb (0 = always refresh)."""
         now = int(time.time())
@@ -464,6 +494,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
 
     def _test_payload(self) -> dict:
         return {
+            "path": API_PATH_TEST,
             "status": "ok",
             "message": "API is up and running",
             "endpoints": [
@@ -496,6 +527,30 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                 {"path": API_PATH_ALL, "optional_params": []},
                 {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
                 {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
+                {
+                    "path": API_PATH_STATUS_UPDATES_DELTA,
+                    "optional_params": [
+                        {
+                            "name": "after_id",
+                            "type": "int",
+                            "required": True,
+                            "description": "Return rows where id > after_id",
+                        },
+                        {
+                            "name": "limit",
+                            "type": "int",
+                            "default": 500,
+                            "max": 2000,
+                            "description": "Maximum rows per page",
+                        },
+                        {
+                            "name": "token",
+                            "type": "string",
+                            "required": False,
+                            "description": "Optional auth token when server token protection is enabled",
+                        },
+                    ],
+                },
                 {"path": API_PATH_REFRESH, "optional_params": []},
                 {"path": API_PATH_RESTART, "optional_params": []},
                 {
@@ -530,51 +585,51 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             "message": "Automation control API help",
             "commands": [
                 {
+                    "path": API_PATH_PAUSE,
                     "name": "status",
                     "method": "GET",
-                    "path": API_PATH_PAUSE,
                     "description": "Get current pause override state",
                     "example": f"{API_PATH_PAUSE}",
                 },
                 {
+                    "path": API_PATH_PAUSE,
                     "name": "pause_on",
                     "method": "POST",
-                    "path": API_PATH_PAUSE,
                     "description": "Enable pause override (forces desired power to 0)",
                     "example": f"{API_PATH_PAUSE}?state=on",
                 },
                 {
+                    "path": API_PATH_PAUSE,
                     "name": "pause_off",
                     "method": "POST",
-                    "path": API_PATH_PAUSE,
                     "description": "Disable pause override (resume schedule control)",
                     "example": f"{API_PATH_PAUSE}?state=off",
                 },
                 {
+                    "path": API_PATH_RESTART,
                     "name": "restart",
                     "method": "POST",
-                    "path": API_PATH_RESTART,
                     "description": "Request graceful restart of automation process",
                     "example": f"{API_PATH_RESTART}",
                 },
                 {
+                    "path": API_PATH_REFRESH,
                     "name": "refresh_schedule",
                     "method": "GET",
-                    "path": API_PATH_REFRESH,
                     "description": "Force schedule refresh from API",
                     "example": f"{API_PATH_REFRESH}",
                 },
                 {
+                    "path": API_PATH_LOG_LEVEL,
                     "name": "log_level_status",
                     "method": "GET",
-                    "path": API_PATH_LOG_LEVEL,
                     "description": "Get current runtime log level",
                     "example": f"{API_PATH_LOG_LEVEL}",
                 },
                 {
+                    "path": API_PATH_LOG_LEVEL,
                     "name": "log_level_set",
                     "method": "POST",
-                    "path": API_PATH_LOG_LEVEL,
                     "description": "Set runtime log level (DEBUG|INFO|WARNING|ERROR)",
                     "example": f"{API_PATH_LOG_LEVEL}?level=info",
                 },
@@ -586,17 +641,18 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if parsed.path not in ("/", "/api"):
             return False
         self._send_json({
+            "path": parsed.path,
             "ok": True,
             "message": "Automation API help",
             "endpoints": self._test_payload().get("endpoints", []),
             "control": self._control_help_payload().get("commands", []),
-        })
+        }, sort_keys=False)
         return True
 
     def _handle_test(self, path: str) -> bool:
         if path != API_PATH_TEST:
             return False
-        self._send_json(self._test_payload())
+        self._send_json(self._test_payload(), sort_keys=False)
         return True
 
     def _handle_wh_per_hour(self, path: str) -> bool:
@@ -608,6 +664,70 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return True
         data = compute_wh_per_hour(db_path, int(time.time()), WH_PER_HOUR_DAYS_DEFAULT)
         self._send_json(data, sort_keys=True)
+        return True
+
+    def _handle_status_updates_delta(self, parsed) -> bool:
+        if parsed.path != API_PATH_STATUS_UPDATES_DELTA:
+            return False
+
+        if not self._is_status_updates_delta_authorized(parsed):
+            self._send_json({"error": "Unauthorized"}, 401)
+            return True
+
+        query = parse_qs(parsed.query)
+        if "after_id" not in query or not query["after_id"]:
+            self._send_json({"error": "Missing required query parameter: after_id"}, 400)
+            return True
+
+        try:
+            after_id = int(query["after_id"][0])
+            if after_id < 0:
+                raise ValueError("after_id must be non-negative")
+        except (ValueError, TypeError):
+            self._send_json({"error": "Invalid after_id; expected non-negative integer"}, 400)
+            return True
+
+        limit = self._parse_non_negative_int_query(parsed, "limit", 500)
+        if limit is None or limit <= 0:
+            self._send_json({"error": "Invalid limit; expected positive integer"}, 400)
+            return True
+        limit = min(limit, 2000)
+
+        db_path = getattr(self.server, "db_path", None)
+        if not db_path or not os.path.exists(db_path):
+            self._send_json({"error": "Status updates database not available"}, 503)
+            return True
+
+        rows = []
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.execute(
+                    "SELECT id, type, old_value, new_value, p1_total_power, electric_level, timestamp "
+                    "FROM status_updates WHERE id > ? ORDER BY id ASC LIMIT ?",
+                    (after_id, limit + 1),
+                )
+                fetched = cur.fetchall()
+
+            has_more = len(fetched) > limit
+            selected = fetched[:limit]
+            rows = [dict(r) for r in selected]
+        except Exception as e:
+            self._send_json({"error": f"Failed to query status updates: {e}"}, 500)
+            return True
+
+        max_id_returned = after_id
+        if rows:
+            max_id_returned = int(rows[-1]["id"])
+
+        self._send_json(
+            {
+                "rows": rows,
+                "max_id_returned": max_id_returned,
+                "has_more": has_more,
+            },
+            sort_keys=False,
+        )
         return True
 
     def _handle_refresh(self, path: str) -> bool:
@@ -814,6 +934,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if self._handle_test(parsed.path):
             return
         if self._handle_wh_per_hour(parsed.path):
+            return
+        if self._handle_status_updates_delta(parsed):
             return
         if self._handle_refresh(parsed.path):
             return
@@ -1543,6 +1665,12 @@ class AutomationApp:
             self.http_server.pause_getter = lambda: self.pause_override_active
             self.http_server.pause_setter = self._set_pause_override
             self.http_server.controller = self.controller
+            token_cfg = self.schedule_controller.config.get("statusUpdatesDeltaApiToken", "")
+            env_token = os.getenv("STATUS_UPDATES_DELTA_API_TOKEN", "")
+            token = str(token_cfg).strip() if token_cfg is not None else ""
+            if not token and env_token is not None:
+                token = str(env_token).strip()
+            self.http_server.status_updates_delta_token = token or None
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
