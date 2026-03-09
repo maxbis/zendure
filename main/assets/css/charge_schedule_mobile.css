@@ -1179,7 +1179,7 @@ code {
     background: var(--bg-secondary);
     border-radius: 10px;
     width: 286px;
-    height: 320px;
+    height: 410px;
     max-width: calc(100vw - 24px);
     max-height: calc(100vh - 24px);
     padding: 0;
@@ -1284,7 +1284,8 @@ code {
 
 .price-graph-mobile-popup-body .price-graph-popup-spot-price,
 .price-graph-mobile-popup-body .price-graph-popup-schedule,
-.price-graph-mobile-popup-body .price-graph-popup-source {
+.price-graph-mobile-popup-body .price-graph-popup-source,
+.price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
     margin-top: 6px;
     line-height: 1.25;
 }
@@ -1341,9 +1342,52 @@ code {
 .price-graph-mobile-popup-body .price-graph-popup-price,
 .price-graph-mobile-popup-body .price-graph-popup-spot-price,
 .price-graph-mobile-popup-body .price-graph-popup-schedule,
-.price-graph-mobile-popup-body .price-graph-popup-source {
+.price-graph-mobile-popup-body .price-graph-popup-source,
+.price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
     position: relative;
     z-index: 2;
+}
+
+.price-graph-popup-estimate {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.price-graph-popup-estimate-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.76);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.price-graph-popup-estimate-values,
+.price-graph-popup-estimate-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 0.84rem;
+}
+
+.price-graph-popup-estimate-note {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.52);
+}
+
+.price-graph-popup-estimate-delta.charging {
+    color: #81c784;
+}
+
+.price-graph-popup-estimate-delta.discharging {
+    color: #ef9a9a;
+}
+
+.price-graph-popup-estimate-delta.neutral {
+    color: rgba(255, 255, 255, 0.78);
 }
 
 .price-graph-mobile-popup-hint {

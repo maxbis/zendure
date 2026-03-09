@@ -7,6 +7,7 @@
 const PRICE_PROXY_NO_DATA = 0.24;
 const POPUP_POWER_EFFICIENCY = 0.9;
 const POPUP_NETZERO_REFERENCE_W = 250;
+const POPUP_NETZERO_PLUS_REFERENCE_W = 300;
 
 /**
  * Interpolates between two RGB colors
@@ -137,7 +138,8 @@ function formatScheduleDisplayWithPercent(scheduleValue) {
         return `netzero${formatPopupPercent(pct, { prefix: '\u00b1' })}`;
     }
     if (normalized === 'netzero+' || normalized === 'net zero+') {
-        return 'netzero+';
+        const pct = powerToCapacityPercent(POPUP_NETZERO_PLUS_REFERENCE_W);
+        return `netzero+${formatPopupPercent(pct, { prefix: '+' })}`;
     }
 
     const num = Number(raw);
@@ -146,6 +148,171 @@ function formatScheduleDisplayWithPercent(scheduleValue) {
         return `${raw}${formatPopupPercent(pct)}`;
     }
     return raw;
+}
+
+function getPopupForecastBatteryState() {
+    const state = window.currentBatteryForecastState;
+    if (!state) return null;
+
+    const electricLevel = Number(state.electricLevel);
+    if (!Number.isFinite(electricLevel)) return null;
+
+    const minChargeLevelRaw = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
+        : 20;
+    const maxChargeLevelRaw = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
+        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
+        : 90;
+    const minChargeLevel = Math.max(0, Math.min(100, minChargeLevelRaw));
+    const maxChargeLevel = Math.max(minChargeLevel, Math.min(100, maxChargeLevelRaw));
+
+    return {
+        electricLevel: Math.max(0, Math.min(100, electricLevel)),
+        minChargeLevel,
+        maxChargeLevel
+    };
+}
+
+function estimateSchedulePowerForPopup(scheduleValue) {
+    if (scheduleValue === undefined || scheduleValue === null || scheduleValue === '') {
+        return 0;
+    }
+
+    if (typeof scheduleValue === 'string') {
+        const normalized = scheduleValue.trim().toLowerCase();
+        if (normalized === 'netzero' || normalized === 'net zero') {
+            return -POPUP_NETZERO_REFERENCE_W;
+        }
+        if (normalized === 'netzero+' || normalized === 'net zero+') {
+            return POPUP_NETZERO_PLUS_REFERENCE_W;
+        }
+    }
+
+    const numericValue = Number(scheduleValue);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function getPopupForecastUniqueBars() {
+    const uniqueBars = new Map();
+    const bars = document.querySelectorAll('.price-graph-bar[data-key][data-date][data-hour]');
+
+    bars.forEach((bar) => {
+        const key = bar.dataset.key;
+        if (!key) return;
+        if (!uniqueBars.has(key)) {
+            uniqueBars.set(key, bar);
+        }
+    });
+
+    return Array.from(uniqueBars.values()).sort((a, b) => {
+        const keyA = a.dataset.key || '';
+        const keyB = b.dataset.key || '';
+        return keyA.localeCompare(keyB);
+    });
+}
+
+function getPopupForecastForBar(targetBar) {
+    if (!targetBar) return null;
+
+    const batteryState = getPopupForecastBatteryState();
+    if (!batteryState) return null;
+
+    const allBars = getPopupForecastUniqueBars();
+    if (allBars.length === 0) return null;
+
+    const now = new Date();
+    let runningPercent = batteryState.electricLevel;
+    let targetForecast = null;
+
+    for (const bar of allBars) {
+        const dateStr = bar.dataset.date;
+        const hour = parseInt(bar.dataset.hour, 10);
+        if (!dateStr || Number.isNaN(hour)) continue;
+
+        const slotStart = new Date(
+            Number(dateStr.slice(0, 4)),
+            Number(dateStr.slice(4, 6)) - 1,
+            Number(dateStr.slice(6, 8)),
+            hour,
+            0,
+            0,
+            0
+        );
+        const slotEnd = new Date(slotStart.getTime() + (60 * 60 * 1000));
+
+        if (slotEnd <= now) {
+            continue;
+        }
+
+        const durationHours = slotStart <= now
+            ? Math.max(0, (slotEnd.getTime() - now.getTime()) / (60 * 60 * 1000))
+            : 1;
+
+        if (durationHours <= 0) {
+            continue;
+        }
+
+        const estimatedPowerW = estimateSchedulePowerForPopup(bar.dataset.scheduleValue);
+        const percentPerHour = powerToCapacityPercent(estimatedPowerW);
+        const rawDeltaPercent = percentPerHour == null ? 0 : percentPerHour * durationHours;
+        const signedDeltaPercent = estimatedPowerW < 0 ? -rawDeltaPercent : rawDeltaPercent;
+        const startPercent = runningPercent;
+        const endPercent = Math.max(
+            batteryState.minChargeLevel,
+            Math.min(batteryState.maxChargeLevel, startPercent + signedDeltaPercent)
+        );
+        const appliedDeltaPercent = endPercent - startPercent;
+
+        if (bar === targetBar) {
+            targetForecast = {
+                startPercent,
+                endPercent,
+                deltaPercent: appliedDeltaPercent,
+                estimatedPowerW,
+                durationHours,
+                minChargeLevel: batteryState.minChargeLevel,
+                maxChargeLevel: batteryState.maxChargeLevel,
+                isCurrentHour: slotStart <= now && slotEnd > now
+            };
+            break;
+        }
+
+        runningPercent = endPercent;
+    }
+
+    return targetForecast;
+}
+
+function formatPopupForecastHtml(targetBar) {
+    const forecast = getPopupForecastForBar(targetBar);
+    if (!forecast) return '';
+
+    const startLabel = forecast.isCurrentHour ? 'Now' : 'Start';
+    const endLabel = 'End';
+    const deltaPrefix = forecast.deltaPercent > 0 ? '+' : '';
+    const deltaClass = forecast.deltaPercent > 0
+        ? 'charging'
+        : (forecast.deltaPercent < 0 ? 'discharging' : 'neutral');
+    const powerPrefix = forecast.estimatedPowerW > 0 ? '+' : '';
+    const durationMinutes = Math.round(forecast.durationHours * 60);
+    const durationLabel = forecast.isCurrentHour
+        ? `Current hour, ${durationMinutes} min remaining`
+        : 'Full hour estimate';
+
+    return `
+        <div class="price-graph-popup-estimate">
+            <div class="price-graph-popup-estimate-title">Estimated battery level</div>
+            <div class="price-graph-popup-estimate-values">
+                <span>${startLabel}: ${forecast.startPercent.toFixed(1)}%</span>
+                <span>${endLabel}: ${forecast.endPercent.toFixed(1)}%</span>
+            </div>
+            <div class="price-graph-popup-estimate-meta">
+                <span class="price-graph-popup-estimate-delta ${deltaClass}">Δ ${deltaPrefix}${forecast.deltaPercent.toFixed(1)}%</span>
+                <span>@ ${powerPrefix}${Math.round(forecast.estimatedPowerW)} W</span>
+            </div>
+            <div class="price-graph-popup-estimate-note">${durationLabel}</div>
+        </div>
+    `;
 }
 
 function ensurePriceGraphPopup() {
@@ -159,6 +326,7 @@ function ensurePriceGraphPopup() {
         <div class="price-graph-popup-spot-price"></div>
         <div class="price-graph-popup-schedule"></div>
         <div class="price-graph-popup-source"></div>
+        <div class="price-graph-popup-estimate-wrap"></div>
     `;
     document.body.appendChild(popup);
 
@@ -221,6 +389,7 @@ function ensurePriceGraphMobilePopup() {
                     <div class="price-graph-popup-spot-price"></div>
                     <div class="price-graph-popup-schedule"></div>
                     <div class="price-graph-popup-source"></div>
+                    <div class="price-graph-popup-estimate-wrap"></div>
                 </div>
             </div>
             <div class="price-graph-mobile-popup-footer">
@@ -393,6 +562,7 @@ function renderPriceGraphMobilePopupContent() {
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
     const sourceEl = popup.querySelector('.price-graph-popup-source');
+    const estimateEl = popup.querySelector('.price-graph-popup-estimate-wrap');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
     const timeRange = formatHourRange(hourValue);
@@ -438,6 +608,9 @@ function renderPriceGraphMobilePopupContent() {
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
     if (sourceEl) {
         sourceEl.textContent = sourceLabel ? `Source: ${sourceLabel}` : '';
+    }
+    if (estimateEl) {
+        estimateEl.innerHTML = formatPopupForecastHtml(bar);
     }
 
     const close = () => {
@@ -574,6 +747,7 @@ function showPriceGraphPopup(bar, container) {
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
     const sourceEl = popup.querySelector('.price-graph-popup-source');
+    const estimateEl = popup.querySelector('.price-graph-popup-estimate-wrap');
 
     const hourValue = parseInt(bar.dataset.hour, 10);
     const timeRange = formatHourRange(hourValue);
@@ -619,6 +793,9 @@ function showPriceGraphPopup(bar, container) {
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
     if (sourceEl) {
         sourceEl.textContent = sourceLabel ? `Source: ${sourceLabel}` : '';
+    }
+    if (estimateEl) {
+        estimateEl.innerHTML = formatPopupForecastHtml(bar);
     }
 
     popup.style.display = 'block';

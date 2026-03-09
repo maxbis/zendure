@@ -515,6 +515,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
 
     // Handle error
     if (!zendureData || !zendureData.success) {
+        window.currentBatteryForecastState = null;
         const errorEl = document.createElement('div');
         errorEl.id = 'charge-status-error';
         errorEl.className = 'charge-status-error';
@@ -526,6 +527,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const properties = zendureData.data?.properties || zendureData.properties;
 
     if (!properties) {
+        window.currentBatteryForecastState = null;
         const emptyEl = document.createElement('div');
         emptyEl.id = 'charge-status-empty';
         emptyEl.className = 'charge-status-empty';
@@ -543,6 +545,11 @@ function renderChargeStatus(zendureData, p1Data = null) {
     const solarInputPower = properties.solarInputPower || 0;
     const inputLimit = properties.inputLimit || 0;
     const outputLimit = properties.outputLimit || 0;
+
+    window.currentBatteryForecastState = {
+        electricLevel,
+        timestamp: zendureData.timestamp || null
+    };
 
     // Calculate charge/discharge value
     const chargeDischargeValue = (outputPackPower > 0) ? outputPackPower : ((outputHomePower > 0) ? -outputHomePower : 0);
