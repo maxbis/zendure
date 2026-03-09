@@ -604,6 +604,36 @@ body.mobile-dark {
     padding: 12px;
 }
 
+.price-graph-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 8px;
+}
+
+.price-graph-zoom-toggle {
+    flex: none;
+    min-width: 52px;
+    min-height: 28px;
+    margin: 0;
+    padding: 4px 9px;
+    border: 1px solid rgba(141, 150, 110, 0.3);
+    border-radius: 999px;
+    background: rgba(191, 196, 128, 0.05);
+    color: #cbcf9d;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.price-graph-zoom-toggle[aria-pressed="true"] {
+    background: rgba(222, 168, 83, 0.12);
+    border-color: rgba(255, 182, 72, 0.42);
+    color: #f2c786;
+}
+
 .price-graph-row-mobile {
     display: flex;
     gap: 2px;
@@ -615,6 +645,23 @@ body.mobile-dark {
     position: relative;
     scrollbar-width: thin;
     min-width: 0;
+    scroll-behavior: smooth;
+    --price-graph-bar-width: 18px;
+    --price-graph-bar-gap: 2px;
+    --price-graph-label-size: 0.6rem;
+    --price-graph-price-size: 0.6rem;
+    --price-graph-hit-padding: 0px;
+}
+
+.price-graph-wrapper-mobile.price-graph-zoomed .price-graph-row-mobile {
+    gap: 6px;
+    height: 92px;
+    padding: 8px 6px;
+    --price-graph-bar-width: 36px;
+    --price-graph-bar-gap: 6px;
+    --price-graph-label-size: 0.72rem;
+    --price-graph-price-size: 0.72rem;
+    --price-graph-hit-padding: 4px;
 }
 
 .price-graph-row-mobile::-webkit-scrollbar {
@@ -638,8 +685,8 @@ body.mobile-dark {
 /* Style existing price-graph-bar classes within mobile container */
 .price-graph-row-mobile .price-graph-bar {
     flex: none;
-    width: 18px;
-    min-width: 18px;
+    width: var(--price-graph-bar-width);
+    min-width: var(--price-graph-bar-width);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -649,6 +696,8 @@ body.mobile-dark {
     transition: all 0.2s ease;
     border-radius: 4px 4px 0 0;
     padding: 0;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .price-graph-row-mobile .price-graph-bar.has-schedule::after {
@@ -691,11 +740,6 @@ body.mobile-dark {
     background: #cbe100;
 }
 
-.price-graph-row-mobile .price-graph-bar:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-}
-
 .price-graph-row-mobile .price-graph-bar.price-current {
     background: rgba(255, 152, 0, 0.2);
     border: 2px solid #ff9800;
@@ -713,7 +757,7 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar-label {
-    font-size: 0.6rem;
+    font-size: var(--price-graph-label-size);
     color: var(--text-secondary);
     margin-top: 4px;
     font-weight: 500;
@@ -726,7 +770,7 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar-price {
-    font-size: 0.6rem;
+    font-size: var(--price-graph-price-size);
     color: #bfc280;
     margin-top: 2px;
     font-weight: 400;
@@ -737,6 +781,35 @@ body.mobile-dark {
 .price-graph-row-mobile .price-graph-bar.price-current .price-graph-bar-price {
     color: #ff9800;
     font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .price-graph-row-mobile .price-graph-bar:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+    }
+}
+
+@media (pointer: coarse) {
+    .price-graph-row-mobile .price-graph-bar::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        bottom: -4px;
+        left: calc(-1 * var(--price-graph-hit-padding));
+        right: calc(-1 * var(--price-graph-hit-padding));
+    }
+
+    .price-graph-zoom-toggle {
+        min-height: 32px;
+        padding-inline: 10px;
+    }
+}
+
+@media (min-width: 769px) and (pointer: fine) {
+    .price-graph-zoom-toggle {
+        display: none;
+    }
 }
 
 /* Energy Graph - Mobile (dark mode, graph only) */
@@ -1177,13 +1250,13 @@ code {
 
 .price-graph-mobile-popup-dialog {
     background: var(--bg-secondary);
-    border-radius: 10px;
-    width: 286px;
-    height: 410px;
-    max-width: calc(100vw - 24px);
-    max-height: calc(100vh - 24px);
+    border-radius: 14px;
+    width: 360px;
+    min-height: 500px;
+    max-width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
     padding: 0;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.56);
     border: 1px solid var(--border-color);
     transform: scale(0.9) translateY(-20px);
     opacity: 0;
@@ -1239,16 +1312,16 @@ code {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 9px 12px;
+    padding: 14px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: linear-gradient(180deg, rgba(30, 30, 30, 0.22) 0%, rgba(18, 18, 18, 0.14) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
 }
 
 .price-graph-mobile-popup-title {
-    font-size: 0.9rem;
+    font-size: 1.2rem;
     font-weight: 600;
     color: #e8e8e8;
     line-height: 1.2;
@@ -1257,9 +1330,11 @@ code {
 
 .price-graph-mobile-popup-close {
     position: absolute;
-    right: 12px;
+    right: 16px;
     top: 50%;
     transform: translateY(-50%);
+    font-size: 1.7rem;
+    line-height: 1;
 }
 
 .price-graph-mobile-popup-close:hover,
@@ -1269,25 +1344,26 @@ code {
 
 .price-graph-mobile-popup-body {
     position: relative;
-    padding: 12px;
+    padding: 18px;
     flex: 1 1 auto;
     overflow-y: auto;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-price {
-    font-size: 1.2rem;
+    font-size: 2rem;
     font-weight: 700;
     color: #a6c400;
     /* color: var(--text-primary); */
-    margin-bottom: 2px;
+    margin-bottom: 8px;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-spot-price,
 .price-graph-mobile-popup-body .price-graph-popup-schedule,
 .price-graph-mobile-popup-body .price-graph-popup-source,
 .price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
-    margin-top: 6px;
-    line-height: 1.25;
+    margin-top: 10px;
+    line-height: 1.38;
+    font-size: 1.05rem;
 }
 
 .price-graph-mobile-popup-nav {
@@ -1349,14 +1425,14 @@ code {
 }
 
 .price-graph-popup-estimate {
-    padding: 8px 10px;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.045);
     border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .price-graph-popup-estimate-title {
-    font-size: 0.72rem;
+    font-size: 0.82rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.76);
     text-transform: uppercase;
@@ -1368,13 +1444,13 @@ code {
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    margin-top: 6px;
-    font-size: 0.84rem;
+    margin-top: 8px;
+    font-size: 0.96rem;
 }
 
 .price-graph-popup-estimate-note {
-    margin-top: 6px;
-    font-size: 0.72rem;
+    margin-top: 8px;
+    font-size: 0.82rem;
     color: rgba(255, 255, 255, 0.52);
 }
 
@@ -1391,8 +1467,8 @@ code {
 }
 
 .price-graph-mobile-popup-hint {
-    margin-top: 2px;
-    font-size: 0.64rem;
+    margin-top: 4px;
+    font-size: 0.78rem;
     color: rgba(255, 255, 255, 0.42);
     text-align: center;
 }
@@ -1403,21 +1479,21 @@ code {
 } */
 
 .price-graph-mobile-popup-footer {
-    padding: 14px 12px 10px;
+    padding: 18px 18px 14px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     background: linear-gradient(180deg, rgba(12, 12, 12, 0.34) 0%, rgba(6, 6, 6, 0.46) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 12px 22px rgba(0, 0, 0, 0.2);
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .price-graph-mobile-popup-footer .btn {
     width: 100%;
-    padding: 7px 12px;
-    font-size: 0.96rem;
+    padding: 12px 14px;
+    font-size: 1.05rem;
 }
 
 .price-graph-mobile-popup-netzero,
@@ -1426,10 +1502,10 @@ code {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
     white-space: nowrap;
-    font-size: 0.9rem;
+    font-size: 1rem;
 }
 
 .price-graph-mobile-popup-footer .price-graph-mobile-popup-netzero {
@@ -1460,8 +1536,30 @@ code {
 
 .price-graph-mobile-popup-actions {
     display: flex;
-    gap: 12px;
+    gap: 14px;
     align-items: stretch;
+}
+
+@media (max-width: 420px) {
+    .price-graph-mobile-popup-dialog {
+        width: min(360px, calc(100vw - 16px));
+        min-height: 460px;
+    }
+
+    .price-graph-mobile-popup-title {
+        font-size: 1.08rem;
+    }
+
+    .price-graph-mobile-popup-body .price-graph-popup-price {
+        font-size: 1.72rem;
+    }
+
+    .price-graph-mobile-popup-body .price-graph-popup-spot-price,
+    .price-graph-mobile-popup-body .price-graph-popup-schedule,
+    .price-graph-mobile-popup-body .price-graph-popup-source,
+    .price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
+        font-size: 0.98rem;
+    }
 }
 
 .price-graph-mobile-popup-actions .price-graph-mobile-popup-clear {

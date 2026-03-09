@@ -358,6 +358,151 @@ function isPriceGraphMobile() {
     return document.body.classList.contains('mobile-dark') || window.innerWidth <= 768;
 }
 
+const PRICE_GRAPH_MOBILE_ZOOMED_CLASS = 'price-graph-zoomed';
+let priceGraphMobileZoomEnabled = false;
+
+function getPriceGraphMobileWrapper() {
+    return document.querySelector('.price-graph-wrapper-mobile');
+}
+
+function getPriceGraphMobileRows() {
+    return Array.from(document.querySelectorAll('.price-graph-row-mobile'));
+}
+
+function getPriceGraphZoomButtons() {
+    return Array.from(document.querySelectorAll('[data-price-graph-zoom-toggle]'));
+}
+
+function getPriceGraphMobileCenterSnapshot(container) {
+    if (!container) return null;
+
+    const bars = Array.from(container.querySelectorAll('.price-graph-bar'));
+    if (bars.length === 0) {
+        return {
+            ratio: container.scrollWidth > container.clientWidth
+                ? (container.scrollLeft / Math.max(1, container.scrollWidth - container.clientWidth))
+                : 0
+        };
+    }
+
+    const visibleCenter = container.scrollLeft + (container.clientWidth / 2);
+    let closestBar = bars[0];
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    bars.forEach((bar) => {
+        const barLeft = bar.offsetLeft;
+        const barWidth = bar.offsetWidth || 1;
+        const barCenter = barLeft + (barWidth / 2);
+        const distance = Math.abs(barCenter - visibleCenter);
+        if (distance < closestDistance) {
+            closestBar = bar;
+            closestDistance = distance;
+        }
+    });
+
+    if (!closestBar) return null;
+
+    const barLeft = closestBar.offsetLeft;
+    const barWidth = closestBar.offsetWidth || 1;
+    const relativeOffset = (visibleCenter - barLeft) / barWidth;
+
+    return {
+        key: closestBar.dataset.key || '',
+        ratio: container.scrollWidth > container.clientWidth
+            ? (container.scrollLeft / Math.max(1, container.scrollWidth - container.clientWidth))
+            : 0,
+        offsetRatio: Math.max(0, Math.min(1, relativeOffset))
+    };
+}
+
+function restorePriceGraphMobileCenter(container, snapshot) {
+    if (!container || !snapshot) return;
+
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    if (maxScrollLeft === 0) {
+        container.scrollLeft = 0;
+        return;
+    }
+
+    if (snapshot.key) {
+        const targetBar = container.querySelector(`.price-graph-bar[data-key="${snapshot.key}"]`);
+        if (targetBar) {
+            const barLeft = targetBar.offsetLeft;
+            const barWidth = targetBar.offsetWidth || 1;
+            const targetCenter = barLeft + (barWidth * (snapshot.offsetRatio ?? 0.5));
+            container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, targetCenter - (container.clientWidth / 2)));
+            return;
+        }
+    }
+
+    const targetRatio = typeof snapshot.ratio === 'number' ? snapshot.ratio : 0;
+    container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, maxScrollLeft * targetRatio));
+}
+
+function syncPriceGraphMobileZoomUi() {
+    const wrapper = getPriceGraphMobileWrapper();
+    if (!wrapper) return;
+
+    wrapper.classList.toggle(PRICE_GRAPH_MOBILE_ZOOMED_CLASS, priceGraphMobileZoomEnabled);
+
+    getPriceGraphZoomButtons().forEach((button) => {
+        button.setAttribute('aria-pressed', priceGraphMobileZoomEnabled ? 'true' : 'false');
+        button.textContent = priceGraphMobileZoomEnabled ? 'Normal' : 'Zoom';
+        button.setAttribute(
+            'aria-label',
+            priceGraphMobileZoomEnabled ? 'Return price bars to normal size' : 'Zoom in price bars'
+        );
+    });
+}
+
+function togglePriceGraphMobileZoom(preferredContainer) {
+    if (!isPriceGraphMobile()) return;
+
+    const rows = getPriceGraphMobileRows();
+    const snapshots = rows.map((container) => ({
+        container,
+        snapshot: getPriceGraphMobileCenterSnapshot(container)
+    }));
+
+    priceGraphMobileZoomEnabled = !priceGraphMobileZoomEnabled;
+    syncPriceGraphMobileZoomUi();
+
+    const anchorContainer = preferredContainer || rows[0] || null;
+    if (anchorContainer) {
+        hidePriceGraphPopup();
+        hidePriceGraphMobilePopup();
+    }
+
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            snapshots.forEach(({ container, snapshot }) => {
+                restorePriceGraphMobileCenter(container, snapshot);
+            });
+        });
+    });
+}
+
+function initPriceGraphMobileZoomControls() {
+    const wrapper = getPriceGraphMobileWrapper();
+    if (!wrapper) return;
+
+    getPriceGraphZoomButtons().forEach((button) => {
+        if (button.dataset.zoomBound === 'true') return;
+        button.dataset.zoomBound = 'true';
+        button.addEventListener('click', () => {
+            const containerIds = (button.getAttribute('aria-controls') || '')
+                .split(/\s+/)
+                .filter(Boolean);
+            const targetContainer = containerIds.length > 0
+                ? document.getElementById(containerIds[0])
+                : null;
+            togglePriceGraphMobileZoom(targetContainer);
+        });
+    });
+
+    syncPriceGraphMobileZoomUi();
+}
+
 let priceGraphMobilePopup = null;
 let priceGraphMobilePopupEscapeHandler = null;
 let priceGraphMobilePopupResizeHandler = null;
@@ -1351,6 +1496,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         const pricesToRender = tomorrowPrices || {};
         renderPriceRow(pricesToRender, tomorrowDateStr, tomorrowContainerMobile, false);
     }
+
+    initPriceGraphMobileZoomControls();
     
     // Auto-scroll to current time (center it) for desktop view.
     // Use the today container and its nearest price-graph-container instead of the first match on the page.
@@ -1464,3 +1611,7 @@ async function fetchAndRenderPrices(priceApiUrl, scheduleEntries, editModal) {
         renderPriceGraph({ today: {}, tomorrow: {}, error: errorMessage }, currentHour, scheduleEntries, editModal);
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    initPriceGraphMobileZoomControls();
+});
