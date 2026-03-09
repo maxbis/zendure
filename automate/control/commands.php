@@ -17,7 +17,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => 'Confirm Restart',
             'confirmBody' => 'This restarts the automation process immediately. Active control stops briefly during restart.',
             'confirmAction' => 'Restart',
-            'buttonClass' => 'btn-danger',
+            'buttonClass' => 'btn-process',
             'expect_disconnect' => true,
         ],
         'pause_on' => [
@@ -43,7 +43,20 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-primary',
+            'buttonClass' => 'btn-resume',
+            'expect_disconnect' => false,
+        ],
+        'refresh_schedule' => [
+            'method' => 'GET',
+            'path' => '/api/refresh',
+            'label' => 'Refresh Schedule',
+            'description' => 'Force schedule refresh from API.',
+            'group' => 'automation',
+            'order' => 30,
+            'confirmTitle' => '',
+            'confirmBody' => '',
+            'confirmAction' => '',
+            'buttonClass' => 'btn-refresh',
             'expect_disconnect' => false,
         ],
         'log_debug' => [
@@ -56,7 +69,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-primary',
+            'buttonClass' => 'btn-debug',
             'expect_disconnect' => false,
         ],
         'log_info' => [
@@ -69,7 +82,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-primary',
+            'buttonClass' => 'btn-info',
             'expect_disconnect' => false,
         ],
         'log_warning' => [

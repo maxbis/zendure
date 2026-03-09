@@ -741,7 +741,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         try:
             schedule_controller.fetch_schedule()
             status_api.post_update(EVENT_TYPE_RESCAN, None, None)
-            self._send_json({"ok": True})
+            self._send_json({"ok": True, "message": "Schedule refreshed"})
         except Exception as e:
             self._send_json({"ok": False, "error": str(e)}, 500)
         return True

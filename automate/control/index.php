@@ -105,15 +105,75 @@ foreach ($groupedCommands as $groupKey => $commands) {
       font-size: 14px;
       min-height: 34px;
     }
+    .btn-process {
+      background: #8d4a1f;
+      border-color: #c96e34;
+      color: #fff1e8;
+    }
+    .btn-process:hover:not(:disabled) {
+      background: #a95a24;
+      border-color: #df8245;
+      color: #fff7f1;
+    }
+    .btn-resume {
+      background: #1f6f63;
+      border-color: #2d9d8d;
+      color: #e7fffa;
+    }
+    .btn-resume:hover:not(:disabled) {
+      background: #278575;
+      border-color: #35b09f;
+      color: #f4fffd;
+    }
+    .btn-refresh {
+      background: #2d6ea3;
+      border-color: #5aa7e7;
+      color: #eef8ff;
+    }
+    .btn-refresh:hover:not(:disabled) {
+      background: #377fb9;
+      border-color: #78bbf1;
+      color: #f7fbff;
+    }
+    .btn-debug {
+      background: #465f8d;
+      border-color: #6988be;
+      color: #eff4ff;
+    }
+    .btn-debug:hover:not(:disabled) {
+      background: #5470a3;
+      border-color: #84a1d4;
+      color: #f7faff;
+    }
+    .btn-info {
+      background: #477fba;
+      border-color: #6cb0ef;
+      color: #f2f9ff;
+    }
+    .btn-info:hover:not(:disabled) {
+      background: #5692d0;
+      border-color: #86c0f5;
+      color: #fbfdff;
+    }
     .btn-warning {
-      background: #68491f;
-      border-color: #9b6a2a;
-      color: #ffd27a;
+      background: #7a5618;
+      border-color: #bc8525;
+      color: #ffe09a;
     }
     .btn-warning:hover:not(:disabled) {
-      background: #8b5f24;
-      border-color: #bf7f2f;
-      color: #ffe3a5;
+      background: #94691d;
+      border-color: #d89b33;
+      color: #ffebbd;
+    }
+    .btn-danger {
+      background: #8d2926;
+      border-color: #c4413d;
+      color: #fff0ef;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: #a9322f;
+      border-color: #dd5955;
+      color: #fff7f6;
     }
     .command-status {
       margin-top: 14px;
@@ -121,7 +181,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
       color: var(--text-secondary);
       min-height: 1.2em;
     }
-    .command-status.ok { color: #81c784; }
+    .command-status.ok { color: #72b77b; }
     .command-status.err { color: #e57373; }
     .command-status.warn { color: #ffb74d; }
 
