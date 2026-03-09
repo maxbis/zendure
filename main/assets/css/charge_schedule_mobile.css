@@ -659,8 +659,8 @@ body.mobile-dark {
     padding: 8px 6px;
     --price-graph-bar-width: 36px;
     --price-graph-bar-gap: 6px;
-    --price-graph-label-size: 0.72rem;
-    --price-graph-price-size: 0.72rem;
+    --price-graph-label-size: calc(0.72rem + 2px);
+    --price-graph-price-size: calc(0.72rem + 4px);
     --price-graph-hit-padding: 4px;
 }
 
