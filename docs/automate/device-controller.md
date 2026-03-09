@@ -5,10 +5,10 @@ This file provides a set of Python classes designed to interact with and control
 ## Global Constants
 
 -   `TEST_MODE` (bool): Loaded from `config.json` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
--   `MIN_CHARGE_LEVEL` (int): The battery percentage below which the system will stop discharging. Defaults to `20`.
--   `MAX_CHARGE_LEVEL` (int): The battery percentage above which the system will stop charging. Defaults to `90`.
--   `MAX_DISCHARGE_POWER` (int): Maximum allowed power feed in watts for discharge. Defaults to `800`.
--   `MAX_CHARGE_POWER` (int): Maximum allowed power feed in watts for charge. Defaults to `1200`.
+-   `MIN_CHARGE_LEVEL` (int): Config-driven minimum battery percentage below which the system will stop discharging. Falls back to `20` if the key is missing.
+-   `MAX_CHARGE_LEVEL` (int): Config-driven maximum battery percentage above which the system will stop charging. Falls back to `90` if the key is missing.
+-   `MAX_DISCHARGE_POWER` (int): Config-driven maximum allowed power feed in watts for discharge. Falls back to `800` if the key is missing.
+-   `MAX_CHARGE_POWER` (int): Config-driven maximum allowed power feed in watts for charge. Falls back to `1200` if the key is missing.
 
 ## `PowerResult` Data Class
 

@@ -45,6 +45,15 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 ---
 
+## Power caps
+
+| Key | Type | Description | Where used |
+|-----|------|-------------|------------|
+| **MAX_DISCHARGE_POWER** | number | Maximum allowed discharge power in watts. Outgoing negative power-feed commands are clamped to this limit. | `device_controller.py`: `BaseDeviceController` (`max_discharge_power`) and `ZendureDeviceController.send_power_feed()`. |
+| **MAX_CHARGE_POWER** | number | Maximum allowed charge power in watts. Outgoing positive power-feed commands are clamped to this limit. | Same as `MAX_DISCHARGE_POWER`. |
+
+---
+
 ## Power feed tuning
 
 | Key | Type | Description | Where used |

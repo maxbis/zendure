@@ -30,8 +30,8 @@ from config_loader import load_config as load_config_json
 TEST_MODE = False               # If True, operations are simulated but not applied
 MIN_CHARGE_LEVEL = 20          # Legacy default min SoC (%) (config key: MIN_CHARGE_LEVEL)
 MAX_CHARGE_LEVEL = 90          # Legacy default max SoC (%) (config key: MAX_CHARGE_LEVEL)
-MAX_DISCHARGE_POWER = 800      # Maximum allowed power feed in watts
-MAX_CHARGE_POWER = 1200        # Maximum allowed power feed in watts
+MAX_DISCHARGE_POWER = 1000      # Legacy default max discharge power (config key: MAX_DISCHARGE_POWER)
+MAX_CHARGE_POWER = 1200        # Legacy default max charge power (config key: MAX_CHARGE_POWER)
 
 
 # ============================================================================
@@ -177,14 +177,16 @@ class BaseDeviceController:
 
         # Battery SoC limits (single source of truth: config.jsonc)
         # Fallbacks are the legacy defaults (20/90) when keys are missing.
-        def _parse_soc(key: str, default: int) -> int:
+        def _parse_int_config(key: str, default: int) -> int:
             try:
                 return int(self.config.get(key, default))
             except (TypeError, ValueError):
                 return int(default)
 
-        min_soc = _parse_soc("MIN_CHARGE_LEVEL", MIN_CHARGE_LEVEL)
-        max_soc = _parse_soc("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
+        min_soc = _parse_int_config("MIN_CHARGE_LEVEL", MIN_CHARGE_LEVEL)
+        max_soc = _parse_int_config("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
+        max_discharge_power = _parse_int_config("MAX_DISCHARGE_POWER", MAX_DISCHARGE_POWER)
+        max_charge_power = _parse_int_config("MAX_CHARGE_POWER", MAX_CHARGE_POWER)
 
         # Clamp to [0, 100]
         min_soc = max(0, min(100, min_soc))
@@ -196,6 +198,8 @@ class BaseDeviceController:
 
         self.min_charge_level = min_soc
         self.max_charge_level = max_soc
+        self.max_discharge_power = max(0, max_discharge_power)
+        self.max_charge_power = max(0, max_charge_power)
 
     def _find_config_file(self) -> Path:
         """
@@ -740,12 +744,12 @@ class AutomateController(BaseDeviceController):
             self.log('warning', f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge")
             power_feed = 0
 
-        if power_feed < -MAX_DISCHARGE_POWER:
-            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_DISCHARGE_POWER ({MAX_DISCHARGE_POWER} W), limiting discharge.")
-            power_feed = -MAX_DISCHARGE_POWER
-        if power_feed > MAX_CHARGE_POWER:
-            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_CHARGE_POWER ({MAX_CHARGE_POWER} W), limiting charge")
-            power_feed = MAX_CHARGE_POWER
+        if power_feed < -self.max_discharge_power:
+            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_DISCHARGE_POWER ({self.max_discharge_power} W), limiting discharge.")
+            power_feed = -self.max_discharge_power
+        if power_feed > self.max_charge_power:
+            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_CHARGE_POWER ({self.max_charge_power} W), limiting charge")
+            power_feed = self.max_charge_power
 
         # Check if the new power value is the same as the previous one
         if self.previous_power is not None and power_feed == self.previous_power:
