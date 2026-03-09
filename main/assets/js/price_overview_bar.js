@@ -7,7 +7,7 @@
 const PRICE_PROXY_NO_DATA = 0.24;
 const POPUP_POWER_EFFICIENCY = 0.9;
 const POPUP_NETZERO_REFERENCE_W = 250;
-const POPUP_NETZERO_PLUS_REFERENCE_W = 300;
+const POPUP_NETZERO_PLUS_REFERENCE_W = 350;
 
 /**
  * Interpolates between two RGB colors
