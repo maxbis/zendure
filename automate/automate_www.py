@@ -2085,6 +2085,10 @@ class AutomationApp:
             f"   Battery SoC limits: MIN_CHARGE_LEVEL={self.controller.min_charge_level}%, "
             f"MAX_CHARGE_LEVEL={self.controller.max_charge_level}%"
         )
+        self.logger.info(
+            f"   Power caps: MAX_DISCHARGE_POWER={self.controller.max_discharge_power} W, "
+            f"MAX_CHARGE_POWER={self.controller.max_charge_power} W"
+        )
         # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning(
