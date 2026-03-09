@@ -19,19 +19,19 @@ if (!$todayDt) {
 }
 $tomorrow_modified = $todayDt->modify('+1 day')->format('Y-m-d');
 ?>
-<div class="price-graph-toolbar">
-    <button
-        type="button"
-        class="price-graph-zoom-toggle"
-        data-price-graph-zoom-toggle
-        aria-pressed="false"
-        aria-controls="price-graph-today price-graph-tomorrow-mobile">
-        Zoom
-    </button>
-</div>
 <div class="price-cards">
     <div class="card">
-        <h3 class="card-header">💲 Today's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($today_modified); ?>)</span></h3>
+        <div class="price-graph-card-header">
+            <h3 class="card-header">💲 Today's Prices <span style="font-size: 0.85rem; color: var(--text-tertiary);">(<?= htmlspecialchars($today_modified); ?>)</span></h3>
+            <button
+                type="button"
+                class="price-graph-zoom-toggle"
+                data-price-graph-zoom-toggle
+                aria-pressed="false"
+                aria-controls="price-graph-today price-graph-tomorrow-mobile">
+                Zoom
+            </button>
+        </div>
         <div class="price-graph-row-mobile" id="price-graph-today"></div>
     </div>
     <div class="card" id="tomorrow-price-card-mobile" style="display: none;">

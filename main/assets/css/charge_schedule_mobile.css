@@ -604,18 +604,24 @@ body.mobile-dark {
     padding: 12px;
 }
 
-.price-graph-toolbar {
+.price-graph-card-header {
     display: flex;
+    align-items: flex-start;
     justify-content: flex-end;
-    margin: 0 0 8px;
+    gap: 10px;
+}
+
+.price-graph-card-header .card-header {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .price-graph-zoom-toggle {
     flex: none;
     min-width: 52px;
-    min-height: 28px;
-    margin: 0;
-    padding: 4px 9px;
+    min-height: 24px;
+    margin: -6px 0 0;
+    padding: 1px 9px;
     border: 1px solid rgba(141, 150, 110, 0.3);
     border-radius: 999px;
     background: rgba(191, 196, 128, 0.05);
@@ -801,7 +807,7 @@ body.mobile-dark {
     }
 
     .price-graph-zoom-toggle {
-        min-height: 32px;
+        min-height: 28px;
         padding-inline: 10px;
     }
 }

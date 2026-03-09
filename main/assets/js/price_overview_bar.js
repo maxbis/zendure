@@ -439,6 +439,34 @@ function restorePriceGraphMobileCenter(container, snapshot) {
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, maxScrollLeft * targetRatio));
 }
 
+function scrollPriceGraphMobileRowToCurrentHour(container) {
+    if (!container) return;
+
+    const currentBar = container.querySelector('.price-graph-bar.price-current');
+    if (!currentBar) {
+        if (typeof window.scrollPriceGraphToCurrent === 'function') {
+            window.scrollPriceGraphToCurrent();
+        }
+        return;
+    }
+
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    const barLeft = currentBar.offsetLeft;
+    const barWidth = currentBar.offsetWidth || currentBar.clientWidth || 1;
+    const targetLeft = barLeft - (container.clientWidth / 2) + (barWidth / 2);
+
+    const nextLeft = Math.max(0, Math.min(maxScrollLeft, targetLeft));
+
+    if (typeof container.scrollTo === 'function') {
+        container.scrollTo({
+            left: nextLeft,
+            behavior: 'smooth'
+        });
+    } else {
+        container.scrollLeft = nextLeft;
+    }
+}
+
 function syncPriceGraphMobileZoomUi() {
     const wrapper = getPriceGraphMobileWrapper();
     if (!wrapper) return;
@@ -475,9 +503,17 @@ function togglePriceGraphMobileZoom(preferredContainer) {
 
     window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
-            snapshots.forEach(({ container, snapshot }) => {
-                restorePriceGraphMobileCenter(container, snapshot);
-            });
+            if (priceGraphMobileZoomEnabled) {
+                const todayContainer = document.getElementById('price-graph-today');
+                scrollPriceGraphMobileRowToCurrentHour(todayContainer);
+                window.setTimeout(() => {
+                    scrollPriceGraphMobileRowToCurrentHour(todayContainer);
+                }, 180);
+            } else {
+                snapshots.forEach(({ container, snapshot }) => {
+                    restorePriceGraphMobileCenter(container, snapshot);
+                });
+            }
         });
     });
 }
