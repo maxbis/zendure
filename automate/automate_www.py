@@ -1524,7 +1524,7 @@ class AutomationApp:
         self.stop_posted = False
         self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
-        self.power_feed_max_delta = 2400
+        self.power_feed_max_delta = 300
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self.zero_count_threshold_standby = ZERO_COUNT_THRESHOLD_STANDBY
         self._runtime_condition_warning_cache: set[str] = set()
