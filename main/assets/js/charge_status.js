@@ -55,6 +55,28 @@ function showNoBackendDialog() {
     }
 }
 
+function updateGridFastIndicator() {
+    const indicator = document.querySelector('[data-role="grid-fast-indicator"]');
+    if (!indicator) return;
+
+    const isFastModeActive = !document.hidden && !noBackendDialogShown && remainingBoostTicks > 0 && activeRefreshIntervalMs === BOOST_REFRESH_INTERVAL_MS;
+    indicator.classList.toggle('fast-refresh-active', isFastModeActive);
+}
+
+function bindGridFastRefreshTrigger() {
+    const trigger = document.querySelector('[data-role="grid-fast-refresh-trigger"]');
+    if (!trigger || trigger.dataset.fastRefreshBound === 'true') {
+        return;
+    }
+
+    trigger.dataset.fastRefreshBound = 'true';
+    trigger.addEventListener('click', () => {
+        if (typeof window.restartFastRefreshBurst === 'function') {
+            window.restartFastRefreshBurst(true);
+        }
+    });
+}
+
 function ensureNextScheduleRefreshAt() {
     if (nextScheduleRefreshAt === null) {
         nextScheduleRefreshAt = Date.now() + SCHEDULE_REFRESH_INTERVAL_MS;
@@ -467,6 +489,7 @@ function toggleChargeStatusDetails() {
  */
 function startAutoRefresh() {
     if (noBackendDialogShown) {
+        updateGridFastIndicator();
         return;
     }
 
@@ -479,6 +502,7 @@ function startAutoRefresh() {
     // Only start interval if page is visible
     if (!document.hidden) {
         ensureNextScheduleRefreshAt();
+        updateGridFastIndicator();
 
         autoRefreshIntervalId = setInterval(() => {
             // Double-check page is still visible before refreshing
@@ -500,6 +524,7 @@ function startAutoRefresh() {
                     if (remainingBoostTicks === 0) {
                         activeRefreshIntervalMs = NORMAL_REFRESH_INTERVAL_MS;
                         console.log('⏱️ Fast refresh burst completed; returning to 20-second interval');
+                        updateGridFastIndicator();
                         startAutoRefresh();
                     }
                 }
@@ -511,6 +536,8 @@ function startAutoRefresh() {
         }, activeRefreshIntervalMs);
 
         console.log('⏰ Auto-refresh interval started (every ' + (activeRefreshIntervalMs / 1000) + ' seconds)');
+    } else {
+        updateGridFastIndicator();
     }
 }
 
@@ -521,6 +548,7 @@ function startAutoRefresh() {
 function restartFastRefreshBurst(immediateRefresh = false) {
     remainingBoostTicks = BOOST_TICK_COUNT;
     activeRefreshIntervalMs = BOOST_REFRESH_INTERVAL_MS;
+    updateGridFastIndicator();
 
     if (document.hidden || noBackendDialogShown) {
         return;
@@ -546,6 +574,7 @@ function stopAutoRefresh() {
         autoRefreshIntervalId = null;
         console.log('⏸️ Auto-refresh interval stopped');
     }
+    updateGridFastIndicator();
 }
 
 /**
@@ -558,6 +587,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (noBackendRetryBtn) {
         noBackendRetryBtn.addEventListener('click', () => { location.reload(); });
     }
+
+    bindGridFastRefreshTrigger();
+    updateGridFastIndicator();
 
     // Track initial state
     wasPageHidden = document.hidden;

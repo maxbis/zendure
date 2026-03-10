@@ -639,6 +639,11 @@ body.mobile-dark .charge-status-mobile .charge-status-box-content {
     margin: 0;
 }
 
+.charge-status-details-icon {
+    display: inline-block;
+    transform-origin: 50% 60%;
+}
+
 .charge-status-details-header .charge-refresh-btn {
     margin-left: auto;
 }
@@ -654,6 +659,40 @@ body.mobile-dark .charge-status-details-mobile .charge-power-box {
     background: var(--bg-tertiary);
     border-color: var(--border-color);
     border-radius: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-power-box:active {
+    transform: scale(0.995);
+}
+
+body.mobile-dark .charge-status-details-mobile .charge-status-details-icon.fast-refresh-active {
+    animation: grid-fast-indicator-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes grid-fast-indicator-breathe {
+    0%,
+    100% {
+        opacity: 0.85;
+        transform: scale(1);
+        text-shadow: none;
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+        text-shadow: 0 0 8px rgba(66, 165, 245, 0.35);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.mobile-dark .charge-status-details-mobile .charge-power-box {
+        transition: none;
+    }
+
+    body.mobile-dark .charge-status-details-mobile .charge-status-details-icon.fast-refresh-active {
+        animation: none;
+    }
 }
 
 body.mobile-dark .charge-status-details-mobile .charge-power-label {
