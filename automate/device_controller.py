@@ -701,7 +701,7 @@ class AutomateController(BaseDeviceController):
         if p1_power is None:
             raise ValueError("P1 meter data supplied by the caller is missing 'total_power'")
 
-        self.log('info', f"P1 power (grid-status): {p1_power}")
+        self.log('debug', f"P1 power (grid-status): {p1_power}")
 
         # Read Zendure state
         reader = get_reader(self.config_path)
