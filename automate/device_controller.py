@@ -201,6 +201,9 @@ class BaseDeviceController:
         self.max_discharge_power = max(0, max_discharge_power)
         self.max_charge_power = max(0, max_charge_power)
 
+        # Track last emitted log message (level + message) to avoid duplicates.
+        self._last_log_key: Optional[Tuple[str, str]] = None
+
     def _find_config_file(self) -> Path:
         """
         Find config.jsonc for automate (automate/config/config.jsonc only).
@@ -270,6 +273,12 @@ class BaseDeviceController:
         # Priority order: DEBUG < INFO/SUCCESS < WARNING < ERROR.
         if self._LOG_LEVEL_PRIORITY[level_upper] < self._LOG_LEVEL_PRIORITY[self.log_level]:
             return
+
+        # Avoid repeating the exact same log line (same level + message) consecutively.
+        message_key = (level_upper, message)
+        if getattr(self, "_last_log_key", None) == message_key:
+            return
+        self._last_log_key = message_key
 
         emoji = emoji_map.get(level_lower, '')
 

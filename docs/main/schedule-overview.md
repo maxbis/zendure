@@ -2,7 +2,7 @@
 
 A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The active entrypoint in this repository is `main/charge_schedule_mobile.php`, which uses the shared schedule JS modules.
 
-**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [docs/mobile/api-dependencies.md](../mobile/api-dependencies.md) (mobile API usage), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).
+**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).
 
 ## Architecture Overview
 
@@ -34,24 +34,18 @@ main/
 │       ├── edit_modal.js            # Edit entry modal
 │       ├── confirm_dialog.js        # Confirmation dialogs
 │       ├── price_overview_bar.js    # Price visualization
-│       ├── price_statistics.js      # Price statistics
-│       ├── schedule_calculator.js   # Schedule calculator
 │       ├── automation_status.js     # Automation status display
-│       └── charge_status.js         # Charge/discharge status
+│       ├── charge_status.js         # Charge/discharge status
+│       └── energy_graph_refresh.js  # Energy graph refresh
 ├── partials/
-│   ├── schedule_panels.php          # Schedule panels HTML
-│   ├── schedule_overview_bar.php    # Bar graph HTML
-│   ├── price_overview_bar.php       # Price graph HTML
-│   ├── price_statistics.php         # Price stats HTML
-│   ├── calculate.php                # Calculator HTML
+│   ├── schedule_panels_mobile.php   # Schedule panels HTML
+│   ├── price_overview_bar_mobile.php# Price graph HTML
 │   ├── automation_status.php        # Automation status HTML
-│   ├── charge_status.php            # Charge status HTML
-│   ├── charge_status_details.php    # Detailed charge status
+│   ├── charge_status_mobile.php     # Charge status HTML
+│   ├── charge_status_details_mobile.php # Detailed charge status
+│   ├── energy_graph_mobile.php      # Energy graph HTML
 │   ├── edit_modal.php               # Edit modal HTML
 │   └── confirm_dialog.php           # Confirm dialog HTML
-├── includes/
-│   └── status.php                   # Automation status helpers
-└── README.md                        # This file
 ```
 
 ## JavaScript Module Architecture
@@ -72,10 +66,9 @@ Scripts are loaded in a specific order to ensure dependencies are available:
 
 <!-- 3. Feature modules -->
 <script src="assets/js/price_overview_bar.js"></script>
-<script src="assets/js/price_statistics.js"></script>
-<script src="assets/js/schedule_calculator.js"></script>
 <script src="assets/js/automation_status.js"></script>
 <script src="assets/js/charge_status.js"></script>
+<script src="assets/js/energy_graph_refresh.js"></script>
 
 <!-- 4. Main application (must load last) -->
 <script src="assets/js/charge_schedule.js"></script>
@@ -170,7 +163,7 @@ Main application orchestrator.
 
 #### `charge_schedule_mobile.php`
 - Entry point for the application
-- Loads configuration from `config.json`
+- Loads configuration from `main/config/config.json` through `ConfigLoader`
 - Performs initial server-side render
 - Injects API URLs as JavaScript constants
 - Includes partials for HTML structure
@@ -210,15 +203,13 @@ Auto-calculation endpoint:
 
 ## Configuration
 
-The application reads configuration from `config/config.json`:
+The application reads configuration from `main/config/config.json`:
 
 ```json
 {
   "scheduleApiUrl": "main/data/api/data_api.php?type=schedule&resolved=1",
   "calculate_schedule_apiUrl": "api/calculate_schedule_api.php",
-  "priceUrls": {
-    "get_price": "..."
-  },
+  "priceApiUrl": "...",
   "location": "local|remote",
   "zendureFetchApiUrl": "...",
   "zendureFetchApiUrl-local": "..."

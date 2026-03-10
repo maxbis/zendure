@@ -32,8 +32,9 @@ The `type` parameter in the query string determines which file or logic is acces
     * `DELETE`: Remove a single entry from the schedule.
 
 ### 4. Automation Status (`type=automation_status`)
-* **Filename:** `automation_status.json`
-* **Operations:** `GET` (Read), `POST` (Write).
+* **Status:** Legacy documentation entry.
+* **Current runtime:** the active automation runtime stores status in SQLite (`automate/data/status_updates.db`) and exposes it through the built-in HTTP API on port `1611`.
+* **Recommendation:** use the automation runtime endpoints such as `/api/status`, `/api/automation_status`, `/api/wh_per_hour`, and `/api/status_updates_delta` instead of relying on a JSON status file.
 
 ### 5. Generic JSON Files (`type=file`)
 * **Filename Pattern:** Any `.json` file in the data directory.
@@ -76,7 +77,7 @@ The Data API consists of two main files:
 Gets the file path for a given data type and parameters.
 
 **Parameters:**
-- `$type` (string) - Type of data: `price`, `zendure`, `zendure_p1`, `schedule`, `automation_status`, or `file`
+- `$type` (string) - Type of data: `price`, `zendure`, `zendure_p1`, `schedule`, `automation_status` (legacy), or `file`
 - `$params` (array) - Parameters array:
   - For `price`: requires `date` (YYYYMMDD format)
   - For `file`: requires `name` (must end with `.json`)

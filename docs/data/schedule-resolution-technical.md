@@ -212,7 +212,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
    - Build **price context** from price file:
      - `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour` (all in cents/kWh)
      - `ranking_by_hour` — map `hour → rank`
-   - Build **sun context** (from `config.json` lat/lon, defaulting to Amsterdam):
+   - Build **sun context** (from `main/config/config.json` lat/lon, defaulting to Amsterdam):
      - `sunrise_hour`, `sunset_hour`, `sunrise_time`, `sunset_time`
 4. For each hour 0–23:
    - Walk rules in order
@@ -265,7 +265,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
 }
 ```
 
-> **Note:** `runtime_conditions` are present when a rule has conditions (like `electricity_level`) that cannot be evaluated statically. The automation layer (`automate.py`) is responsible for handling these at runtime and deciding to apply `value` or `fallback_value`.
+> **Note:** `runtime_conditions` are present when a rule has conditions (like `electricity_level`) that cannot be evaluated statically. The active automation layer (`automate_www.py`) is responsible for handling these at runtime and deciding to apply `value` or `fallback_value`.
 
 ---
 
@@ -279,7 +279,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
 
 1. Load `charge_schedule.json`
 2. Call `resolveScheduleForDate($schedule, $date)` → base resolved slots
-3. If `include_conditions: true` in `config/config.json`:
+3. If `include_conditions: true` in `main/config/config.json`:
    - Call `mergeResolvedWithConditional($resolved, $date)`:
      - Invokes `resolve_schedule_conditions.php` via `shell_exec`
      - Matches returned items by `time` to base-resolved slots

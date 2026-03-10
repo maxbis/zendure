@@ -1,6 +1,6 @@
 # Automate config reference
 
-This file documents every key in `config.jsonc`. The config is used only by the **automate** scripts (e.g. `automate.py`, `automate_www.py`, `device_controller.py`, `dump_status_updates.py`).
+This file documents every key in `config.jsonc`. The config is used only by the **automate** scripts (primarily `automate_www.py`, plus `device_controller.py` and `dump_status_updates.py`).
 
 ## Comments in config.jsonc
 
@@ -29,7 +29,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **TEST_MODE** | boolean | If `true`, the automation runs in test mode: power/charge actions are simulated and not applied to the device. | `device_controller.py` (`BaseDeviceController`): sets `test_mode` at init; Zendure and P1 logic respect it. Startup messages in `automate.py` / `automate_www.py` show test mode. |
+| **TEST_MODE** | boolean | If `true`, the automation runs in test mode: power/charge actions are simulated and not applied to the device. | `device_controller.py` (`BaseDeviceController`): sets `test_mode` at init; Zendure and P1 logic respect it. Startup messages in `automate_www.py` show test mode. |
 | **LOG_LEVEL** | string | Minimum log severity to emit. Supported values: `DEBUG`, `INFO`, `WARNING`, `ERROR` (default `INFO`). | `device_controller.py` (`BaseDeviceController.log`): filters all controller/app logs; `SUCCESS` is treated as `INFO`. |
 | **deviceIp** | string | IP address of the Zendure device on the local network. | `device_controller.py`: `ZendureDeviceController` (device control) and `DeviceDataReader` (device data + P1 meter API base). Required. |
 | **deviceSn** | string | Serial number of the Zendure device. | `device_controller.py`: `ZendureDeviceController` only. Required. |
@@ -40,7 +40,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **MIN_CHARGE_LEVEL** | number | Minimum state-of-charge (%), 0–100. Below this, discharge is prevented. | `device_controller.py`: `BaseDeviceController` (`min_charge_level`). Used in `automate.py` / `automate_www.py` when deciding charge/discharge limits. |
+| **MIN_CHARGE_LEVEL** | number | Minimum state-of-charge (%), 0–100. Below this, discharge is prevented. | `device_controller.py`: `BaseDeviceController` (`min_charge_level`). Used in `automate_www.py` when deciding charge/discharge limits. |
 | **MAX_CHARGE_LEVEL** | number | Maximum state-of-charge (%), 0–100. Above this, charge is prevented. | Same as `MIN_CHARGE_LEVEL`. |
 
 ---
@@ -60,7 +60,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 |-----|------|-------------|------------|
 | **POWER_FEED_MIN_THRESHOLD** | number | Minimum absolute power (W). If desired power is below this, it is treated as 0. | `device_controller.py`: `ZendureDeviceController`. |
 | **POWER_FEED_MIN_DELTA** | number | Minimum change (W) to apply a new power limit; smaller deltas are ignored. | `device_controller.py`: `ZendureDeviceController`. |
-| **POWER_FEED_MAX_DELTA** | number | Maximum allowed step (W) for a single power-feed change. | `automate.py`, `automate_www.py`: main loop when applying power feed updates. |
+| **POWER_FEED_MAX_DELTA** | number | Maximum allowed step (W) for a single power-feed change. | `automate_www.py`: main loop when applying power feed updates. |
 
 ---
 
@@ -68,9 +68,9 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **LOOP_INTERVAL_SECONDS** | number | Fallback seconds between main automation loop iterations when the selected power meter does not define its own interval. | `automate.py`, `automate_www.py`: main loop sleep interval. |
-| **API_REFRESH_INTERVAL_SECONDS** | number | How often (seconds) to refresh data from external APIs (e.g. schedule) within the loop. | `automate.py`, `automate_www.py`: throttles API calls. |
-| **ZERO_COUNT_THRESHOLD_STANDBY** | number | Number of consecutive “zero” readings before treating the system as standby. | `automate.py`, `automate_www.py`: standby detection logic. |
+| **LOOP_INTERVAL_SECONDS** | number | Fallback seconds between main automation loop iterations when the selected power meter does not define its own interval. | `automate_www.py`: main loop sleep interval. |
+| **API_REFRESH_INTERVAL_SECONDS** | number | How often (seconds) to refresh data from external APIs (e.g. schedule) within the loop. | `automate_www.py`: throttles API calls. |
+| **ZERO_COUNT_THRESHOLD_STANDBY** | number | Number of consecutive “zero” readings before treating the system as standby. | `automate_www.py`: standby detection logic. |
 
 ---
 
@@ -87,7 +87,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **apiUrl** | string | Schedule API URL: returns the resolved schedule (times and values). | `device_controller.py`: `ScheduleController.fetch_schedule()`; `automate.py`, `automate_www.py`: fetching schedule. |
+| **apiUrl** | string | Schedule API URL: returns the resolved schedule (times and values). | `device_controller.py`: `ScheduleController.fetch_schedule()`; `automate_www.py`: fetching schedule. |
 
 ---
 

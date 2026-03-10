@@ -8,7 +8,7 @@ This directory contains Python scripts for automating the control of a Zendure S
 
 This module provides object-oriented wrappers for interacting with the Zendure battery and related devices. Power-meter access is abstracted separately in `power_metere_loader.py`.
 
-- **`BaseDeviceController`**: A base class that handles common tasks like loading the `config.json` file and logging.
+- **`BaseDeviceController`**: A base class that handles common tasks like loading `automate/config/config.jsonc` and logging.
 
 - **`PowerAccumulator`**: A standalone class that tracks power-feed energy (watt-hours) across multiple time periods (quarter-hour, hour, day, and manual). Automatically handles period boundary crossings and rollovers.
 
@@ -55,7 +55,7 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
 
 4.  **Control**: Using the `AutomateController`, the script sends the appropriate commands to the Zendure battery to set its charge or discharge rate. The app/runtime layer owns power-meter reads and passes normalized `p1_data` into dynamic netzero calculations.
 
-5.  **Monitoring**: The script sends status updates to a monitoring API, which can be used to track the automation's health and activity.
+5.  **Monitoring**: The script stores status updates in a local SQLite database and exposes them through the built-in HTTP API, which the web app can read for health and activity.
 
 6.  **Power Accumulation**: The `PowerAccumulator` tracks energy usage over time, maintaining separate counters for quarter-hourly, hourly, daily, and manual periods.
 
@@ -142,7 +142,7 @@ When the device has been at 0 power for a configurable number of consecutive ite
 
 ## API Calls Used by `automate_www.py`
 
-When `automate_www.py` runs, it (and the `device_controller.py` components it uses) performs the following API calls. Config keys refer to `config.json` unless noted.
+When `automate_www.py` runs, it (and the `device_controller.py` components it uses) performs the following network/API calls. Config keys refer to `config.jsonc` unless noted.
 
 ### 1. Schedule API (GET)
 
@@ -153,14 +153,13 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 - When: on startup, every N minutes (default 5; `API_REFRESH_INTERVAL_SECONDS`), and on `refresh` keyboard command.
 - Expected response: JSON with `success`, `resolved` (array of `{time, value, key}` entries).
 
-### 2. Automation status API (POST)
+### 2. Local automation status storage + HTTP API
 
-- Config key: `statusApiUrl` (or `statusApiUrl-local` when `location` is `"local"`)
-- Method: `POST`
+- Storage path: `{dataDir}/status_updates.db`
 - Used by: `StatusApi.post_update()` in `automate_www.py`
-- Purpose: report automation lifecycle and power changes so the schedule UI can show current status (running, last power, P1 power).
+- Purpose: persist automation lifecycle and power-change events so the built-in API can expose current and historical status.
 - When: on start (`type: 'start'`), stop (`type: 'stop'`), power change (`type: 'change'`), and schedule rescan (`type: 'Rescan'`).
-- Payload: `type`, `timestamp`, `oldValue`, `newValue`; optionally `p1TotalPower` (W).
+- Exposed via: `/api/status`, `/api/automation_status`, `/api/wh_per_hour`, `/api/status_updates_delta`
 
 ### 3. Zendure device – read (GET)
 
@@ -202,8 +201,8 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 ### Summary
 
 1. Schedule: `GET` via `apiUrl` to fetch charge/discharge schedule.
-2. Automation status: `POST` via `statusApiUrl` / `statusApiUrl-local` to report start/stop/change/rescan.
+2. Local status: write events into SQLite and expose them through the built-in HTTP API.
 3. Zendure read: `GET` on `http://{deviceIp}/properties/report` for device state.
 4. Zendure write: `POST` on `http://{deviceIp}/properties/write` to set charge/discharge power.
-5. P1 meter: `GET` via `powerMeter.p1_hw.ip` + `powerMeter.p1_hw.endpoint` for grid power.
-6. Data API (Zendure): `POST` via `dataApiUrl?type=zendure` to store Zendure snapshots.
+5. P1 meter: `GET` via the selected `powerMeter.<type>` configuration for grid power.
+6. Data API (Zendure): `POST` via `dataApiUrl?type=zendure` to store Zendure snapshots when configured.

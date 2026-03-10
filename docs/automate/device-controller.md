@@ -4,7 +4,7 @@ This file provides a set of Python classes designed to interact with and control
 
 ## Global Constants
 
--   `TEST_MODE` (bool): Loaded from `config.json` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
+-   `TEST_MODE` (bool): Loaded from `automate/config/config.jsonc` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
 -   `MIN_CHARGE_LEVEL` (int): Config-driven minimum battery percentage below which the system will stop discharging. Falls back to `20` if the key is missing.
 -   `MAX_CHARGE_LEVEL` (int): Config-driven maximum battery percentage above which the system will stop charging. Falls back to `90` if the key is missing.
 -   `MAX_DISCHARGE_POWER` (int): Config-driven maximum allowed power feed in watts for discharge. Falls back to `800` if the key is missing.
@@ -26,19 +26,19 @@ This is the foundational class that provides common functionality to all other c
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the controller. It finds and loads the `config.json` file.
+-   **Description**: Initializes the controller. It finds and loads `automate/config/config.jsonc`.
 -   **Arguments**:
-    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it searches for `config.json` in the project's root `config/` directory and then in the local `automate/config/` directory.
+    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it uses `automate/config/config.jsonc`.
 -   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.
 
 ### `_find_config_file(self) -> Path`
 
--   **Description**: A helper method that locates the `config.json` file. It prioritizes the root directory's config file over the local one.
+-   **Description**: A helper method that locates `automate/config/config.jsonc`.
 -   **Returns**: The `Path` to the found configuration file.
 
 ### `_load_config(self, config_path: Path) -> Dict[str, Any]`
 
--   **Description**: Loads and parses the specified JSON configuration file.
+-   **Description**: Loads and parses the specified JSONC configuration file.
 -   **Returns**: A dictionary containing the configuration settings.
 
 ### `log(self, level: str, message: str, include_timestamp: bool = True, file_path: str = None)`
@@ -123,7 +123,7 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
     -   `p1_data` (Optional[Dict[str, Any]]): Required normalized P1 meter data when `value` is `netzero`, `netzero+`, or `None`.
 -   **Returns**: A `PowerResult` object indicating the outcome.
 -   **Raises**: `ValueError` if `value` is invalid.
--   **Note**: Test mode is controlled by `config.json` key `"TEST_MODE"`. When enabled, operations are simulated but not applied.
+-   **Note**: Test mode is controlled by `config.jsonc` key `"TEST_MODE"`. When enabled, operations are simulated but not applied.
 
 ### `set_standby_mode(self) -> PowerResult`
 
@@ -138,9 +138,9 @@ Inherits from `BaseDeviceController`. This class is used to read data from the Z
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the DeviceDataReader. It finds and loads the `config.json` file and extracts the Zendure device IP from the configuration.
+-   **Description**: Initializes the DeviceDataReader. It finds and loads `automate/config/config.jsonc` and extracts the Zendure device IP from the configuration.
 -   **Arguments**:
-    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it searches for `config.json` in standard locations.
+    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it uses the standard automate config location.
 -   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.
 
 ### `_store_data_via_api(self, api_url: Optional[str], data: dict, data_type: str = "data") -> bool`
@@ -167,9 +167,9 @@ Inherits from `BaseDeviceController`. This class is responsible for managing the
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the controller. It finds and loads the `config.json` file and sets up for schedule management. The timezone is set to 'Europe/Amsterdam' for schedule calculations.
+-   **Description**: Initializes the controller. It finds and loads `automate/config/config.jsonc` and sets up for schedule management. The timezone is set to 'Europe/Amsterdam' for schedule calculations.
 -   **Arguments**:
-    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it searches for `config.json` in standard locations.
+    -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it uses the standard automate config location.
 -   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.
 
 ### `fetch_schedule(self) -> Dict[str, Any]`

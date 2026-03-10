@@ -20,7 +20,7 @@ Executed before any HTML is emitted.
 - **Dependencies (PHP)**:
   - `login/validate.php` (access control)
   - `main/api/charge_schedule_functions.php` (schedule IO + resolving)
-    - Provides: `loadSchedule()`, `resolveScheduleForDate()`, `writeScheduleAtomic()` etc.
+    - Provides: `loadSchedule()`, `resolveScheduleForDateWithConditions()`, `writeScheduleAtomic()` etc.
   - `main/includes/config_loader.php` (centralized config reads)
     - Reads: `config/config.json` or `run_schedule/config/config.json` (fallback)
 - **Dependencies (data/config)**:
@@ -28,13 +28,13 @@ Executed before any HTML is emitted.
   - Query param: `?initial_date=YYYYMMDD` (optional)
   - Config keys used:
     - `scheduleApiUrl` (current local value: `http://localhost/zendure/main/data/api/data_api.php?type=schedule&resolved=1`)
-    - `priceUrls.get_price` or `priceUrls.get_prices` (backward compatibility)
+    - `priceApiUrl`
     - `calculate_schedule_apiUrl`
     - `zendureFetchApiUrl` (location-aware via `ConfigLoader::getWithLocation`)
 - **Computed variables used by partials**:
   - `$schedule` = `loadSchedule(...)`
   - `$today` (from `initial_date` or `date('Ymd')`)
-  - `$resolvedToday` = `resolveScheduleForDate($schedule, $today)`
+  - `$resolvedToday` = `resolveScheduleForDateWithConditions($schedule, $today, $includeConditions)`
   - `$currentTime` = `date('Hi')`
 
 ---
@@ -44,25 +44,23 @@ Executed before any HTML is emitted.
 - **Order**: 1
 - **Rendered by**: `main/charge_schedule_mobile.php`
 - **Dependencies (CSS)**:
-  - `main/assets/css/charge_schedule.css` (base layout + schedule panels + modal base styles)
-  - `main/assets/css/price_statistics.css`
+  - `main/assets/css/general_mobile.css`
+  - `main/assets/css/charge_schedule_mobile.css`
   - `main/assets/css/automation_status.css`
   - `main/assets/css/charge_status_defines.css`
   - `main/assets/css/charge_status.css`
-  - `main/assets/css/schedule_calculator.css`
 - **Dependencies (static assets)**:
   - `main/favicon.ico`, `main/favicon-16x16.png`, `main/favicon-32x32.png`, `main/apple-touch-icon.png`
 
 ---
 
-## Header (page title + current server time)
+## Header (page title)
 
 - **Order**: 2
 - **Rendered by**: `main/charge_schedule_mobile.php`
 - **DOM hooks**:
-  - `#current-time` (server-rendered text; not currently updated by JS in this page)
 - **CSS**:
-  - `main/assets/css/charge_schedule.css` (header + responsive title swap)
+  - `main/assets/css/general_mobile.css`
 
 ---
 
@@ -71,7 +69,7 @@ Executed before any HTML is emitted.
 This is the main “editing” area: **Today’s resolved schedule** (left) and **Schedule Entries table** (right).
 
 - **Order**: 3
-- **Rendered by (PHP partial)**: `main/partials/schedule_panels.php`
+- **Rendered by (PHP partial)**: `main/partials/schedule_panels_mobile.php`
 - **Inputs required from parent**:
   - `$today`, `$resolvedToday`, `$currentTime`, `$schedule`
   - Note: the partial defines local PHP helpers `getTimeClass()` and `getValueLabel()`.
@@ -130,33 +128,12 @@ Used for “Clear old entries”, “Auto calculate schedule”, etc.
 
 ---
 
-## Schedule Overview Bar Graph (Today + Tomorrow)
-
-Clickable “hour bars” that open the edit modal for that hour key.
-
-- **Order**: 6
-- **Rendered by (PHP partial)**: `main/partials/schedule_overview_bar.php`
-- **Inputs required from parent**:
-  - `$today` (used only to display formatted date)
-- **DOM hooks**:
-  - `#bar-graph-today`
-  - `#bar-graph-tomorrow`
-- **Client code dependencies**:
-  - `main/assets/js/schedule_renderer.js`
-    - Provides: `renderBarGraph(...)` which renders bars into these containers and binds click-to-edit.
-  - `main/assets/js/charge_schedule.js`
-    - Calls `renderBarGraph(...)` after fetching schedule data.
-  - `main/assets/js/charge_status.js`
-    - Updates “current hour” highlight classes without full re-render (`updateGraphTimeIndicators()`).
-
----
-
 ## Price Overview Bar Graph (Today + conditional Tomorrow)
 
 Shows electricity prices, color-coded; bars are clickable to edit schedule entries for that hour.
 
 - **Order**: 7
-- **Rendered by (PHP partial)**: `main/partials/price_overview_bar.php`
+- **Rendered by (PHP partial)**: `main/partials/price_overview_bar_mobile.php`
 - **Inputs required from parent**:
   - `$today` (display only)
   - Server-time dependency: shows Tomorrow column only when PHP `date('H') >= 15`
@@ -173,46 +150,16 @@ Shows electricity prices, color-coded; bars are clickable to edit schedule entri
 
 ---
 
-## Price Statistics (min/max/avg/current cards)
-
-Pure “placeholder DOM” server-side; JS fetches prices and fills in values.
+## Energy Graph (Wh per hour)
 
 - **Order**: 8
-- **Rendered by (PHP partial)**: `main/partials/price_statistics.php`
+- **Rendered by (PHP partial)**: `main/partials/energy_graph_mobile.php`
 - **DOM hooks**:
-  - `#price-stat-min-value`, `#price-stat-min-detail`
-  - `#price-stat-max-value`, `#price-stat-max-detail`
-  - `#price-stat-avg-value`, `#price-stat-avg-detail`
-  - `#price-stat-current-value`, `#price-stat-current-detail`
-- **Dependencies (config)**:
-  - `PRICE_API_URL` (same injected constant as above)
+  - chart canvas and wrappers defined by the partial
 - **Client code dependencies**:
-  - `main/assets/js/price_statistics.js` (fetches price data and renders into these IDs)
-- **CSS**:
-  - `main/assets/css/price_statistics.css`
-
----
-
-## Schedule Calculator (Wh sums)
-
-This section is **legacy** in this document. The current `main/charge_schedule_mobile.php` page does not include `main/partials/calculate.php`.
-
-- **Order**: 9
-- **Rendered by (PHP partial)**: _Not present in current mobile page_
+  - `main/assets/js/energy_graph_refresh.js`
 - **Server-side dependencies**:
-  - N/A for current mobile page.
-- **DOM hooks**:
-  - Header: `#calculator-current-time`
-  - Today full-day:
-    - `#calc-today-full-total`, `#calc-today-full-positive`, `#calc-today-full-negative`
-  - Today from “now”:
-    - `#calc-today-from-now-total`, `#calc-today-from-now-positive`, `#calc-today-from-now-negative`
-  - Tomorrow full-day:
-    - `#calc-tomorrow-full-total`, `#calc-tomorrow-full-positive`, `#calc-tomorrow-full-negative`
-- **Client code dependencies**:
-  - N/A for current mobile page.
-- **CSS**:
-  - N/A for current mobile page.
+  - same-origin proxy `main/api/energy_graph_proxy.php`
 
 ---
 
@@ -220,12 +167,12 @@ This section is **legacy** in this document. The current `main/charge_schedule_m
 
 Server tries to fetch and render initial state; JS supports refresh + expand/collapse.
 
-- **Order**: 10
+- **Order**: 9
 - **Rendered by (PHP partial)**: `main/partials/automation_status.php`
 - **Server-side dependencies**:
   - Injects: `AUTOMATION_STATUS_API_URL` (inline `<script>`), built from:
-    - Config key `statusApiUrl` / `statusApiUrl-local` (via `ConfigLoader::getWithLocation`)
-    - Fallback to `main/api/automation_status_api.php?type=all&limit=20`
+    - same-origin proxy `main/api/automation_status_proxy.php`
+    - proxy config keys `automationStatusApi` and `apiBaseUrlPiControl`
 - **DOM hooks**:
   - Refresh button: `#automation-refresh-btn`
   - Entries container (server-rendered or re-rendered by JS): `#automation-entries-wrapper`, `#automation-entries-list`
@@ -242,7 +189,7 @@ Server tries to fetch and render initial state; JS supports refresh + expand/col
 
 Server renders the mobile shell; JS fetches Zendure/P1 and updates live.
 
-- **Order**: 11
+- **Order**: 10
 - **Rendered by (PHP partial)**: `main/partials/charge_status_mobile.php`
 - **Server-side dependencies**:
   - Uses same-origin proxy `main/api/charge_status_all_proxy.php` via `CHARGE_STATUS_ALL_API_URL` injected by `main/charge_schedule_mobile.php`.
@@ -264,7 +211,7 @@ Server renders the mobile shell; JS fetches Zendure/P1 and updates live.
 
 Additional detail view with a toggle button.
 
-- **Order**: 12
+- **Order**: 11
 - **Rendered by (PHP partial)**: `main/partials/charge_status_details_mobile.php`
 - **Server-side dependencies**:
   - Uses same data source as charge status (`CHARGE_STATUS_ALL_API_URL`).
@@ -287,7 +234,7 @@ Additional detail view with a toggle button.
 Rendered by: `main/charge_schedule_mobile.php`
 
 - `API_URL` (schedule CRUD/resolve endpoint; used by schedule JS)
-- `PRICE_API_URL` (price endpoint; used by price graph + stats JS)
+- `PRICE_API_URL` (price endpoint; used by the price graph)
 - `CALCULATE_SCHEDULE_API_URL` (auto-schedule endpoint; used by “Auto” button logic)
 
 Additional inline constants are injected by partials:
@@ -316,9 +263,8 @@ Rendered by: `main/charge_schedule_mobile.php`
    - `main/assets/js/components/price_graph_component.js`
 4. **Feature modules**:
    - `main/assets/js/price_overview_bar.js`
-   - `main/assets/js/price_statistics.js`
-   - `main/assets/js/schedule_calculator.js`
    - `main/assets/js/automation_status.js`
    - `main/assets/js/charge_status.js`
+   - `main/assets/js/energy_graph_refresh.js`
 5. **Main application (must load last)**:
    - `main/assets/js/charge_schedule.js`

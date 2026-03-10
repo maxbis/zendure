@@ -104,11 +104,27 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 - Triggers a schedule refresh: fetch from schedule API and post a `Rescan` status update.
 - Returns `{"ok": true}` on success, or `{"ok": false, "error": "..."}` with status 500 on failure.
 
+9. `GET /api/pause`
+- Returns the current pause-override state.
+
+10. `POST /api/pause?state=on|off`
+- Enables or disables pause override.
+- When pause is enabled, desired power is forced to `0`.
+
+11. `GET /api/loglevel`
+- Returns the current runtime log level and the allowed values.
+
+12. `POST /api/loglevel?level=DEBUG|INFO|WARNING|ERROR`
+- Changes the runtime log level immediately.
+
+13. `POST /api/restart`
+- Requests a graceful restart of the automation process.
+
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.
 
 ## How It Works
 
-1. **Configuration**: Reads `config.json` from `../config/config.json` or `./config/config.json`.
+1. **Configuration**: Reads `automate/config/config.jsonc`.
 
 2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (SQLite + callback), `InputHandler`, `CommandHandler`, initializes the shared power-meter reader, sets up signal handlers, and loads loop config via `_load_loop_config()`.
 
@@ -151,6 +167,8 @@ Supported commands:
 - `z`, `zero`: set power to 0
 - `nz`, `netzero`: set power to netzero mode
 - `nzp`, `netzero+`: set power to netzero+ mode
+- `pause on|off|status`: pause automation at 0W or resume schedule control
+- `resume`, `unpause`: resume schedule control
 - `q`, `quit`: quit gracefully
 
 Dynamic commands (`p netzero`, `nz`, `nzp`) first read the configured power meter in the app/runtime layer and then pass the normalized reading into `AutomateController`.
@@ -169,11 +187,23 @@ curl http://localhost:1611/api/wh_per_hour
 
 # Trigger schedule refresh
 curl http://localhost:1611/api/refresh
+
+# Pause automation at 0W
+curl -X POST "http://localhost:1611/api/pause?state=on"
+
+# Resume schedule control
+curl -X POST "http://localhost:1611/api/pause?state=off"
+
+# Show current log level
+curl http://localhost:1611/api/loglevel
+
+# Change runtime log level
+curl -X POST "http://localhost:1611/api/loglevel?level=DEBUG"
 ```
 
 ## API Calls (External)
 
-`automate_www.py` uses the same external APIs for the Zendure device, P1 meter, schedule, and data storage as described in the overview, except for the **automation status API**. Status updates are stored locally in SQLite; there is no POST to `statusApiUrl` for start/stop/change/Rescan events.
+`automate_www.py` uses the same external APIs for the Zendure device, P1 meter, schedule, and optional data storage as described in the overview, except for the **automation status API**. Status updates are stored locally in SQLite; there is no external status POST for start/stop/change/Rescan events.
 
 See [automate-overview.md](automate-overview.md#api-calls-used-by-automate_wwwpy) for the full list of schedule, Zendure, P1, and data API calls. The status API (item 2 in that list) does **not** apply to `automate_www.py`.
 

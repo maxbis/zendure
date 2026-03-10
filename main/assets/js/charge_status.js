@@ -3,18 +3,24 @@
  * Client-side logic for fetching and rendering charge/discharge status
  */
 
-// Auto-refresh interval when page becomes visible (20 seconds in milliseconds)
-const AUTO_REFRESH_INTERVAL = 20000;
+// Normal auto-refresh interval in milliseconds
+const NORMAL_REFRESH_INTERVAL_MS = 20000;
 
-// Refresh schedule/Wh table & graphs every N auto-refresh ticks
-const SCHEDULE_REFRESH_TICK_INTERVAL = 20;
+// Temporary fast-refresh burst: 10 ticks at 6 seconds each
+const BOOST_REFRESH_INTERVAL_MS = 6000;
+const BOOST_TICK_COUNT = 10;
+
+// Refresh schedule/Wh table & graphs on the same wall-clock cadence as before
+const SCHEDULE_REFRESH_INTERVAL_MS = 20 * NORMAL_REFRESH_INTERVAL_MS;
 
 const DEBUG_MODE = false;
 
-// Track auto-refresh interval
+// Track auto-refresh interval state
 let autoRefreshIntervalId = null;
 let wasPageHidden = false;
-let scheduleRefreshTickCount = 0;
+let activeRefreshIntervalMs = NORMAL_REFRESH_INTERVAL_MS;
+let remainingBoostTicks = 0;
+let nextScheduleRefreshAt = null;
 
 // Track if "back-end not running" dialog was already shown (avoid duplicate modals)
 let noBackendDialogShown = false;
@@ -45,6 +51,27 @@ function showNoBackendDialog() {
     if (dialog) {
         dialog.classList.add('active');
         dialog.setAttribute('aria-hidden', 'false');
+    }
+}
+
+function ensureNextScheduleRefreshAt() {
+    if (nextScheduleRefreshAt === null) {
+        nextScheduleRefreshAt = Date.now() + SCHEDULE_REFRESH_INTERVAL_MS;
+    }
+}
+
+function maybeRefreshScheduleData() {
+    ensureNextScheduleRefreshAt();
+
+    if (Date.now() < nextScheduleRefreshAt) {
+        return;
+    }
+
+    nextScheduleRefreshAt = Date.now() + SCHEDULE_REFRESH_INTERVAL_MS;
+    console.log('⏱️ Schedule/Wh refresh triggered');
+
+    if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
+        window.refreshScheduleAndPricesImmediate();
     }
 }
 
@@ -268,8 +295,8 @@ async function refreshStatus(isAutoRefresh = false) {
 
 /**
  * How long (seconds) after a command is issued we consider the bar "pending".
- * Worst case lag: one automation loop (20 s) + one browser refresh (20 s) = 40 s.
- * Using 35 s gives one full loop interval with a small buffer.
+ * Worst case lag is roughly one automation loop plus one browser refresh cycle.
+ * Keep a small buffer so pending state does not clear before the device catches up.
  */
 const PENDING_WINDOW_SECONDS = 35;
 
@@ -434,9 +461,13 @@ function toggleChargeStatusDetails() {
 // which calls refreshStatus() to update all sections
 
 /**
- * Start auto-refresh interval (if page is visible)
+ * Start auto-refresh interval with the current cadence (if page is visible)
  */
 function startAutoRefresh() {
+    if (noBackendDialogShown) {
+        return;
+    }
+
     // Clear any existing interval first
     if (autoRefreshIntervalId !== null) {
         clearInterval(autoRefreshIntervalId);
@@ -445,29 +476,29 @@ function startAutoRefresh() {
 
     // Only start interval if page is visible
     if (!document.hidden) {
-        // Do immediate refresh first
-        if (typeof refreshStatus === 'function') {
-            indicateAutoRefresh();
-            refreshStatus(true);
-        }
+        ensureNextScheduleRefreshAt();
 
-        // Then set up interval for periodic refresh
         autoRefreshIntervalId = setInterval(() => {
             // Double-check page is still visible before refreshing
             if (!document.hidden && typeof refreshStatus === 'function') {
                 if (DEBUG_MODE) {
                     console.log('⏰ Auto-refresh interval triggered');
                 }
-                console.log('⏱️ Auto-refresh tick ' + (scheduleRefreshTickCount + 1) + '/' + SCHEDULE_REFRESH_TICK_INTERVAL);
+
+                if (remainingBoostTicks > 0) {
+                    console.log('⏱️ Fast auto-refresh tick ' + (BOOST_TICK_COUNT - remainingBoostTicks + 1) + '/' + BOOST_TICK_COUNT);
+                }
+
                 indicateAutoRefresh();
                 refreshStatus(true);
+                maybeRefreshScheduleData();
 
-                scheduleRefreshTickCount += 1;
-                if (scheduleRefreshTickCount >= SCHEDULE_REFRESH_TICK_INTERVAL) {
-                    scheduleRefreshTickCount = 0;
-                    console.log('⏱️ Schedule/Wh refresh triggered (every ' + SCHEDULE_REFRESH_TICK_INTERVAL + ' auto-refresh ticks)');
-                    if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
-                        window.refreshScheduleAndPricesImmediate();
+                if (remainingBoostTicks > 0) {
+                    remainingBoostTicks -= 1;
+                    if (remainingBoostTicks === 0) {
+                        activeRefreshIntervalMs = NORMAL_REFRESH_INTERVAL_MS;
+                        console.log('⏱️ Fast refresh burst completed; returning to 20-second interval');
+                        startAutoRefresh();
                     }
                 }
             } else if (document.hidden) {
@@ -475,11 +506,34 @@ function startAutoRefresh() {
                     console.log('⏰ Auto-refresh skipped (page hidden)');
                 }
             }
-        }, AUTO_REFRESH_INTERVAL);
+        }, activeRefreshIntervalMs);
 
-        console.log('⏰ Auto-refresh interval started (every ' + (AUTO_REFRESH_INTERVAL / 1000) + ' seconds)');
+        console.log('⏰ Auto-refresh interval started (every ' + (activeRefreshIntervalMs / 1000) + ' seconds)');
     }
 }
+
+/**
+ * Restart the 10-tick fast-refresh burst and optionally refresh immediately.
+ * @param {boolean} immediateRefresh
+ */
+function restartFastRefreshBurst(immediateRefresh = false) {
+    remainingBoostTicks = BOOST_TICK_COUNT;
+    activeRefreshIntervalMs = BOOST_REFRESH_INTERVAL_MS;
+
+    if (document.hidden || noBackendDialogShown) {
+        return;
+    }
+
+    if (immediateRefresh && typeof refreshStatus === 'function') {
+        indicateAutoRefresh();
+        refreshStatus(true);
+        maybeRefreshScheduleData();
+    }
+
+    startAutoRefresh();
+}
+
+window.restartFastRefreshBurst = restartFastRefreshBurst;
 
 /**
  * Stop auto-refresh interval
@@ -493,8 +547,8 @@ function stopAutoRefresh() {
 }
 
 /**
- * Auto-refresh when page becomes visible after being hidden
- * Refreshes every 20 seconds when the tab is visible
+ * Auto-refresh only when the page is visible.
+ * Reload and foreground events restart a 10-tick fast-refresh burst.
  */
 document.addEventListener('DOMContentLoaded', () => {
     // Wire "Back-end not running" dialog Retry button
@@ -508,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start auto-refresh if page is visible on initial load
     if (!document.hidden) {
-        startAutoRefresh();
+        restartFastRefreshBurst(true);
     }
 
     // Handle visibility changes
@@ -522,8 +576,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Page became visible
             if (wasPageHidden) {
-                // Page became visible after being hidden - start auto-refresh
-                startAutoRefresh();
+                // Page became visible after being hidden - restart fast-refresh burst
+                restartFastRefreshBurst(true);
                 wasPageHidden = false;
             }
         }
