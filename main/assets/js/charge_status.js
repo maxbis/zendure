@@ -7,8 +7,8 @@
 const NORMAL_REFRESH_INTERVAL_MS = 20000;
 
 // Temporary fast-refresh burst: 10 ticks at 6 seconds each
-const BOOST_REFRESH_INTERVAL_MS = 6000;
-const BOOST_TICK_COUNT = 10;
+const BOOST_REFRESH_INTERVAL_MS = 5100;
+const BOOST_TICK_COUNT = 8;
 
 // Refresh schedule/Wh table & graphs on the same wall-clock cadence as before
 const SCHEDULE_REFRESH_INTERVAL_MS = 20 * NORMAL_REFRESH_INTERVAL_MS;
@@ -57,10 +57,14 @@ function showNoBackendDialog() {
 
 function updateGridFastIndicator() {
     const indicator = document.querySelector('[data-role="grid-fast-indicator"]');
+    const trigger = document.querySelector('[data-role="grid-fast-refresh-trigger"]');
     if (!indicator) return;
 
     const isFastModeActive = !document.hidden && !noBackendDialogShown && remainingBoostTicks > 0 && activeRefreshIntervalMs === BOOST_REFRESH_INTERVAL_MS;
     indicator.classList.toggle('fast-refresh-active', isFastModeActive);
+    if (trigger) {
+        trigger.classList.toggle('fast-refresh-active', isFastModeActive);
+    }
 }
 
 function bindGridFastRefreshTrigger() {

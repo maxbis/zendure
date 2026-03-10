@@ -663,6 +663,11 @@ body.mobile-dark .charge-status-details-mobile .charge-power-box {
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+body.mobile-dark .charge-status-details-mobile .charge-power-box.fast-refresh-active {
+    border-color: #64b5f6;
+    box-shadow: 0 0 0 1px rgba(100, 181, 246, 0.14);
+}
+
 body.mobile-dark .charge-status-details-mobile .charge-power-box:active {
     transform: scale(0.995);
 }
