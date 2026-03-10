@@ -216,6 +216,45 @@
     color: #111;
 }
 
+.charge-grid-value-highlight {
+    display: inline-block;
+    transform-origin: 50% 60%;
+    backface-visibility: hidden;
+}
+
+.charge-grid-value-highlight.grid-value-refresh {
+    animation: grid-value-breath 460ms ease-in-out;
+}
+
+@keyframes grid-value-breath {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    20% {
+        opacity: 0.35;
+        transform: translateY(1px) scale(0.94);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(0) scale(1.08);
+    }
+    75% {
+        opacity: 0.7;
+        transform: translateY(0) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .charge-grid-value-highlight.grid-value-refresh {
+        animation: none;
+    }
+}
+
 .charge-power-time {
     font-weight: 400;
     font-size: 0.85rem;
@@ -707,6 +746,29 @@ body.mobile-dark .charge-status-mobile .charge-status-details-collapsible {
 
 body.mobile-dark .charge-status-mobile .charge-status-details-collapsible.expanded {
     display: grid;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-display {
+    gap: 6px;
+    padding: 10px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-label,
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-value {
+    font-size: 0.82rem;
+    line-height: 1.2;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-label-value {
+    gap: 6px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-bar {
+    height: 7px;
+}
+
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-battery-bar-marker {
+    width: 2px;
 }
 
 body.mobile-dark .charge-status-mobile .charge-refresh-btn {

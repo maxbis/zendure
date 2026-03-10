@@ -493,15 +493,260 @@ function renderAutomationStatus(data) {
  * @param {Object} zendureData - Zendure data from API
  * @param {Object} p1Data - P1 data from API (optional)
  */
+function getChargeStatusMarkup(isMobile, isDetailsExpanded) {
+    if (isMobile) {
+        return `
+            <div class="charge-status-box">
+                <div class="charge-status-box-title">Status</div>
+                <div class="charge-status-box-content">
+                    <div class="charge-status-subtitle" data-role="status-title" style="font-size: 0.75rem;margin-bottom: 10px;">--</div>
+                    <div class="charge-status-indicator standby" data-role="status-indicator" style="padding: 10px; border-radius: 6px;">
+                        <div class="charge-status-icon" data-role="status-icon" style="font-size: 1.5rem;">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charge-status-box">
+                <div class="charge-status-box-title">Power</div>
+                <div class="charge-status-box-content">
+                    <div class="charge-power-display" style="padding: 10px; border-radius: 6px;">
+                        <div class="charge-power-label-value" style="margin-bottom: 8px;">
+                            <span class="charge-power-value" data-role="power-value" style="font-size: 1.1rem; font-weight: 700;">0 W</span>
+                        </div>
+                        <div class="charge-power-bar-container" style="height: 14px;">
+                            <div class="charge-power-bar-label left" data-role="power-min-label" style="font-size: 0.6rem;">0</div>
+                            <div class="charge-power-bar-label center" style="font-size: 0.6rem;">0</div>
+                            <div class="charge-power-bar-label right" data-role="power-max-label" style="font-size: 0.6rem;">0</div>
+                            <div class="charge-power-bar-center"></div>
+                            <div id="charge-power-bar-fill" class="charge-power-bar-fill" data-role="power-bar-fill" style="width:0;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charge-status-box">
+                <div class="charge-status-box-header">
+                    <div class="charge-status-box-title">Battery</div>
+                    <button class="charge-refresh-btn${isDetailsExpanded ? ' expanded' : ''}" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional battery details">
+                        <span class="refresh-icon charge-details-toggle-icon">▼</span>
+                        <span class="refresh-text charge-details-toggle-text">${isDetailsExpanded ? 'Show less' : 'Show more'}</span>
+                    </button>
+                </div>
+                <div class="charge-status-box-content">
+                    <div class="charge-battery-display" style="padding: 10px; border-radius: 6px;">
+                        <div class="charge-battery-label-value" style="margin-bottom: 8px;">
+                            <span class="charge-battery-value" data-role="battery-summary-value" style="font-size: 1rem; font-weight: 600;">--</span>
+                        </div>
+                        <div class="charge-battery-bar" style="height: 14px;">
+                            <div class="charge-battery-bar-marker min" data-role="battery-min-marker" title="Minimum"></div>
+                            <div class="charge-battery-bar-marker max" data-role="battery-max-marker" title="Maximum"></div>
+                            <div class="charge-battery-bar-fill" data-role="battery-summary-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="charge-status-details-collapsible${isDetailsExpanded ? ' expanded' : ''}" id="charge-status-details-collapsible">
+                        <div class="charge-battery-display" data-metric="wifi-signal">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">WiFi Signal:</span>
+                                <span class="charge-battery-value">–/10 (-- dBm)</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-battery-display" data-metric="system-temp">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">System Temp:</span>
+                                <span class="charge-battery-value">-- °C</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-battery-display" data-metric="battery1-level">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">B1:</span>
+                                <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-marker min" title="Minimum"></div>
+                                <div class="charge-battery-bar-marker max" title="Maximum"></div>
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-battery-display" data-metric="battery1-temp">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">B1 Temp:</span>
+                                <span class="charge-battery-value">-- °C</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-battery-display" data-metric="battery2-level">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">B2:</span>
+                                <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-marker min" title="Minimum"></div>
+                                <div class="charge-battery-bar-marker max" title="Maximum"></div>
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-battery-display" data-metric="battery2-temp">
+                            <div class="charge-battery-label-value">
+                                <span class="charge-battery-label">B2 Temp:</span>
+                                <span class="charge-battery-value">-- °C</span>
+                            </div>
+                            <div class="charge-battery-bar">
+                                <div class="charge-battery-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="charge-status-header charge-status-header--details" data-role="mobile-last-update" hidden></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="charge-status-row" style="display: flex; gap: 12px;">
+            <div class="charge-status-indicator standby" data-role="status-indicator" style="flex: 0 0 40%; max-width: 40%;">
+                <div class="charge-status-icon" data-role="status-icon">--</div>
+                <div class="charge-status-text">
+                    <div class="charge-status-title" data-role="status-title">--</div>
+                    <div class="charge-status-subtitle" data-role="status-subtitle">--</div>
+                </div>
+            </div>
+
+            <div class="charge-power-display" style="flex: 0 0 60%; max-width: 60%;">
+                <div class="charge-power-label-value">
+                    <span class="charge-power-label">Power:</span>
+                    <span class="charge-power-value" data-role="power-value">0 W</span>
+                </div>
+                <div class="charge-power-bar-container">
+                    <div class="charge-power-bar-label left" data-role="power-min-label">0 W</div>
+                    <div class="charge-power-bar-label center">0</div>
+                    <div class="charge-power-bar-label right" data-role="power-max-label">0 W</div>
+                    <div class="charge-power-bar-center"></div>
+                    <div id="charge-power-bar-fill" class="charge-power-bar-fill" data-role="power-bar-fill" style="width:0;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charge-battery-display" style="width: 100%;">
+            <div class="charge-battery-label-value">
+                <span class="charge-battery-label">Battery Level:</span>
+                <span class="charge-battery-value" data-role="battery-summary-value">--</span>
+            </div>
+            <div class="charge-battery-bar">
+                <div class="charge-battery-bar-marker min" data-role="battery-min-marker" title="Minimum"></div>
+                <div class="charge-battery-bar-marker max" data-role="battery-max-marker" title="Maximum"></div>
+                <div class="charge-battery-bar-fill" data-role="battery-summary-fill" style="width: 0%;"></div>
+            </div>
+        </div>
+    `;
+}
+
+function ensureChargeStatusContent(container, isMobile, isDetailsExpanded, chargeDischargeValue) {
+    let contentEl = document.getElementById('charge-status-content');
+    const expectedClass = isMobile ? 'charge-status-mobile' : 'charge-status-content';
+
+    if (!contentEl || contentEl.className !== expectedClass) {
+        if (contentEl) {
+            contentEl.remove();
+        }
+
+        contentEl = document.createElement('div');
+        contentEl.id = 'charge-status-content';
+        contentEl.className = expectedClass;
+        contentEl.dataset.actualPower = chargeDischargeValue;
+        if (isMobile) {
+            contentEl.style.display = 'grid';
+            contentEl.style.gridTemplateColumns = 'minmax(0, 0.5fr) minmax(0, 1.5fr)';
+            contentEl.style.gap = '10px';
+        } else {
+            contentEl.style.display = 'flex';
+            contentEl.style.flexDirection = 'column';
+            contentEl.style.gap = '12px';
+        }
+
+        contentEl.innerHTML = getChargeStatusMarkup(isMobile, isDetailsExpanded);
+        container.appendChild(contentEl);
+    }
+
+    return contentEl;
+}
+
+function setPowerBarState(contentEl, barWidth, barClass, minPower, maxPower, commandedPower) {
+    const powerBarFill = contentEl.querySelector('[data-role="power-bar-fill"]');
+    const minLabel = contentEl.querySelector('[data-role="power-min-label"]');
+    const maxLabel = contentEl.querySelector('[data-role="power-max-label"]');
+    const barContainer = powerBarFill?.parentElement;
+
+    if (!powerBarFill || !barContainer) return;
+
+    if (minLabel) minLabel.textContent = minLabel.textContent.includes('W') ? `${minPower} W` : String(minPower);
+    if (maxLabel) maxLabel.textContent = maxLabel.textContent.includes('W') ? `${maxPower} W` : String(maxPower);
+
+    powerBarFill.className = barClass ? `charge-power-bar-fill ${barClass}` : 'charge-power-bar-fill';
+    powerBarFill.style.width = barWidth > 0 ? `${barWidth}%` : '0';
+
+    let commandedMarker = barContainer.querySelector('.charge-power-bar-marker-commanded');
+    if (commandedPower !== 0) {
+        const commandedClamped = Math.max(minPower, Math.min(maxPower, commandedPower));
+        const commandedLeft = commandedClamped >= 0
+            ? 50 + (commandedClamped / maxPower) * 50
+            : 50 - (Math.abs(commandedClamped) / Math.abs(minPower)) * 50;
+        const commandedTitle = `Commanded: ${commandedPower > 0 ? '+' : ''}${commandedPower} W`;
+
+        if (!commandedMarker) {
+            commandedMarker = document.createElement('div');
+            commandedMarker.className = 'charge-power-bar-marker-commanded';
+            barContainer.appendChild(commandedMarker);
+        }
+
+        commandedMarker.style.left = `${commandedLeft}%`;
+        commandedMarker.style.transform = 'translateX(-50%)';
+        commandedMarker.title = commandedTitle;
+    } else if (commandedMarker) {
+        commandedMarker.remove();
+    }
+}
+
+function setLastUpdateElements(container, contentEl, isMobile, lastUpdateHtml) {
+    const mobileLastUpdate = contentEl.querySelector('[data-role="mobile-last-update"]');
+    if (mobileLastUpdate) {
+        if (lastUpdateHtml) {
+            mobileLastUpdate.innerHTML = lastUpdateHtml;
+            mobileLastUpdate.hidden = false;
+        } else {
+            mobileLastUpdate.innerHTML = '';
+            mobileLastUpdate.hidden = true;
+        }
+    }
+
+    const existingLastUpdateDiv = container.querySelector(':scope > .charge-status-header');
+    if (existingLastUpdateDiv) {
+        existingLastUpdateDiv.remove();
+    }
+
+    if (!isMobile && lastUpdateHtml) {
+        const newLastUpdateDiv = document.createElement('div');
+        newLastUpdateDiv.className = 'charge-status-header';
+        newLastUpdateDiv.innerHTML = lastUpdateHtml;
+        container.appendChild(newLastUpdateDiv);
+    }
+}
+
 function renderChargeStatus(zendureData, p1Data = null) {
     const errorDiv = document.getElementById('charge-status-error');
     const emptyDiv = document.getElementById('charge-status-empty');
     const contentDiv = document.getElementById('charge-status-content');
 
-    // Clear existing content
+    // Clear transient state messages before normal update
     if (errorDiv) errorDiv.remove();
     if (emptyDiv) emptyDiv.remove();
-    if (contentDiv) contentDiv.remove();
 
     // Injection target: .metric-section inside the main Charge/Discharge card
     const container = document.querySelector('[data-component="charge-status-main"] .metric-section');
@@ -516,6 +761,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
     // Handle error
     if (!zendureData || !zendureData.success) {
         window.currentBatteryForecastState = null;
+        if (contentDiv) contentDiv.remove();
         const errorEl = document.createElement('div');
         errorEl.id = 'charge-status-error';
         errorEl.className = 'charge-status-error';
@@ -528,6 +774,7 @@ function renderChargeStatus(zendureData, p1Data = null) {
 
     if (!properties) {
         window.currentBatteryForecastState = null;
+        if (contentDiv) contentDiv.remove();
         const emptyEl = document.createElement('div');
         emptyEl.id = 'charge-status-empty';
         emptyEl.className = 'charge-status-empty';
@@ -628,231 +875,103 @@ function renderChargeStatus(zendureData, p1Data = null) {
 
     // Commanded power marker (inputLimit when charging, -outputLimit when discharging)
     const commandedPower = (inputLimit > 0) ? inputLimit : ((outputLimit > 0) ? -outputLimit : 0);
-    let commandedMarkerHtml = '';
-    if (commandedPower !== 0) {
-        const commandedClamped = Math.max(minPower, Math.min(maxPower, commandedPower));
-        // Scale: 0% = minPower, 50% = 0, 100% = maxPower. For negative use 50 - ... so marker is left of center.
-        const commandedLeft = commandedClamped >= 0
-            ? 50 + (commandedClamped / maxPower) * 50
-            : 50 - (Math.abs(commandedClamped) / Math.abs(minPower)) * 50;
-        const commandedTitle = 'Commanded: ' + (commandedPower > 0 ? '+' : '') + commandedPower + ' W';
-        commandedMarkerHtml = `<div class="charge-power-bar-marker-commanded" style="left: ${commandedLeft}%; transform: translateX(-50%);" title="${escapeHtml(commandedTitle)}"></div>`;
-    }
 
     // Calculate battery capacity
     const usableNetKwh = Math.max(0, ((electricLevel - MIN_CHARGE_LEVEL) / 100) * TOTAL_CAPACITY_KWH);
     const roomToChargeKwh = Math.max(0, ((MAX_CHARGE_LEVEL - electricLevel) / 100) * TOTAL_CAPACITY_KWH);
 
     const isMobile = document.body && document.body.classList.contains('mobile-dark');
+    const isDetailsExpanded = Boolean(window.chargeStatusDetailsExpanded);
 
-    const mobileContentHtml = `
-        <!-- Box 1: Status Indicator -->
-        <div class="charge-status-box">
-            <div class="charge-status-box-title">Status</div>
-            <div class="charge-status-box-content">
-             <div class="charge-status-subtitle" style="font-size: 0.75rem;margin-bottom: 10px;">${escapeHtml(systemStatus.title)}</div>
-                <div class="charge-status-indicator ${systemStatus.class}" style="padding: 10px; border-radius: 6px;">
-                    <div class="charge-status-icon" style="font-size: 1.5rem;">${systemStatus.icon}</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Box 2: Power Display -->
-        <div class="charge-status-box">
-            <div class="charge-status-box-title">Power</div>
-            <div class="charge-status-box-content">
-                <div class="charge-power-display" style="padding: 10px; border-radius: 6px;">
-                    <div class="charge-power-label-value" style="margin-bottom: 8px;">
-                        <span class="charge-power-value" style="color: ${escapeHtml(powerColor)}; font-size: 1.1rem; font-weight: 700;">
-                            ${escapeHtml(powerDisplay)}
-                            ${timeEstimate ? `<span class="charge-power-time" style="font-size: 0.8rem;">(${escapeHtml(timeEstimate)})</span>` : ''}
-                        </span>
-                    </div>
-                    <div class="charge-power-bar-container" style="height: 14px;">
-                        <div class="charge-power-bar-label left" style="font-size: 0.6rem;">${minPower}</div>
-                        <div class="charge-power-bar-label center" style="font-size: 0.6rem;">0</div>
-                        <div class="charge-power-bar-label right" style="font-size: 0.6rem;">${maxPower}</div>
-                        <div class="charge-power-bar-center"></div>
-                        ${barWidth > 0 ? `<div id="charge-power-bar-fill" class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : '<div id="charge-power-bar-fill" class="charge-power-bar-fill" style="width:0;"></div>'}
-                        ${commandedMarkerHtml}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Box 3: Battery Level -->
-        <div class="charge-status-box">
-            <div class="charge-status-box-header">
-                <div class="charge-status-box-title">Battery</div>
-                <button class="charge-refresh-btn" id="charge-details-toggle" onclick="toggleChargeStatusDetails()" title="Show/hide additional battery details">
-                    <span class="refresh-icon charge-details-toggle-icon">▼</span>
-                    <span class="refresh-text charge-details-toggle-text">Show more</span>
-                </button>
-            </div>
-            <div class="charge-status-box-content">
-                <div class="charge-battery-display" style="padding: 10px; border-radius: 6px;">
-                    <div class="charge-battery-label-value" style="margin-bottom: 8px;">
-                        <span class="charge-battery-value" style="font-size: 1rem; font-weight: 600;">
-                            <span class="charge-value-highlight">${electricLevel}%</span> (${usableNetKwh.toFixed(2)} kWh - ${roomToChargeKwh.toFixed(2)} kWh)
-                        </span>
-                    </div>
-                    <div class="charge-battery-bar" style="height: 14px;">
-                        <div class="charge-battery-bar-marker min" style="left: ${MIN_CHARGE_LEVEL}%;" title="Minimum: ${MIN_CHARGE_LEVEL}%"></div>
-                        <div class="charge-battery-bar-marker max" style="left: ${MAX_CHARGE_LEVEL}%;" title="Maximum: ${MAX_CHARGE_LEVEL}%"></div>
-                        <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, electricLevel))}%; background-color: ${escapeHtml(systemStatus.color)};"></div>
-                    </div>
-                </div>
-                <div class="charge-status-details-collapsible" id="charge-status-details-collapsible">
-                    <div class="charge-battery-display" data-metric="wifi-signal">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">WiFi Signal:</span>
-                            <span class="charge-battery-value">–/10 (-- dBm)</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="charge-battery-display" data-metric="system-temp">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">System Temp:</span>
-                            <span class="charge-battery-value">-- °C</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="charge-battery-display" data-metric="battery1-level">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">B1:</span>
-                            <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-marker min" title="Minimum"></div>
-                            <div class="charge-battery-bar-marker max" title="Maximum"></div>
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="charge-battery-display" data-metric="battery1-temp">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">B1 Temp:</span>
-                            <span class="charge-battery-value">-- °C</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="charge-battery-display" data-metric="battery2-level">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">B2:</span>
-                            <span class="charge-battery-value">--% (-- kWh - -- kWh)</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-marker min" title="Minimum"></div>
-                            <div class="charge-battery-bar-marker max" title="Maximum"></div>
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    <div class="charge-battery-display" data-metric="battery2-temp">
-                        <div class="charge-battery-label-value">
-                            <span class="charge-battery-label">B2 Temp:</span>
-                            <span class="charge-battery-value">-- °C</span>
-                        </div>
-                        <div class="charge-battery-bar">
-                            <div class="charge-battery-bar-fill" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const desktopContentHtml = `
-        <!-- Row 1: Status (40%) + Power (60%) -->
-        <div class="charge-status-row" style="display: flex; gap: 12px;">
-            <div class="charge-status-indicator ${systemStatus.class}" style="flex: 0 0 40%; max-width: 40%;">
-                <div class="charge-status-icon">${systemStatus.icon}</div>
-                <div class="charge-status-text">
-                    <div class="charge-status-title">${escapeHtml(systemStatus.title)}</div>
-                    <div class="charge-status-subtitle">${escapeHtml(systemStatus.subtitle)}</div>
-                </div>
-            </div>
-
-            <!-- Power Value -->
-            <div class="charge-power-display" style="flex: 0 0 60%; max-width: 60%;">
-                <div class="charge-power-label-value">
-                    <span class="charge-power-label">Power:</span>
-                    <span class="charge-power-value" style="color: ${escapeHtml(powerColor)};">
-                        ${escapeHtml(powerDisplay)}
-                        ${timeEstimate ? `<span class="charge-power-time">(${escapeHtml(timeEstimate)})</span>` : ''}
-                    </span>
-                </div>
-                <div class="charge-power-bar-container">
-                    <div class="charge-power-bar-label left">${minPower} W</div>
-                    <div class="charge-power-bar-label center">0</div>
-                    <div class="charge-power-bar-label right">${maxPower} W</div>
-                    <div class="charge-power-bar-center"></div>
-                    ${barWidth > 0 ? `<div id="charge-power-bar-fill" class="charge-power-bar-fill ${barClass}" style="width: ${barWidth}%;"></div>` : '<div id="charge-power-bar-fill" class="charge-power-bar-fill" style="width:0;"></div>'}
-                    ${commandedMarkerHtml}
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 2: Battery Level (full width) -->
-        <div class="charge-battery-display" style="width: 100%;">
-            <div class="charge-battery-label-value">
-                <span class="charge-battery-label">Battery Level:</span>
-                <span class="charge-battery-value">
-                    <span class="charge-value-highlight">${electricLevel}%</span> (${usableNetKwh.toFixed(2)} kWh - ${roomToChargeKwh.toFixed(2)} kWh)
+    const lastUpdateHtml = zendureData.timestamp
+        ? (() => {
+            const relativeTime = formatRelativeTimeJS(zendureData.timestamp);
+            const absoluteTime = formatAbsoluteTimeJS(zendureData.timestamp);
+            return `
+                <span class="charge-last-update" id="charge-last-update">
+                    Last update: ${escapeHtml(relativeTime)}
+                    <span class="charge-timestamp-full">(${escapeHtml(absoluteTime)})</span>
                 </span>
-            </div>
-            <div class="charge-battery-bar">
-                <div class="charge-battery-bar-marker min" style="left: ${MIN_CHARGE_LEVEL}%;" title="Minimum: ${MIN_CHARGE_LEVEL}%"></div>
-                <div class="charge-battery-bar-marker max" style="left: ${MAX_CHARGE_LEVEL}%;" title="Maximum: ${MAX_CHARGE_LEVEL}%"></div>
-                <div class="charge-battery-bar-fill" style="width: ${Math.min(100, Math.max(0, electricLevel))}%; background-color: ${escapeHtml(systemStatus.color)};"></div>
-            </div>
-        </div>
-    `;
+            `;
+        })()
+        : '';
+    const contentEl = ensureChargeStatusContent(container, isMobile, isDetailsExpanded, chargeDischargeValue);
+    contentEl.dataset.actualPower = chargeDischargeValue;
 
-    // Build content HTML
-    const contentEl = document.createElement('div');
-    contentEl.id = 'charge-status-content';
-    contentEl.className = isMobile ? 'charge-status-mobile' : 'charge-status-content';
-    contentEl.dataset.actualPower = chargeDischargeValue;  // used by applyPendingPowerState()
-    if (isMobile) {
-        contentEl.style.display = 'grid';
-        contentEl.style.gridTemplateColumns = 'minmax(0, 0.5fr) minmax(0, 1.5fr)';
-        contentEl.style.gap = '10px';
-    } else {
-        contentEl.style.display = 'flex';
-        contentEl.style.flexDirection = 'column';
-        contentEl.style.gap = '12px';
-    }
-    contentEl.innerHTML = isMobile ? mobileContentHtml : desktopContentHtml;
+    const statusIndicator = contentEl.querySelector('[data-role="status-indicator"]');
+    const statusIcon = contentEl.querySelector('[data-role="status-icon"]');
+    const statusTitle = contentEl.querySelector('[data-role="status-title"]');
+    const statusSubtitle = contentEl.querySelector('[data-role="status-subtitle"]');
+    const powerValueEl = contentEl.querySelector('[data-role="power-value"]');
+    const batterySummaryValue = contentEl.querySelector('[data-role="battery-summary-value"]');
+    const batterySummaryFill = contentEl.querySelector('[data-role="battery-summary-fill"]');
+    const batteryMinMarker = contentEl.querySelector('[data-role="battery-min-marker"]');
+    const batteryMaxMarker = contentEl.querySelector('[data-role="battery-max-marker"]');
+    const detailsSection = contentEl.querySelector('#charge-status-details-collapsible');
+    const detailsToggle = contentEl.querySelector('#charge-details-toggle');
+    const detailsToggleText = detailsToggle?.querySelector('.charge-details-toggle-text');
 
-    container.appendChild(contentEl);
-
-    // Update or create last update time element
-    // Remove any existing last update element to ensure correct order
-    const existingLastUpdateDiv = container.querySelector('.charge-status-header');
-    if (existingLastUpdateDiv) {
-        existingLastUpdateDiv.remove();
+    if (statusIndicator) {
+        statusIndicator.className = `charge-status-indicator ${systemStatus.class}`;
+        if (isMobile) {
+            statusIndicator.style.padding = '10px';
+            statusIndicator.style.borderRadius = '6px';
+        } else {
+            statusIndicator.style.flex = '0 0 40%';
+            statusIndicator.style.maxWidth = '40%';
+        }
     }
 
-    if (zendureData.timestamp) {
-        const relativeTime = formatRelativeTimeJS(zendureData.timestamp);
-        const absoluteTime = formatAbsoluteTimeJS(zendureData.timestamp);
-
-        // Create new element and append to container (after content)
-        const newLastUpdateDiv = document.createElement('div');
-        newLastUpdateDiv.className = 'charge-status-header';
-        newLastUpdateDiv.innerHTML = `
-            <span class="charge-last-update" id="charge-last-update">
-                Last update: ${escapeHtml(relativeTime)}
-                <span class="charge-timestamp-full">(${escapeHtml(absoluteTime)})</span>
-            </span>
-        `;
-        container.appendChild(newLastUpdateDiv);
+    if (statusIcon) {
+        statusIcon.textContent = systemStatus.icon;
     }
+
+    if (statusTitle) {
+        statusTitle.textContent = systemStatus.title;
+    }
+
+    if (statusSubtitle && !isMobile) {
+        statusSubtitle.textContent = systemStatus.subtitle;
+    }
+
+    if (powerValueEl) {
+        powerValueEl.style.color = powerColor;
+        powerValueEl.innerHTML = `${escapeHtml(powerDisplay)}${timeEstimate ? ` <span class="charge-power-time">${isMobile ? `(${escapeHtml(timeEstimate)})` : `(${escapeHtml(timeEstimate)})`}</span>` : ''}`;
+    }
+
+    if (batterySummaryValue) {
+        batterySummaryValue.innerHTML = `<span class="charge-value-highlight">${electricLevel}%</span> (${usableNetKwh.toFixed(2)} kWh - ${roomToChargeKwh.toFixed(2)} kWh)`;
+    }
+
+    if (batterySummaryFill) {
+        batterySummaryFill.style.width = `${Math.min(100, Math.max(0, electricLevel))}%`;
+        batterySummaryFill.style.backgroundColor = systemStatus.color;
+    }
+
+    if (batteryMinMarker) {
+        batteryMinMarker.style.left = `${MIN_CHARGE_LEVEL}%`;
+        batteryMinMarker.title = `Minimum: ${MIN_CHARGE_LEVEL}%`;
+    }
+
+    if (batteryMaxMarker) {
+        batteryMaxMarker.style.left = `${MAX_CHARGE_LEVEL}%`;
+        batteryMaxMarker.title = `Maximum: ${MAX_CHARGE_LEVEL}%`;
+    }
+
+    if (detailsSection) {
+        detailsSection.classList.toggle('expanded', isDetailsExpanded);
+    }
+
+    if (detailsToggle) {
+        detailsToggle.classList.toggle('expanded', isDetailsExpanded);
+    }
+
+    if (detailsToggleText) {
+        detailsToggleText.textContent = isDetailsExpanded ? 'Show less' : 'Show more';
+    }
+
+    setPowerBarState(contentEl, barWidth, barClass, minPower, maxPower, commandedPower);
+    setLastUpdateElements(container, contentEl, isMobile, lastUpdateHtml);
 }
 
 // Helper functions for rendering
@@ -1093,6 +1212,14 @@ function findElementByLabel(container, labelText) {
  * @param {Object} zendureData - Zendure data from API
  * @param {Object} p1Data - P1 data from API (optional)
  */
+function animateGridValueRefresh(valueEl) {
+    if (!valueEl) return;
+
+    valueEl.classList.remove('grid-value-refresh');
+    void valueEl.offsetWidth;
+    valueEl.classList.add('grid-value-refresh');
+}
+
 function renderChargeStatusDetails(zendureData, p1Data = null) {
     const detailsContainer = document;
 
@@ -1128,7 +1255,10 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const p1TotalPower = p1Data?.total_power || p1Data?.data?.total_power || 0;
         const gridPowerDisplay = p1TotalPower.toLocaleString();
 
-        gridValueSpan.innerHTML = `<span class="charge-value-highlight">${escapeHtml(gridPowerDisplay)}</span> W`;
+        gridValueSpan.innerHTML = `<span class="charge-value-highlight charge-grid-value-highlight">${escapeHtml(gridPowerDisplay)}</span> W`;
+
+        const gridAnimatedValue = gridValueSpan.querySelector('.charge-grid-value-highlight');
+        animateGridValueRefresh(gridAnimatedValue);
 
         // Calculate bar width for -1200 to +1200 range
         const minGridPower = (typeof GRID_MIN_POWER !== 'undefined' && Number.isFinite(Number(GRID_MIN_POWER)))

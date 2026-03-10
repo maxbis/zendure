@@ -21,6 +21,7 @@ let wasPageHidden = false;
 let activeRefreshIntervalMs = NORMAL_REFRESH_INTERVAL_MS;
 let remainingBoostTicks = 0;
 let nextScheduleRefreshAt = null;
+window.chargeStatusDetailsExpanded = window.chargeStatusDetailsExpanded || false;
 
 // Track if "back-end not running" dialog was already shown (avoid duplicate modals)
 let noBackendDialogShown = false;
@@ -442,6 +443,7 @@ function toggleChargeStatusDetails() {
 
     // Toggle expanded class on collapsible section
     const isExpanded = collapsibleSection.classList.toggle('expanded');
+    window.chargeStatusDetailsExpanded = isExpanded;
 
     // Update toggle button appearance and text
     if (isExpanded) {
