@@ -806,7 +806,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             active = bool(pause_getter())
             self._send_json({"ok": True, "pauseActive": active})
         except Exception as e:
-            self._send_json({"ok": False, "error": str(e)}, 500)
+            active = bool(pause_getter())
+            self._send_json({"ok": False, "error": str(e), "pauseActive": active}, 500)
         return True
 
     def _allowed_runtime_log_levels(self) -> list[str]:
@@ -1773,10 +1774,19 @@ class AutomationApp:
         if active == self.pause_override_active:
             self.logger.info(f"Pause override already {'ON' if active else 'OFF'}.")
             return
-        self.pause_override_active = active
         if active:
-            self.logger.info("Pause override enabled: forcing power to 0 until pause is cancelled.")
+            result = self.controller.set_power(0)
+            if not result.success:
+                raise RuntimeError(f"Failed to set power to 0 before enabling pause: {result.error}")
+
+            self.pause_override_active = True
+            self.value = 0
+            self.old_value = 0
+            p1_w = self.last_p1_total_power
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0, p1_total_power=p1_w)
+            self.logger.info("Pause override enabled after setting power to 0.")
         else:
+            self.pause_override_active = False
             self.logger.info("Pause override disabled: schedule control resumed.")
 
     def _warn_runtime_condition_once(self, key: str, message: str) -> None:
