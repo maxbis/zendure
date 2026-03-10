@@ -66,7 +66,7 @@
                         </div>
                         <div class="charge-battery-display" data-metric="system-temp">
                             <div class="charge-battery-label-value">
-                                <span class="charge-battery-label">Temperture:</span>
+                                <span class="charge-battery-label">Temp:</span>
                                 <span class="charge-battery-value">-- °C</span>
                             </div>
                             <div class="charge-battery-bar">
@@ -76,7 +76,7 @@
                         <div class="charge-battery-display" data-metric="battery1-level">
                             <div class="charge-battery-label-value">
                                 <span class="charge-battery-label">B1:</span>
-                                <span class="charge-battery-value">--% (-- - -- )</span>
+                                <span class="charge-battery-value">--%</span>
                             </div>
                             <div class="charge-battery-bar">
                                 <div class="charge-battery-bar-marker min" title="Minimum"></div>
@@ -86,7 +86,7 @@
                         </div>
                         <div class="charge-battery-display" data-metric="battery1-temp">
                             <div class="charge-battery-label-value">
-                                <span class="charge-battery-label">B1 Temp:</span>
+                                <span class="charge-battery-label">B1:</span>
                                 <span class="charge-battery-value">-- °C</span>
                             </div>
                             <div class="charge-battery-bar">
@@ -96,7 +96,7 @@
                         <div class="charge-battery-display" data-metric="battery2-level">
                             <div class="charge-battery-label-value">
                                 <span class="charge-battery-label">B2:</span>
-                                <span class="charge-battery-value">--% (-- - --)</span>
+                                <span class="charge-battery-value">--%</span>
                             </div>
                             <div class="charge-battery-bar">
                                 <div class="charge-battery-bar-marker min" title="Minimum"></div>
@@ -106,7 +106,7 @@
                         </div>
                         <div class="charge-battery-display" data-metric="battery2-temp">
                             <div class="charge-battery-label-value">
-                                <span class="charge-battery-label">B2 Temp:</span>
+                                <span class="charge-battery-label">B2:</span>
                                 <span class="charge-battery-value">-- °C</span>
                             </div>
                             <div class="charge-battery-bar">

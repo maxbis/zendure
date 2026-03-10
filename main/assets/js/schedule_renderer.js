@@ -1145,7 +1145,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const wifiBarFill = wifiDisplay.querySelector('.charge-battery-bar-fill');
 
         if (wifiValue) {
-            wifiValue.textContent = `${rssiScore.toFixed(1)}/10 (${rssi.toLocaleString()} dBm)`;
+            wifiValue.textContent = `${rssi.toLocaleString()} dBm`;
         }
         if (wifiBarFill) {
             wifiBarFill.style.width = `${Math.min(100, Math.max(0, rssiScore * 10))}%`;
@@ -1189,7 +1189,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const battery1MaxMarker = battery1LevelDisplay.querySelector('.charge-battery-bar-marker.max');
 
         if (battery1Value) {
-            battery1Value.textContent = `${pack1Soc.toFixed(0)}% (${pack1UsableNetKwh.toFixed(2)} - ${pack1RoomToChargeKwh.toFixed(2)})`;
+            battery1Value.textContent = `${pack1Soc.toFixed(0)}%`;
         }
         if (battery1BarFill) {
             battery1BarFill.style.width = `${Math.min(100, Math.max(0, pack1Soc))}%`;
@@ -1240,7 +1240,7 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const battery2MaxMarker = battery2LevelDisplay.querySelector('.charge-battery-bar-marker.max');
 
         if (battery2Value) {
-            battery2Value.textContent = `${pack2Soc.toFixed(0)}% (${pack2UsableNetKwh.toFixed(2)} - ${pack2RoomToChargeKwh.toFixed(2)})`;
+            battery2Value.textContent = `${pack2Soc.toFixed(0)}%`;
         }
         if (battery2BarFill) {
             battery2BarFill.style.width = `${Math.min(100, Math.max(0, pack2Soc))}%`;
