@@ -1,6 +1,6 @@
 # `device_controller.py` Documentation
 
-This file provides a set of Python classes designed to interact with and control a Zendure SuperBase V battery system, a P1 smart meter, and associated web APIs for scheduling. It is structured using Object-Oriented principles to create a clear and reusable interface for automation tasks.
+This file provides a set of Python classes designed to interact with and control a Zendure SuperBase V battery system and associated web APIs for scheduling. Power-meter access is handled separately through the config-driven loader in `power_metere_loader.py`.
 
 ## Global Constants
 
@@ -56,11 +56,10 @@ This is the foundational class that provides common functionality to all other c
 
 A standalone class that handles accumulation and persistence of power/energy related values.
 - Accumulates **power feed** energy (watt-hours) over quarter-hour, hour, day, and manual periods.
-- Tracks **P1 hourly energy deltas** based on P1 meter cumulative kWh readings and stores hourly values in `data/p1_hourly_energy.json`.
 
 ### `__init__(self, logger=None, log_file_path=None)`
 
--   **Description**: Initializes the PowerAccumulator for power feed accumulation and P1 hourly energy delta tracking.
+-   **Description**: Initializes the PowerAccumulator for power feed accumulation.
 -   **Arguments**:
     -   `logger`: Optional logger object with `log()` method (for logging accumulation events).
     -   `log_file_path`: Optional path to log file for accumulation logs.
@@ -70,16 +69,6 @@ A standalone class that handles accumulation and persistence of power/energy rel
 -   **Description**: Accumulates power feed energy over time into four separate accumulators. Tracks energy (watt-hours) accumulated over quarter-hour periods (resets at 0, 15, 30, 45 minutes), hourly periods (resets at full hour), daily periods (resets at midnight), and a manual accumulator (only resets when explicitly set to 0).
 -   **Arguments**:
     -   `power_feed` (int): Power feed value in watts (signed: positive=charge, negative=discharge).
-
-### `accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float) -> Tuple[float, float]`
-
--   **Description**: Tracks hourly energy deltas from the P1 meter using cumulative kWh readings (import/export). Maintains a reference that resets at the start of each hour and stores hourly deltas in `data/p1_hourly_energy.json`.
--   **Arguments**:
-    -   `import_kwh` (float): Cumulative import energy in kWh from the P1 meter.
-    -   `export_kwh` (float): Cumulative export energy in kWh from the P1 meter.
--   **Returns**: A tuple of `(import_delta_kwh, export_delta_kwh)` for the current hour.
-
----
 
 ## `AutomateController`
 
@@ -119,19 +108,19 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 
 ### `calculate_netzero_power(self, mode: Literal['netzero', 'netzero+'] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> int`
 
--   **Description**: Orchestrates the net-zero calculation by fetching the latest data from the P1 meter and the Zendure device, then calculating what power setting is needed to achieve zero feed-in.
+-   **Description**: Orchestrates the net-zero calculation by using caller-supplied P1 meter data plus the latest Zendure device state, then calculating what power setting is needed to achieve zero feed-in.
 -   **Arguments**:
     -   `mode` ('netzero' or 'netzero+'): In 'netzero' mode, the battery can charge or discharge. In 'netzero+' mode, it can only charge (it will not discharge to the grid). Defaults to 'netzero'.
-    -   `p1_data` (Optional[Dict[str, Any]]): Optional pre-read P1 meter data. If provided, will be used instead of reading again.
+    -   `p1_data` (Optional[Dict[str, Any]]): Required normalized P1 meter data supplied by the caller for dynamic power modes. Must contain `total_power`.
 -   **Returns**: The calculated power value to set (positive for charge, negative for discharge, 0 for stop).
--   **Raises**: `ValueError` if P1 meter or Zendure data cannot be read. `requests.exceptions.RequestException` on network errors.
+-   **Raises**: `ValueError` if caller-supplied P1 meter data is missing/invalid or Zendure data cannot be read. `requests.exceptions.RequestException` on network errors.
 
 ### `set_power(self, value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> PowerResult`
 
 -   **Description**: The main public method for setting the battery's power. It can accept a specific integer power value or a dynamic mode like 'netzero'.
 -   **Arguments**:
     -   `value`: An integer power value (in watts, positive=charge, negative=discharge, 0=stop), 'netzero', 'netzero+', or `None`. If `None`, defaults to 'netzero'.
-    -   `p1_data` (Optional[Dict[str, Any]]): Optional pre-read P1 meter data. If provided and `value` is netzero/netzero+, will be used instead of reading P1 meter again.
+    -   `p1_data` (Optional[Dict[str, Any]]): Required normalized P1 meter data when `value` is `netzero`, `netzero+`, or `None`.
 -   **Returns**: A `PowerResult` object indicating the outcome.
 -   **Raises**: `ValueError` if `value` is invalid.
 -   **Note**: Test mode is controlled by `config.json` key `"TEST_MODE"`. When enabled, operations are simulated but not applied.
@@ -145,30 +134,23 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 
 ## `DeviceDataReader`
 
-Inherits from `BaseDeviceController`. This class is used to read data from the P1 meter and the Zendure device, and optionally store it via API endpoints.
+Inherits from `BaseDeviceController`. This class is used to read data from the Zendure device.
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the DeviceDataReader. It finds and loads the `config.json` file and extracts the P1 meter IP and device IP from the configuration.
+-   **Description**: Initializes the DeviceDataReader. It finds and loads the `config.json` file and extracts the Zendure device IP from the configuration.
 -   **Arguments**:
     -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it searches for `config.json` in standard locations.
 -   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.
 
 ### `_store_data_via_api(self, api_url: Optional[str], data: dict, data_type: str = "data") -> bool`
 
--   **Description**: A helper method that sends data (e.g., a new P1 reading or Zendure state) to a specified web API endpoint for storage. This is used to keep a historical record of device states. Logs warnings on failure but does not raise exceptions.
+-   **Description**: A helper method that sends data (for example a Zendure state snapshot) to a specified web API endpoint for storage. This is used to keep a historical record of device states. Logs warnings on failure but does not raise exceptions.
 -   **Arguments**:
     -   `api_url` (Optional[str]): API endpoint URL (from config). If `None`, operation is skipped.
     -   `data` (dict): Data dictionary to store.
-    -   `data_type` (str): Type of data for logging (e.g., "P1 meter data", "Zendure data"). Defaults to "data".
+    -   `data_type` (str): Type of data for logging (e.g., "Zendure data"). Defaults to "data".
 -   **Returns**: `True` if storage was successful, `False` otherwise.
-
-### `read_p1_meter(self, update_json: bool = True) -> Optional[dict]`
-
--   **Description**: Fetches the latest data from the P1 meter via its local API.
--   **Arguments**:
-    -   `update_json` (bool): If `True`, the new reading is also sent to the storage API. Defaults to `True`.
--   **Returns**: A dictionary with the P1 meter data (including `deviceId`, `total_power`, phase powers, and `timestamp`), or `None` on error.
 
 ### `read_zendure(self, update_json: bool = True) -> Optional[dict]`
 

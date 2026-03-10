@@ -64,7 +64,8 @@ Important keys to set:
 
 - `TEST_MODE` (set `false` for live control)
 - `deviceIp`, `deviceSn`
-- `p1Meter.ip`, `p1Meter.endpoint`, `p1Meter.totalPowerPath`
+- `powerMeter.type`
+- `powerMeter.p1_hw.ip`, `powerMeter.p1_hw.endpoint`, `powerMeter.p1_hw.totalPowerPath`
 - `apiUrl` (resolved schedule endpoint)
 - loop and threshold values:
   - `LOOP_INTERVAL_SECONDS`
@@ -168,4 +169,3 @@ Allowed key storage:
 - **Automation not acting**
   - `TEST_MODE` still true
   - incorrect `deviceIp` / `deviceSn` / P1 config
-

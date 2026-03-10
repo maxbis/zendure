@@ -3,15 +3,15 @@
 Device Controller - OOP wrapper for Zendure battery control and data reading
 
 This module provides object-oriented interfaces for controlling the Zendure
-battery system and reading data from P1 meter and Zendure devices, based on
-the functionality in zero_feed_in_controller.py.
+battery system and reading data from Zendure devices, based on the
+functionality in zero_feed_in_controller.py.
 """
 
 import json
 import time
 
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, Union, Literal, List
 from zoneinfo import ZoneInfo
@@ -323,8 +323,8 @@ class PowerAccumulator:
     """
     Handles accumulation of power values over time periods.
 
-    Tracks energy (watt-hours) for both power feed and P1 meter readings
-    across multiple time periods: quarter-hour, hour, day, and manual.
+    Tracks energy (watt-hours) for power feed readings across multiple time
+    periods: quarter-hour, hour, day, and manual.
     """
 
     def __init__(self, logger=None, log_file_path=None):
@@ -338,219 +338,15 @@ class PowerAccumulator:
         self.logger = logger
         self.log_file_path = log_file_path
 
-        # P1 hourly energy tracking (for total_power_import_kwh and total_power_export_kwh)
-        self.p1_hourly_reference: Optional[Dict[str, float]] = None  # Reference values: {'import_kwh': X, 'export_kwh': Y}
-        self.p1_hourly_last_reset_hour: Optional[int] = None  # Last hour when reference was reset (0-23)
-        # JSON file path for hourly energy data (in data/ directory)
-        script_dir = Path(__file__).parent
-        data_dir = script_dir.parent / "data"
-        self.p1_hourly_json_path = data_dir / "p1_hourly_energy.json"
-        self.p1_hourly_data: Dict[str, Dict[str, Dict[str, float]]] = {}  # {date: {hour: {import_delta_kwh, export_delta_kwh}}}
         self.last_zendure_data: Optional[dict] = None
         # Snapshot of the active schedule entry copied in from the automation loop.
         # Expected shape: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
         self.last_schedule_entry: Optional[Dict[str, Any]] = None
 
-        # Load persisted data on initialization
-        self._load_p1_hourly_data()
-
     def _log(self, level: str, message: str):
         """Helper method to log messages using the logger if available."""
         if self.logger:
             self.logger.log(level, message, file_path=self.log_file_path)
-
-    def _load_p1_hourly_data(self) -> None:
-        """
-        Load P1 hourly reference values and JSON data from file on startup.
-
-        Loads reference values and hourly data from JSON file if it exists.
-        If file doesn't exist or is invalid, starts with empty state.
-        """
-        if not self.p1_hourly_json_path.exists():
-            # File doesn't exist yet, start fresh
-            return
-
-        try:
-            with open(self.p1_hourly_json_path, 'r') as f:
-                data = json.load(f)
-
-            # Load reference values from _metadata key if present
-            metadata = data.get('_metadata', {})
-            if metadata:
-                # Preferred (new) format: values stored in kWh
-                ref_import = metadata.get('reference_import_kwh')
-                ref_export = metadata.get('reference_export_kwh')
-                last_reset_hour = metadata.get('last_reset_hour')
-
-                if ref_import is not None and ref_export is not None:
-                    self.p1_hourly_reference = {
-                        'import_kwh': float(ref_import),
-                        'export_kwh': float(ref_export)
-                    }
-                if last_reset_hour is not None:
-                    self.p1_hourly_last_reset_hour = int(last_reset_hour)
-
-            # Load hourly data (exclude _metadata key)
-            self.p1_hourly_data = {
-                date_str: hour_data
-                for date_str, hour_data in data.items()
-                if date_str != '_metadata'
-            }
-
-        except (json.JSONDecodeError, KeyError, ValueError, OSError):
-            # File exists but is invalid, start fresh
-            self.p1_hourly_data = {}
-            self.p1_hourly_reference = None
-            self.p1_hourly_last_reset_hour = None
-
-    def _save_p1_hourly_data(self) -> None:
-        """
-        Save P1 hourly reference values and JSON data to file.
-
-        Creates data directory if it doesn't exist and saves both
-        reference values (in _metadata) and hourly data.
-        """
-        try:
-            # Create data directory if it doesn't exist
-            self.p1_hourly_json_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Prepare data structure with metadata and hourly data
-            data_to_save = {
-                '_metadata': {
-                    # Store reference values in kWh (preferred format; matches loader expectations)
-                    'reference_import_kwh': float(self.p1_hourly_reference.get('import_kwh')) if self.p1_hourly_reference else None,
-                    'reference_export_kwh': float(self.p1_hourly_reference.get('export_kwh')) if self.p1_hourly_reference else None,
-                    'last_reset_hour': self.p1_hourly_last_reset_hour,
-                }
-            }
-            # Add hourly data
-            data_to_save.update(self.p1_hourly_data)
-            # Write to file
-            with open(self.p1_hourly_json_path, 'w') as f:
-                json.dump(data_to_save, f, indent=2)
-
-        except (OSError, TypeError, ValueError):
-            # Don't crash if persistence fails
-            pass
-
-    def accumulate_p1_reading_hourly(self, import_kwh: float, export_kwh: float) -> Tuple[float, float]:
-        """
-        Accumulate P1 meter hourly energy deltas from cumulative kWh readings.
-
-        Tracks hourly energy changes (deltas) from P1 meter cumulative readings
-        (total_power_import_kwh and total_power_export_kwh). Maintains reference
-        values that reset at the start of each hour and stores hourly delta
-        measurements in a JSON file organized by date.
-
-        Args:
-            import_kwh: Cumulative import energy in kWh from P1 meter
-            export_kwh: Cumulative export energy in kWh from P1 meter
-
-        Returns:
-            Tuple[float, float]: (import_delta_kwh, export_delta_kwh) for the current hour
-        """
-        # Get current time in Europe/Amsterdam timezone
-        tz = ZoneInfo('Europe/Amsterdam')
-        now = datetime.now(tz=tz)
-        current_hour = now.hour
-        current_date_str = now.strftime('%Y-%m-%d')
-        current_hour_str = now.strftime('%H')
-
-        # Initialize reference if needed (first call or reference is None/0)
-        if (self.p1_hourly_reference is None or
-            self.p1_hourly_reference.get('import_kwh', 0) is None or
-            self.p1_hourly_reference.get('export_kwh', 0) is None ):
-            # Set first measurement as reference
-            self.p1_hourly_reference = {
-                'import_kwh': float(import_kwh),
-                'export_kwh': float(export_kwh)
-            }
-            self.p1_hourly_last_reset_hour = current_hour
-            self._log('debug', f"P1 hourly reference set: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
-            # Save initial state
-            self._save_p1_hourly_data()
-            return 0.0, 0.0
-
-        # Calculate deltas from reference
-        import_delta = float(import_kwh) - self.p1_hourly_reference['import_kwh']
-        export_delta = float(export_kwh) - self.p1_hourly_reference['export_kwh']
-
-        # Detect hour boundary: check if we're at or past a new hour
-        # Only reset once per hour - if last_reset_hour differs from current_hour, we need to reset
-        should_reset = False
-        if self.p1_hourly_last_reset_hour is None:
-            # First time tracking, reset now
-            should_reset = True
-        elif self.p1_hourly_last_reset_hour != current_hour:
-            # Different hour - we're at or past a new hour, reset now
-            should_reset = True
-
-        if should_reset:
-            # Store last hour's measurement (delta values) before resetting reference
-            # Calculate what the last hour's delta was (before reset)
-            last_hour_delta_import = float(import_kwh) - self.p1_hourly_reference['import_kwh']
-            last_hour_delta_export = float(export_kwh) - self.p1_hourly_reference['export_kwh']
-
-            # Determine which date/hour to store this measurement in
-            # If we just crossed the hour boundary, store in the previous hour
-            # But if last_reset_hour is None, this is the first reset, so store in current hour
-            if self.p1_hourly_last_reset_hour is not None:
-                # We crossed an hour boundary - store in the previous hour
-                # Calculate previous hour and potentially previous date
-                prev_hour = self.p1_hourly_last_reset_hour
-                store_date_str = current_date_str
-                # Handle date boundary (if we went from 23 to 0)
-                if current_hour == 0 and self.p1_hourly_last_reset_hour == 23:
-                    # Went back a day
-                    store_date_str = (now - timedelta(days=1)).strftime('%Y-%m-%d')
-                store_hour_str = f"{prev_hour:02d}"
-            else:
-                # First reset ever, store in current hour (though this is unusual)
-                store_date_str = current_date_str
-                store_hour_str = current_hour_str
-
-            # Initialize date entry if needed
-            if store_date_str not in self.p1_hourly_data:
-                self.p1_hourly_data[store_date_str] = {}
-
-            electric_level = None
-            if self.last_zendure_data:
-                props = self.last_zendure_data.get("properties", {})
-                electric_level = props.get("electricLevel")
-
-            schedule_entry = self.last_schedule_entry if isinstance(self.last_schedule_entry, dict) else None
-            schedule_time = schedule_entry.get('time') if schedule_entry else None
-            schedule_value = schedule_entry.get('value') if schedule_entry else None
-            schedule_key = schedule_entry.get('key') if schedule_entry else None
-
-            # Store the last hour's delta values
-            self.p1_hourly_data[store_date_str][store_hour_str] = {
-                'import_delta_wh': int(last_hour_delta_import*1000),
-                'export_delta_wh': int(last_hour_delta_export*1000),
-                'electric_level': electric_level,
-                'schedule_time': schedule_time,
-                'schedule_value': schedule_value,
-                'schedule_key': schedule_key,
-            }
-
-            self._log('debug', f"Hourly measurement stored for {store_date_str} {store_hour_str}:00 - "
-                    f"import_delta={int(last_hour_delta_import*1000)} Wh, export_delta={int(last_hour_delta_export*1000)} Wh")
-
-            # Reset reference values to current values
-            self.p1_hourly_reference = {
-                'import_kwh': float(import_kwh),
-                'export_kwh': float(export_kwh)
-            }
-            self.p1_hourly_last_reset_hour = current_hour
-
-            self._log('debug', f"P1 hourly reference reset at {current_hour:02d}:00 - "
-                    f"new reference: import={import_kwh:.3f} kWh, export={export_kwh:.3f} kWh")
-
-            # Save data after reset
-            self._save_p1_hourly_data()
-        # Note: We don't save on every call, only when reference resets to avoid excessive I/O
-
-        return import_delta, export_delta
 
 class AutomateController(BaseDeviceController):
     """
@@ -884,39 +680,31 @@ class AutomateController(BaseDeviceController):
         """
         Calculate the actual power value needed to achieve netzero/netzero+ mode.
 
-        This method reads P1 meter data and current Zendure state, then calculates
-        what power setting is needed to achieve zero feed-in.
+        This method uses caller-supplied P1 meter data and current Zendure state,
+        then calculates what power setting is needed to achieve zero feed-in.
 
         Args:
             mode: 'netzero' (can charge or discharge) or 'netzero+' (only charge, no discharge)
-            p1_data: Optional pre-read P1 meter data. If provided, will be used instead of reading again.
+            p1_data: Required normalized P1 meter data from the caller.
 
         Returns:
             int: Power value in watts (positive=charge, negative=discharge, 0=stop)
 
         Raises:
-            ValueError: If P1 meter or Zendure data cannot be read
+            ValueError: If P1 meter data is missing/invalid or Zendure data cannot be read
             requests.exceptions.RequestException: On network errors
         """
-        # Use DeviceDataReader to get current data
-        reader = get_reader(self.config_path)
-
-        # Read P1 meter data if not provided
         if p1_data is None:
-            p1_data = reader.read_p1_meter(update_json=True)
-            if not p1_data:
-                raise ValueError("Failed to read P1 meter data")
-        else:
-            # If P1 data was provided, still update JSON to ensure it's stored
-            reader.read_p1_meter(update_json=True)
+            raise ValueError("P1 meter data must be supplied by the caller for dynamic power modes")
 
         p1_power = p1_data.get("total_power")
         if p1_power is None:
-            raise ValueError("P1 meter data missing 'total_power' field")
+            raise ValueError("P1 meter data supplied by the caller is missing 'total_power'")
 
         self.log('info', f"P1 power (grid-status): {p1_power}")
 
         # Read Zendure state
+        reader = get_reader(self.config_path)
         zendure_data = reader.read_zendure(update_json=True)
         if not zendure_data:
             raise ValueError("Failed to read Zendure device data")
@@ -1003,8 +791,7 @@ class AutomateController(BaseDeviceController):
                 - int: Specific power feed in watts (positive=charge, negative=discharge, 0=stop)
                 - 'netzero' or None: Use dynamic zero feed-in calculation (default)
                 - 'netzero+': Use dynamic zero feed-in calculation, but only charge (no discharge)
-            p1_data: Optional pre-read P1 meter data. If provided and value is netzero/netzero+,
-                     will be used instead of reading P1 meter again.
+            p1_data: Required normalized P1 meter data when value is netzero/netzero+.
 
         Returns:
             PowerResult: Result object with success status, power value, and optional error message
@@ -1036,10 +823,15 @@ class AutomateController(BaseDeviceController):
         if value == 'netzero' or value == 'netzero+' or value is None:
             # Determine mode (default to 'netzero' if None)
             mode = value if value is not None else 'netzero'
+            if p1_data is None:
+                return PowerResult(
+                    success=False,
+                    power=0,
+                    error="P1 meter data must be supplied by the caller for dynamic power modes",
+                )
 
             try:
                 # Calculate the actual power value needed
-                # Pass p1_data if provided to avoid reading P1 meter again
                 calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)
 
                 # If test mode, just return the calculated value without applying
@@ -1088,21 +880,18 @@ class AutomateController(BaseDeviceController):
 
 class DeviceDataReader(BaseDeviceController):
     """
-    Class for reading data from P1 meter and Zendure battery devices via API calls.
+    Class for reading Zendure battery device data via API calls.
 
     This class handles reading device data and automatically storing it via API endpoints.
     """
 
     # Config keys
-    CONFIG_KEY_P1_METER_IP = "p1MeterIp"
-    CONFIG_KEY_P1_METER = "p1Meter"
     CONFIG_KEY_DEVICE_IP = "deviceIp"
 
     # API endpoints
     API_ENDPOINT_PROPERTIES_REPORT = "/properties/report"
 
     # Data field names
-    FIELD_TOTAL_POWER = "total_power"
     FIELD_TIMESTAMP = "timestamp"
     FIELD_PROPERTIES = "properties"
     FIELD_PACK_DATA = "packData"
@@ -1121,99 +910,8 @@ class DeviceDataReader(BaseDeviceController):
         """
         super().__init__(config_path)
 
-        # Load P1 meter config (new structure with ip/endpoint/path)
-        p1_meter_config = self.config.get(self.CONFIG_KEY_P1_METER, {})
-        if p1_meter_config and "ip" in p1_meter_config:
-            # New config structure: p1Meter object with ip, endpoint, totalPowerPath
-            self.p1_meter_ip = p1_meter_config.get("ip")
-            self.p1_meter_endpoint = p1_meter_config.get("endpoint", self.API_ENDPOINT_PROPERTIES_REPORT)
-            self.p1_total_power_path = p1_meter_config.get("totalPowerPath", self.FIELD_TOTAL_POWER)
-        else:
-            # Backward compatibility: old config structure with p1MeterIp at top level
-            self.p1_meter_ip = self.config.get(self.CONFIG_KEY_P1_METER_IP)
-            self.p1_meter_endpoint = self.API_ENDPOINT_PROPERTIES_REPORT
-            self.p1_total_power_path = self.FIELD_TOTAL_POWER
-        
         self.device_ip = self.config.get(self.CONFIG_KEY_DEVICE_IP)
         self.last_zendure_data: Optional[dict] = None
-
-    def _get_json_value(self, data: dict, path: str):
-        """
-        Navigate nested JSON structure using dot notation.
-
-        Args:
-            data: JSON dictionary to navigate
-            path: Dot-separated path (e.g., "data.total_power" or "total_power")
-
-        Returns:
-            Value at path, or None if path doesn't exist
-        """
-        keys = path.split('.')
-        value = data
-        for key in keys:
-            if isinstance(value, dict):
-                value = value.get(key)
-            else:
-                return None
-            if value is None:
-                return None
-        return value
-
-    def _get_p1_api_url(self) -> Optional[str]:
-        """
-        Get the P1 meter API URL from config.
-
-        Supports both new config structure (p1Meter object) and old structure (p1MeterIp).
-
-        Returns:
-            Full API URL string, or None if not configured
-        """
-        if not self.p1_meter_ip:
-            return None
-
-        return f"http://{self.p1_meter_ip}{self.p1_meter_endpoint}"
-
-    def read_p1_meter(self, update_json: bool = True) -> Optional[dict]:
-        """
-        Read data from P1 meter device via API call.
-
-        Args:
-            update_json: Ignored (kept for API compatibility).
-
-        Returns:
-            dict: Raw P1 meter data from device, or None on error
-        """
-        _ = update_json
-        url = self._get_p1_api_url()
-        if not url:
-            self.log('error', "P1 meter configuration not found in config.jsonc (check p1Meter or p1MeterIp)")
-            return None
-
-        try:
-            response = requests.get(url, timeout=self.REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-
-            # Extract total_power using configured JSON path
-            total_power = self._get_json_value(data, self.p1_total_power_path)
-
-            # Debug: log if extraction fails
-            if total_power is None:
-                self.log('warning', f"Failed to extract total_power using path '{self.p1_total_power_path}'. "
-                          f"Available keys in response: {list(data.keys())[:10]}")  # Show first 10 keys
-
-            # Add total_power to returned data for use by accumulation code
-            # Return the raw device data with total_power added
-            result = data.copy()
-            result[self.FIELD_TOTAL_POWER] = total_power
-            return result
-
-        except requests.exceptions.RequestException as e:
-            self.log('error', f"Error reading from P1 meter at {url}: {e}")
-            return None
-        except (json.JSONDecodeError, KeyError) as e:
-            self.log('error', f"Error parsing P1 response: {e}")
-            return None
 
     def read_zendure(self, update_json: bool = True) -> Optional[dict]:
         """

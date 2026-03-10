@@ -9,6 +9,7 @@ Run with:
 from __future__ import annotations
 
 import json
+import sqlite3
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import requests
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -301,6 +303,38 @@ def _import_automate_www_module():
     return automate_www
 
 
+def _import_power_meter_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import power_metere_p1_hw  # type: ignore
+    return power_metere_p1_hw
+
+
+def _import_shelly_power_meter_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import power_metere_shelly  # type: ignore
+    return power_metere_shelly
+
+
+def _import_power_meter_loader_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import power_metere_loader  # type: ignore
+    return power_metere_loader
+
+
+def _import_device_controller_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import device_controller  # type: ignore
+    return device_controller
+
+
 def _build_app_with_slot(slot: dict, electric_level: int):
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()
@@ -318,6 +352,450 @@ def _build_app_with_slot(slot: dict, electric_level: int):
     fake_reader = SimpleNamespace(last_zendure_data={"properties": {"electricLevel": electric_level}})
     automate_www.get_reader = lambda _config_path: fake_reader
     return app, logs
+
+
+def test_p1_power_meter_reader_reads_flat_total_power(tmp_path, monkeypatch):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "p1_hw",
+                    "p1_hw": {
+                        "ip": "127.0.0.1:1616",
+                        "endpoint": "/api/v1/data",
+                        "totalPowerPath": "active_power_w",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"active_power_w": -321, "deviceId": "meter-1"}
+
+    monkeypatch.setattr(power_meter_reader.requests, "get", lambda url, timeout: _Response())
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    result = reader.read()
+
+    assert result["total_power"] == -321
+    assert result["deviceId"] == "meter-1"
+
+
+def test_p1_power_meter_reader_reads_nested_total_power(tmp_path, monkeypatch):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "p1_hw",
+                    "p1_hw": {
+                        "ip": "127.0.0.1:1616",
+                        "endpoint": "/api/v1/data",
+                        "totalPowerPath": "data.metrics.grid_w",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"metrics": {"grid_w": 456}}}
+
+    monkeypatch.setattr(power_meter_reader.requests, "get", lambda url, timeout: _Response())
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    result = reader.read()
+
+    assert result["total_power"] == 456
+
+
+def test_p1_power_meter_reader_returns_none_on_request_failure(tmp_path, monkeypatch):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "p1_hw",
+                    "p1_hw": {
+                        "ip": "127.0.0.1:1616",
+                        "endpoint": "/api/v1/data",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _raise(_url, timeout):
+        raise requests.exceptions.RequestException("boom")
+
+    monkeypatch.setattr(power_meter_reader.requests, "get", _raise)
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    assert reader.read() is None
+
+
+def test_shelly_power_meter_reader_reads_total_power(tmp_path, monkeypatch):
+    power_meter_reader = _import_shelly_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "shelly",
+                    "shelly": {
+                        "ip": "127.0.0.1:1616",
+                        "endpoint": "/rpc/EM.GetStatus?id=0",
+                        "totalPowerPath": "total_act_power",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"total_act_power": 789, "a_current": 1.2}
+
+    monkeypatch.setattr(power_meter_reader.requests, "get", lambda url, timeout: _Response())
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    result = reader.read()
+
+    assert result["total_power"] == 789
+    assert result["a_current"] == 1.2
+
+
+def test_shelly_power_meter_reader_rounds_total_power_to_int(tmp_path, monkeypatch):
+    power_meter_reader = _import_shelly_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "shelly",
+                    "shelly": {
+                        "ip": "127.0.0.1:1616",
+                        "endpoint": "/rpc/EM.GetStatus?id=0",
+                        "totalPowerPath": "total_act_power",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"total_act_power": 789.456}
+
+    monkeypatch.setattr(power_meter_reader.requests, "get", lambda url, timeout: _Response())
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    result = reader.read()
+
+    assert result["total_power"] == 789
+
+
+def test_build_power_meter_reader_selects_p1(tmp_path):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps(
+            {
+                "powerMeter": {
+                    "type": "p1_hw",
+                    "p1_hw": {
+                        "ip": "127.0.0.1:1616",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reader = power_meter_reader.build_power_meter_reader(config_path=config_path)
+    assert isinstance(reader, power_meter_reader.P1PowerMeterReader)
+
+
+def test_build_power_meter_reader_requires_power_meter_block(tmp_path):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(json.dumps({}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="powerMeter configuration is required"):
+        power_meter_reader.build_power_meter_reader(config_path=config_path)
+
+
+def test_build_power_meter_reader_requires_type(tmp_path):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(json.dumps({"powerMeter": {}}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="powerMeter.type is required"):
+        power_meter_reader.build_power_meter_reader(config_path=config_path)
+
+
+def test_build_power_meter_reader_rejects_unsupported_type(tmp_path):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "modbus"}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unsupported powerMeter.type 'modbus'"):
+        power_meter_reader.build_power_meter_reader(config_path=config_path)
+
+
+def test_build_power_meter_reader_requires_p1_ip(tmp_path):
+    power_meter_reader = _import_power_meter_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "p1_hw", "p1_hw": {}}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="powerMeter.p1_hw.ip is required"):
+        power_meter_reader.build_power_meter_reader(config_path=config_path)
+
+
+def test_power_metere_loader_resolves_p1(tmp_path):
+    power_meter_loader = _import_power_meter_loader_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "p1_hw", "p1_hw": {"ip": "127.0.0.1"}}}),
+        encoding="utf-8",
+    )
+
+    reader = power_meter_loader.get_power_meter_reader(config_path=config_path)
+    assert reader.__class__.__name__ == "P1PowerMeterReader"
+
+
+def test_power_metere_loader_resolves_shelly(tmp_path):
+    power_meter_loader = _import_power_meter_loader_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "shelly", "shelly": {"ip": "127.0.0.1"}}}),
+        encoding="utf-8",
+    )
+
+    reader = power_meter_loader.get_power_meter_reader(config_path=config_path)
+    assert reader.__class__.__name__ == "ShellyPowerMeterReader"
+
+
+def test_power_metere_loader_rejects_invalid_identifier(tmp_path):
+    power_meter_loader = _import_power_meter_loader_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "Shelly-1"}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Invalid powerMeter.type 'Shelly-1'"):
+        power_meter_loader.get_power_meter_reader(config_path=config_path)
+
+
+def test_power_metere_loader_rejects_unknown_module(tmp_path):
+    power_meter_loader = _import_power_meter_loader_module()
+    config_path = tmp_path / "config.jsonc"
+    config_path.write_text(
+        json.dumps({"powerMeter": {"type": "modbus"}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unsupported powerMeter.type 'modbus'"):
+        power_meter_loader.get_power_meter_reader(config_path=config_path)
+
+
+def test_refresh_p1_for_api_uses_power_meter_reader():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.logger = SimpleNamespace(
+        info=lambda msg: None,
+        warning=lambda msg: None,
+        error=lambda msg: None,
+        debug=lambda msg: None,
+    )
+    app.controller = SimpleNamespace(config_path=Path("/tmp/config.jsonc"))
+
+    fake_reader = SimpleNamespace(read=lambda: {"total_power": -42, "source": "test-meter"})
+    automate_www.get_power_meter_reader = lambda _config_path: fake_reader
+
+    app._refresh_p1_for_api()
+
+    assert app.api_state.last_p1 is not None
+    assert app.api_state.last_p1.readings == {"total_power": -42, "source": "test-meter"}
+    assert app.last_p1_total_power == -42
+
+
+def test_apply_dynamic_power_command_reads_meter_once_and_passes_same_data():
+    automate_www = _import_automate_www_module()
+    device_controller = _import_device_controller_module()
+    app = automate_www.AutomationApp()
+    app.logger = SimpleNamespace(
+        info=lambda msg: None,
+        warning=lambda msg: None,
+        error=lambda msg: None,
+        debug=lambda msg: None,
+    )
+    app.controller = SimpleNamespace(
+        config_path=Path("/tmp/config.jsonc"),
+        set_power=lambda mode, p1_data=None: device_controller.PowerResult(
+            success=True,
+            power=123 if p1_data == {"total_power": -55} and mode == automate_www.POWER_MODE_NETZERO else 0,
+        ),
+    )
+
+    app._accumulate_p1_data = lambda: {"total_power": -55}
+
+    success, power, error = app._apply_dynamic_power_command(automate_www.POWER_MODE_NETZERO)
+
+    assert success is True
+    assert power == 123
+    assert error is None
+    assert app.api_state.last_p1 is not None
+    assert app.api_state.last_p1.readings == {"total_power": -55}
+
+
+def test_command_handler_uses_dynamic_power_setter_for_netzero():
+    automate_www = _import_automate_www_module()
+    calls = []
+    logs = []
+    handler = automate_www.CommandHandler(
+        controller=SimpleNamespace(set_power=lambda value: (_ for _ in ()).throw(AssertionError("should not call controller.set_power for dynamic mode"))),
+        schedule_controller=SimpleNamespace(),
+        status_api=SimpleNamespace(post_update=lambda *args, **kwargs: calls.append(("status", args, kwargs))),
+        logger=SimpleNamespace(
+            info=lambda msg: logs.append(("info", str(msg))),
+            warning=lambda msg: logs.append(("warning", str(msg))),
+            error=lambda msg: logs.append(("error", str(msg))),
+            debug=lambda msg: logs.append(("debug", str(msg))),
+        ),
+        dynamic_power_setter=lambda mode: (True, 321, None),
+    )
+
+    assert handler.handle("netzero") is True
+    assert any(level == "info" and "Power set to netzero" in msg for level, msg in logs)
+    assert calls
+
+
+def test_controller_set_power_requires_p1_data_for_dynamic_modes():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.test_mode = True
+
+    result = device_controller.AutomateController.set_power(controller, "netzero", p1_data=None)
+
+    assert result.success is False
+    assert "must be supplied by the caller" in str(result.error)
+
+
+def test_controller_calculate_netzero_power_requires_p1_data():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.config_path = Path("/tmp/config.jsonc")
+
+    with pytest.raises(ValueError, match="must be supplied by the caller"):
+        device_controller.AutomateController.calculate_netzero_power(controller, mode="netzero", p1_data=None)
+
+
+def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):
+    automate_www = _import_automate_www_module()
+    db_path = tmp_path / "status_updates.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        # One 30-minute charge segment at 600W -> 300Wh.
+        conn.execute(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            ("change", json.dumps(600), 77, 1735732800),
+        )
+        conn.execute(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            ("change", json.dumps(0), 78, 1735734600),
+        )
+        conn.commit()
+
+    result = automate_www.compute_wh_per_hour(str(db_path), now=1735734600, days_back=0)
+    end_dt = datetime.fromtimestamp(1735734600, tz=automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE))
+    today = end_dt.strftime("%Y-%m-%d")
+    hour_bucket = next(item for item in result[today] if item["hour"] == end_dt.strftime("%H"))
+
+    assert hour_bucket["charged_wh"] == pytest.approx(300.0)
+    assert hour_bucket["discharged_wh"] == pytest.approx(0.0)
+    assert hour_bucket["electric_level"] == 78
+
+
+def test_load_loop_config_prefers_selected_power_meter_interval():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.controller = SimpleNamespace(
+        config={
+            "LOOP_INTERVAL_SECONDS": 20,
+            "powerMeter": {
+                "type": "shelly",
+                "p1_hw": {"loopIntervalSeconds": 20},
+                "shelly": {"loopIntervalSeconds": 5},
+            },
+            "POWER_FEED_MAX_DELTA": 300,
+            "API_REFRESH_INTERVAL_SECONDS": 60,
+            "ZERO_COUNT_THRESHOLD_STANDBY": 3,
+        }
+    )
+
+    app._load_loop_config()
+
+    assert app.loop_interval_seconds == 5
+
+
+def test_load_loop_config_falls_back_to_global_interval():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.controller = SimpleNamespace(
+        config={
+            "LOOP_INTERVAL_SECONDS": 25,
+                "powerMeter": {
+                "type": "p1_hw",
+                "p1_hw": {},
+            },
+            "POWER_FEED_MAX_DELTA": 300,
+            "API_REFRESH_INTERVAL_SECONDS": 60,
+            "ZERO_COUNT_THRESHOLD_STANDBY": 3,
+        }
+    )
+
+    app._load_loop_config()
+
+    assert app.loop_interval_seconds == 25
 
 
 def test_runtime_condition_true_keeps_base_value():

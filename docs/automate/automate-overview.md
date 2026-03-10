@@ -6,11 +6,11 @@ This directory contains Python scripts for automating the control of a Zendure S
 
 ### `device_controller.py`
 
-This module provides object-oriented wrappers for interacting with the Zendure battery and related devices (like a P1 meter). It abstracts the low-level API calls into a set of reusable classes.
+This module provides object-oriented wrappers for interacting with the Zendure battery and related devices. Power-meter access is abstracted separately in `power_metere_loader.py`.
 
 - **`BaseDeviceController`**: A base class that handles common tasks like loading the `config.json` file and logging.
 
-- **`PowerAccumulator`**: A standalone class that tracks energy (watt-hours) for both power feed and P1 meter readings across multiple time periods (quarter-hour, hour, day, and manual). Automatically handles period boundary crossings and rollovers.
+- **`PowerAccumulator`**: A standalone class that tracks power-feed energy (watt-hours) across multiple time periods (quarter-hour, hour, day, and manual). Automatically handles period boundary crossings and rollovers.
 
 - **`AutomateController`**: The main class for controlling the Zendure battery's power settings. It can:
     - Set specific charge or discharge power levels.
@@ -20,10 +20,11 @@ This module provides object-oriented wrappers for interacting with the Zendure b
     - Use `PowerAccumulator` to track and log power usage over time.
     - Put the device into standby mode when appropriate.
 
-- **`DeviceDataReader`**: A class for reading data from:
-    - A P1 meter (to get real-time grid power information).
-    - The Zendure battery itself (to get its current state, like charge level).
-    - Automatically stores readings via API endpoints for historical tracking.
+- **`DeviceDataReader`**: A class for reading data from the Zendure battery itself (to get its current state, like charge level) and optionally storing those readings via API endpoints for historical tracking.
+
+- **`power_metere_loader.py`**: A config-driven loader that selects the concrete power meter module based on `powerMeter.type`.
+- **`power_metere_p1_hw.py`**: P1 hardware power-meter implementation that reads a configurable HTTP JSON endpoint and normalizes `total_power`.
+- **`power_metere_shelly.py`**: Shelly power-meter implementation that reads a configurable HTTP JSON endpoint and normalizes `total_power`.
 
 - **`ScheduleController`**: A class responsible for fetching a charge/discharge schedule from a web API. It determines the desired power setting for the current time based on this schedule, with caching support to minimize API calls.
 
@@ -45,13 +46,14 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
 
 ## How it Works
 
-1.  **Configuration**: The scripts read their configuration from a `config.json` file. This file must contain details like the IP addresses of the Zendure battery and P1 meter, and the URLs for the schedule and status APIs. The script looks for this file in `../config/config.json` or `./config/config.json`.
+1.  **Configuration**: The scripts read their configuration from `automate/config/config.jsonc`. This file contains details like the Zendure device IP, typed power-meter configuration, and schedule/data API URLs.
 
 2.  **Scheduling**: An external web service provides a schedule in JSON format. The `ScheduleController` fetches this schedule. The schedule defines what the battery should be doing at different times of the day (e.g., charge at 1000W, discharge at 500W, or run in net-zero mode).
 
-3.  **Execution**: The `automate_www.py` script runs continuously. It periodically checks the schedule and determines the correct power setting for the current time.
+3.  **Execution**: The `automate_www.py` script runs continuously. It reads the configured power meter, checks the schedule, and determines the correct power setting for the current time.
+    The loop interval can be overridden per selected power meter via `powerMeter.<type>.loopIntervalSeconds`.
 
-4.  **Control**: Using the `AutomateController`, the script sends the appropriate commands to the Zendure battery to set its charge or discharge rate.
+4.  **Control**: Using the `AutomateController`, the script sends the appropriate commands to the Zendure battery to set its charge or discharge rate. The app/runtime layer owns power-meter reads and passes normalized `p1_data` into dynamic netzero calculations.
 
 5.  **Monitoring**: The script sends status updates to a monitoring API, which can be used to track the automation's health and activity.
 
@@ -73,7 +75,7 @@ While the script is running, you can interact with it using keyboard commands:
 
 - **`h` or `help`**: Show available commands
 - **`s` or `status`**: Show current status (power, battery, schedule)
-- **`a` or `accumulators`**: Print accumulator status (power feed and P1 meter energy tracking)
+- **`a` or `accumulators`**: Print accumulator status (power feed tracking)
 - **`r` or `refresh`**: Force refresh schedule from API
 - **`p <value>`**: Set power manually (e.g., `p 500` or `p netzero`)
 - **`z` or `zero`**: Set power to 0
@@ -181,23 +183,14 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 
 ### 5. P1 meter (GET)
 
-- URL: `http://{p1Meter.ip}{p1Meter.endpoint}` (example: `http://192.168.2.5/api/v1/data` or `.../properties/report`)
-- Config: `p1Meter` object (`ip`, `endpoint`, `totalPowerPath`) or legacy `p1MeterIp` (endpoint defaults to `/properties/report`)
+- URL: `http://{powerMeter.p1_hw.ip}{powerMeter.p1_hw.endpoint}` (example: `http://192.168.2.5/api/v1/data` or `.../properties/report`)
+- Config: `powerMeter` object with `type: "p1_hw"` and nested `p1_hw` settings (`ip`, `endpoint`, `totalPowerPath`)
 - Method: `GET`
-- Used by: `DeviceDataReader.read_p1_meter()` in `device_controller.py`
-- Purpose: get current grid power (and optional cumulative kWh) for net-zero calculation and for attaching `p1TotalPower` to status updates.
-- When: every loop iteration when P1 is configured.
+- Used by: the concrete module selected by `power_metere_loader.py` (for example `power_metere_p1_hw.py` or `power_metere_shelly.py`)
+- Purpose: get current grid power for net-zero calculation and for attaching `p1TotalPower` to status updates.
+- When: every loop iteration when P1 is configured, using the selected meter's `loopIntervalSeconds` when present, otherwise `LOOP_INTERVAL_SECONDS`.
 
-### 6. Data API – store P1 readings (POST)
-
-- URL: `{dataApiUrl}` or `{dataApiUrl-local}` with `?type=zendure_p1`
-- Config key: `dataApiUrl` or `dataApiUrl-local` (chosen by `location`)
-- Method: `POST`
-- Used by: `DeviceDataReader.read_p1_meter()` -> `_store_data_via_api()` in `device_controller.py`
-- Purpose: persist P1 meter readings for historical tracking.
-- When: after each successful P1 read when the data API URL is set.
-
-### 7. Data API – store Zendure readings (POST)
+### 6. Data API – store Zendure readings (POST)
 
 - URL: `{dataApiUrl}` or `{dataApiUrl-local}` with `?type=zendure`
 - Config key: `dataApiUrl` or `dataApiUrl-local` (chosen by `location`)
@@ -212,6 +205,5 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 2. Automation status: `POST` via `statusApiUrl` / `statusApiUrl-local` to report start/stop/change/rescan.
 3. Zendure read: `GET` on `http://{deviceIp}/properties/report` for device state.
 4. Zendure write: `POST` on `http://{deviceIp}/properties/write` to set charge/discharge power.
-5. P1 meter: `GET` via `p1Meter.ip` + `p1Meter.endpoint` for grid power.
-6. Data API (P1): `POST` via `dataApiUrl?type=zendure_p1` to store P1 readings.
-7. Data API (Zendure): `POST` via `dataApiUrl?type=zendure` to store Zendure snapshots.
+5. P1 meter: `GET` via `powerMeter.p1_hw.ip` + `powerMeter.p1_hw.endpoint` for grid power.
+6. Data API (Zendure): `POST` via `dataApiUrl?type=zendure` to store Zendure snapshots.

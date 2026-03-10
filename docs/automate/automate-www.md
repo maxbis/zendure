@@ -44,7 +44,7 @@ The current repository only contains `automate_www.py`. Compared with legacy `au
 
 - `LOOP_INTERVAL_SECONDS`
   - Default: `20`
-  - Config override: `LOOP_INTERVAL_SECONDS`
+  - Config override: selected `powerMeter.<type>.loopIntervalSeconds`, otherwise `LOOP_INTERVAL_SECONDS`
   - Meaning: seconds between loop iterations (clamped 5-300)
 - `API_REFRESH_INTERVAL_SECONDS`
   - Default: `300`
@@ -110,13 +110,13 @@ Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_
 
 1. **Configuration**: Reads `config.json` from `../config/config.json` or `./config/config.json`.
 
-2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (SQLite + callback), `InputHandler`, `CommandHandler`, sets up signal handlers, and loads loop config via `_load_loop_config()`.
+2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (SQLite + callback), `InputHandler`, `CommandHandler`, initializes the shared power-meter reader, sets up signal handlers, and loads loop config via `_load_loop_config()`.
 
 3. **HTTP server**: Starts `AutomationTCPServer` in a daemon thread; shares `api_state`, `db_path`, `schedule_controller`, and `status_api` with the request handler.
 
 4. **Main loop**:
    - Sleep with interrupt for input
-   - Accumulate P1 data and update `api_state.last_p1`
+   - Read power-meter data and update `api_state.last_p1`
    - Check keyboard input and process via `CommandHandler`
    - Refresh schedule if interval elapsed
    - Compute desired power from schedule
@@ -152,6 +152,8 @@ Supported commands:
 - `nz`, `netzero`: set power to netzero mode
 - `nzp`, `netzero+`: set power to netzero+ mode
 - `q`, `quit`: quit gracefully
+
+Dynamic commands (`p netzero`, `nz`, `nzp`) first read the configured power meter in the app/runtime layer and then pass the normalized reading into `AutomateController`.
 
 ### Example HTTP usage
 

@@ -68,7 +68,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **LOOP_INTERVAL_SECONDS** | number | Seconds between main automation loop iterations. | `automate.py`, `automate_www.py`: main loop sleep interval. |
+| **LOOP_INTERVAL_SECONDS** | number | Fallback seconds between main automation loop iterations when the selected power meter does not define its own interval. | `automate.py`, `automate_www.py`: main loop sleep interval. |
 | **API_REFRESH_INTERVAL_SECONDS** | number | How often (seconds) to refresh data from external APIs (e.g. schedule) within the loop. | `automate.py`, `automate_www.py`: throttles API calls. |
 | **ZERO_COUNT_THRESHOLD_STANDBY** | number | Number of consecutive “zero” readings before treating the system as standby. | `automate.py`, `automate_www.py`: standby detection logic. |
 
@@ -91,13 +91,19 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 ---
 
-## P1 meter
+## Power meter
 
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **p1Meter** | object | P1 meter connection and JSON path. | `device_controller.py`: `DeviceDataReader`. |
-| **p1Meter.ip** | string | IP (or host) of the P1 meter / gateway. | Used to build the P1 API URL. |
-| **p1Meter.endpoint** | string | HTTP path for the P1 data (e.g. `"/api/v1/data"` or `"/properties/report"`). | Appended to `http://<ip><endpoint>` for reading. |
-| **p1Meter.totalPowerPath** | string | Dot-notation path to total power in the P1 JSON (e.g. `"active_power_w"` or `"total_power"`). | Used to read the power value from the P1 response. |
-
-*Legacy: a top-level **p1MeterIp** string is still supported if `p1Meter` is missing or has no `ip`.*
+| **powerMeter** | object | Required power meter configuration block. | `power_metere_loader.py`: selects the concrete reader module. |
+| **powerMeter.type** | string | Power meter type selector. The value must match a module suffix in `power_metere_<identifier>.py` (for example `"p1_hw"` or `"shelly"`). | `power_metere_loader.py`: `get_power_meter_reader()`. |
+| **powerMeter.p1_hw** | object | P1 hardware meter connection and JSON path. Required when `powerMeter.type` is `"p1_hw"`. | `power_metere_p1_hw.py`: `P1PowerMeterReader`. |
+| **powerMeter.p1_hw.ip** | string | IP (or host) of the P1 meter / gateway. | Used to build the P1 API URL. |
+| **powerMeter.p1_hw.endpoint** | string | HTTP path for the P1 data (e.g. `"/api/v1/data"` or `"/properties/report"`). Defaults to `"/properties/report"` when omitted. | Appended to `http://<ip><endpoint>` for reading. |
+| **powerMeter.p1_hw.totalPowerPath** | string | Dot-notation path to total power in the P1 JSON (e.g. `"active_power_w"` or `"total_power"`). Defaults to `"total_power"` when omitted. | Used to read the power value from the P1 response. |
+| **powerMeter.p1_hw.loopIntervalSeconds** | number | Optional loop interval override used when `powerMeter.type` is `"p1_hw"`. | `automate_www.py`: `_load_loop_config()`. |
+| **powerMeter.shelly** | object | Shelly meter connection and JSON path. | `power_metere_shelly.py`: `ShellyPowerMeterReader`. |
+| **powerMeter.shelly.ip** | string | IP (or host) of the Shelly meter. | Used to build the Shelly API URL. |
+| **powerMeter.shelly.endpoint** | string | HTTP path for the Shelly data (for example `"/rpc/EM.GetStatus?id=0"`). Defaults to `"/properties/report"` when omitted. | Appended to `http://<ip><endpoint>` for reading. |
+| **powerMeter.shelly.totalPowerPath** | string | Dot-notation path to total power in the Shelly JSON (for example `"total_act_power"`). Defaults to `"total_power"` when omitted. | Used to read the power value from the Shelly response. |
+| **powerMeter.shelly.loopIntervalSeconds** | number | Optional loop interval override used when `powerMeter.type` is `"shelly"`. | `automate_www.py`: `_load_loop_config()`. |

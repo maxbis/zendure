@@ -30,6 +30,7 @@ from typing import Optional, Any, Callable
 from urllib.parse import urlparse, parse_qs
 
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
+from power_metere_loader import get_power_meter_reader
 
 # ============================================================================
 # CONSTANTS & DEFAULT CONFIG (override via config.jsonc)
@@ -1219,7 +1220,8 @@ class CommandHandler:
     def __init__(self, controller: AutomateController, schedule_controller: ScheduleController,
                  status_api: StatusApi, logger: Logger,
                  on_pause_change: Optional[Callable[[bool], None]] = None,
-                 is_pause_active: Optional[Callable[[], bool]] = None):
+                 is_pause_active: Optional[Callable[[], bool]] = None,
+                 dynamic_power_setter: Optional[Callable[[str], tuple[bool, Optional[int], Optional[str]]]] = None):
         """
         Initialize command handler.
 
@@ -1235,6 +1237,7 @@ class CommandHandler:
         self.logger = logger
         self.on_pause_change = on_pause_change
         self.is_pause_active = is_pause_active
+        self.dynamic_power_setter = dynamic_power_setter
         self._command_handlers = {
             "h": self._cmd_help,
             "help": self._cmd_help,
@@ -1367,12 +1370,20 @@ class CommandHandler:
                 self.logger.info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
                 return True
             self.logger.info(f"Manually setting power to: {power_value}")
-            result = self.controller.set_power(power_value)
-            if result.success:
-                self.logger.info(f"Power set to: {result.power}")
-                self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
+            if power_value in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS]:
+                success, actual_power, error = self._apply_dynamic_power(power_value)
+                if success:
+                    self.logger.info(f"Power set to: {actual_power}")
+                    self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
+                else:
+                    self.logger.error(f"Failed to set power: {error}")
             else:
-                self.logger.error(f"Failed to set power: {result.error}")
+                result = self.controller.set_power(power_value)
+                if result.success:
+                    self.logger.info(f"Power set to: {result.power}")
+                    self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
+                else:
+                    self.logger.error(f"Failed to set power: {result.error}")
         except ValueError:
             self.logger.warning(f"Invalid power value: {power_arg}")
         return True
@@ -1389,22 +1400,22 @@ class CommandHandler:
 
     def _cmd_netzero(self, args: list) -> bool:
         self.logger.info("Setting power to netzero")
-        result = self.controller.set_power(POWER_MODE_NETZERO)
-        if result.success:
+        success, actual_power, error = self._apply_dynamic_power(POWER_MODE_NETZERO)
+        if success:
             self.logger.info("Power set to netzero")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, POWER_MODE_NETZERO)
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
         else:
-            self.logger.error(f"Failed to set power: {result.error}")
+            self.logger.error(f"Failed to set power: {error}")
         return True
 
     def _cmd_netzero_plus(self, args: list) -> bool:
         self.logger.info("Setting power to netzero+")
-        result = self.controller.set_power(POWER_MODE_NETZERO_PLUS)
-        if result.success:
+        success, actual_power, error = self._apply_dynamic_power(POWER_MODE_NETZERO_PLUS)
+        if success:
             self.logger.info("Power set to netzero+")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, POWER_MODE_NETZERO_PLUS)
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
         else:
-            self.logger.error(f"Failed to set power: {result.error}")
+            self.logger.error(f"Failed to set power: {error}")
         return True
 
     def _cmd_quit(self, args: list) -> bool:
@@ -1461,6 +1472,11 @@ class CommandHandler:
     def _cmd_resume(self, args: list) -> bool:
         self._set_pause(False)
         return True
+
+    def _apply_dynamic_power(self, mode: str) -> tuple[bool, Optional[int], Optional[str]]:
+        if self.dynamic_power_setter is None:
+            return False, None, "Dynamic power setter is not configured"
+        return self.dynamic_power_setter(mode)
 
 
 # ============================================================================
@@ -1526,8 +1542,9 @@ class AutomationApp:
             print(f"[startup] CWD: {os.getcwd()}")
             print(f"[startup] config file: {os.path.abspath(str(self.controller.config_path))}")
 
-            # Initialize shared DeviceDataReader early (fail fast on config issues)
+            # Initialize shared readers early (fail fast on config issues)
             get_reader(self.controller.config_path)
+            get_power_meter_reader(self.controller.config_path)
 
             # Initialize logger
             self.logger = Logger(self.controller)
@@ -1561,6 +1578,7 @@ class AutomationApp:
                 self.logger,
                 on_pause_change=self._set_pause_override,
                 is_pause_active=lambda: self.pause_override_active,
+                dynamic_power_setter=self._apply_dynamic_power_command,
             )
 
             # Set up signal handlers
@@ -1587,8 +1605,20 @@ class AutomationApp:
 
     def _load_loop_config(self) -> None:
         """Load loop-related config from controller config and set attributes."""
+        power_meter_config = self.controller.config.get("powerMeter")
+        selected_meter_interval = None
+        if isinstance(power_meter_config, dict):
+            selected_meter_type = power_meter_config.get("type")
+            selected_meter_config = power_meter_config.get(selected_meter_type) if selected_meter_type else None
+            if isinstance(selected_meter_config, dict):
+                selected_meter_interval = selected_meter_config.get("loopIntervalSeconds")
+
         try:
-            loop_interval = int(self.controller.config.get("LOOP_INTERVAL_SECONDS", LOOP_INTERVAL_SECONDS))
+            loop_interval = int(
+                selected_meter_interval
+                if selected_meter_interval is not None
+                else self.controller.config.get("LOOP_INTERVAL_SECONDS", LOOP_INTERVAL_SECONDS)
+            )
         except (TypeError, ValueError):
             loop_interval = LOOP_INTERVAL_SECONDS
         self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
@@ -1692,18 +1722,13 @@ class AutomationApp:
     # ------------------------------------------------------------------------
 
     def _accumulate_p1_data(self) -> Optional[dict]:
-        """Read P1 meter and accumulate data."""
-        p1_data = None
+        """Read the configured power meter."""
         try:
-            reader = get_reader(self.controller.config_path)
-            p1_data = reader.read_p1_meter(update_json=True)
-            if p1_data:
-                if p1_data["total_power_import_kwh"] is not None and p1_data["total_power_export_kwh"] is not None:
-                    import_delta, export_delta = self.controller.accumulator.accumulate_p1_reading_hourly(p1_data["total_power_import_kwh"], p1_data["total_power_export_kwh"])
-                    self.logger.debug(f"P1 deltas: import_delta={int(import_delta*1000)} Wh, export_delta={int(export_delta*1000)} Wh, actual power={p1_data['total_power']} W")
+            power_meter_reader = get_power_meter_reader(self.controller.config_path)
+            return power_meter_reader.read()
         except Exception as e:
-            self.logger.warning(f"Failed to read P1 for accumulation: {e}")
-        return p1_data
+            self.logger.warning(f"Failed to read power meter: {e}")
+            return None
 
     def _refresh_p1_for_api(self) -> None:
         """Read P1 meter and update api_state.last_p1 (for on-demand refresh from /api/p1)."""
@@ -1718,6 +1743,17 @@ class AutomationApp:
                     self.last_p1_total_power = int(p1_data["total_power"])
                 except (TypeError, ValueError):
                     pass
+
+    def _apply_dynamic_power_command(self, mode: str) -> tuple[bool, Optional[int], Optional[str]]:
+        p1_data = self._accumulate_p1_data()
+        if p1_data is None:
+            return False, None, "Failed to read P1 meter data"
+
+        self._update_p1_state(p1_data)
+        result = self.controller.set_power(mode, p1_data=p1_data)
+        if not result.success:
+            return False, None, result.error
+        return True, result.power, None
 
     def _refresh_zendure_for_api(self) -> None:
         """Read Zendure device and update api_state.last_zendure (for on-demand refresh from /api/zendure)."""
