@@ -2014,7 +2014,10 @@ class AutomationApp:
         if should_apply:
             result = self.controller.set_power(desired_power, p1_data=p1_data)
             if result.success:
-                self.logger.info(f"Power: {result.power} (desired: {desired_power})")
+                power_log_message = f"Power: {result.power} (desired: {desired_power})"
+                self.logger.debug(power_log_message)
+                if result.power != self.old_value:
+                    self.logger.info(power_log_message)
                 p1_w = None
                 if p1_data is not None and p1_data.get('total_power') is not None:
                     try:
