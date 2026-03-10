@@ -771,6 +771,11 @@ body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charg
     width: 2px;
 }
 
+body.mobile-dark .charge-status-mobile .charge-status-details-collapsible .charge-status-header--details {
+    grid-column: 1 / -1;
+    padding-left: 8px;
+}
+
 body.mobile-dark .charge-status-mobile .charge-refresh-btn {
     background: var(--bg-tertiary);
     border-color: var(--border-color);
