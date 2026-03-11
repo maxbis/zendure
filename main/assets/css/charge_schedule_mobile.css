@@ -1233,6 +1233,17 @@ code {
     margin-bottom: 4px;
 }
 
+.price-graph-popup-source-main {
+    color: inherit;
+}
+
+.price-graph-popup-source-helper {
+    margin-top: 2px;
+    font-size: 0.78em;
+    color: var(--text-muted, rgba(255, 255, 255, 0.58));
+    letter-spacing: 0.01em;
+}
+
 /* Price graph mobile tap popup (info + Edit) */
 .price-graph-mobile-popup {
     position: fixed;

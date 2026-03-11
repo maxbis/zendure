@@ -124,6 +124,58 @@ function formatPopupPercent(pct, opts) {
     return ` (${prefix}${pct.toFixed(decimals)}%)`;
 }
 
+function escapePopupHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderPopupSource(sourceEl, options) {
+    if (!sourceEl) return;
+
+    const {
+        scheduleSource,
+        hasRuntimeCondition,
+        ruleName,
+        ruleIndex
+    } = options || {};
+
+    const hasSource = scheduleSource !== undefined &&
+        scheduleSource !== null &&
+        scheduleSource !== '' &&
+        scheduleSource !== 'null' &&
+        scheduleSource !== 'undefined';
+    const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
+    const hasRuleName = ruleName !== undefined &&
+        ruleName !== null &&
+        String(ruleName).trim() !== '';
+    const hasRuleIndex = ruleIndex !== undefined &&
+        ruleIndex !== null &&
+        String(ruleIndex).trim() !== '';
+
+    const ruleLabel = hasRuleName
+        ? `${hasRuleIndex ? ('#' + String(ruleIndex).trim() + ' ') : ''}${String(ruleName).trim()}`
+        : '';
+    const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
+    const mainSourceLabel = ruleLabel || plainSourceLabel;
+
+    if (!mainSourceLabel && !hasRuntimeCondition) {
+        sourceEl.textContent = '';
+        return;
+    }
+
+    const helperHtml = hasRuntimeCondition
+        ? '<div class="price-graph-popup-source-helper">Dynamic rule</div>'
+        : '';
+
+    sourceEl.innerHTML = mainSourceLabel
+        ? `<div class="price-graph-popup-source-main">Source: ${escapePopupHtml(mainSourceLabel)}</div>${helperHtml}`
+        : helperHtml;
+}
+
 function formatScheduleDisplayWithPercent(scheduleValue) {
     if (scheduleValue === undefined || scheduleValue === null || scheduleValue === '') {
         return '—';
@@ -760,36 +812,20 @@ function renderPriceGraphMobilePopupContent() {
     const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
 
     const scheduleSource = bar.dataset.scheduleSource;
-    const hasSource = scheduleSource !== undefined &&
-        scheduleSource !== null &&
-        scheduleSource !== '' &&
-        scheduleSource !== 'null' &&
-        scheduleSource !== 'undefined';
-    const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
     const ruleNameRaw = bar.dataset.ruleName;
-    const hasRuleName = ruleNameRaw !== undefined &&
-        ruleNameRaw !== null &&
-        String(ruleNameRaw).trim() !== '';
     const ruleIndexRaw = bar.dataset.ruleIndex;
-    const hasRuleIndex = ruleIndexRaw !== undefined &&
-        ruleIndexRaw !== null &&
-        String(ruleIndexRaw).trim() !== '';
-    const ruleLabel = hasRuleName
-        ? `${hasRuleIndex ? ('#' + String(ruleIndexRaw).trim() + ' ') : ''}${String(ruleNameRaw).trim()}`
-        : '';
-    const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
-    const sourceLabel = hasRuntimeCondition
-        ? (ruleLabel ? `runtime condition (${ruleLabel})` : 'runtime condition')
-        : (ruleLabel ? ruleLabel : plainSourceLabel);
 
     titleEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
-    if (sourceEl) {
-        sourceEl.textContent = sourceLabel ? `Source: ${sourceLabel}` : '';
-    }
+    renderPopupSource(sourceEl, {
+        scheduleSource,
+        hasRuntimeCondition,
+        ruleName: ruleNameRaw,
+        ruleIndex: ruleIndexRaw
+    });
     if (estimateEl) {
         estimateEl.innerHTML = formatPopupForecastHtml(bar);
     }
@@ -945,36 +981,20 @@ function showPriceGraphPopup(bar, container) {
     const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
 
     const scheduleSource = bar.dataset.scheduleSource;
-    const hasSource = scheduleSource !== undefined &&
-        scheduleSource !== null &&
-        scheduleSource !== '' &&
-        scheduleSource !== 'null' &&
-        scheduleSource !== 'undefined';
-    const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
     const ruleNameRaw = bar.dataset.ruleName;
-    const hasRuleName = ruleNameRaw !== undefined &&
-        ruleNameRaw !== null &&
-        String(ruleNameRaw).trim() !== '';
     const ruleIndexRaw = bar.dataset.ruleIndex;
-    const hasRuleIndex = ruleIndexRaw !== undefined &&
-        ruleIndexRaw !== null &&
-        String(ruleIndexRaw).trim() !== '';
-    const ruleLabel = hasRuleName
-        ? `${hasRuleIndex ? ('#' + String(ruleIndexRaw).trim() + ' ') : ''}${String(ruleNameRaw).trim()}`
-        : '';
-    const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
-    const sourceLabel = hasRuntimeCondition
-        ? (ruleLabel ? `runtime condition (${ruleLabel})` : 'runtime condition')
-        : (ruleLabel ? ruleLabel : plainSourceLabel);
 
     timeEl.textContent = timeRange || '—';
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
-    if (sourceEl) {
-        sourceEl.textContent = sourceLabel ? `Source: ${sourceLabel}` : '';
-    }
+    renderPopupSource(sourceEl, {
+        scheduleSource,
+        hasRuntimeCondition,
+        ruleName: ruleNameRaw,
+        ruleIndex: ruleIndexRaw
+    });
     if (estimateEl) {
         estimateEl.innerHTML = formatPopupForecastHtml(bar);
     }
