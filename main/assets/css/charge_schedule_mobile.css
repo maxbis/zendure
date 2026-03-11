@@ -1770,10 +1770,6 @@ code {
         min-height: 460px;
     }
 
-    .price-graph-rule-detail-grid {
-        grid-template-columns: 1fr;
-    }
-
     .price-graph-mobile-popup-title {
         font-size: 1.08rem;
     }
@@ -1787,6 +1783,12 @@ code {
     .price-graph-mobile-popup-body .price-graph-popup-source,
     .price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
         font-size: 0.98rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .price-graph-rule-detail-grid {
+        grid-template-columns: 1fr;
     }
 }
 
