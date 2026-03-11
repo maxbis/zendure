@@ -862,7 +862,6 @@ function ensurePriceGraphMobilePopup() {
                     <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clear</button>
                     <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
                 </div>
-                <div class="price-graph-mobile-popup-hint">Use arrows to browse hours</div>
             </div>
         </div>
     `;
