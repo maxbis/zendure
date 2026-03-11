@@ -147,6 +147,10 @@ function normalizeRules(array $rules): array
 
 $isApi = isset($_GET['api']) && $_GET['api'] === '1';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$initialRule = isset($_GET['rule']) && is_numeric($_GET['rule']) ? (int) $_GET['rule'] : null;
+if ($initialRule !== null && $initialRule < 1) {
+    $initialRule = null;
+}
 
 if ($isApi) {
     header('Access-Control-Allow-Origin: *');
@@ -198,6 +202,7 @@ if ($isApi) {
         <div class="card-header-row">
             <h1>⚡ Zendure Rules Editor</h1>
             <div class="actions">
+                <a class="btn-link" href="./">Back to /main</a>
                 <button id="btn-raw-json" type="button">Raw JSON</button>
                 <button id="btn-reload" type="button">Reload</button>
                 <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
@@ -297,6 +302,7 @@ if ($isApi) {
 </main>
 <script>
 window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8'); ?>?api=1';
+window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>
 </body>

@@ -93,6 +93,9 @@ let priceGraphPopup = null;
 let priceGraphPopupActiveBar = null;
 let priceGraphPopupActiveContainer = null;
 const priceGraphPopupBoundContainers = new WeakSet();
+let priceGraphRuleDetailModal = null;
+let priceGraphRuleDetailEscapeHandler = null;
+let priceGraphRulesCachePromise = null;
 
 function formatHourRange(hourValue) {
     const hour = Number.isFinite(hourValue) ? hourValue : NaN;
@@ -133,6 +136,220 @@ function escapePopupHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function formatRuleOutputValue(value) {
+    if (value === 'netzero' || value === 'netzero+') {
+        return String(value);
+    }
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+        return `${Math.trunc(numeric)} W`;
+    }
+    return String(value || '—');
+}
+
+function formatRuleCondition(condition) {
+    if (!condition || typeof condition !== 'object') return '';
+    const field = condition.field ? String(condition.field) : '';
+    const op = condition.op ? String(condition.op) : '';
+    const hasValueRef = condition.value_ref !== undefined && condition.value_ref !== null && String(condition.value_ref).trim() !== '';
+    const hasValue = Object.prototype.hasOwnProperty.call(condition, 'value');
+    const rightSide = hasValueRef
+        ? String(condition.value_ref).trim()
+        : (hasValue ? String(condition.value) : '');
+    return [field, op, rightSide].filter(Boolean).join(' ');
+}
+
+function getRuleLabel(ruleIndex, ruleName) {
+    const hasRuleIndex = ruleIndex !== undefined &&
+        ruleIndex !== null &&
+        String(ruleIndex).trim() !== '';
+    const hasRuleName = ruleName !== undefined &&
+        ruleName !== null &&
+        String(ruleName).trim() !== '';
+    if (hasRuleName) {
+        return `${hasRuleIndex ? ('#' + String(ruleIndex).trim() + ' ') : ''}${String(ruleName).trim()}`;
+    }
+    if (hasRuleIndex) {
+        return `#${String(ruleIndex).trim()}`;
+    }
+    return '';
+}
+
+function ensurePriceGraphRuleDetailModal() {
+    if (priceGraphRuleDetailModal) return priceGraphRuleDetailModal;
+
+    const modal = document.createElement('div');
+    modal.className = 'price-graph-rule-detail-modal';
+    modal.setAttribute('hidden', 'hidden');
+    modal.innerHTML = `
+        <div class="price-graph-dialog-shell price-graph-rule-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="price-graph-rule-detail-title">
+            <div class="price-graph-dialog-header price-graph-rule-detail-header">
+                <div class="price-graph-rule-detail-title-wrap">
+                    <div class="price-graph-rule-detail-eyebrow">Rule details</div>
+                    <div class="price-graph-rule-detail-title" id="price-graph-rule-detail-title"></div>
+                </div>
+                <button type="button" class="modal-close price-graph-rule-detail-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="price-graph-rule-detail-body"></div>
+            <div class="price-graph-dialog-footer price-graph-rule-detail-footer">
+                <button type="button" class="btn btn-outline price-graph-rule-detail-dismiss">Close</button>
+                <button type="button" class="btn btn-primary price-graph-rule-detail-edit">Edit Rule</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            hidePriceGraphRuleDetailModal();
+        }
+    });
+
+    const closeButton = modal.querySelector('.price-graph-rule-detail-close');
+    const dismissButton = modal.querySelector('.price-graph-rule-detail-dismiss');
+    if (closeButton) closeButton.addEventListener('click', hidePriceGraphRuleDetailModal);
+    if (dismissButton) dismissButton.addEventListener('click', hidePriceGraphRuleDetailModal);
+
+    priceGraphRuleDetailModal = modal;
+    return modal;
+}
+
+function hidePriceGraphRuleDetailModal() {
+    if (!priceGraphRuleDetailModal) return;
+    priceGraphRuleDetailModal.setAttribute('hidden', 'hidden');
+    priceGraphRuleDetailModal.classList.remove('active');
+    if (priceGraphRuleDetailEscapeHandler) {
+        document.removeEventListener('keydown', priceGraphRuleDetailEscapeHandler);
+        priceGraphRuleDetailEscapeHandler = null;
+    }
+}
+
+function renderRuleDetailBody(rule) {
+    if (!rule || typeof rule !== 'object') {
+        return '<div class="price-graph-rule-detail-empty">Rule details unavailable.</div>';
+    }
+
+    const fields = [];
+    fields.push({
+        label: 'Output',
+        value: escapePopupHtml(formatRuleOutputValue(rule.value))
+    });
+    fields.push({
+        label: 'Enabled',
+        value: escapePopupHtml(rule.enabled === false ? 'No' : 'Yes')
+    });
+
+    ['month', 'hour', 'min_time', 'max_time', 'fallback_value'].forEach((fieldName) => {
+        if (!Object.prototype.hasOwnProperty.call(rule, fieldName) || rule[fieldName] === '' || rule[fieldName] === null) return;
+        const labelMap = {
+            month: 'Month',
+            hour: 'Hour',
+            min_time: 'Min time',
+            max_time: 'Max time',
+            fallback_value: 'Fallback'
+        };
+        const rawValue = fieldName === 'fallback_value'
+            ? formatRuleOutputValue(rule[fieldName])
+            : String(rule[fieldName]);
+        fields.push({
+            label: labelMap[fieldName],
+            value: escapePopupHtml(rawValue)
+        });
+    });
+
+    const fieldsHtml = fields.map((field) => `
+        <div class="price-graph-rule-detail-field">
+            <div class="price-graph-rule-detail-field-label">${escapePopupHtml(field.label)}</div>
+            <div class="price-graph-rule-detail-field-value">${field.value}</div>
+        </div>
+    `).join('');
+
+    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+    const conditionsHtml = conditions.length > 0
+        ? `
+            <div class="price-graph-rule-detail-section">
+                <div class="price-graph-rule-detail-section-title">Conditions</div>
+                <div class="price-graph-rule-detail-condition-list">
+                    ${conditions.map((condition, index) => `
+                        <div class="price-graph-rule-detail-condition">
+                            <span class="price-graph-rule-detail-condition-index">${index + 1}.</span>
+                            <code>${escapePopupHtml(formatRuleCondition(condition) || 'Invalid condition')}</code>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `
+        : `
+            <div class="price-graph-rule-detail-section">
+                <div class="price-graph-rule-detail-section-title">Conditions</div>
+                <div class="price-graph-rule-detail-empty">No conditions configured.</div>
+            </div>
+        `;
+
+    return `
+        <div class="price-graph-rule-detail-grid">${fieldsHtml}</div>
+        ${conditionsHtml}
+    `;
+}
+
+async function getPriceGraphRules() {
+    if (!priceGraphRulesCachePromise) {
+        priceGraphRulesCachePromise = fetch('edit_rules.php?api=1', { method: 'GET' })
+            .then(async (response) => {
+                const data = await response.json();
+                if (!response.ok || !data.success || !Array.isArray(data.rules)) {
+                    throw new Error(data.error || 'Rule details unavailable');
+                }
+                return data.rules;
+            })
+            .catch((error) => {
+                priceGraphRulesCachePromise = null;
+                throw error;
+            });
+    }
+    return priceGraphRulesCachePromise;
+}
+
+async function showPriceGraphRuleDetail(ruleIndex, ruleName) {
+    const modal = ensurePriceGraphRuleDetailModal();
+    const titleEl = modal.querySelector('.price-graph-rule-detail-title');
+    const bodyEl = modal.querySelector('.price-graph-rule-detail-body');
+    const editButton = modal.querySelector('.price-graph-rule-detail-edit');
+    const safeRuleIndex = Number.parseInt(ruleIndex, 10);
+    const ruleLabel = getRuleLabel(ruleIndex, ruleName) || 'Rule';
+
+    titleEl.textContent = ruleLabel;
+    bodyEl.innerHTML = '<div class="price-graph-rule-detail-empty">Loading rule details...</div>';
+    modal.classList.add('active');
+    modal.removeAttribute('hidden');
+
+    if (editButton) {
+        editButton.disabled = !Number.isInteger(safeRuleIndex) || safeRuleIndex < 1;
+        editButton.onclick = () => {
+            if (!Number.isInteger(safeRuleIndex) || safeRuleIndex < 1) return;
+            window.location.href = `edit_rules.php?rule=${safeRuleIndex}`;
+        };
+    }
+
+    if (!priceGraphRuleDetailEscapeHandler) {
+        priceGraphRuleDetailEscapeHandler = (event) => {
+            if (event.key === 'Escape') hidePriceGraphRuleDetailModal();
+        };
+        document.addEventListener('keydown', priceGraphRuleDetailEscapeHandler);
+    }
+
+    try {
+        const rules = await getPriceGraphRules();
+        if (!Number.isInteger(safeRuleIndex) || safeRuleIndex < 1 || safeRuleIndex > rules.length) {
+            bodyEl.innerHTML = '<div class="price-graph-rule-detail-empty">Rule details unavailable.</div>';
+            return;
+        }
+        bodyEl.innerHTML = renderRuleDetailBody(rules[safeRuleIndex - 1]);
+    } catch (error) {
+        bodyEl.innerHTML = `<div class="price-graph-rule-detail-empty">${escapePopupHtml(error.message || 'Rule details unavailable.')}</div>`;
+    }
+}
+
 function renderPopupSource(sourceEl, options) {
     if (!sourceEl) return;
 
@@ -149,16 +366,7 @@ function renderPopupSource(sourceEl, options) {
         scheduleSource !== 'null' &&
         scheduleSource !== 'undefined';
     const normalizedScheduleSource = hasSource ? String(scheduleSource).trim().toLowerCase() : '';
-    const hasRuleName = ruleName !== undefined &&
-        ruleName !== null &&
-        String(ruleName).trim() !== '';
-    const hasRuleIndex = ruleIndex !== undefined &&
-        ruleIndex !== null &&
-        String(ruleIndex).trim() !== '';
-
-    const ruleLabel = hasRuleName
-        ? `${hasRuleIndex ? ('#' + String(ruleIndex).trim() + ' ') : ''}${String(ruleName).trim()}`
-        : '';
+    const ruleLabel = getRuleLabel(ruleIndex, ruleName);
     const plainSourceLabel = (hasSource && normalizedScheduleSource !== 'condition') ? String(scheduleSource).trim() : '';
     const mainSourceLabel = ruleLabel || plainSourceLabel;
 
@@ -170,10 +378,26 @@ function renderPopupSource(sourceEl, options) {
     const helperHtml = hasRuntimeCondition
         ? '<div class="price-graph-popup-source-helper">Dynamic rule</div>'
         : '';
+    const safeRuleIndex = Number.parseInt(ruleIndex, 10);
+    const isRuleClickable = Number.isInteger(safeRuleIndex) && safeRuleIndex > 0;
+    const sourceMainHtml = isRuleClickable
+        ? `<button type="button" class="price-graph-popup-source-button" data-rule-index="${safeRuleIndex}" data-rule-name="${escapePopupHtml(ruleName || '')}">Source: ${escapePopupHtml(mainSourceLabel)}</button>`
+        : `<div class="price-graph-popup-source-main">Source: ${escapePopupHtml(mainSourceLabel)}</div>`;
 
     sourceEl.innerHTML = mainSourceLabel
-        ? `<div class="price-graph-popup-source-main">Source: ${escapePopupHtml(mainSourceLabel)}</div>${helperHtml}`
+        ? `${sourceMainHtml}${helperHtml}`
         : helperHtml;
+
+    if (isRuleClickable) {
+        const button = sourceEl.querySelector('.price-graph-popup-source-button');
+        if (button) {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                showPriceGraphRuleDetail(String(safeRuleIndex), ruleName || '');
+            });
+        }
+    }
 }
 
 function formatScheduleDisplayWithPercent(scheduleValue) {
@@ -595,8 +819,6 @@ let priceGraphMobilePopup = null;
 let priceGraphMobilePopupEscapeHandler = null;
 let priceGraphMobilePopupResizeHandler = null;
 let priceGraphMobilePopupState = null;
-const PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX = 10;
-const PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO = 0.28;
 const PRICE_GRAPH_MOBILE_POPUP_NAV_OUT_MS = 90;
 const PRICE_GRAPH_MOBILE_POPUP_NAV_IN_MS = 140;
 
@@ -607,16 +829,16 @@ function ensurePriceGraphMobilePopup() {
     backdrop.className = 'price-graph-mobile-popup';
     backdrop.setAttribute('id', 'price-graph-mobile-popup');
     backdrop.innerHTML = `
-        <div class="price-graph-mobile-popup-dialog">
-            <div class="price-graph-mobile-popup-header">
+        <div class="price-graph-dialog-shell price-graph-mobile-popup-dialog">
+            <div class="price-graph-dialog-header price-graph-mobile-popup-header">
+                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-prev" aria-label="Previous time slot"></button>
                 <span class="price-graph-mobile-popup-title-wrap">
                     <span class="price-graph-mobile-popup-title"></span>
                 </span>
+                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-next" aria-label="Next time slot"></button>
                 <button type="button" class="modal-close price-graph-mobile-popup-close" aria-label="Close">&times;</button>
             </div>
             <div class="price-graph-mobile-popup-body">
-                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-prev" aria-label="Previous time slot"></button>
-                <button type="button" class="price-graph-mobile-popup-nav price-graph-mobile-popup-nav-next" aria-label="Next time slot"></button>
                 <div class="price-graph-mobile-popup-content">
                     <div class="price-graph-popup-price"></div>
                     <div class="price-graph-popup-spot-price"></div>
@@ -625,7 +847,7 @@ function ensurePriceGraphMobilePopup() {
                     <div class="price-graph-popup-estimate-wrap"></div>
                 </div>
             </div>
-            <div class="price-graph-mobile-popup-footer">
+            <div class="price-graph-dialog-footer price-graph-mobile-popup-footer">
                 <div style="display:flex; gap:8px; align-items:center;">
                     <button type="button"
                             class="btn btn-outline price-graph-mobile-popup-netzero">
@@ -640,13 +862,12 @@ function ensurePriceGraphMobilePopup() {
                     <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clear</button>
                     <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
                 </div>
-                <div class="price-graph-mobile-popup-hint">Tap left or right edge to browse hours</div>
+                <div class="price-graph-mobile-popup-hint">Use arrows to browse hours</div>
             </div>
         </div>
     `;
     document.body.appendChild(backdrop);
 
-    const body = backdrop.querySelector('.price-graph-mobile-popup-body');
     const prevNav = backdrop.querySelector('.price-graph-mobile-popup-nav-prev');
     const nextNav = backdrop.querySelector('.price-graph-mobile-popup-nav-next');
     if (prevNav) {
@@ -661,58 +882,6 @@ function ensurePriceGraphMobilePopup() {
             e.stopPropagation();
             navigatePriceGraphMobilePopup(1);
         };
-    }
-
-    if (body) {
-        let pointerStartX = 0;
-        let pointerStartY = 0;
-        let pointerActive = false;
-        let pointerMoved = false;
-
-        body.addEventListener('touchstart', (e) => {
-            if (!e.touches || e.touches.length !== 1) return;
-            pointerActive = true;
-            pointerMoved = false;
-            pointerStartX = e.touches[0].clientX;
-            pointerStartY = e.touches[0].clientY;
-        }, { passive: true });
-
-        body.addEventListener('touchmove', (e) => {
-            if (!pointerActive || !e.touches || e.touches.length !== 1) return;
-            const deltaX = e.touches[0].clientX - pointerStartX;
-            const deltaY = e.touches[0].clientY - pointerStartY;
-            if (Math.abs(deltaX) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX ||
-                Math.abs(deltaY) > PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
-                pointerMoved = true;
-            }
-        }, { passive: true });
-
-        body.addEventListener('touchend', (e) => {
-            if (!pointerActive) return;
-            pointerActive = false;
-            const touch = e.changedTouches && e.changedTouches[0];
-            if (!touch) return;
-
-            const deltaX = touch.clientX - pointerStartX;
-            const deltaY = touch.clientY - pointerStartY;
-            if (!pointerMoved &&
-                Math.abs(deltaX) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX &&
-                Math.abs(deltaY) <= PRICE_GRAPH_MOBILE_POPUP_TAP_MAX_MOVEMENT_PX) {
-                const rect = body.getBoundingClientRect();
-                const relativeX = touch.clientX - rect.left;
-                const tapZoneWidth = rect.width * PRICE_GRAPH_MOBILE_POPUP_TAP_ZONE_RATIO;
-                if (relativeX <= tapZoneWidth) {
-                    navigatePriceGraphMobilePopup(-1);
-                } else if (relativeX >= rect.width - tapZoneWidth) {
-                    navigatePriceGraphMobilePopup(1);
-                }
-            }
-        }, { passive: true });
-
-        body.addEventListener('touchcancel', () => {
-            pointerActive = false;
-            pointerMoved = false;
-        }, { passive: true });
     }
 
     priceGraphMobilePopup = backdrop;

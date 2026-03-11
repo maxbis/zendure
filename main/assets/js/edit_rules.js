@@ -4,6 +4,7 @@
     const state = {
         rules: [],
         editIndex: null,
+        initialRuleIndex: Number.isInteger(window.EDIT_RULES_INITIAL_RULE) ? window.EDIT_RULES_INITIAL_RULE - 1 : null,
     };
 
     const els = {
@@ -289,6 +290,23 @@
         renderTable();
     }
 
+    function applyInitialRuleSelection() {
+        if (!Number.isInteger(state.initialRuleIndex)) return false;
+        const idx = state.initialRuleIndex;
+        state.initialRuleIndex = null;
+        if (idx < 0 || idx >= state.rules.length || !state.rules[idx]) {
+            setStatus('Requested rule not found.', 'error');
+            return false;
+        }
+        fillEditor(state.rules[idx], idx);
+        const row = els.rulesTbody.querySelector('tr[data-row-idx="' + idx + '"]');
+        if (row && typeof row.scrollIntoView === 'function') {
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        setStatus('Loaded ' + state.rules.length + ' rules. Focused rule #' + (idx + 1) + '.', 'ok');
+        return true;
+    }
+
     function readConditionRows() {
         const rows = Array.from(els.conditionsList.querySelectorAll('.condition-row'));
         const conditions = [];
@@ -435,7 +453,9 @@
             state.rules = rules.map(normalizeRule);
             renderTable();
             clearEditor();
-            setStatus('Loaded ' + state.rules.length + ' rules.', 'ok');
+            if (!applyInitialRuleSelection()) {
+                setStatus('Loaded ' + state.rules.length + ' rules.', 'ok');
+            }
         } catch (e) {
             setStatus(e.message, 'error');
         }
