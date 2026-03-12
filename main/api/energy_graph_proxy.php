@@ -172,8 +172,7 @@ $context = stream_context_create([
     ]
 ]);
 
-echo $upstreamUrl;
-exit();
+
 $jsonData = @file_get_contents($upstreamUrl, false, $context);
 
 if ($jsonData === false || $jsonData === '') {
