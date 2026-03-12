@@ -4,7 +4,7 @@ Create a compressed copy of status_updates.db for profiling experiments.
 
 Compression rule:
 - copy all non-"change" rows unchanged
-- collapse consecutive "change" rows with the same numeric new_value
+- collapse consecutive "change" rows only when both numeric new_value and electric_level match
 - keep the first row of each completed run
 - keep the last row of the final run so open-ended tail behavior stays realistic
 
@@ -100,16 +100,18 @@ def compress_rows(rows: list[StatusRow]) -> list[StatusRow]:
         run_first = change_rows[0]
         run_last = change_rows[0]
         run_value = normalize_change_value(change_rows[0].new_value)
+        run_level = change_rows[0].electric_level
 
         for row in change_rows[1:]:
             row_value = normalize_change_value(row.new_value)
-            if row_value == run_value:
+            if row_value == run_value and row.electric_level == run_level:
                 run_last = row
                 continue
             result.append(run_first)
             run_first = row
             run_last = row
             run_value = row_value
+            run_level = row.electric_level
 
         # Keep the last row of the final run to preserve the open-ended tail timestamp.
         result.append(run_last)

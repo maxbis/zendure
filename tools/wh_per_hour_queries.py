@@ -74,11 +74,11 @@ def _empty_wh_result(allowed_dates: list[str]) -> dict:
 
 
 def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, float]]:
-    raw_points: list[tuple[int, float]] = []
+    raw_points: list[tuple[int, float, int | None]] = []
     with sqlite3.connect(db_path) as conn:
         seed_cur = conn.execute(
             """
-            SELECT CAST(new_value AS REAL), timestamp FROM status_updates
+            SELECT CAST(new_value AS REAL), timestamp, electric_level FROM status_updates
             WHERE type = ? AND new_value IS NOT NULL AND timestamp < ?
             ORDER BY timestamp DESC
             LIMIT 1
@@ -88,34 +88,38 @@ def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, f
         rows = seed_cur.fetchall()
         cur = conn.execute(
             """
-            SELECT CAST(new_value AS REAL), timestamp FROM status_updates
+            SELECT CAST(new_value AS REAL), timestamp, electric_level FROM status_updates
             WHERE type = ? AND new_value IS NOT NULL AND timestamp >= ?
             ORDER BY timestamp ASC
             """,
             (EVENT_TYPE_CHANGE, window_start_ts),
         )
         rows.extend(cur.fetchall())
-        for power_raw, ts in rows:
+        for power_raw, ts, electric_level_raw in rows:
             if ts is None:
                 continue
             try:
-                raw_points.append((int(ts), float(power_raw)))
+                electric_level = (
+                    int(electric_level_raw) if electric_level_raw is not None else None
+                )
+                raw_points.append((int(ts), float(power_raw), electric_level))
             except (TypeError, ValueError):
                 continue
     if not raw_points:
         return []
 
     points: list[tuple[int, float]] = []
-    run_start_ts, run_power = raw_points[0]
+    run_start_ts, run_power, run_level = raw_points[0]
     run_last_ts = run_start_ts
-    for ts, power in raw_points[1:]:
-        if power == run_power:
+    for ts, power, electric_level in raw_points[1:]:
+        if power == run_power and electric_level == run_level:
             run_last_ts = ts
             continue
         points.append((run_start_ts, run_power))
         run_start_ts = ts
         run_last_ts = ts
         run_power = power
+        run_level = electric_level
     points.append((run_last_ts, run_power))
     return points
 

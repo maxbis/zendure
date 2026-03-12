@@ -796,6 +796,46 @@ def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
     assert hour_bucket["electric_level"] == 71
 
 
+def test_load_change_points_preserves_electric_level_transitions(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        base_ts = int(datetime(2025, 1, 1, 10, 0, 0, tzinfo=tz).timestamp())
+        conn.executemany(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            [
+                ("change", json.dumps(600), 70, base_ts),
+                ("change", json.dumps(600), 70, base_ts + 300),
+                ("change", json.dumps(600), 71, base_ts + 600),
+                ("change", json.dumps(600), 71, base_ts + 900),
+                ("change", json.dumps(0), 71, base_ts + 1200),
+            ],
+        )
+        conn.commit()
+
+    points = automate_www._load_change_points(str(db_path), window_start_ts=base_ts)
+
+    assert points == [
+        (base_ts, 600.0),
+        (base_ts + 600, 600.0),
+        (base_ts + 1200, 0.0),
+    ]
+
+
 def test_load_loop_config_prefers_selected_power_meter_interval():
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()
