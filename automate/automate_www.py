@@ -196,28 +196,26 @@ def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, f
     raw_points: list[tuple[int, float]] = []
     with sqlite3.connect(db_path) as conn:
         seed_cur = conn.execute(
-            "SELECT new_value, timestamp FROM status_updates "
+            "SELECT CAST(new_value AS REAL), timestamp FROM status_updates "
             "WHERE type = ? AND new_value IS NOT NULL AND timestamp < ? "
             "ORDER BY timestamp DESC LIMIT 1",
             (EVENT_TYPE_CHANGE, window_start_ts),
         )
         rows = seed_cur.fetchall()
         cur = conn.execute(
-            "SELECT new_value, timestamp FROM status_updates "
+            "SELECT CAST(new_value AS REAL), timestamp FROM status_updates "
             "WHERE type = ? AND new_value IS NOT NULL AND timestamp >= ? "
             "ORDER BY timestamp ASC",
             (EVENT_TYPE_CHANGE, window_start_ts),
         )
         rows.extend(cur.fetchall())
-        for nv_raw, ts in rows:
+        for power_raw, ts in rows:
             if ts is None:
                 continue
             try:
-                nv = json.loads(nv_raw) if isinstance(nv_raw, str) else nv_raw
-            except (json.JSONDecodeError, TypeError, ValueError):
+                raw_points.append((int(ts), float(power_raw)))
+            except (TypeError, ValueError):
                 continue
-            if isinstance(nv, (int, float)):
-                raw_points.append((int(ts), float(nv)))
     if not raw_points:
         return []
 
@@ -241,14 +239,20 @@ def _load_electric_levels_by_hour(
 ) -> dict[str, dict[str, int]]:
     levels_by_date_hour: dict[str, dict[str, int]] = {}
     with sqlite3.connect(db_path) as conn:
-        cur = conn.execute(
-            "SELECT timestamp, electric_level FROM status_updates "
-            "WHERE timestamp IS NOT NULL AND electric_level IS NOT NULL "
-            "AND timestamp >= ? "
-            "ORDER BY timestamp ASC",
-            (window_start_ts,),
-        )
-        for ts_raw, level_raw in cur.fetchall():
+        for hour_offset in range((len(allowed_dates) * 24)):
+            hour_start_dt = datetime.fromtimestamp(window_start_ts, tz=tz) + timedelta(hours=hour_offset)
+            hour_end_dt = hour_start_dt + timedelta(hours=1)
+            cur = conn.execute(
+                "SELECT timestamp, electric_level FROM status_updates "
+                "WHERE timestamp >= ? AND timestamp < ? "
+                "AND electric_level IS NOT NULL "
+                "ORDER BY timestamp DESC LIMIT 1",
+                (int(hour_start_dt.timestamp()), int(hour_end_dt.timestamp())),
+            )
+            row = cur.fetchone()
+            if row is None:
+                continue
+            ts_raw, level_raw = row
             try:
                 ts = int(ts_raw)
                 level = int(level_raw)
