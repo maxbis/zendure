@@ -170,6 +170,12 @@ def _allowed_wh_dates(now: int, days_back: int, tz: ZoneInfo) -> list[str]:
     ]
 
 
+def _wh_window_start_ts(now: int, days_back: int, tz: ZoneInfo) -> int:
+    dt = datetime.fromtimestamp(now, tz=tz)
+    start_day = datetime(dt.year, dt.month, dt.day, tzinfo=tz) - timedelta(days=days_back)
+    return int(start_day.timestamp())
+
+
 def _empty_wh_result(allowed_dates: list[str]) -> dict:
     return {
         d: [
@@ -185,15 +191,24 @@ def _empty_wh_result(allowed_dates: list[str]) -> dict:
     }
 
 
-def _load_change_points(db_path: str) -> list[tuple[int, float]]:
+def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, float]]:
     points: list[tuple[int, float]] = []
     with sqlite3.connect(db_path) as conn:
+        seed_cur = conn.execute(
+            "SELECT new_value, timestamp FROM status_updates "
+            "WHERE type = ? AND new_value IS NOT NULL AND timestamp < ? "
+            "ORDER BY timestamp DESC LIMIT 1",
+            (EVENT_TYPE_CHANGE, window_start_ts),
+        )
+        rows = seed_cur.fetchall()
         cur = conn.execute(
             "SELECT new_value, timestamp FROM status_updates "
-            "WHERE type = ? AND new_value IS NOT NULL",
-            (EVENT_TYPE_CHANGE,),
+            "WHERE type = ? AND new_value IS NOT NULL AND timestamp >= ? "
+            "ORDER BY timestamp ASC",
+            (EVENT_TYPE_CHANGE, window_start_ts),
         )
-        for nv_raw, ts in cur.fetchall():
+        rows.extend(cur.fetchall())
+        for nv_raw, ts in rows:
             if ts is None:
                 continue
             try:
@@ -202,19 +217,20 @@ def _load_change_points(db_path: str) -> list[tuple[int, float]]:
                 continue
             if isinstance(nv, (int, float)):
                 points.append((int(ts), float(nv)))
-    points.sort(key=lambda p: p[0])
     return points
 
 
 def _load_electric_levels_by_hour(
-    db_path: str, allowed_dates: set[str], tz: ZoneInfo
+    db_path: str, allowed_dates: set[str], tz: ZoneInfo, window_start_ts: int
 ) -> dict[str, dict[str, int]]:
     levels_by_date_hour: dict[str, dict[str, int]] = {}
     with sqlite3.connect(db_path) as conn:
         cur = conn.execute(
             "SELECT timestamp, electric_level FROM status_updates "
             "WHERE timestamp IS NOT NULL AND electric_level IS NOT NULL "
-            "ORDER BY timestamp ASC"
+            "AND timestamp >= ? "
+            "ORDER BY timestamp ASC",
+            (window_start_ts,),
         )
         for ts_raw, level_raw in cur.fetchall():
             try:
@@ -334,19 +350,20 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
     """
     tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
     allowed_dates = _allowed_wh_dates(now=now, days_back=days_back, tz=tz)
+    window_start_ts = _wh_window_start_ts(now=now, days_back=days_back, tz=tz)
     if not os.path.exists(db_path):
         return _empty_wh_result(allowed_dates)
     allowed_dates_set = set(allowed_dates)
 
     try:
         electric_levels_by_date_hour = _load_electric_levels_by_hour(
-            db_path=db_path, allowed_dates=allowed_dates_set, tz=tz
+            db_path=db_path, allowed_dates=allowed_dates_set, tz=tz, window_start_ts=window_start_ts
         )
     except Exception:
         electric_levels_by_date_hour = {}
 
     try:
-        points = _load_change_points(db_path)
+        points = _load_change_points(db_path, window_start_ts=window_start_ts)
     except Exception:
         points = []
 
@@ -1052,6 +1069,7 @@ class StatusApi:
             timestamp INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_status_updates_timestamp ON status_updates(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_status_updates_type_timestamp ON status_updates(type, timestamp);
     """
 
     def __init__(self, logger: Logger,

@@ -755,6 +755,47 @@ def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):
     assert hour_bucket["electric_level"] == 78
 
 
+def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        window_start = int(datetime(2025, 1, 1, 0, 0, 0, tzinfo=tz).timestamp())
+        conn.execute(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            ("change", json.dumps(600), 70, window_start - 300),
+        )
+        conn.execute(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            ("change", json.dumps(0), 71, window_start + 1800),
+        )
+        conn.commit()
+
+    result = automate_www.compute_wh_per_hour(
+        str(db_path),
+        now=int(datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz).timestamp()),
+        days_back=0,
+    )
+    hour_bucket = result["2025-01-01"][0]
+
+    assert hour_bucket["charged_wh"] == pytest.approx(300.0)
+    assert hour_bucket["discharged_wh"] == pytest.approx(0.0)
+    assert hour_bucket["electric_level"] == 71
+
+
 def test_load_loop_config_prefers_selected_power_meter_interval():
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()
