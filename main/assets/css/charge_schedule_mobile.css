@@ -875,6 +875,17 @@ body.mobile-dark {
     border-bottom-color: var(--accent-color, #64b5f6);
 }
 
+.energy-graph-mobile-status {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(229, 115, 115, 0.14);
+    border: 1px solid rgba(229, 115, 115, 0.35);
+    color: #ffb4b4;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
 .energy-graph-mobile-tab-panels {
     height: 180px;
     position: relative;

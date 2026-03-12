@@ -9,6 +9,7 @@ Each segment is capped at 1 hour so we don't extrapolate one reading for days.
 Usage:
   python tools/wh_per_hour_queries.py [path/to/status_updates.db]
   python tools/wh_per_hour_queries.py --days 5
+  python tools/wh_per_hour_queries.py --profile
   python tools/wh_per_hour_queries.py   # uses automate/data/status_updates.db, 3 days
 
 Output: JSON in API shape, then grand totals (charged positive, discharged negative).
@@ -233,12 +234,82 @@ def compute_wh_per_hour(
     )
 
 
+def profile_wh_per_hour(
+    db_path: str, now: int, days_back: int = WH_PER_HOUR_DAYS_DEFAULT
+) -> tuple[dict, dict[str, object]]:
+    tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
+    timings: dict[str, float] = {}
+    started = time.perf_counter()
+
+    t0 = time.perf_counter()
+    allowed_dates = _allowed_wh_dates(now=now, days_back=days_back, tz=tz)
+    allowed_dates_set = set(allowed_dates)
+    timings["allowed_dates"] = time.perf_counter() - t0
+
+    if not os.path.exists(db_path):
+        timings["total"] = time.perf_counter() - started
+        return _empty_wh_result(allowed_dates), {
+            "db_path": db_path,
+            "allowed_dates": allowed_dates,
+            "timings": timings,
+            "electric_hours": 0,
+            "change_points": 0,
+            "integrated_hours": 0,
+        }
+
+    t0 = time.perf_counter()
+    try:
+        electric_levels_by_date_hour = _load_electric_levels_by_hour(
+            db_path=db_path, allowed_dates=allowed_dates_set, tz=tz
+        )
+    except Exception:
+        electric_levels_by_date_hour = {}
+    timings["load_electric_levels"] = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    try:
+        points = _load_change_points(db_path)
+    except Exception:
+        points = []
+    timings["load_change_points"] = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    wh_by_date_hour: dict[str, dict[str, dict[str, float]]] = {}
+    if points:
+        wh_by_date_hour = _integrate_wh_points(
+            points=points,
+            now=now,
+            allowed_dates=allowed_dates_set,
+            tz=tz,
+        )
+    timings["integrate_wh_points"] = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    result = _build_wh_result(
+        wh_by_date_hour, electric_levels_by_date_hour, allowed_dates
+    )
+    timings["build_result"] = time.perf_counter() - t0
+    timings["total"] = time.perf_counter() - started
+
+    electric_hours = sum(len(hours) for hours in electric_levels_by_date_hour.values())
+    integrated_hours = sum(len(hours) for hours in wh_by_date_hour.values())
+    return result, {
+        "db_path": db_path,
+        "allowed_dates": allowed_dates,
+        "timings": timings,
+        "electric_hours": electric_hours,
+        "change_points": len(points),
+        "integrated_hours": integrated_hours,
+    }
+
+
 def main() -> int:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     default_db = os.path.join(repo_root, "automate", "data", "status_updates.db")
 
     argv = sys.argv[1:]
     opt_days = WH_PER_HOUR_DAYS_DEFAULT
+    opt_profile = False
     positional = []
     i = 0
     while i < len(argv):
@@ -249,6 +320,10 @@ def main() -> int:
                 pass
             i += 2
             continue
+        if argv[i] == "--profile":
+            opt_profile = True
+            i += 1
+            continue
         positional.append(argv[i])
         i += 1
 
@@ -258,7 +333,11 @@ def main() -> int:
         return 2
 
     now = int(time.time())
-    result = compute_wh_per_hour(db_path, now, days_back=opt_days)
+    profile = None
+    if opt_profile:
+        result, profile = profile_wh_per_hour(db_path, now, days_back=opt_days)
+    else:
+        result = compute_wh_per_hour(db_path, now, days_back=opt_days)
     print(json.dumps(result, indent=2))
 
     total_charged = 0.0
@@ -271,6 +350,15 @@ def main() -> int:
     print(f"  charged_wh:   +{total_charged:.2f}")
     print(f"  discharged_wh: -{total_discharged_magnitude:.2f}")
     print(f"  net_wh:       {total_charged - total_discharged_magnitude:+.2f}")
+    if profile is not None:
+        print("\nProfile:")
+        print(f"  db_path:         {profile['db_path']}")
+        print(f"  allowed_dates:   {', '.join(profile['allowed_dates'])}")
+        print(f"  change_points:   {profile['change_points']}")
+        print(f"  electric_hours:  {profile['electric_hours']}")
+        print(f"  integrated_hours:{profile['integrated_hours']}")
+        for key, value in profile["timings"].items():
+            print(f"  {key:18} {value * 1000:9.2f} ms")
     return 0
 
 

@@ -7,16 +7,16 @@
  */
 date_default_timezone_set('Europe/Amsterdam');
 
-require_once __DIR__ . '/../../login/validate.php';
+// require_once __DIR__ . '/../../login/validate.php';
 require_once __DIR__ . '/../includes/config_loader.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store, max-age=0');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+// if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+//     http_response_code(200);
+//     exit();
+// }
 
 $cachePath = __DIR__ . '/../data/energy_graph_cache.json';
 $ttlSeconds = (int) ConfigLoader::get('whPerHourCacheMinutes', 5) * 60;
@@ -139,14 +139,26 @@ function writeCache($path, $payload) {
     return @file_put_contents($path, $toWrite, LOCK_EX) !== false;
 }
 
+/**
+ * Emit a normalized API response payload.
+ */
+function emitPayload(array $payload, array $cacheInfo = []) {
+    echo json_encode([
+        'whPerHour' => $payload['whPerHour'],
+        'whPerDay'  => $payload['whPerDay'],
+        'baseWh'    => (int) $payload['baseWh'],
+        'cacheInfo' => $cacheInfo
+    ], JSON_UNESCAPED_SLASHES);
+}
+
 // 1) Try fresh cache
 $cached = readCache($cachePath);
 if ($cached !== null && (time() - (int) $cached['cachedAt']) <= $ttlSeconds) {
-    echo json_encode([
-        'whPerHour' => $cached['whPerHour'],
-        'whPerDay'  => $cached['whPerDay'],
-        'baseWh'    => (int) $cached['baseWh']
-    ], JSON_UNESCAPED_SLASHES);
+    emitPayload($cached, [
+        'source' => 'cache',
+        'cachedAt' => (int) $cached['cachedAt'],
+        'isStale' => false
+    ]);
     exit();
 }
 
@@ -159,15 +171,19 @@ $context = stream_context_create([
         'header' => 'User-Agent: Energy-Graph-Proxy'
     ]
 ]);
+
+echo $upstreamUrl;
+exit();
 $jsonData = @file_get_contents($upstreamUrl, false, $context);
 
 if ($jsonData === false || $jsonData === '') {
     if ($cached !== null) {
-        echo json_encode([
-            'whPerHour' => $cached['whPerHour'],
-            'whPerDay'  => $cached['whPerDay'],
-            'baseWh'    => (int) $cached['baseWh']
-        ], JSON_UNESCAPED_SLASHES);
+        emitPayload($cached, [
+            'source' => 'cache',
+            'cachedAt' => (int) $cached['cachedAt'],
+            'isStale' => true,
+            'upstreamError' => 'fetch_failed'
+        ]);
         exit();
     }
     http_response_code(502);
@@ -178,11 +194,12 @@ if ($jsonData === false || $jsonData === '') {
 $external = json_decode($jsonData, true);
 if (!is_array($external)) {
     if ($cached !== null) {
-        echo json_encode([
-            'whPerHour' => $cached['whPerHour'],
-            'whPerDay'  => $cached['whPerDay'],
-            'baseWh'    => (int) $cached['baseWh']
-        ], JSON_UNESCAPED_SLASHES);
+        emitPayload($cached, [
+            'source' => 'cache',
+            'cachedAt' => (int) $cached['cachedAt'],
+            'isStale' => true,
+            'upstreamError' => 'invalid_json'
+        ]);
         exit();
     }
     http_response_code(502);
@@ -195,8 +212,8 @@ $payload = transformWhPerHourResponse($external, $baseWh, $energyGraphDaysBack, 
 $payload['cachedAt'] = time();
 writeCache($cachePath, $payload);
 
-echo json_encode([
-    'whPerHour' => $payload['whPerHour'],
-    'whPerDay'  => $payload['whPerDay'],
-    'baseWh'    => $payload['baseWh']
-], JSON_UNESCAPED_SLASHES);
+emitPayload($payload, [
+    'source' => 'upstream',
+    'cachedAt' => (int) $payload['cachedAt'],
+    'isStale' => false
+]);

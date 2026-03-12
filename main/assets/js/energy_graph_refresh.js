@@ -326,6 +326,51 @@
         return div.innerHTML;
     }
 
+    function formatCacheTimestamp(unixSeconds) {
+        var value = Number(unixSeconds);
+        if (!isFinite(value) || value <= 0) return '';
+        var date = new Date(value * 1000);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleString([], {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function renderCacheStatus(cacheInfo) {
+        var card = document.querySelector('.energy-graph-mobile');
+        if (!card) return;
+        var statusEl = card.querySelector('.energy-graph-mobile-status');
+        if (!statusEl) {
+            statusEl = document.createElement('p');
+            statusEl.className = 'energy-graph-mobile-status';
+            var tabs = card.querySelector('.energy-graph-mobile-tabs');
+            if (tabs && tabs.parentNode) {
+                tabs.parentNode.insertBefore(statusEl, tabs.nextSibling);
+            } else {
+                card.insertBefore(statusEl, card.firstChild.nextSibling);
+            }
+        }
+
+        if (!cacheInfo || cacheInfo.isStale !== true) {
+            statusEl.hidden = true;
+            statusEl.textContent = '';
+            return;
+        }
+
+        var updatedAt = formatCacheTimestamp(cacheInfo.cachedAt);
+        var text = 'Showing cached energy data';
+        if (updatedAt) {
+            text += ' from ' + updatedAt;
+        }
+        text += '. Live refresh from the control API failed.';
+        statusEl.textContent = text;
+        statusEl.hidden = false;
+    }
+
     function renderMobileDailyTable(whPerDay, baseWh) {
         var container = document.querySelector('.energy-graph-mobile-daily-table');
         if (!container) return;
@@ -370,6 +415,7 @@
             var whPerHour = json.whPerHour;
             var whPerDay = json.whPerDay;
             var baseWh = json.baseWh != null ? Number(json.baseWh) : 5760;
+            var cacheInfo = json.cacheInfo || null;
 
             latestWhPerHour = Array.isArray(whPerHour) ? whPerHour : [];
             if (selectedMobileDay) {
@@ -383,6 +429,7 @@
             ensureMobileChartExists();
             updateMobileChart(cdMobile);
             renderMobileDailyTable(whPerDay, baseWh);
+            renderCacheStatus(cacheInfo);
         } catch (e) {
             console.warn('Energy graph refresh failed:', e);
         }
