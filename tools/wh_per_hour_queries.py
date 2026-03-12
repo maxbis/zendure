@@ -74,7 +74,7 @@ def _empty_wh_result(allowed_dates: list[str]) -> dict:
 
 
 def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, float]]:
-    points: list[tuple[int, float]] = []
+    raw_points: list[tuple[int, float]] = []
     with sqlite3.connect(db_path) as conn:
         seed_cur = conn.execute(
             """
@@ -103,7 +103,22 @@ def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, f
             except (json.JSONDecodeError, TypeError, ValueError):
                 continue
             if isinstance(nv, (int, float)):
-                points.append((int(ts), float(nv)))
+                raw_points.append((int(ts), float(nv)))
+    if not raw_points:
+        return []
+
+    points: list[tuple[int, float]] = []
+    run_start_ts, run_power = raw_points[0]
+    run_last_ts = run_start_ts
+    for ts, power in raw_points[1:]:
+        if power == run_power:
+            run_last_ts = ts
+            continue
+        points.append((run_start_ts, run_power))
+        run_start_ts = ts
+        run_last_ts = ts
+        run_power = power
+    points.append((run_last_ts, run_power))
     return points
 
 

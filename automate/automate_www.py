@@ -53,6 +53,7 @@ WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
 WH_PER_HOUR_DAYS_DEFAULT = 3
 # Cap last segment so we don't extrapolate one power reading to "now" for days (avoids inflated totals)
 WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS = 3600  # 1 hour
+WH_PER_HOUR_CACHE_SECONDS = 60
 
 # Shared timezone for status timestamps
 STATUS_TIMEZONE = "Europe/Amsterdam"
@@ -192,7 +193,7 @@ def _empty_wh_result(allowed_dates: list[str]) -> dict:
 
 
 def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, float]]:
-    points: list[tuple[int, float]] = []
+    raw_points: list[tuple[int, float]] = []
     with sqlite3.connect(db_path) as conn:
         seed_cur = conn.execute(
             "SELECT new_value, timestamp FROM status_updates "
@@ -216,7 +217,22 @@ def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, f
             except (json.JSONDecodeError, TypeError, ValueError):
                 continue
             if isinstance(nv, (int, float)):
-                points.append((int(ts), float(nv)))
+                raw_points.append((int(ts), float(nv)))
+    if not raw_points:
+        return []
+
+    points: list[tuple[int, float]] = []
+    run_start_ts, run_power = raw_points[0]
+    run_last_ts = run_start_ts
+    for ts, power in raw_points[1:]:
+        if power == run_power:
+            run_last_ts = ts
+            continue
+        points.append((run_start_ts, run_power))
+        run_start_ts = ts
+        run_last_ts = ts
+        run_power = power
+    points.append((run_last_ts, run_power))
     return points
 
 
@@ -438,6 +454,8 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         self.restart_callback: Optional[Callable[[], None]] = None
         self.pause_getter: Optional[Callable[[], bool]] = None
         self.pause_setter: Optional[Callable[[bool], None]] = None
+        self.wh_per_hour_cache: Optional[dict[str, Any]] = None
+        self.wh_per_hour_cache_lock = threading.Lock()
 
 
 class ApiTestHandler(http.server.BaseHTTPRequestHandler):
@@ -680,7 +698,27 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if not db_path or not os.path.exists(db_path):
             self._send_json({"error": "Status updates database not available"})
             return True
-        data = compute_wh_per_hour(db_path, int(time.time()), WH_PER_HOUR_DAYS_DEFAULT)
+        now = int(time.time())
+        cached = None
+        with self.server.wh_per_hour_cache_lock:
+            cache_entry = self.server.wh_per_hour_cache
+            if (
+                cache_entry
+                and cache_entry.get("db_path") == db_path
+                and (now - int(cache_entry.get("computed_at", 0))) < WH_PER_HOUR_CACHE_SECONDS
+            ):
+                cached = cache_entry.get("data")
+        if cached is not None:
+            self._send_json(cached, sort_keys=True)
+            return True
+
+        data = compute_wh_per_hour(db_path, now, WH_PER_HOUR_DAYS_DEFAULT)
+        with self.server.wh_per_hour_cache_lock:
+            self.server.wh_per_hour_cache = {
+                "db_path": db_path,
+                "computed_at": now,
+                "data": data,
+            }
         self._send_json(data, sort_keys=True)
         return True
 
@@ -1132,6 +1170,10 @@ class StatusApi:
                 cutoff = int(timestamp) - (self.retention_days * 24 * 60 * 60)
                 conn.execute("DELETE FROM status_updates WHERE timestamp < ?", (cutoff,))
                 conn.commit()
+            http_server = getattr(self, "http_server", None)
+            if http_server is not None and hasattr(http_server, "wh_per_hour_cache_lock"):
+                with http_server.wh_per_hour_cache_lock:
+                    http_server.wh_per_hour_cache = None
         except Exception as e:
             self.logger.warning(f"Failed to write status update to SQLite: {e}")
 
@@ -1708,6 +1750,7 @@ class AutomationApp:
             self.http_server.db_path = self.status_api.db_path
             self.http_server.schedule_controller = self.schedule_controller
             self.http_server.status_api = self.status_api
+            self.status_api.http_server = self.http_server
             self.http_server.refresh_p1_callback = self._refresh_p1_for_api
             self.http_server.refresh_zendure_callback = self._refresh_zendure_for_api
             self.http_server.restart_callback = self.request_restart
