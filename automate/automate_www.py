@@ -474,6 +474,7 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         super().__init__(server_address, request_handler_class)
         self.api_state: Optional[ApiState] = None
         self.db_path: Optional[str] = None
+        self.wh_per_hour_db_path: Optional[str] = None
         self.schedule_controller: Optional[ScheduleController] = None
         self.status_api: Optional["StatusApi"] = None
         self.refresh_p1_callback: Optional[Callable[[], None]] = None
@@ -721,7 +722,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def _handle_wh_per_hour(self, path: str) -> bool:
         if path != API_PATH_WH_PER_HOUR:
             return False
-        db_path = getattr(self.server, "db_path", None)
+        db_path = getattr(self.server, "wh_per_hour_db_path", None) or getattr(self.server, "db_path", None)
         if not db_path or not os.path.exists(db_path):
             self._send_json({"error": "Status updates database not available"})
             return True
@@ -1600,6 +1601,7 @@ class AutomationApp:
 
         # Shared state for API endpoints
         self.api_state = ApiState()
+        self.wh_per_hour_db_path: Optional[str] = None
 
         # State variables
         self.last_api_refresh_time = 0
@@ -1638,6 +1640,8 @@ class AutomationApp:
 
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
+            wh_per_hour_db_path = self.schedule_controller.config.get("whPerHourDbPath", db_path)
+            self.wh_per_hour_db_path = wh_per_hour_db_path
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
 
             def get_electric_level() -> Optional[int]:
@@ -1775,6 +1779,7 @@ class AutomationApp:
             self.http_server = AutomationTCPServer(("", HTTP_API_PORT), ApiTestHandler)
             self.http_server.api_state = self.api_state
             self.http_server.db_path = self.status_api.db_path
+            self.http_server.wh_per_hour_db_path = getattr(self, "wh_per_hour_db_path", None) or self.status_api.db_path
             self.http_server.schedule_controller = self.schedule_controller
             self.http_server.status_api = self.status_api
             self.status_api.http_server = self.http_server

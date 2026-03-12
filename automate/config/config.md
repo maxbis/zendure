@@ -79,6 +79,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
 | **dataDir** | string | Directory for local data (e.g. `status_updates.db`). Default `"./data/"`. | `automate_www.py`: path for status-updates DB and retention; `dump_status_updates.py`: DB path when loading from config. |
+| **whPerHourDbPath** | string | Optional SQLite path for `/api/wh_per_hour` reads. When omitted, the runtime uses `{dataDir}/status_updates.db`. Useful for a periodically rebuilt compressed copy such as `"./data/status_updates_compressed.db"`. | `automate_www.py`: `/api/wh_per_hour` source DB path. |
 | **statusUpdatesRetentionDays** | number | Days to keep rows in the status_updates SQLite DB; older rows are pruned. | `automate_www.py`: retention cleanup. |
 
 ---
