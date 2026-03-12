@@ -18,9 +18,12 @@ import argparse
 import os
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 EVENT_TYPE_CHANGE = "change"
+WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
 
 
 @dataclass
@@ -91,20 +94,41 @@ def normalize_change_value(raw: str | None) -> float | None:
         return None
 
 
+def hour_start_ts(ts: int, tz: ZoneInfo) -> int:
+    dt = datetime.fromtimestamp(ts, tz=tz)
+    return int(datetime(dt.year, dt.month, dt.day, dt.hour, 0, 0, tzinfo=tz).timestamp())
+
+
+def mark_hour_anchor_indices(rows: list[StatusRow], tz: ZoneInfo) -> set[int]:
+    anchors: dict[int, tuple[int, int]] = {}
+    for idx, row in enumerate(rows):
+        hour_ts = hour_start_ts(row.timestamp, tz)
+        distance = abs(row.timestamp - hour_ts)
+        current = anchors.get(hour_ts)
+        if current is None or distance < current[0]:
+            anchors[hour_ts] = (distance, idx)
+    return {anchor_idx for _distance, anchor_idx in anchors.values()}
+
+
 def compress_rows(rows: list[StatusRow]) -> list[StatusRow]:
     result: list[StatusRow] = []
     change_rows = [row for row in rows if row.event_type == EVENT_TYPE_CHANGE]
     non_change_rows = [row for row in rows if row.event_type != EVENT_TYPE_CHANGE]
 
     if change_rows:
+        hour_anchor_indices = mark_hour_anchor_indices(change_rows, ZoneInfo(WH_PER_HOUR_TIMEZONE))
         run_first = change_rows[0]
         run_last = change_rows[0]
         run_value = normalize_change_value(change_rows[0].new_value)
         run_level = change_rows[0].electric_level
 
-        for row in change_rows[1:]:
+        for idx, row in enumerate(change_rows[1:], start=1):
             row_value = normalize_change_value(row.new_value)
-            if row_value == run_value and row.electric_level == run_level:
+            if (
+                row_value == run_value
+                and row.electric_level == run_level
+                and idx not in hour_anchor_indices
+            ):
                 run_last = row
                 continue
             result.append(run_first)

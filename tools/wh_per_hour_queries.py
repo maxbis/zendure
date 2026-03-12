@@ -73,7 +73,25 @@ def _empty_wh_result(allowed_dates: list[str]) -> dict:
     }
 
 
-def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, float]]:
+def _hour_start_ts(ts: int, tz: ZoneInfo) -> int:
+    dt = datetime.fromtimestamp(ts, tz=tz)
+    return int(datetime(dt.year, dt.month, dt.day, dt.hour, 0, 0, tzinfo=tz).timestamp())
+
+
+def _mark_hour_anchor_indices(
+    raw_points: list[tuple[int, float, int | None]], tz: ZoneInfo
+) -> set[int]:
+    anchors: dict[int, tuple[int, int]] = {}
+    for idx, (ts, _power, _level) in enumerate(raw_points):
+        hour_start_ts = _hour_start_ts(ts, tz)
+        distance = abs(ts - hour_start_ts)
+        current = anchors.get(hour_start_ts)
+        if current is None or distance < current[0]:
+            anchors[hour_start_ts] = (distance, idx)
+    return {anchor_idx for _distance, anchor_idx in anchors.values()}
+
+
+def _load_change_points(db_path: str, window_start_ts: int, tz: ZoneInfo) -> list[tuple[int, float]]:
     raw_points: list[tuple[int, float, int | None]] = []
     with sqlite3.connect(db_path) as conn:
         seed_cur = conn.execute(
@@ -108,11 +126,12 @@ def _load_change_points(db_path: str, window_start_ts: int) -> list[tuple[int, f
     if not raw_points:
         return []
 
+    hour_anchor_indices = _mark_hour_anchor_indices(raw_points, tz)
     points: list[tuple[int, float]] = []
     run_start_ts, run_power, run_level = raw_points[0]
     run_last_ts = run_start_ts
-    for ts, power, electric_level in raw_points[1:]:
-        if power == run_power and electric_level == run_level:
+    for idx, (ts, power, electric_level) in enumerate(raw_points[1:], start=1):
+        if power == run_power and electric_level == run_level and idx not in hour_anchor_indices:
             run_last_ts = ts
             continue
         points.append((run_start_ts, run_power))
@@ -273,7 +292,7 @@ def compute_wh_per_hour(
         electric_levels_by_date_hour = {}
 
     try:
-        points = _load_change_points(db_path, window_start_ts=window_start_ts)
+        points = _load_change_points(db_path, window_start_ts=window_start_ts, tz=tz)
     except Exception:
         points = []
 
@@ -325,7 +344,7 @@ def profile_wh_per_hour(
 
     t0 = time.perf_counter()
     try:
-        points = _load_change_points(db_path, window_start_ts=window_start_ts)
+        points = _load_change_points(db_path, window_start_ts=window_start_ts, tz=tz)
     except Exception:
         points = []
     timings["load_change_points"] = time.perf_counter() - t0
