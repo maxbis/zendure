@@ -1708,6 +1708,7 @@ class AutomationApp:
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
+            self.logger.info(f"Status updates DB path: {db_path}")
 
             def get_electric_level() -> Optional[int]:
                 if not self.api_state or not self.api_state.last_zendure:
