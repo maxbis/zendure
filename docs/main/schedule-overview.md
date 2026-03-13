@@ -237,6 +237,7 @@ The application reads configuration from `main/config/config.json`:
 
 **Value types:**
 - `number` - Power in watts (positive=charge, negative=discharge)
+- `"auto"` - Resume normal auto/rule resolution from this time onward without forcing a power value
 - `"netzero"` - Net zero mode
 - `"netzero+"` - Solar charge mode
 

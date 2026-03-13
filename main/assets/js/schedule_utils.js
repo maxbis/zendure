@@ -5,7 +5,7 @@
 
 /**
  * Get display label for a schedule value
- * @param {*} value - The schedule value (number, 'netzero', 'netzero+', or null)
+ * @param {*} value - The schedule value (number, 'auto', 'netzero', 'netzero+', or null)
  * @returns {string} - Display label
  */
 function getValueLabel(value) {
@@ -19,6 +19,7 @@ function getValueLabel(value) {
     }
 
     // Fallback to hardcoded values if modal not loaded yet
+    if (value === 'auto') return 'Auto';
     if (value === 'netzero') return 'Net Zero';
     if (value === 'netzero+') return 'Solar Charge';
 

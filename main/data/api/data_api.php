@@ -366,8 +366,8 @@ function validateScheduleKeyValue($keyStr, $value, $context = '') {
     if (strlen($keyStr) !== 12) {
         throw new Exception("Key must be 12 characters (YYYYMMDDHHmm format)" . ($context ? " [$context]" : ""));
     }
-    if ($value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
-        throw new Exception("Invalid value. Must be 'netzero', 'netzero+', or a number");
+    if ($value !== 'auto' && $value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
+        throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
     }
 }
 
@@ -461,8 +461,8 @@ function handlePostSchedule($input) {
         if (strlen($keyStr) !== 12 && !preg_match('/^[\d*]{12}$/', $keyStr)) {
             throw new Exception("Invalid schedule key format: '$keyStr'. Keys must be 12 characters (YYYYMMDDHHmm format) or contain wildcards.");
         }
-        if ($value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
-            throw new Exception("Invalid schedule value for key '$keyStr'. Value must be 'netzero', 'netzero+', or a number.");
+        if ($value !== 'auto' && $value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
+            throw new Exception("Invalid schedule value for key '$keyStr'. Value must be 'auto', 'netzero', 'netzero+', or a number.");
         }
     }
     if (!writeDataFileAtomic($filePath, $input)) {

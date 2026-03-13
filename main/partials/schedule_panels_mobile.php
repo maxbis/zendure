@@ -18,6 +18,8 @@ function getValueLabel($val)
         return 'Net Zero';
     if ($val === 'netzero+')
         return 'Solar Charge';
+    if ($val === 'auto')
+        return 'Auto';
     if (is_numeric($val))
         return ($val > 0 ? '+' : '') . intval($val) . ' W';
     return $val . ' W';

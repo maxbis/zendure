@@ -65,6 +65,11 @@ function extractTimeFromKey($key)
     return $timePart;
 }
 
+function isSupportedScheduleValue($value)
+{
+    return $value === 'auto' || $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+}
+
 function matchesAndBeforeTime($entryKey, $datetime, $slotTime)
 {
     $datePart = substr($datetime, 0, 8);
@@ -98,9 +103,9 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
     }
     // Schedule times
     foreach ($schedule as $key => $value) {
-        // Validation of value happens loosely here, or we filter?
-        // Spec: Integers, "netzero", "netzero+"
-        if ($value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value))
+        // Validation of value happens loosely here.
+        // Supported raw values: integers, "auto", "netzero", "netzero+"
+        if (!isSupportedScheduleValue($value))
             continue;
 
         $t = extractTimeFromKey((string) $key);
@@ -113,7 +118,7 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
     // Prepare entries list for easier processing
     $entries = [];
     foreach ($schedule as $k => $v) {
-        if ($v !== 'netzero' && $v !== 'netzero+' && !is_numeric($v))
+        if (!isSupportedScheduleValue($v))
             continue;
         $entries[] = [
             'key' => (string) $k,
@@ -134,6 +139,42 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
         }
 
         $selected = null;
+        if (!empty($candidates)) {
+            $latestAutoTime = null;
+            foreach ($candidates as $candidate) {
+                if ($candidate['value'] !== 'auto' || $candidate['time'] === null) {
+                    continue;
+                }
+                if ($latestAutoTime === null || strcmp($candidate['time'], $latestAutoTime) > 0) {
+                    $latestAutoTime = $candidate['time'];
+                }
+            }
+
+            if ($latestAutoTime !== null) {
+                $candidates = array_values(array_filter($candidates, function ($candidate) use ($latestAutoTime) {
+                    if (!is_array($candidate)) {
+                        return false;
+                    }
+                    if (($candidate['value'] ?? null) === 'auto') {
+                        return false;
+                    }
+                    $candidateKey = (string) ($candidate['key'] ?? '');
+                    if (strpos($candidateKey, '*') !== false) {
+                        return true;
+                    }
+                    $candidateTime = $candidate['time'] ?? null;
+                    if ($candidateTime === null) {
+                        return true;
+                    }
+                    return strcmp((string) $candidateTime, $latestAutoTime) > 0;
+                }));
+            } else {
+                $candidates = array_values(array_filter($candidates, function ($candidate) {
+                    return is_array($candidate) && (($candidate['value'] ?? null) !== 'auto');
+                }));
+            }
+        }
+
         if (!empty($candidates)) {
             // Sort
             usort($candidates, function ($a, $b) {

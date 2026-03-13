@@ -180,6 +180,11 @@ class EditModal {
                 document.getElementById('group-watts').style.display = 'block';
                 document.getElementById('inp-watts').disabled = true;
                 document.getElementById('inp-watts').value = '';
+            } else if (value === 'auto') {
+                document.querySelector('input[name="val-mode"][value="auto"]').checked = true;
+                document.getElementById('group-watts').style.display = 'block';
+                document.getElementById('inp-watts').disabled = true;
+                document.getElementById('inp-watts').value = '';
             } else {
                 document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
                 document.getElementById('group-watts').style.display = 'block';
@@ -202,7 +207,7 @@ class EditModal {
 
     handleModeChange(mode) {
         const wattsInput = document.getElementById('inp-watts');
-        if (mode === 'netzero' || mode === 'netzero+') {
+        if (mode === 'netzero' || mode === 'netzero+' || mode === 'auto') {
             wattsInput.disabled = true;
             wattsInput.value = '';
             wattsInput.setAttribute('value', '');
@@ -302,6 +307,8 @@ class EditModal {
             val = 'netzero';
         } else if (mode === 'netzero+') {
             val = 'netzero+';
+        } else if (mode === 'auto') {
+            val = 'auto';
         } else {
             val = document.getElementById('inp-watts').value.trim();
             // If watts is empty or none, use 0

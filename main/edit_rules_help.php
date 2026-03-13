@@ -221,6 +221,7 @@ date_default_timezone_set('Europe/Amsterdam');
             <li><code>manual non-wildcard key</code> (no <code>*</code>) wins and is not overridden by condition rules, including explicit <code>0</code>.</li>
             <li>Wildcard/empty base slots may be overridden by condition rules.</li>
         </ul>
+        <p class="muted">Raw schedule entries may also use <code>auto</code> as a boundary marker in <code>charge_schedule.json</code>: from that exact time onward, inherited earlier manual values stop carrying forward and normal wildcard/rule resolution resumes.</p>
         <p class="muted">When available, UI source labels show the originating condition rule as <code>#&lt;index&gt; &lt;name&gt;</code>.</p>
     </section>
 

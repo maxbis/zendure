@@ -110,8 +110,8 @@ try {
             }
             
             // Validate value
-            if ($val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
-                throw new Exception("Invalid value");
+            if ($val !== 'auto' && $val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
+                throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
             }
             
             // Convert numeric value to int

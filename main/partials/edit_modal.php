@@ -21,16 +21,20 @@
                 <label>Value Mode</label>
                 <div class="edit-modal-mode-options">
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="fixed" checked>
-                        <span class="edit-modal-toggle-label">Watts&nbsp;(W)</span>
+                        <input type="radio" name="val-mode" value="netzero+" label="☀️ Only">
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">☀️</span><span>NetZero+</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="netzero" label="Net Zero">
-                        <span class="edit-modal-toggle-label">NetZero</span>
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🔌</span><span>NetZero</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="netzero+" label="☀️ Only">
-                        <span class="edit-modal-toggle-label">NetZero+</span>
+                        <input type="radio" name="val-mode" value="fixed" checked>
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">⚡</span><span>Watts&nbsp;(W)</span></span>
+                    </label>
+                    <label class="edit-modal-toggle edit-modal-toggle-radio">
+                        <input type="radio" name="val-mode" value="auto" label="Auto">
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">↩</span><span>Auto</span></span>
                     </label>
                 </div>
             </div>
