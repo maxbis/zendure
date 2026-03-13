@@ -280,13 +280,8 @@ function cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD)
 
         $slotKey = isset($slot['key']) ? (string) $slot['key'] : '';
         $isManualNonWildcard = $slotKey !== '' && strpos($slotKey, '*') === false;
-        // A slot value of 0 (integer) is treated as "transparent" (auto) and may be
-        // overridden by conditions, even when it originates from an exact-date key.
-        // Any other explicit non-wildcard value blocks condition override.
-        $slotValue = array_key_exists('value', $slot) ? $slot['value'] : null;
-        $isZeroValue = is_numeric($slotValue) && (int) $slotValue === 0;
-        // Preserve manual exact entries (non-zero); conditions can override wildcard/empty/zero slots.
-        if ($isManualNonWildcard && !$isZeroValue) {
+        // Preserve exact manual entries; conditions can override wildcard/empty slots.
+        if ($isManualNonWildcard) {
             continue;
         }
 

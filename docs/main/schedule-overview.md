@@ -232,6 +232,8 @@ The application reads configuration from `main/config/config.json`:
 **Key format:** `YYYYMMDDHHNN` (12 characters)
 - `*` = wildcard (matches any value)
 - More specific keys override wildcards
+- Exact manual entries, including `0`, block condition-rule overrides
+- Transparent/auto behavior comes from deleting the exact entry rather than storing a sentinel value
 
 **Value types:**
 - `number` - Power in watts (positive=charge, negative=discharge)

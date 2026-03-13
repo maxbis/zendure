@@ -218,7 +218,7 @@ date_default_timezone_set('Europe/Amsterdam');
         </ol>
         <p>Priority at merge time:</p>
         <ul>
-            <li><code>manual non-wildcard key</code> (no <code>*</code>) wins and is not overridden by condition rules.</li>
+            <li><code>manual non-wildcard key</code> (no <code>*</code>) wins and is not overridden by condition rules, including explicit <code>0</code>.</li>
             <li>Wildcard/empty base slots may be overridden by condition rules.</li>
         </ul>
         <p class="muted">When available, UI source labels show the originating condition rule as <code>#&lt;index&gt; &lt;name&gt;</code>.</p>

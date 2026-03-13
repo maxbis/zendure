@@ -234,13 +234,21 @@ class EditModal {
         const confirmed = await this.showConfirmDialog('Are you sure you want to delete this entry?');
         if (!confirmed) return;
 
+        await this.deleteEntry(this.currentOriginalKey);
+    }
+
+    async deleteEntry(key, options = {}) {
+        if (!key) return false;
+
+        const closeAfterDelete = options.closeAfterDelete !== false;
+
         try {
             const res = await fetch(this.apiUrl, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ key: this.currentOriginalKey })
+                body: JSON.stringify({ key })
             });
             
             if (!res.ok) {
@@ -250,7 +258,9 @@ class EditModal {
             const json = await res.json();
             console.log('Delete response:', json);
             if (json.success) {
-                this.close();
+                if (closeAfterDelete) {
+                    this.close();
+                }
                 console.log('Delete successful, refreshing data...');
                 if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
                     await window.refreshScheduleAndPricesImmediate();
@@ -259,6 +269,7 @@ class EditModal {
                     console.warn('refreshScheduleAndPricesImmediate not available, reloading page');
                     window.location.reload();
                 }
+                return true;
             } else {
                 alert(json.error || 'Delete failed');
             }
@@ -266,6 +277,8 @@ class EditModal {
             console.error(e);
             alert('Delete failed');
         }
+
+        return false;
     }
 
     async handleSave() {
@@ -322,7 +335,10 @@ class EditModal {
         } else if (mode === 'netzero+') {
             val = 'netzero+';
         } else if (mode === 'clear') {
-            val = 0;
+            if (options.originalKey) {
+                await this.deleteEntry(options.originalKey, { closeAfterDelete: false });
+            }
+            return;
         } else {
             return;
         }

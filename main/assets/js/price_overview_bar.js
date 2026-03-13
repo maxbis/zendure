@@ -1029,7 +1029,9 @@ function renderPriceGraphMobilePopupContent() {
     netZeroBtn.onclick = () => applyQuickMode('netzero');
     netZeroPlusBtn.onclick = () => applyQuickMode('netzero+');
     if (clearBtn) {
-        clearBtn.onclick = () => applyQuickMode('clear');
+        clearBtn.disabled = !hasExistingEntry;
+        clearBtn.setAttribute('aria-disabled', hasExistingEntry ? 'false' : 'true');
+        clearBtn.onclick = hasExistingEntry ? () => applyQuickMode('clear') : null;
     }
 
     editBtn.onclick = () => {

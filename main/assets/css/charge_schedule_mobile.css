@@ -79,6 +79,15 @@ body.mobile-dark {
     transform: translateY(0);
 }
 
+.btn:disabled,
+.btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+
 .btn-primary {
     background: #64b5f6;
     color: #fff;
@@ -1816,6 +1825,13 @@ code {
     background: rgba(164, 52, 52, 0.42);
     border-color: rgba(216, 97, 97, 0.7);
     color: #ffd2d2;
+}
+
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-clear:disabled,
+.price-graph-mobile-popup-actions .price-graph-mobile-popup-clear[aria-disabled="true"] {
+    background: rgba(100, 100, 100, 0.16);
+    border-color: rgba(140, 140, 140, 0.28);
+    color: rgba(241, 179, 179, 0.45);
 }
 
 .price-graph-mobile-popup-actions .price-graph-mobile-popup-edit {
