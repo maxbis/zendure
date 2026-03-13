@@ -1158,6 +1158,10 @@ class StatusApi:
         self.get_electric_level = get_electric_level
         self.retention_days = retention_days
         self._db_initialized = False
+        self._last_stored_change_power: Optional[float] = None
+        self._last_stored_change_level: Optional[int] = None
+        self._last_stored_change_timestamp: Optional[int] = None
+        self._last_stored_change_hour_start_ts: Optional[int] = None
 
     def _ensure_db(self) -> None:
         """Create DB file, directory, and table if needed."""
@@ -1169,6 +1173,7 @@ class StatusApi:
                 os.makedirs(db_dir, exist_ok=True)
             with sqlite3.connect(self.db_path) as conn:
                 conn.executescript(self._SCHEMA)
+                self._load_change_insert_state(conn)
             self._db_initialized = True
         except Exception as e:
             self.logger.warning(f"Failed to initialize SQLite DB: {e}")
@@ -1198,27 +1203,41 @@ class StatusApi:
         hour_start_ts = int(hour_start.timestamp())
         return hour_start_ts, hour_start_ts + 3600
 
-    def _should_store_change_row(
-        self,
-        conn: sqlite3.Connection,
-        new_value: Any,
-        electric_level: Optional[int],
-        timestamp: int,
-    ) -> bool:
-        new_power = self._parse_change_power(new_value)
-        if new_power is None:
-            return True
-
+    def _load_change_insert_state(self, conn: sqlite3.Connection) -> None:
         prev_row = conn.execute(
             "SELECT new_value, electric_level, timestamp FROM status_updates "
             "WHERE type = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
             (EVENT_TYPE_CHANGE,),
         ).fetchone()
         if prev_row is None:
+            self._last_stored_change_power = None
+            self._last_stored_change_level = None
+            self._last_stored_change_timestamp = None
+            self._last_stored_change_hour_start_ts = None
+            return
+
+        self._last_stored_change_power = self._parse_change_power(prev_row[0])
+        self._last_stored_change_level = int(prev_row[1]) if prev_row[1] is not None else None
+        self._last_stored_change_timestamp = int(prev_row[2]) if prev_row[2] is not None else None
+        if self._last_stored_change_timestamp is not None:
+            self._last_stored_change_hour_start_ts, _ = self._hour_window_for_timestamp(
+                self._last_stored_change_timestamp
+            )
+        else:
+            self._last_stored_change_hour_start_ts = None
+
+    def _should_store_change_row(
+        self, new_value: Any, electric_level: Optional[int], timestamp: int
+    ) -> bool:
+        new_power = self._parse_change_power(new_value)
+        if new_power is None:
             return True
 
-        prev_power = self._parse_change_power(prev_row[0])
-        prev_level = int(prev_row[1]) if prev_row[1] is not None else None
+        if self._last_stored_change_power is None and self._last_stored_change_timestamp is None:
+            return True
+
+        prev_power = self._last_stored_change_power
+        prev_level = self._last_stored_change_level
         if prev_power is None:
             return True
         if new_power != prev_power:
@@ -1226,14 +1245,16 @@ class StatusApi:
         if electric_level != prev_level:
             return True
 
-        hour_start_ts, hour_end_ts = self._hour_window_for_timestamp(timestamp)
-        same_hour_row = conn.execute(
-            "SELECT id FROM status_updates "
-            "WHERE type = ? AND timestamp >= ? AND timestamp < ? "
-            "ORDER BY timestamp ASC, id ASC LIMIT 1",
-            (EVENT_TYPE_CHANGE, hour_start_ts, hour_end_ts),
-        ).fetchone()
-        return same_hour_row is None
+        hour_start_ts, _hour_end_ts = self._hour_window_for_timestamp(timestamp)
+        return self._last_stored_change_hour_start_ts != hour_start_ts
+
+    def _remember_stored_change_row(
+        self, new_value: Any, electric_level: Optional[int], timestamp: int
+    ) -> None:
+        self._last_stored_change_power = self._parse_change_power(new_value)
+        self._last_stored_change_level = electric_level
+        self._last_stored_change_timestamp = int(timestamp)
+        self._last_stored_change_hour_start_ts, _ = self._hour_window_for_timestamp(timestamp)
 
     def _insert_status(self, event_type: str, old_value: Any, new_value: Any,
                        p1_total_power: Optional[int], timestamp: int) -> None:
@@ -1249,11 +1270,12 @@ class StatusApi:
                 pass
         old_str = json.dumps(old_value) if old_value is not None else None
         new_str = json.dumps(new_value) if new_value is not None else None
+        should_insert = False
         try:
             with sqlite3.connect(self.db_path) as conn:
                 should_insert = (
                     event_type != EVENT_TYPE_CHANGE
-                    or self._should_store_change_row(conn, new_value, electric_level, timestamp)
+                    or self._should_store_change_row(new_value, electric_level, timestamp)
                 )
                 if should_insert:
                     conn.execute(
@@ -1261,6 +1283,8 @@ class StatusApi:
                         "VALUES (?, ?, ?, ?, ?, ?)",
                         (event_type, old_str, new_str, p1_total_power, electric_level, timestamp)
                     )
+                    if event_type == EVENT_TYPE_CHANGE:
+                        self._remember_stored_change_row(new_value, electric_level, timestamp)
                 conn.execute(
                     "DELETE FROM status_updates WHERE timestamp < ?",
                     (int(timestamp) - (self.retention_days * 24 * 60 * 60),)

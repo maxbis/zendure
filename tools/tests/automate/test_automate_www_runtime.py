@@ -920,6 +920,51 @@ def test_status_api_keeps_non_change_events_unchanged(tmp_path):
     ]
 
 
+def test_status_api_initializes_change_insert_state_from_existing_db(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    first_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            "INSERT INTO status_updates (type, new_value, electric_level, timestamp) VALUES (?, ?, ?, ?)",
+            ("change", json.dumps(600), 70, first_ts),
+        )
+        conn.commit()
+
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: 70,
+    )
+    status_api._ensure_db()
+    status_api._insert_status("change", None, 600, None, first_ts + 300)
+    status_api._insert_status("change", None, 600, None, first_ts + 3600)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [
+        ("change", "600", 70, first_ts),
+        ("change", "600", 70, first_ts + 3600),
+    ]
+
+
 def test_load_change_points_preserves_electric_level_transitions(tmp_path):
     automate_www = _import_automate_www_module()
     tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
