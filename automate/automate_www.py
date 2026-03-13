@@ -474,7 +474,6 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         super().__init__(server_address, request_handler_class)
         self.api_state: Optional[ApiState] = None
         self.db_path: Optional[str] = None
-        self.wh_per_hour_db_path: Optional[str] = None
         self.schedule_controller: Optional[ScheduleController] = None
         self.status_api: Optional["StatusApi"] = None
         self.refresh_p1_callback: Optional[Callable[[], None]] = None
@@ -722,7 +721,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def _handle_wh_per_hour(self, path: str) -> bool:
         if path != API_PATH_WH_PER_HOUR:
             return False
-        db_path = getattr(self.server, "wh_per_hour_db_path", None) or getattr(self.server, "db_path", None)
+        db_path = getattr(self.server, "db_path", None)
         if not db_path or not os.path.exists(db_path):
             self._send_json({"error": "Status updates database not available"})
             return True
@@ -1174,6 +1173,68 @@ class StatusApi:
         except Exception as e:
             self.logger.warning(f"Failed to initialize SQLite DB: {e}")
 
+    def _parse_change_power(self, value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        parsed = value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return None
+        if isinstance(parsed, (int, float)):
+            return float(parsed)
+        if isinstance(parsed, str):
+            try:
+                return float(parsed.strip())
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def _hour_window_for_timestamp(self, timestamp: int) -> tuple[int, int]:
+        tz = ZoneInfo(STATUS_TIMEZONE)
+        dt = datetime.fromtimestamp(int(timestamp), tz=tz)
+        hour_start = datetime(dt.year, dt.month, dt.day, dt.hour, 0, 0, tzinfo=tz)
+        hour_start_ts = int(hour_start.timestamp())
+        return hour_start_ts, hour_start_ts + 3600
+
+    def _should_store_change_row(
+        self,
+        conn: sqlite3.Connection,
+        new_value: Any,
+        electric_level: Optional[int],
+        timestamp: int,
+    ) -> bool:
+        new_power = self._parse_change_power(new_value)
+        if new_power is None:
+            return True
+
+        prev_row = conn.execute(
+            "SELECT new_value, electric_level, timestamp FROM status_updates "
+            "WHERE type = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
+            (EVENT_TYPE_CHANGE,),
+        ).fetchone()
+        if prev_row is None:
+            return True
+
+        prev_power = self._parse_change_power(prev_row[0])
+        prev_level = int(prev_row[1]) if prev_row[1] is not None else None
+        if prev_power is None:
+            return True
+        if new_power != prev_power:
+            return True
+        if electric_level != prev_level:
+            return True
+
+        hour_start_ts, hour_end_ts = self._hour_window_for_timestamp(timestamp)
+        same_hour_row = conn.execute(
+            "SELECT id FROM status_updates "
+            "WHERE type = ? AND timestamp >= ? AND timestamp < ? "
+            "ORDER BY timestamp ASC, id ASC LIMIT 1",
+            (EVENT_TYPE_CHANGE, hour_start_ts, hour_end_ts),
+        ).fetchone()
+        return same_hour_row is None
+
     def _insert_status(self, event_type: str, old_value: Any, new_value: Any,
                        p1_total_power: Optional[int], timestamp: int) -> None:
         """Insert status update into SQLite and optionally run retention cleanup."""
@@ -1190,16 +1251,23 @@ class StatusApi:
         new_str = json.dumps(new_value) if new_value is not None else None
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (event_type, old_str, new_str, p1_total_power, electric_level, timestamp)
+                should_insert = (
+                    event_type != EVENT_TYPE_CHANGE
+                    or self._should_store_change_row(conn, new_value, electric_level, timestamp)
                 )
-                cutoff = int(timestamp) - (self.retention_days * 24 * 60 * 60)
-                conn.execute("DELETE FROM status_updates WHERE timestamp < ?", (cutoff,))
+                if should_insert:
+                    conn.execute(
+                        "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (event_type, old_str, new_str, p1_total_power, electric_level, timestamp)
+                    )
+                conn.execute(
+                    "DELETE FROM status_updates WHERE timestamp < ?",
+                    (int(timestamp) - (self.retention_days * 24 * 60 * 60),)
+                )
                 conn.commit()
             http_server = getattr(self, "http_server", None)
-            if http_server is not None and hasattr(http_server, "wh_per_hour_cache_lock"):
+            if should_insert and http_server is not None and hasattr(http_server, "wh_per_hour_cache_lock"):
                 with http_server.wh_per_hour_cache_lock:
                     http_server.wh_per_hour_cache = None
         except Exception as e:
@@ -1601,7 +1669,6 @@ class AutomationApp:
 
         # Shared state for API endpoints
         self.api_state = ApiState()
-        self.wh_per_hour_db_path: Optional[str] = None
 
         # State variables
         self.last_api_refresh_time = 0
@@ -1640,8 +1707,6 @@ class AutomationApp:
 
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
-            wh_per_hour_db_path = self.schedule_controller.config.get("whPerHourDbPath", db_path)
-            self.wh_per_hour_db_path = wh_per_hour_db_path
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
 
             def get_electric_level() -> Optional[int]:
@@ -1779,7 +1844,6 @@ class AutomationApp:
             self.http_server = AutomationTCPServer(("", HTTP_API_PORT), ApiTestHandler)
             self.http_server.api_state = self.api_state
             self.http_server.db_path = self.status_api.db_path
-            self.http_server.wh_per_hour_db_path = getattr(self, "wh_per_hour_db_path", None) or self.status_api.db_path
             self.http_server.schedule_controller = self.schedule_controller
             self.http_server.status_api = self.status_api
             self.status_api.http_server = self.http_server

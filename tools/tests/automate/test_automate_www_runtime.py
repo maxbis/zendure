@@ -796,6 +796,130 @@ def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
     assert hour_bucket["electric_level"] == 71
 
 
+def test_status_api_skips_redundant_change_rows_in_same_hour(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: 70,
+    )
+    base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
+
+    status_api._insert_status("change", None, 600, None, base_ts)
+    status_api._insert_status("change", None, 600, None, base_ts + 300)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [("change", "600", 70, base_ts)]
+
+
+def test_status_api_keeps_first_change_row_in_new_hour(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: 70,
+    )
+    base_ts = int(datetime(2025, 1, 1, 10, 55, 0, tzinfo=tz).timestamp())
+
+    status_api._insert_status("change", None, 600, None, base_ts)
+    status_api._insert_status("change", None, 600, None, base_ts + 600)
+    status_api._insert_status("change", None, 600, None, base_ts + 900)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [
+        ("change", "600", 70, base_ts),
+        ("change", "600", 70, base_ts + 600),
+    ]
+
+
+def test_status_api_keeps_change_when_electric_level_changes(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    levels = iter([70, 71])
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: next(levels),
+    )
+    base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
+
+    status_api._insert_status("change", None, 600, None, base_ts)
+    status_api._insert_status("change", None, 600, None, base_ts + 300)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [
+        ("change", "600", 70, base_ts),
+        ("change", "600", 71, base_ts + 300),
+    ]
+
+
+def test_status_api_keeps_change_when_power_changes(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: 70,
+    )
+    base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
+
+    status_api._insert_status("change", None, 600, None, base_ts)
+    status_api._insert_status("change", None, 400, None, base_ts + 300)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [
+        ("change", "600", 70, base_ts),
+        ("change", "400", 70, base_ts + 300),
+    ]
+
+
+def test_status_api_keeps_non_change_events_unchanged(tmp_path):
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = tmp_path / "status_updates.db"
+    status_api = automate_www.StatusApi(
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        db_path=str(db_path),
+        get_electric_level=lambda: 70,
+    )
+    ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
+
+    status_api._insert_status("start", None, None, None, ts)
+    status_api._insert_status("start", None, None, None, ts + 60)
+
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT type, new_value, electric_level, timestamp FROM status_updates ORDER BY timestamp ASC"
+        ).fetchall()
+
+    assert rows == [
+        ("start", None, 70, ts),
+        ("start", None, 70, ts + 60),
+    ]
+
+
 def test_load_change_points_preserves_electric_level_transitions(tmp_path):
     automate_www = _import_automate_www_module()
     tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
@@ -827,7 +951,7 @@ def test_load_change_points_preserves_electric_level_transitions(tmp_path):
         )
         conn.commit()
 
-    points = automate_www._load_change_points(str(db_path), window_start_ts=base_ts)
+    points = automate_www._load_change_points(str(db_path), window_start_ts=base_ts, tz=tz)
 
     assert points == [
         (base_ts, 600.0),
