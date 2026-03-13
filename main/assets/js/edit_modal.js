@@ -64,6 +64,7 @@ class EditModal {
         // Wildcard expansion handlers
         const dateInput = document.getElementById('inp-date');
         const timeInput = document.getElementById('inp-time');
+        const wattsInput = document.getElementById('inp-watts');
         
         dateInput.addEventListener('input', (e) => {
             this.handleWildcardExpansion(e, 8);
@@ -86,6 +87,9 @@ class EditModal {
             }
         });
         timeInput.addEventListener('blur', (e) => this.handleEmptyToWildcard(e, 4));
+        if (wattsInput) {
+            wattsInput.addEventListener('input', () => this.updateWattsInputState());
+        }
         
         // Enter key to save
         this.modal.addEventListener('keydown', (e) => {
@@ -192,6 +196,7 @@ class EditModal {
                 document.getElementById('inp-watts').value = value || '';
             }
         }
+        this.updateWattsInputState();
         this.modal.classList.add('active');
         
         // Auto-focus on first input for quicker editing
@@ -215,6 +220,23 @@ class EditModal {
             wattsInput.disabled = false;
             // Leave watts empty when switching to fixed mode - user can enter value
         }
+        this.updateWattsInputState();
+    }
+
+    updateWattsInputState() {
+        const wattsInput = document.getElementById('inp-watts');
+        if (!wattsInput) return;
+
+        wattsInput.classList.remove('is-charging', 'is-discharging');
+        if (wattsInput.disabled) return;
+
+        const rawValue = wattsInput.value.trim();
+        if (rawValue === '') return;
+
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue) || numericValue === 0) return;
+
+        wattsInput.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
     }
 
     showConfirmDialog(message) {

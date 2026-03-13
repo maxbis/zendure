@@ -1921,7 +1921,6 @@ code {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    m_in-height: 68px;
     padding: 10px 14px;
     border-radius: 10px;
     background: #5a5a5a;
@@ -1999,10 +1998,19 @@ code {
     box-sizing: border-box;
 }
 #edit-modal #inp-watts {
-    width: 220px;
+    width: 180px;
     max-width: 100%;
     min-height: 44px;
     padding: 10px 12px;
     font-size: 1rem;
+    font-weight: 600;
     box-sizing: border-box;
+}
+#edit-modal #inp-watts.is-charging {
+    color: #7fd77f;
+    font-weight: 700;
+}
+#edit-modal #inp-watts.is-discharging {
+    color: #ff8b8b;
+    font-weight: 700;
 }

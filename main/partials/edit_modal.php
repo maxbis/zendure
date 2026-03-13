@@ -40,7 +40,7 @@
             </div>
             <div class="form-group" id="group-watts">
                 <label>Watts (Positive = Charge, Negative = Discharge)</label>
-                <input type="number" id="inp-watts" placeholder="0" step="50">
+                <input type="number" id="inp-watts" placeholder="0" step="100">
             </div>
         </div>
         <div class="modal-footer">
