@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ENV_FILE_NAME = ".env"
-DEFAULT_BATCH_SIZE = 250
+DEFAULT_BATCH_SIZE = 1000
 DEFAULT_MARIADB_PORT = 3306
 
 

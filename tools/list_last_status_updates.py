@@ -71,14 +71,17 @@ def main() -> int:
         print(f"No rows found in {db_path}")
         return 0
 
+    col_width = 10
+    columns = ["id", "type", "old_value", "new_value", "p1_total_power", "electric_level", "timestamp"]
+
     print(f"db_path: {db_path}")
-    print("id | type | old_value | new_value | p1_total_power | electric_level | timestamp")
+    header_parts = [f"{col:<{col_width}}" for col in columns[:-1]] + [columns[-1]]
+    print(" ".join(header_parts))
     for row in rows:
         row_id, event_type, old_value, new_value, p1_total_power, electric_level, timestamp = row
-        print(
-            f"{row_id} | {event_type} | {old_value} | {new_value} | "
-            f"{p1_total_power} | {electric_level} | {format_timestamp(timestamp)}"
-        )
+        values = [row_id, event_type, old_value, new_value, p1_total_power, electric_level, format_timestamp(timestamp)]
+        row_parts = [f"{str(v):<{col_width}}" for v in values[:-1]] + [str(values[-1])]
+        print(" ".join(row_parts))
     return 0
 
 
