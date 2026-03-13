@@ -1975,7 +1975,7 @@ code {
     color: #ffffff;
 }
 
-@media (max-width: 420px) {
+@media (max-width: 360px) {
     .edit-modal-mode-options {
         grid-template-columns: 1fr;
     }

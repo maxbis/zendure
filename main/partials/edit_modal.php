@@ -7,11 +7,11 @@
         <div class="modal-body">
             <div class="edit-modal-grid">
                 <div class="form-group">
-                    <label>Date Pattern (YYYYMMDD)</label>
+                    <label>Date (YYYYMMDD)</label>
                     <input type="text" id="inp-date" maxlength="8" placeholder="20251222">
                 </div>
                 <div class="form-group">
-                    <label>Time Pattern (HHmm)</label>
+                    <label>Time (HHMM)</label>
                     <input type="text" id="inp-time" maxlength="4" placeholder="0800">
                 </div>
             </div>
