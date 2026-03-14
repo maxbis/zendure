@@ -137,8 +137,12 @@ class EditModal {
     open(key = null, value = null, prefillKey = null) {
         this.currentOriginalKey = key;
         const isAdd = (key === null);
+        const clearModeInput = document.querySelector('input[name="val-mode"][value="clear"]');
         document.getElementById('modal-title').innerText = isAdd ? 'Add Schedule Entry' : 'Edit Schedule Entry';
         document.getElementById('btn-delete').style.display = isAdd ? 'none' : 'block';
+        if (clearModeInput) {
+            clearModeInput.disabled = isAdd;
+        }
 
         if (isAdd) {
             let dateStr, timeStr;
@@ -212,7 +216,7 @@ class EditModal {
 
     handleModeChange(mode) {
         const wattsInput = document.getElementById('inp-watts');
-        if (mode === 'netzero' || mode === 'netzero+' || mode === 'auto') {
+        if (mode === 'netzero' || mode === 'netzero+' || mode === 'auto' || mode === 'clear') {
             wattsInput.disabled = true;
             wattsInput.value = '';
             wattsInput.setAttribute('value', '');
@@ -331,6 +335,12 @@ class EditModal {
             val = 'netzero+';
         } else if (mode === 'auto') {
             val = 'auto';
+        } else if (mode === 'clear') {
+            if (!this.currentOriginalKey) {
+                return;
+            }
+            await this.deleteEntry(this.currentOriginalKey);
+            return;
         } else {
             val = document.getElementById('inp-watts').value.trim();
             // If watts is empty or none, use 0
@@ -363,6 +373,8 @@ class EditModal {
             val = 'netzero';
         } else if (mode === 'netzero+') {
             val = 'netzero+';
+        } else if (mode === 'auto') {
+            val = 'auto';
         } else if (mode === 'clear') {
             if (options.originalKey) {
                 await this.deleteEntry(options.originalKey, { closeAfterDelete: false });

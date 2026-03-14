@@ -859,7 +859,7 @@ function ensurePriceGraphMobilePopup() {
                     </button>
                 </div>
                 <div class="price-graph-mobile-popup-actions">
-                    <button type="button" class="btn btn-outline price-graph-mobile-popup-clear">Clear</button>
+                    <button type="button" class="btn btn-outline price-graph-mobile-popup-auto">↩&nbsp;Auto</button>
                     <button type="button" class="btn btn-primary price-graph-mobile-popup-edit">Edit Schedule</button>
                 </div>
             </div>
@@ -1004,7 +1004,7 @@ function renderPriceGraphMobilePopupContent() {
 
     const netZeroBtn = popup.querySelector('.price-graph-mobile-popup-netzero');
     const netZeroPlusBtn = popup.querySelector('.price-graph-mobile-popup-netzero-plus');
-    const clearBtn = popup.querySelector('.price-graph-mobile-popup-clear');
+    const autoBtn = popup.querySelector('.price-graph-mobile-popup-auto');
     const editBtn = popup.querySelector('.price-graph-mobile-popup-edit');
     const closeBtn = popup.querySelector('.price-graph-mobile-popup-close');
 
@@ -1028,10 +1028,8 @@ function renderPriceGraphMobilePopupContent() {
 
     netZeroBtn.onclick = () => applyQuickMode('netzero');
     netZeroPlusBtn.onclick = () => applyQuickMode('netzero+');
-    if (clearBtn) {
-        clearBtn.disabled = !hasExistingEntry;
-        clearBtn.setAttribute('aria-disabled', hasExistingEntry ? 'false' : 'true');
-        clearBtn.onclick = hasExistingEntry ? () => applyQuickMode('clear') : null;
+    if (autoBtn) {
+        autoBtn.onclick = () => applyQuickMode('auto');
     }
 
     editBtn.onclick = () => {
