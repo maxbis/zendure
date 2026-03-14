@@ -2206,7 +2206,16 @@ class AutomationApp:
                         p1_w = int(p1_data['total_power'])
                     except (TypeError, ValueError):
                         pass
-                self.status_api.post_update(EVENT_TYPE_CHANGE, self.old_value, result.power, p1_total_power=p1_w)
+                # Avoid refreshing the "latest change" timestamp for dynamic modes when
+                # the effective watt value did not actually change. Otherwise the main UI
+                # can remain stuck in a perpetual "Pending..." state.
+                if result.power != self.old_value:
+                    self.status_api.post_update(
+                        EVENT_TYPE_CHANGE,
+                        self.old_value,
+                        result.power,
+                        p1_total_power=p1_w,
+                    )
                 # Update self.value with the actual power that was set (result.power)
                 # This is important for netzero modes where calculated power may differ from 'netzero'
                 self.value = result.power
