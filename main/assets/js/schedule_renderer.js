@@ -613,8 +613,19 @@ function renderChargeStatus(zendureData, p1Data = null) {
         timestamp: zendureData.timestamp || null
     };
 
-    // Calculate charge/discharge value
-    const chargeDischargeValue = (outputPackPower > 0) ? outputPackPower : ((outputHomePower > 0) ? -outputHomePower : 0);
+    // Calculate charge/discharge value from live device telemetry when available.
+    // Some devices report the active mode/limits correctly while leaving the
+    // power telemetry fields at 0 during charging. In that case, fall back to
+    // the currently applied device limits so the UI does not show "Charging"
+    // together with "0 W".
+    let chargeDischargeValue = (outputPackPower > 0) ? outputPackPower : ((outputHomePower > 0) ? -outputHomePower : 0);
+    if (chargeDischargeValue === 0) {
+        if (acMode === 1 && inputLimit > 0) {
+            chargeDischargeValue = inputLimit;
+        } else if (acMode === 2 && outputLimit > 0) {
+            chargeDischargeValue = -outputLimit;
+        }
+    }
 
     // Get system status
     const systemStatus = getSystemStatusInfoJS(acMode, outputPackPower, outputHomePower, solarInputPower, electricLevel);
