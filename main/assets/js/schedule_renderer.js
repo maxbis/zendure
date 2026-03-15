@@ -717,6 +717,8 @@ function renderChargeStatus(zendureData, p1Data = null) {
 
     contentEl.hidden = false;
     contentEl.dataset.actualPower = chargeDischargeValue;
+    contentEl.dataset.commandedPower = commandedPower;
+    contentEl.dataset.acMode = String(acMode);
 
     const statusIndicator = contentEl.querySelector('[data-role="status-indicator"]');
     const statusIcon = contentEl.querySelector('[data-role="status-icon"]');

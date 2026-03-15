@@ -430,6 +430,8 @@ function applyPendingPowerState(automationData) {
         return;
     }
     const actualW = Number(contentEl.dataset.actualPower);
+    const deviceCommandedW = Number(contentEl.dataset.commandedPower);
+    const acMode = Number(contentEl.dataset.acMode);
     if (!Number.isFinite(actualW)) {
         clearPendingState();
         return;
@@ -437,11 +439,23 @@ function applyPendingPowerState(automationData) {
 
     // ── compare with tolerance ────────────────────────────────────────────────
     const withinTolerance = Math.abs(commandedW - actualW) <= PENDING_MATCH_TOLERANCE_W;
+    const commandModeMatches = (
+        (commandedW > 0 && acMode === 1) ||
+        (commandedW < 0 && acMode === 2) ||
+        (commandedW === 0 && (acMode === 0 || Number.isNaN(acMode)))
+    );
+    const deviceCommandMatches =
+        Number.isFinite(deviceCommandedW) &&
+        Math.abs(commandedW - deviceCommandedW) <= PENDING_MATCH_TOLERANCE_W &&
+        commandModeMatches;
 
-    if (withinTolerance) {
-        // Device has confirmed the new power level — remove pending state
+    if (withinTolerance || deviceCommandMatches) {
+        // Device has confirmed the new power level, or it reports the commanded
+        // mode/limit even when instantaneous power metrics remain at 0 W.
         if (DEBUG_MODE) {
-            console.log(`✅ Power confirmed: commanded=${commandedW} W, actual=${actualW} W`);
+            console.log(
+                `✅ Power confirmed: commanded=${commandedW} W, actual=${actualW} W, device=${deviceCommandedW} W, acMode=${acMode}`
+            );
         }
         clearPendingState();
     } else {
