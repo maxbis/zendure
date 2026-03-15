@@ -365,9 +365,10 @@ class AutomateController(BaseDeviceController):
     operations for the Zendure battery system.
     """
 
-    # Power limits (W)
-    POWER_FEED_MIN = -800  # Minimum effective power feed (discharge)
-    POWER_FEED_MAX = 1200   # Maximum effective power feed (charge)
+    # Power limits (W) for the effective feed used inside _calculate_new_settings:
+    # positive = discharge, negative = charge.
+    POWER_FEED_MIN = -1200  # Minimum effective power feed (charge)
+    POWER_FEED_MAX = 800    # Maximum effective power feed (discharge)
 
     # Thresholds and battery limits
     POWER_FEED_MIN_THRESHOLD = 30  # Minimum absolute power (W) - if |F_desired| < threshold, set to 0
@@ -653,8 +654,8 @@ class AutomateController(BaseDeviceController):
                 effective_desired = 0
                 self.log('warning', f"Charge level at/below {self.min_charge_level}%, preventing discharge")
 
-        # Clamp effective desired feed
-        effective_desired = max(self.POWER_FEED_MIN, min(self.POWER_FEED_MAX, effective_desired))
+        # Clamp effective desired feed using the configured power caps.
+        effective_desired = max(-self.max_charge_power, min(self.max_discharge_power, effective_desired))
 
         # Apply minimum absolute threshold on resulting feed:
         # if the resulting discharge/charge is very small, turn it off.
