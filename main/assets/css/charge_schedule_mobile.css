@@ -1247,6 +1247,7 @@ code {
 
 .price-graph-popup-spot-price,
 .price-graph-popup-schedule,
+.price-graph-popup-limits,
 .price-graph-popup-source {
     font-size: 0.85rem;
     color: var(--text-secondary);
@@ -1574,6 +1575,7 @@ code {
 
 .price-graph-mobile-popup-body .price-graph-popup-spot-price,
 .price-graph-mobile-popup-body .price-graph-popup-schedule,
+.price-graph-mobile-popup-body .price-graph-popup-limits,
 .price-graph-mobile-popup-body .price-graph-popup-source,
 .price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
     margin-top: 10px;
@@ -1800,6 +1802,7 @@ code {
 
     .price-graph-mobile-popup-body .price-graph-popup-spot-price,
     .price-graph-mobile-popup-body .price-graph-popup-schedule,
+    .price-graph-mobile-popup-body .price-graph-popup-limits,
     .price-graph-mobile-popup-body .price-graph-popup-source,
     .price-graph-mobile-popup-body .price-graph-popup-estimate-wrap {
         font-size: 0.98rem;

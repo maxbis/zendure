@@ -127,6 +127,34 @@ function formatPopupPercent(pct, opts) {
     return ` (${prefix}${pct.toFixed(decimals)}%)`;
 }
 
+function getRawScheduleEntry(scheduleEntry) {
+    if (!scheduleEntry || typeof scheduleEntry !== 'object') return null;
+    const entry = scheduleEntry.entry;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    return entry;
+}
+
+function formatScheduleLimitsText(scheduleEntry) {
+    const entry = getRawScheduleEntry(scheduleEntry);
+    if (!entry) return '';
+
+    if (entry.value !== 'netzero' && entry.value !== 'netzero+') {
+        return '';
+    }
+
+    const hasMin = Object.prototype.hasOwnProperty.call(entry, 'min_value')
+        && entry.min_value !== null
+        && entry.min_value !== '';
+    const hasMax = Object.prototype.hasOwnProperty.call(entry, 'max_value')
+        && entry.max_value !== null
+        && entry.max_value !== '';
+
+    if (!hasMin && !hasMax) return '';
+    if (hasMin && hasMax) return `Limits: ${entry.min_value}\u2013${entry.max_value} W`;
+    if (hasMin) return `Limits: min ${entry.min_value} W`;
+    return `Limits: max ${entry.max_value} W`;
+}
+
 function escapePopupHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -601,6 +629,7 @@ function ensurePriceGraphPopup() {
         <div class="price-graph-popup-price"></div>
         <div class="price-graph-popup-spot-price"></div>
         <div class="price-graph-popup-schedule"></div>
+        <div class="price-graph-popup-limits"></div>
         <div class="price-graph-popup-source"></div>
         <div class="price-graph-popup-estimate-wrap"></div>
     `;
@@ -843,6 +872,7 @@ function ensurePriceGraphMobilePopup() {
                     <div class="price-graph-popup-price"></div>
                     <div class="price-graph-popup-spot-price"></div>
                     <div class="price-graph-popup-schedule"></div>
+                    <div class="price-graph-popup-limits"></div>
                     <div class="price-graph-popup-source"></div>
                     <div class="price-graph-popup-estimate-wrap"></div>
                 </div>
@@ -962,6 +992,7 @@ function renderPriceGraphMobilePopupContent() {
     const priceEl = popup.querySelector('.price-graph-popup-price');
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+    const limitsEl = popup.querySelector('.price-graph-popup-limits');
     const sourceEl = popup.querySelector('.price-graph-popup-source');
     const estimateEl = popup.querySelector('.price-graph-popup-estimate-wrap');
 
@@ -978,6 +1009,8 @@ function renderPriceGraphMobilePopupContent() {
 
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
+    const scheduleEntry = scheduleMap && Object.prototype.hasOwnProperty.call(scheduleMap, key) ? scheduleMap[key] : null;
+    const limitsDisplay = formatScheduleLimitsText(scheduleEntry);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
@@ -988,6 +1021,10 @@ function renderPriceGraphMobilePopupContent() {
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+    if (limitsEl) {
+        limitsEl.textContent = limitsDisplay;
+        limitsEl.style.display = limitsDisplay ? 'block' : 'none';
+    }
     renderPopupSource(sourceEl, {
         scheduleSource,
         hasRuntimeCondition,
@@ -1009,7 +1046,7 @@ function renderPriceGraphMobilePopupContent() {
     const closeBtn = popup.querySelector('.price-graph-mobile-popup-close');
 
     const hasExistingEntry = scheduleMap && Object.prototype.hasOwnProperty.call(scheduleMap, key);
-    const existingValue = hasExistingEntry ? scheduleMap[key] : undefined;
+    const existingEntry = hasExistingEntry ? scheduleMap[key] : undefined;
 
     const applyQuickMode = async (mode) => {
         close();
@@ -1018,8 +1055,8 @@ function renderPriceGraphMobilePopupContent() {
                 originalKey: hasExistingEntry ? key : null
             });
         } else if (editModal) {
-            if (existingValue !== undefined) {
-                editModal.open(key, existingValue);
+            if (existingEntry !== undefined) {
+                editModal.open(key, existingEntry);
             } else {
                 editModal.open(null, null, key);
             }
@@ -1035,8 +1072,8 @@ function renderPriceGraphMobilePopupContent() {
     editBtn.onclick = () => {
         close();
         if (editModal) {
-            if (existingValue !== undefined) {
-                editModal.open(key, existingValue);
+            if (existingEntry !== undefined) {
+                editModal.open(key, existingEntry);
             } else {
                 editModal.open(null, null, key);
             }
@@ -1131,6 +1168,7 @@ function showPriceGraphPopup(bar, container) {
     const priceEl = popup.querySelector('.price-graph-popup-price');
     const spotPriceEl = popup.querySelector('.price-graph-popup-spot-price');
     const scheduleEl = popup.querySelector('.price-graph-popup-schedule');
+    const limitsEl = popup.querySelector('.price-graph-popup-limits');
     const sourceEl = popup.querySelector('.price-graph-popup-source');
     const estimateEl = popup.querySelector('.price-graph-popup-estimate-wrap');
 
@@ -1147,6 +1185,15 @@ function showPriceGraphPopup(bar, container) {
 
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
+    let scheduleEntry = null;
+    if (bar.dataset.scheduleEntry) {
+        try {
+            scheduleEntry = JSON.parse(bar.dataset.scheduleEntry);
+        } catch (error) {
+            console.warn('Failed to parse popup schedule entry dataset:', error);
+        }
+    }
+    const limitsDisplay = formatScheduleLimitsText(scheduleEntry);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
@@ -1157,6 +1204,10 @@ function showPriceGraphPopup(bar, container) {
     priceEl.textContent = priceDisplay;
     spotPriceEl.textContent = spotPriceDisplay;
     scheduleEl.textContent = `Schedule: ${scheduleDisplay}`;
+    if (limitsEl) {
+        limitsEl.textContent = limitsDisplay;
+        limitsEl.style.display = limitsDisplay ? 'block' : 'none';
+    }
     renderPopupSource(sourceEl, {
         scheduleSource,
         hasRuntimeCondition,
@@ -1371,7 +1422,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const scheduleMap = {};
     if (scheduleEntryList) {
         scheduleEntryList.forEach(entry => {
-            scheduleMap[entry.key] = getRawScheduleEntryValue(entry);
+            scheduleMap[entry.key] = entry;
         });
     }
     
@@ -1583,6 +1634,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const key = dateStr + hourTime;
             
             const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition, ruleName, ruleIndex } = getActiveScheduleInfo(dateStr, hourKey);
+            const rawScheduleEntry = scheduleMap[key];
 
             // Create bar element
             const barDiv = document.createElement('div');
@@ -1605,6 +1657,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             if (scheduledSource !== undefined && scheduledSource !== null && scheduledSource !== '') {
                 barDiv.dataset.scheduleSource = String(scheduledSource);
+            }
+            if (rawScheduleEntry) {
+                barDiv.dataset.scheduleEntry = JSON.stringify(rawScheduleEntry);
             }
             if (ruleName !== undefined && ruleName !== null && String(ruleName).trim() !== '') {
                 barDiv.dataset.ruleName = String(ruleName);
@@ -1646,9 +1701,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 if (isPriceGraphMobile()) {
                     showPriceGraphMobilePopup(barDiv, editModal, scheduleMap, key);
                 } else if (editModal) {
-                    const existingValue = scheduleMap[key];
-                    if (existingValue !== undefined) {
-                        editModal.open(key, existingValue);
+                    const existingEntry = scheduleMap[key];
+                    if (existingEntry !== undefined) {
+                        editModal.open(key, existingEntry);
                     } else {
                         editModal.open(null, null, key);
                     }
