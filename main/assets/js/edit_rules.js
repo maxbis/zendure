@@ -102,8 +102,12 @@
             out.max_time = String(rule.max_time);
         }
         if (rule.value === 'netzero' || rule.value === 'netzero+') {
-            out.min_value = rule.min_value !== undefined && rule.min_value !== '' ? Number(rule.min_value) : null;
-            out.max_value = rule.max_value !== undefined && rule.max_value !== '' ? Number(rule.max_value) : null;
+            out.min_value = rule.min_value !== undefined && rule.min_value !== null && rule.min_value !== ''
+                ? Number(rule.min_value)
+                : null;
+            out.max_value = rule.max_value !== undefined && rule.max_value !== null && rule.max_value !== ''
+                ? Number(rule.max_value)
+                : null;
         }
         if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
             out.fallback_value = rule.fallback_value;
@@ -307,8 +311,8 @@
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
-        els.inpMinValue.value = rule.min_value !== undefined ? String(rule.min_value) : '';
-        els.inpMaxValue.value = rule.max_value !== undefined ? String(rule.max_value) : '';
+        els.inpMinValue.value = rule.min_value !== undefined && rule.min_value !== null ? String(rule.min_value) : '';
+        els.inpMaxValue.value = rule.max_value !== undefined && rule.max_value !== null ? String(rule.max_value) : '';
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
 
@@ -418,8 +422,8 @@
                 rule.max_value = parseInt(maxValue, 10);
             }
             if (
-                rule.min_value !== undefined &&
-                rule.max_value !== undefined &&
+                rule.min_value !== null &&
+                rule.max_value !== null &&
                 rule.min_value > rule.max_value
             ) {
                 throw new Error('Min value cannot be greater than max value.');

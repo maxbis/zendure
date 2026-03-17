@@ -95,7 +95,6 @@ let priceGraphPopupActiveContainer = null;
 const priceGraphPopupBoundContainers = new WeakSet();
 let priceGraphRuleDetailModal = null;
 let priceGraphRuleDetailEscapeHandler = null;
-let priceGraphRulesCachePromise = null;
 
 function formatHourRange(hourValue) {
     const hour = Number.isFinite(hourValue) ? hourValue : NaN;
@@ -257,6 +256,10 @@ function renderRuleDetailBody(rule) {
         return '<div class="price-graph-rule-detail-empty">Rule details unavailable.</div>';
     }
 
+    const normalizedValue = typeof rule.value === 'string'
+        ? rule.value.trim().toLowerCase()
+        : '';
+    const isDynamicOutput = normalizedValue === 'netzero' || normalizedValue === 'netzero+';
     const fields = [];
     fields.push({
         label: 'Output',
@@ -266,6 +269,19 @@ function renderRuleDetailBody(rule) {
         label: 'Enabled',
         value: escapePopupHtml(rule.enabled === false ? 'No' : 'Yes')
     });
+
+    if (isDynamicOutput) {
+        [
+            { key: 'min_value', label: 'Min power' },
+            { key: 'max_value', label: 'Max power' }
+        ].forEach(({ key, label }) => {
+            if (!Object.prototype.hasOwnProperty.call(rule, key) || rule[key] === '' || rule[key] === null) return;
+            fields.push({
+                label,
+                value: escapePopupHtml(`${String(rule[key])} W`)
+            });
+        });
+    }
 
     ['month', 'hour', 'min_time', 'max_time', 'fallback_value'].forEach((fieldName) => {
         if (!Object.prototype.hasOwnProperty.call(rule, fieldName) || rule[fieldName] === '' || rule[fieldName] === null) return;
@@ -321,21 +337,15 @@ function renderRuleDetailBody(rule) {
 }
 
 async function getPriceGraphRules() {
-    if (!priceGraphRulesCachePromise) {
-        priceGraphRulesCachePromise = fetch('edit_rules.php?api=1', { method: 'GET' })
-            .then(async (response) => {
-                const data = await response.json();
-                if (!response.ok || !data.success || !Array.isArray(data.rules)) {
-                    throw new Error(data.error || 'Rule details unavailable');
-                }
-                return data.rules;
-            })
-            .catch((error) => {
-                priceGraphRulesCachePromise = null;
-                throw error;
-            });
+    const response = await fetch('edit_rules.php?api=1', {
+        method: 'GET',
+        cache: 'no-store'
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.rules)) {
+        throw new Error(data.error || 'Rule details unavailable');
     }
-    return priceGraphRulesCachePromise;
+    return data.rules;
 }
 
 async function showPriceGraphRuleDetail(ruleIndex, ruleName) {

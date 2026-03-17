@@ -150,6 +150,8 @@ function normalizeRules(array $rules): array
             $normalized['min_value'] = $minValue;
             $normalized['max_value'] = $maxValue;
             if (
+                $normalized['min_value'] !== null &&
+                $normalized['max_value'] !== null &&
                 $normalized['min_value'] > $normalized['max_value']
             ) {
                 $normalized['min_value'] = null;
