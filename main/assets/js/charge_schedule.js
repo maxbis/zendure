@@ -57,6 +57,10 @@ async function _refreshScheduleAndPricesInternal() {
             entriesCount: todayData.entries?.length || 0 
         });
 
+        if (editModal && typeof editModal.setScheduleEntries === 'function') {
+            editModal.setScheduleEntries(todayData.entries || []);
+        }
+
         if (todayData.success) {
             const currentTime = todayData.currentTime || todayData.currentHour || new Date().getHours().toString().padStart(2, '0') + '00';
 

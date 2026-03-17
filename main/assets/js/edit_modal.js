@@ -6,6 +6,7 @@ class EditModal {
     constructor(apiUrl) {
         this.apiUrl = apiUrl;
         this.currentOriginalKey = null;
+        this.scheduleEntriesByKey = {};
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.confirmResolve = null;
@@ -14,6 +15,8 @@ class EditModal {
     }
 
     init() {
+        this.setScheduleEntries(this.collectEntriesFromTable());
+
         // Event Listeners
         document.getElementById('add-entry-btn').onclick = () => this.open();
         document.getElementById('modal-close').onclick = () => this.close();
@@ -175,6 +178,43 @@ class EditModal {
         return { value: null };
     }
 
+    setScheduleEntries(entries) {
+        const byKey = {};
+        if (Array.isArray(entries)) {
+            entries.forEach((item) => {
+                if (!item || typeof item !== 'object' || !item.key) {
+                    return;
+                }
+                if (item.entry && typeof item.entry === 'object' && !Array.isArray(item.entry)) {
+                    byKey[String(item.key)] = { ...item.entry };
+                }
+            });
+        }
+        this.scheduleEntriesByKey = byKey;
+    }
+
+    collectEntriesFromTable() {
+        const rows = Array.from(document.querySelectorAll('#schedule-table tbody tr[data-key]'));
+        return rows.map((row) => ({
+            key: row.dataset.key,
+            entry: this.parseEntryDataset(row)
+        }));
+    }
+
+    getEntryForKey(key, valueOrEntry = null) {
+        const initialEntry = this.getInitialEntry(valueOrEntry);
+        if (!key) {
+            return initialEntry;
+        }
+
+        const canonicalEntry = this.scheduleEntriesByKey[String(key)];
+        if (!canonicalEntry || typeof canonicalEntry !== 'object') {
+            return initialEntry;
+        }
+
+        return { ...initialEntry, ...canonicalEntry };
+    }
+
     clearConstraintInputs() {
         const minValueInput = document.getElementById('inp-min-value');
         const maxValueInput = document.getElementById('inp-max-value');
@@ -233,7 +273,7 @@ class EditModal {
         this.currentOriginalKey = key;
         const isAdd = (key === null);
         const clearModeInput = document.querySelector('input[name="val-mode"][value="clear"]');
-        const entry = this.getInitialEntry(valueOrEntry);
+        const entry = this.getEntryForKey(key, valueOrEntry);
         document.getElementById('modal-title').innerText = isAdd ? 'Add Schedule Entry' : 'Edit Schedule Entry';
         document.getElementById('btn-delete').style.display = isAdd ? 'none' : 'block';
         if (clearModeInput) {
