@@ -1479,7 +1479,7 @@ code {
 }
 
 .price-graph-mobile-popup.active .price-graph-mobile-popup-dialog {
-    transform: scale(1) translateY(-60px);
+    _transform: scale(1) translateY(-60px);
     opacity: 1;
 }
 
@@ -1791,7 +1791,6 @@ code {
     .price-graph-rule-detail-dialog {
         width: min(350px, calc(100vw - 20px));
         max-height: calc(100vh - 82px);
-        transform: none;
     }
 
     .price-graph-mobile-popup-dialog {
