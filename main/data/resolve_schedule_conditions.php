@@ -150,6 +150,33 @@ function normalizeRuleValue($value)
     return is_numeric($value) ? (int) $value : $value;
 }
 
+function normalizeOptionalRuleBoundValue($value): ?int
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+    if (is_int($value)) {
+        return $value;
+    }
+    if (is_bool($value)) {
+        return null;
+    }
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if (preg_match('/^-?\d+$/', $trimmed) !== 1) {
+            return null;
+        }
+        return (int) $trimmed;
+    }
+    if (is_float($value)) {
+        if ((float) ((int) $value) !== $value) {
+            return null;
+        }
+        return (int) $value;
+    }
+    return null;
+}
+
 function matchesKeyPattern(string $ruleKey, string $slotKey): bool
 {
     for ($i = 0; $i < 12; $i++) {
@@ -617,6 +644,23 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
     if (array_key_exists('fallback_value', $entry) && isValidRuleValue($entry['fallback_value'])) {
         $rule['fallback_value'] = normalizeRuleValue($entry['fallback_value']);
     }
+    if ($rule['value'] === 'netzero' || $rule['value'] === 'netzero+') {
+        $minValue = array_key_exists('min_value', $entry) ? normalizeOptionalRuleBoundValue($entry['min_value']) : null;
+        $maxValue = array_key_exists('max_value', $entry) ? normalizeOptionalRuleBoundValue($entry['max_value']) : null;
+        if ($minValue !== null) {
+            $rule['min_value'] = $minValue;
+        }
+        if ($maxValue !== null) {
+            $rule['max_value'] = $maxValue;
+        }
+        if (
+            array_key_exists('min_value', $rule) &&
+            array_key_exists('max_value', $rule) &&
+            $rule['min_value'] > $rule['max_value']
+        ) {
+            unset($rule['min_value'], $rule['max_value']);
+        }
+    }
     return $rule;
 }
 
@@ -707,6 +751,12 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
             }
             if (array_key_exists('fallback_value', $rule)) {
                 $items[count($items) - 1]['fallback_value'] = $rule['fallback_value'];
+            }
+            if (array_key_exists('min_value', $rule)) {
+                $items[count($items) - 1]['min_value'] = $rule['min_value'];
+            }
+            if (array_key_exists('max_value', $rule)) {
+                $items[count($items) - 1]['max_value'] = $rule['max_value'];
             }
             break;
         }

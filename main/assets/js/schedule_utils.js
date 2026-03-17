@@ -53,6 +53,18 @@ function getValueClass(value) {
 }
 
 /**
+ * Get the effective raw schedule value from an API entry item.
+ * @param {Object} scheduleEntry - Raw schedule API entry shaped as { key, entry }
+ * @returns {*} - Entry value or null when unavailable
+ */
+function getRawScheduleEntryValue(scheduleEntry) {
+    if (!scheduleEntry || typeof scheduleEntry !== 'object') return null;
+    const entry = scheduleEntry.entry;
+    if (!entry || typeof entry !== 'object') return null;
+    return Object.prototype.hasOwnProperty.call(entry, 'value') ? entry.value : null;
+}
+
+/**
  * Format date as YYYYMMDD
  * @param {Date} date - Date object
  * @returns {string} - Formatted date string

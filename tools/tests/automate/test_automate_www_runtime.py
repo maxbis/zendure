@@ -32,6 +32,9 @@ DATA_API_FILE = MAIN_DATA_DIR / "api" / "data_api.php"
 MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
 
 TEST_DESCRIPTIONS = [
+    ("test_base_schedule_resolution_reads_object_entries", "Checks raw schedule object entries resolve into standard slot values."),
+    ("test_base_schedule_resolution_propagates_min_max_bounds", "Checks raw schedule netzero entries expose min_value and max_value in resolved slots."),
+    ("test_base_schedule_resolution_rejects_non_integer_bounds", "Checks raw schedule min_value/max_value reject non-integer values."),
     ("test_resolver_wildcard_and_specific_rule_precedence", "Checks wildcard base rule and specific-hour override precedence."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
     ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
@@ -167,6 +170,62 @@ def test_resolver_wildcard_and_specific_rule_precedence(backup_and_restore_price
     assert by_time["1500"]["value"] == 200
 
 
+def test_base_schedule_resolution_reads_object_entries():
+    today, _ = _today_and_tomorrow_ymd()
+
+    php_code = (
+        f'require "{(REPO_ROOT / "main" / "api" / "charge_schedule_functions.php").as_posix()}"; '
+        '$schedule=['
+        f'"********0000"=>["value"=>0],'
+        f'"********1500"=>["value"=>"netzero"],'
+        f'"{today}1600"=>["value"=>250]'
+        '];'
+        f'echo json_encode(resolveScheduleForDate($schedule, "{today}"));'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+    by_time = {str(item.get("time")): item for item in payload}
+
+    assert by_time["1400"]["value"] == 0
+    assert by_time["1500"]["value"] == "netzero"
+    assert by_time["1600"]["value"] == 250
+
+
+def test_base_schedule_resolution_propagates_min_max_bounds():
+    today, _ = _today_and_tomorrow_ymd()
+
+    php_code = (
+        f'require "{(REPO_ROOT / "main" / "api" / "charge_schedule_functions.php").as_posix()}"; '
+        '$schedule=['
+        '"********0000"=>["value"=>0],'
+        f'"{today}1500"=>["value"=>"netzero","min_value"=>100,"max_value"=>700]'
+        '];'
+        f'echo json_encode(resolveScheduleForDate($schedule, "{today}"));'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+    by_time = {str(item.get("time")): item for item in payload}
+
+    assert by_time["1500"]["value"] == "netzero"
+    assert by_time["1500"]["min_value"] == 100
+    assert by_time["1500"]["max_value"] == 700
+
+
+def test_base_schedule_resolution_rejects_non_integer_bounds():
+    today, _ = _today_and_tomorrow_ymd()
+
+    php_code = (
+        f'require "{(REPO_ROOT / "main" / "api" / "charge_schedule_functions.php").as_posix()}"; '
+        '$schedule=['
+        f'"{today}1500"=>["value"=>"netzero","min_value"=>"100.5"]'
+        '];'
+        f'try {{ resolveScheduleForDate($schedule, "{today}"); echo json_encode(["ok" => true]); }} '
+        'catch (Exception $e) { echo json_encode(["ok" => false, "error" => $e->getMessage()]); }'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+
+    assert payload["ok"] is False
+    assert "min_value" in payload["error"]
+
+
 def test_resolver_emits_runtime_condition_metadata(backup_and_restore_price_files):
     today, tomorrow = _today_and_tomorrow_ymd()
     _write_json(_price_file_path(today), _build_hourly_prices(0.10))
@@ -264,7 +323,7 @@ def test_data_api_manual_override_wins_over_condition_if_include_conditions_enab
     _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
 
     manual_key = f"{today}1500"
-    _write_json(SCHEDULE_FILE, {manual_key: 999, f"{today}0000": 0})
+    _write_json(SCHEDULE_FILE, {manual_key: {"value": 999}, f"{today}0000": {"value": 0}})
 
     _write_json(
         CONDITIONS_FILE,
@@ -715,6 +774,185 @@ def test_controller_calculate_netzero_power_requires_p1_data():
 
     with pytest.raises(ValueError, match="must be supplied by the caller"):
         device_controller.AutomateController.calculate_netzero_power(controller, mode="netzero", p1_data=None)
+
+
+def test_controller_find_current_schedule_value_keeps_min_max_metadata():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.ScheduleController.__new__(device_controller.ScheduleController)
+    controller.last_schedule_entry = None
+    controller.log = lambda *args, **kwargs: None
+
+    resolved = [
+        {"time": "0000", "value": 0, "key": "********0000"},
+        {
+            "time": "1500",
+            "value": "netzero",
+            "key": "********1500",
+            "min_value": 100,
+            "max_value": 700,
+        },
+    ]
+
+    value = device_controller.ScheduleController._find_current_schedule_value(controller, resolved, "1515")
+
+    assert value == "netzero"
+    assert controller.last_schedule_entry["min_value"] == 100
+    assert controller.last_schedule_entry["max_value"] == 700
+
+
+def test_controller_set_power_clamps_netzero_to_schedule_bounds():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.test_mode = True
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
+    controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
+    controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+    controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
+    controller.log = lambda *args, **kwargs: None
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 200},
+        schedule_entry={"time": "1500", "key": "********1500", "min_value": 100},
+    )
+
+    assert result.success is True
+    assert result.power == -100
+
+
+def test_controller_set_power_clamps_netzero_plus_without_discharge():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.test_mode = True
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: 50
+    controller._last_dynamic_power_context = {"raw_power": 50, "guarded_power": 50, "guard_active": False}
+    controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+    controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
+    controller.log = lambda *args, **kwargs: None
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero+",
+        p1_data={"total_power": 200},
+        schedule_entry={"time": "1500", "key": "********1500", "min_value": 100},
+    )
+
+    assert result.success is True
+    assert result.power == 100
+
+
+def test_schedule_power_bounds_cap_netzero_magnitude_and_keep_direction():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        -300,
+        mode="netzero",
+        schedule_entry={"time": "1800", "key": "********1800", "max_value": 200},
+        runtime_context={"raw_power": -300, "guarded_power": -300, "guard_active": False},
+    )
+
+    assert bounded == -200
+    assert any("max_value capped netzero" in msg for _, msg in logs)
+
+
+def test_schedule_power_bounds_cap_netzero_charge_direction_when_positive():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        300,
+        mode="netzero",
+        schedule_entry={"time": "1800", "key": "********1800", "max_value": 200},
+        runtime_context={"raw_power": 300, "guarded_power": 300, "guard_active": False},
+    )
+
+    assert bounded == 200
+
+
+def test_schedule_power_bounds_ignore_invalid_bounds_with_debug_log():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        -120,
+        mode="netzero",
+        schedule_entry={"time": "1800", "key": "********1800", "min_value": "bad"},
+        runtime_context={"raw_power": -120, "guarded_power": -120, "guard_active": False},
+    )
+
+    assert bounded == -120
+    assert any(level == "debug" and "Ignoring invalid min_value" in msg for level, msg in logs)
+
+
+def test_schedule_power_bounds_ignore_min_greater_than_max_with_debug_log():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        -120,
+        mode="netzero",
+        schedule_entry={"time": "1800", "key": "********1800", "min_value": 500, "max_value": 200},
+        runtime_context={"raw_power": -120, "guarded_power": -120, "guard_active": False},
+    )
+
+    assert bounded == -120
+    assert any("min_value 500 is greater than max_value 200" in msg for _, msg in logs)
+
+
+def test_schedule_power_bounds_defer_to_reversal_guard():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        150,
+        mode="netzero",
+        schedule_entry={"time": "1800", "key": "********1800", "min_value": 100},
+        runtime_context={"raw_power": -100, "guarded_power": 150, "guard_active": True},
+    )
+
+    assert bounded == 150
+    assert any("ReversalRampGuard deferred min/max handling" in msg for _, msg in logs)
+
+
+def test_controller_set_power_logs_when_device_limits_override_bounded_result():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.test_mode = False
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
+    controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
+    controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+    controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
+    controller._get_dynamic_power_context = device_controller.AutomateController._get_dynamic_power_context.__get__(controller, device_controller.AutomateController)
+    controller._send_power_feed = lambda value: (True, None, 0)
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 200},
+        schedule_entry={"time": "1800", "key": "********1800", "min_value": 100},
+    )
+
+    assert result.success is True
+    assert result.power == 0
+    assert any("Battery/device limits overrode bounded result" in msg for _, msg in logs)
 
 
 def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):

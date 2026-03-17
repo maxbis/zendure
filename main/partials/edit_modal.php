@@ -39,9 +39,21 @@
                 </div>
                 <input type="radio" name="val-mode" value="auto" label="Auto" class="edit-modal-hidden-mode" tabindex="-1" aria-hidden="true">
             </div>
-            <div class="form-group" id="group-watts">
-                <label>Watts (Positive = Charge, Negative = Discharge)</label>
-                <input type="number" id="inp-watts" placeholder="0" step="100">
+            <div class="edit-modal-value-panel">
+                <div class="form-group" id="group-watts">
+                    <label>Watts (Positive = Charge, Negative = Discharge)</label>
+                    <input type="number" id="inp-watts" placeholder="0" step="100">
+                </div>
+                <div class="edit-modal-grid" id="group-constraints" style="display:none;">
+                    <div class="form-group">
+                        <label>Min Power Limit (W)</label>
+                        <input type="number" id="inp-min-value" placeholder="Optional" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Power Limit (W)</label>
+                        <input type="number" id="inp-max-value" placeholder="Optional" step="100">
+                    </div>
+                </div>
             </div>
         </div>
         <div class="modal-footer">

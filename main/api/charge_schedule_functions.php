@@ -21,6 +21,187 @@ function loadSchedule($dataFile)
     return $normalized;
 }
 
+function isValidScheduleKey($key)
+{
+    return is_string($key) && preg_match('/^[\d*]{12}$/', $key) === 1;
+}
+
+function normalizeScheduleValue($value)
+{
+    if (!isSupportedScheduleValue($value)) {
+        throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
+    }
+    return is_numeric($value) ? (int) $value : $value;
+}
+
+function normalizeOptionalScheduleBound($value, $fieldName)
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    if (is_int($value)) {
+        return $value;
+    }
+
+    if (is_bool($value)) {
+        throw new Exception("Invalid '$fieldName'. Must be an integer when provided");
+    }
+
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if (preg_match('/^-?\d+$/', $trimmed) !== 1) {
+            throw new Exception("Invalid '$fieldName'. Must be an integer when provided");
+        }
+        return (int) $trimmed;
+    }
+
+    if (is_float($value)) {
+        if ((float) ((int) $value) !== $value) {
+            throw new Exception("Invalid '$fieldName'. Must be an integer when provided");
+        }
+        return (int) $value;
+    }
+
+    throw new Exception("Invalid '$fieldName'. Must be an integer when provided");
+}
+
+function normalizeRawScheduleEntry($entry)
+{
+    if (!is_array($entry)) {
+        throw new Exception("Invalid schedule entry. Expected object with a 'value' field");
+    }
+    if (!array_key_exists('value', $entry)) {
+        throw new Exception("Invalid schedule entry. Missing required 'value' field");
+    }
+
+    $normalizedValue = normalizeScheduleValue($entry['value']);
+    $normalized = ['value' => $normalizedValue];
+
+    $hasMin = array_key_exists('min_value', $entry);
+    $hasMax = array_key_exists('max_value', $entry);
+    if (($hasMin || $hasMax) && $normalizedValue !== 'netzero' && $normalizedValue !== 'netzero+') {
+        throw new Exception("Fields 'min_value' and 'max_value' are only allowed for 'netzero' and 'netzero+' entries");
+    }
+
+    if ($hasMin) {
+        $normalizedMin = normalizeOptionalScheduleBound($entry['min_value'], 'min_value');
+        if ($normalizedMin !== null) {
+            $normalized['min_value'] = $normalizedMin;
+        }
+    }
+
+    if ($hasMax) {
+        $normalizedMax = normalizeOptionalScheduleBound($entry['max_value'], 'max_value');
+        if ($normalizedMax !== null) {
+            $normalized['max_value'] = $normalizedMax;
+        }
+    }
+
+    if (isset($normalized['min_value'], $normalized['max_value']) && $normalized['min_value'] > $normalized['max_value']) {
+        throw new Exception("Invalid schedule entry. 'min_value' cannot be greater than 'max_value'");
+    }
+
+    foreach ($entry as $key => $value) {
+        $keyStr = (string) $key;
+        if ($keyStr === 'value' || $keyStr === 'min_value' || $keyStr === 'max_value') {
+            continue;
+        }
+        $normalized[$keyStr] = $value;
+    }
+
+    return $normalized;
+}
+
+function normalizeScheduleMap($schedule, $context = '')
+{
+    $normalized = [];
+    if (!is_array($schedule)) {
+        throw new Exception("Schedule data must be an array" . ($context ? " [$context]" : ""));
+    }
+
+    foreach ($schedule as $key => $entry) {
+        $keyStr = (string) $key;
+        if (!isValidScheduleKey($keyStr)) {
+            throw new Exception("Invalid schedule key format: '$keyStr'. Keys must be 12 characters (YYYYMMDDHHmm format) or contain wildcards." . ($context ? " [$context]" : ""));
+        }
+        try {
+            $normalized[$keyStr] = normalizeRawScheduleEntry($entry);
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage() . ($context ? " [$context key=$keyStr]" : " [key=$keyStr]"));
+        }
+    }
+
+    return $normalized;
+}
+
+function normalizeScheduleWritePayload($key, $entry, $context = '')
+{
+    $keyStr = (string) $key;
+    if (!isValidScheduleKey($keyStr)) {
+        throw new Exception("Key must be 12 characters (YYYYMMDDHHmm format)" . ($context ? " [$context]" : ""));
+    }
+    return [$keyStr, normalizeRawScheduleEntry($entry)];
+}
+
+function getScheduleEntryValue($entry)
+{
+    if (!is_array($entry) || !array_key_exists('value', $entry)) {
+        return null;
+    }
+    return $entry['value'];
+}
+
+function normalizeResolvedConditionalMetadata($item)
+{
+    $meta = [
+        'value' => $item['value'],
+        'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
+            ? array_values($item['runtime_conditions'])
+            : null,
+        'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
+        'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
+            ? trim((string) $item['rule_name'])
+            : null,
+        'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
+            ? ((int) $item['rule_index'])
+            : null,
+    ];
+
+    if (array_key_exists('min_value', $item)) {
+        $meta['min_value'] = normalizeOptionalScheduleBound($item['min_value'], 'min_value');
+    }
+    if (array_key_exists('max_value', $item)) {
+        $meta['max_value'] = normalizeOptionalScheduleBound($item['max_value'], 'max_value');
+    }
+    if (
+        array_key_exists('min_value', $meta) &&
+        array_key_exists('max_value', $meta) &&
+        $meta['min_value'] !== null &&
+        $meta['max_value'] !== null &&
+        $meta['min_value'] > $meta['max_value']
+    ) {
+        throw new Exception("Invalid resolved conditional metadata. 'min_value' cannot be greater than 'max_value'");
+    }
+
+    return $meta;
+}
+
+function makeUiScheduleEntries($schedule)
+{
+    $entries = [];
+    foreach ($schedule as $key => $entry) {
+        $entries[] = [
+            'key' => (string) $key,
+            'entry' => is_array($entry) ? $entry : null,
+        ];
+    }
+    usort($entries, function ($a, $b) {
+        return strcmp($a['key'], $b['key']);
+    });
+    return $entries;
+}
+
 function writeScheduleAtomic($dataFile, $schedule)
 {
     $GLOBALS['WRITE_SCHEDULE_ATOMIC_LAST_ERROR'] = null;
@@ -93,6 +274,7 @@ function matchesAndBeforeTime($entryKey, $datetime, $slotTime)
 
 function resolveScheduleForDate($schedule, $dateYYYYMMDD)
 {
+    $schedule = normalizeScheduleMap($schedule, 'resolveScheduleForDate');
     $result = [];
 
     // 1. Collect all unique times
@@ -102,9 +284,8 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
         $allTimes[sprintf("%02d00", $h)] = true;
     }
     // Schedule times
-    foreach ($schedule as $key => $value) {
-        // Validation of value happens loosely here.
-        // Supported raw values: integers, "auto", "netzero", "netzero+"
+    foreach ($schedule as $key => $entry) {
+        $value = getScheduleEntryValue($entry);
         if (!isSupportedScheduleValue($value))
             continue;
 
@@ -117,13 +298,16 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
 
     // Prepare entries list for easier processing
     $entries = [];
-    foreach ($schedule as $k => $v) {
-        if (!isSupportedScheduleValue($v))
+    foreach ($schedule as $k => $entry) {
+        $value = getScheduleEntryValue($entry);
+        if (!isSupportedScheduleValue($value))
             continue;
         $entries[] = [
             'key' => (string) $k,
-            'value' => $v,
-            'time' => extractTimeFromKey((string) $k)
+            'value' => $value,
+            'time' => extractTimeFromKey((string) $k),
+            'min_value' => array_key_exists('min_value', $entry) ? $entry['min_value'] : null,
+            'max_value' => array_key_exists('max_value', $entry) ? $entry['max_value'] : null,
         ];
     }
 
@@ -204,11 +388,18 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
             $selected = $candidates[0];
         }
 
-        $result[] = [
+        $resolvedSlot = [
             'time' => (string) $slotTime,
             'value' => $selected ? $selected['value'] : null, // or 0? Spec doesn't strictly say default. Null is safer.
             'key' => $selected ? $selected['key'] : null
         ];
+        if ($selected && array_key_exists('min_value', $selected) && $selected['min_value'] !== null) {
+            $resolvedSlot['min_value'] = $selected['min_value'];
+        }
+        if ($selected && array_key_exists('max_value', $selected) && $selected['max_value'] !== null) {
+            $resolvedSlot['max_value'] = $selected['max_value'];
+        }
+        $result[] = $resolvedSlot;
     }
 
     return $result;
@@ -291,19 +482,7 @@ function cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD)
             continue;
         }
         $time = str_pad((string) $item['time'], 4, '0', STR_PAD_LEFT);
-        $byTime[$time] = [
-            'value' => $item['value'],
-            'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
-                ? array_values($item['runtime_conditions'])
-                : null,
-            'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
-            'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
-                ? trim((string) $item['rule_name'])
-                : null,
-            'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
-                ? ((int) $item['rule_index'])
-                : null,
-        ];
+        $byTime[$time] = normalizeResolvedConditionalMetadata($item);
     }
 
     if (empty($byTime)) {
@@ -338,6 +517,20 @@ function cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD)
             $slot['fallback_value'] = $slotMeta['fallback_value'];
         } else {
             unset($slot['fallback_value']);
+        }
+        if (array_key_exists('min_value', $slotMeta)) {
+            if ($slotMeta['min_value'] !== null) {
+                $slot['min_value'] = $slotMeta['min_value'];
+            } else {
+                unset($slot['min_value']);
+            }
+        }
+        if (array_key_exists('max_value', $slotMeta)) {
+            if ($slotMeta['max_value'] !== null) {
+                $slot['max_value'] = $slotMeta['max_value'];
+            } else {
+                unset($slot['max_value']);
+            }
         }
         if ($slotMeta['rule_name'] !== null) {
             $slot['rule_name'] = $slotMeta['rule_name'];

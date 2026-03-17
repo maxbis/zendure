@@ -116,9 +116,9 @@ Based on the current code, the automation controller can:
 - apply fixed discharge power values
 - stop charging/discharging by setting power to `0`
 - run **net-zero** mode
-  - charge or discharge to keep grid power close to zero
+  - discharge only to reduce grid import toward zero
 - run **net-zero+** mode
-  - charge only, never discharge to the grid
+  - charge only to reduce grid export toward zero
 - enforce minimum and maximum battery percentage limits
 - limit sudden step changes in requested power
 - use standby logic after repeated zero-power cycles

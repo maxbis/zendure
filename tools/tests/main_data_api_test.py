@@ -116,6 +116,35 @@ def run_delete(
     return out
 
 
+def run_put(
+    base_url: str,
+    params: Dict[str, str],
+    json_body: Dict[str, Any],
+    timeout: int,
+) -> Dict[str, Any]:
+    """PUT data_api.php with params and JSON body. Return same shape as run_get."""
+    url = base_url.split("?")[0]
+    out = {
+        "url": url,
+        "params": params,
+        "status_code": None,
+        "ok": False,
+        "body": None,
+        "error": None,
+    }
+    try:
+        r = requests.put(url, params=params, json=json_body, timeout=timeout)
+        out["status_code"] = r.status_code
+        out["ok"] = 200 <= r.status_code < 300
+        try:
+            out["body"] = r.json()
+        except Exception:
+            out["body"] = r.text[:500] if r.text else None
+    except requests.exceptions.RequestException as e:
+        out["error"] = str(e)
+    return out
+
+
 def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """Expect success, date, currentHour, currentTime, resolved, entries."""
     failures = []
@@ -135,6 +164,23 @@ def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]
             failures.append(f"Expected key '{key}' in resolved schedule response")
     if "entries" in body and not isinstance(body["entries"], list):
         failures.append("Expected 'entries' to be a list")
+    elif isinstance(body.get("entries"), list):
+        for idx, entry in enumerate(body["entries"]):
+            if not isinstance(entry, dict):
+                failures.append(f"Expected entries[{idx}] to be an object")
+                continue
+            if "key" not in entry:
+                failures.append(f"Expected entries[{idx}].key")
+            if "entry" not in entry:
+                failures.append(f"Expected entries[{idx}].entry")
+            elif not isinstance(entry["entry"], dict):
+                failures.append(f"Expected entries[{idx}].entry to be an object")
+            elif "value" not in entry["entry"]:
+                failures.append(f"Expected entries[{idx}].entry.value")
+            else:
+                for bound_field in ("min_value", "max_value"):
+                    if bound_field in entry["entry"] and not isinstance(entry["entry"][bound_field], int):
+                        failures.append(f"Expected entries[{idx}].entry.{bound_field} to be an integer when present")
     return len(failures) == 0, failures
 
 
@@ -155,6 +201,19 @@ def validate_schedule_raw(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
     for key in ("data", "file", "timestamp"):
         if key not in body:
             failures.append(f"Expected key '{key}' in raw schedule response")
+    data = body.get("data")
+    if not isinstance(data, dict):
+        failures.append("Expected raw schedule 'data' to be an object")
+    else:
+        for key, entry in data.items():
+            if not isinstance(entry, dict):
+                failures.append(f"Expected raw schedule entry '{key}' to be an object")
+                continue
+            if "value" not in entry:
+                failures.append(f"Expected raw schedule entry '{key}' to contain 'value'")
+            for bound_field in ("min_value", "max_value"):
+                if bound_field in entry and not isinstance(entry[bound_field], int):
+                    failures.append(f"Expected raw schedule entry '{key}'.{bound_field} to be an integer when present")
     return len(failures) == 0, failures
 
 
@@ -235,7 +294,8 @@ def run_schedule_add_list_delete(
     steps: Dict[str, Dict[str, Any]] = {}
 
     params_post = {"type": "schedule"}
-    body_add = {"key": SCHEDULE_TEST_KEY, "value": SCHEDULE_TEST_VALUE}
+    body_add = {"key": SCHEDULE_TEST_KEY, "entry": {"value": SCHEDULE_TEST_VALUE}}
+    body_put = {"key": SCHEDULE_TEST_KEY, "entry": {"value": SCHEDULE_TEST_VALUE + 1}}
     body_delete = {"key": SCHEDULE_TEST_KEY}
 
     # 1. POST add entry
@@ -265,14 +325,46 @@ def run_schedule_add_list_delete(
         data = body.get("data")
         if not isinstance(data, dict):
             failures.append("GET after add: data is not a dict")
-        elif data.get(SCHEDULE_TEST_KEY) != SCHEDULE_TEST_VALUE:
+        elif not isinstance(data.get(SCHEDULE_TEST_KEY), dict) or data.get(SCHEDULE_TEST_KEY, {}).get("value") != SCHEDULE_TEST_VALUE:
             failures.append(
-                f"GET after add: expected data['{SCHEDULE_TEST_KEY}'] == {SCHEDULE_TEST_VALUE}, got {data.get(SCHEDULE_TEST_KEY)}"
+                f"GET after add: expected data['{SCHEDULE_TEST_KEY}'].value == {SCHEDULE_TEST_VALUE}, got {data.get(SCHEDULE_TEST_KEY)}"
             )
     if failures:
         return False, failures, steps
 
-    # 3. DELETE entry
+    # 3. PUT update entry
+    steps["put_update"] = run_put(base_url, params_post, body_put, timeout)
+    r = steps["put_update"]
+    if r.get("error"):
+        failures.append(f"PUT update: {r['error']}")
+        return False, failures, steps
+    body = r.get("body")
+    if isinstance(body, dict) and not body.get("success"):
+        failures.append(f"PUT update: {body.get('error', 'unknown')}")
+    if failures:
+        return False, failures, steps
+
+    # 4. GET schedule and check updated entry is present
+    steps["get_after_put"] = run_get(base_url, {"type": "schedule"}, timeout)
+    r = steps["get_after_put"]
+    if r.get("error"):
+        failures.append(f"GET after put: {r['error']}")
+        return False, failures, steps
+    body = r.get("body")
+    if not isinstance(body, dict) or not body.get("success"):
+        failures.append("GET after put: success or body missing")
+    else:
+        data = body.get("data")
+        if not isinstance(data, dict):
+            failures.append("GET after put: data is not a dict")
+        elif not isinstance(data.get(SCHEDULE_TEST_KEY), dict) or data.get(SCHEDULE_TEST_KEY, {}).get("value") != SCHEDULE_TEST_VALUE + 1:
+            failures.append(
+                f"GET after put: expected data['{SCHEDULE_TEST_KEY}'].value == {SCHEDULE_TEST_VALUE + 1}, got {data.get(SCHEDULE_TEST_KEY)}"
+            )
+    if failures:
+        return False, failures, steps
+
+    # 5. DELETE entry
     steps["delete"] = run_delete(base_url, params_post, body_delete, timeout)
     r = steps["delete"]
     if r.get("error"):
@@ -284,7 +376,7 @@ def run_schedule_add_list_delete(
     if failures:
         return False, failures, steps
 
-    # 4. GET schedule and check entry is gone
+    # 6. GET schedule and check entry is gone
     steps["get_after_delete"] = run_get(base_url, {"type": "schedule"}, timeout)
     r = steps["get_after_delete"]
     if r.get("error"):
@@ -299,6 +391,121 @@ def run_schedule_add_list_delete(
             failures.append(
                 f"GET after delete: entry '{SCHEDULE_TEST_KEY}' should be gone, got {data.get(SCHEDULE_TEST_KEY)}"
             )
+
+    return len(failures) == 0, failures, steps
+
+
+def run_schedule_scalar_rejected(
+    base_url: str,
+    timeout: int,
+) -> Tuple[bool, List[str], Dict[str, Any]]:
+    failures: List[str] = []
+    params = {"type": "schedule"}
+    body_add = {"key": SCHEDULE_TEST_KEY, "value": SCHEDULE_TEST_VALUE}
+    result = run_post(base_url, params, body_add, timeout)
+    body = result.get("body")
+    if result.get("error"):
+        failures.append(f"POST scalar legacy write: {result['error']}")
+    elif result.get("status_code") != 200:
+        failures.append(f"POST scalar legacy write: HTTP {result.get('status_code')}")
+    elif not isinstance(body, dict) or body.get("success") is not False:
+        failures.append("POST scalar legacy write should fail with success=false")
+    elif "error" not in body:
+        failures.append("POST scalar legacy write should return an error message")
+    return len(failures) == 0, failures, {"post_scalar": result}
+
+
+def run_schedule_min_max_roundtrip(
+    base_url: str,
+    timeout: int,
+) -> Tuple[bool, List[str], Dict[str, Any]]:
+    failures: List[str] = []
+    steps: Dict[str, Dict[str, Any]] = {}
+    params = {"type": "schedule"}
+    add_body = {
+        "key": SCHEDULE_TEST_KEY,
+        "entry": {"value": "netzero", "min_value": 100, "max_value": 800},
+    }
+    invalid_body = {
+        "key": SCHEDULE_TEST_KEY,
+        "entry": {"value": 150, "min_value": 100, "max_value": 800},
+    }
+    invalid_decimal_body = {
+        "key": SCHEDULE_TEST_KEY,
+        "entry": {"value": "netzero", "min_value": 100.5, "max_value": 800},
+    }
+    delete_body = {"key": SCHEDULE_TEST_KEY}
+
+    steps["post_add"] = run_post(base_url, params, add_body, timeout)
+    body = steps["post_add"].get("body")
+    if steps["post_add"].get("error"):
+        failures.append(f"POST add min/max: {steps['post_add']['error']}")
+        return False, failures, steps
+    if steps["post_add"].get("status_code") != 200:
+        failures.append(f"POST add min/max: HTTP {steps['post_add'].get('status_code')}")
+    elif not isinstance(body, dict) or not body.get("success"):
+        failures.append(f"POST add min/max failed: {body}")
+    if failures:
+        return False, failures, steps
+
+    steps["get_raw"] = run_get(base_url, params, timeout)
+    body = steps["get_raw"].get("body")
+    if not isinstance(body, dict) or not body.get("success"):
+        failures.append("GET raw after min/max add: success or body missing")
+    else:
+        entry = (body.get("data") or {}).get(SCHEDULE_TEST_KEY)
+        if not isinstance(entry, dict):
+            failures.append("GET raw after min/max add: stored entry missing")
+        else:
+            if entry.get("value") != "netzero":
+                failures.append(f"GET raw after min/max add: expected value=netzero, got {entry}")
+            if entry.get("min_value") != 100 or entry.get("max_value") != 800:
+                failures.append(f"GET raw after min/max add: expected min/max 100/800, got {entry}")
+    if failures:
+        return False, failures, steps
+
+    steps["get_resolved"] = run_get(base_url, {"type": "schedule", "resolved": "1"}, timeout)
+    body = steps["get_resolved"].get("body")
+    if not isinstance(body, dict) or not body.get("success"):
+        failures.append("GET resolved after min/max add: success or body missing")
+    else:
+        slot = next((item for item in body.get("resolved", []) if item.get("key") == SCHEDULE_TEST_KEY), None)
+        if not isinstance(slot, dict):
+            failures.append("GET resolved after min/max add: matching slot missing")
+        else:
+            if slot.get("min_value") != 100 or slot.get("max_value") != 800:
+                failures.append(f"GET resolved after min/max add: expected min/max 100/800, got {slot}")
+    if failures:
+        return False, failures, steps
+
+    steps["post_invalid_usage"] = run_post(base_url, params, invalid_body, timeout)
+    body = steps["post_invalid_usage"].get("body")
+    if steps["post_invalid_usage"].get("error"):
+        failures.append(f"POST invalid min/max usage: {steps['post_invalid_usage']['error']}")
+    elif steps["post_invalid_usage"].get("status_code") != 200:
+        failures.append(f"POST invalid min/max usage: HTTP {steps['post_invalid_usage'].get('status_code')}")
+    elif not isinstance(body, dict) or body.get("success") is not False:
+        failures.append("POST invalid min/max usage should fail with success=false")
+    elif "error" not in body:
+        failures.append("POST invalid min/max usage should return an error message")
+
+    steps["post_invalid_decimal"] = run_post(base_url, params, invalid_decimal_body, timeout)
+    body = steps["post_invalid_decimal"].get("body")
+    if steps["post_invalid_decimal"].get("error"):
+        failures.append(f"POST invalid min/max decimal: {steps['post_invalid_decimal']['error']}")
+    elif steps["post_invalid_decimal"].get("status_code") != 200:
+        failures.append(f"POST invalid min/max decimal: HTTP {steps['post_invalid_decimal'].get('status_code')}")
+    elif not isinstance(body, dict) or body.get("success") is not False:
+        failures.append("POST invalid min/max decimal should fail with success=false")
+    elif "error" not in body:
+        failures.append("POST invalid min/max decimal should return an error message")
+
+    steps["delete"] = run_delete(base_url, params, delete_body, timeout)
+    delete_body_resp = steps["delete"].get("body")
+    if steps["delete"].get("error"):
+        failures.append(f"DELETE min/max entry: {steps['delete']['error']}")
+    elif not isinstance(delete_body_resp, dict) or not delete_body_resp.get("success"):
+        failures.append(f"DELETE min/max entry failed: {delete_body_resp}")
 
     return len(failures) == 0, failures, steps
 
@@ -537,13 +744,13 @@ def main() -> int:
         print()
 
     # Schedule add -> list -> delete (mutating test)
-    desc_schedule_mutation = "Schedule POST add / GET list / DELETE"
+    desc_schedule_mutation = "Schedule POST add / GET list / PUT update / DELETE"
     passed_local, failures_local, steps_local = run_schedule_add_list_delete(base, args.timeout)
     result_mutation: Dict[str, Any] = {
         "description": desc_schedule_mutation,
         "passed": passed_local,
         "failures": failures_local,
-        "params": {"type": "schedule", "key": SCHEDULE_TEST_KEY, "value": SCHEDULE_TEST_VALUE},
+        "params": {"type": "schedule", "key": SCHEDULE_TEST_KEY, "entry": {"value": SCHEDULE_TEST_VALUE}},
         "url": base,
         "steps": steps_local,
     }
@@ -563,15 +770,52 @@ def main() -> int:
     status = "PASS" if result_mutation["passed"] else "FAIL"
     print(f"[{status}] {desc_schedule_mutation}")
     print(f"  Key: {SCHEDULE_TEST_KEY}  Value: {SCHEDULE_TEST_VALUE}")
-    print(f"  Local: POST add -> GET (verify) -> DELETE -> GET (verify gone)")
-    print(f"  HTTP (local): post={steps_local.get('post_add', {}).get('status_code')}, get={steps_local.get('get_after_add', {}).get('status_code')}, delete={steps_local.get('delete', {}).get('status_code')}, get2={steps_local.get('get_after_delete', {}).get('status_code')}")
+    print(f"  Local: POST add -> GET (verify) -> PUT update -> GET (verify) -> DELETE -> GET (verify gone)")
+    print(f"  HTTP (local): post={steps_local.get('post_add', {}).get('status_code')}, get={steps_local.get('get_after_add', {}).get('status_code')}, put={steps_local.get('put_update', {}).get('status_code')}, get2={steps_local.get('get_after_put', {}).get('status_code')}, delete={steps_local.get('delete', {}).get('status_code')}, get3={steps_local.get('get_after_delete', {}).get('status_code')}")
     if production_base:
         psteps = result_mutation.get("production_steps") or {}
-        print(f"  HTTP (prod):  post={psteps.get('post_add', {}).get('status_code')}, get={psteps.get('get_after_add', {}).get('status_code')}, delete={psteps.get('delete', {}).get('status_code')}, get2={psteps.get('get_after_delete', {}).get('status_code')}")
+        print(f"  HTTP (prod):  post={psteps.get('post_add', {}).get('status_code')}, get={psteps.get('get_after_add', {}).get('status_code')}, put={psteps.get('put_update', {}).get('status_code')}, get2={psteps.get('get_after_put', {}).get('status_code')}, delete={psteps.get('delete', {}).get('status_code')}, get3={psteps.get('get_after_delete', {}).get('status_code')}")
     for f in result_mutation.get("failures", []):
         print(f"  Validation: {f}")
     if not args.quiet and steps_local:
         for step_name, step_result in steps_local.items():
+            body_str = format_body(step_result.get("body"), max_len=200)
+            print(f"  {step_name} (local): {body_str}")
+    print()
+
+    desc_schedule_scalar = "Schedule POST legacy scalar write rejected"
+    passed_scalar, failures_scalar, steps_scalar = run_schedule_scalar_rejected(base, args.timeout)
+    results.append({
+        "description": desc_schedule_scalar,
+        "passed": passed_scalar,
+        "failures": failures_scalar,
+        "steps": steps_scalar,
+    })
+    status = "PASS" if passed_scalar else "FAIL"
+    print(f"[{status}] {desc_schedule_scalar}")
+    print(f"  Key: {SCHEDULE_TEST_KEY}  Legacy payload: {{\"key\": \"{SCHEDULE_TEST_KEY}\", \"value\": {SCHEDULE_TEST_VALUE}}}")
+    for f in failures_scalar:
+        print(f"  Validation: {f}")
+    if not args.quiet:
+        body_str = format_body(steps_scalar.get("post_scalar", {}).get("body"), max_len=200)
+        print(f"  post_scalar (local): {body_str}")
+    print()
+
+    desc_schedule_min_max = "Schedule POST netzero min/max roundtrip and invalid-value rejection"
+    passed_min_max, failures_min_max, steps_min_max = run_schedule_min_max_roundtrip(base, args.timeout)
+    results.append({
+        "description": desc_schedule_min_max,
+        "passed": passed_min_max,
+        "failures": failures_min_max,
+        "steps": steps_min_max,
+    })
+    status = "PASS" if passed_min_max else "FAIL"
+    print(f"[{status}] {desc_schedule_min_max}")
+    print(f"  Key: {SCHEDULE_TEST_KEY}  Payload: {{\"key\": \"{SCHEDULE_TEST_KEY}\", \"entry\": {{\"value\": \"netzero\", \"min_value\": 100, \"max_value\": 800}}}}")
+    for f in failures_min_max:
+        print(f"  Validation: {f}")
+    if not args.quiet:
+        for step_name, step_result in steps_min_max.items():
             body_str = format_body(step_result.get("body"), max_len=200)
             print(f"  {step_name} (local): {body_str}")
     print()

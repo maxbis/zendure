@@ -47,13 +47,30 @@ Use the schedule section to manage entries.
   - time pattern (`HHmm` or `*` wildcards)
   - mode/value:
     - fixed watts
-    - `netzero`
-    - `netzero+`
+    - `netzero` (discharge-only dynamic mode)
+    - `netzero+` (charge-only dynamic mode)
 - Save or delete from the modal.
 
 Notes:
 
 - Wildcards are supported in both date and time patterns.
+- For `netzero` and `netzero+`, the modal can also show optional `min_value` / `max_value` fields.
+- `min_value` and `max_value` use watt values and step in `100 W`.
+- If both are empty, runtime behaves as before with no extra min/max enforcement.
+
+### `min_value` / `max_value` meaning
+
+- `min_value` = minimum watt magnitude while the dynamic mode is active
+- `max_value` = maximum watt magnitude while the dynamic mode is active
+
+Examples:
+
+- `netzero` + `min_value=100`
+  - if dynamic result is too small, runtime forces at least `100 W` discharge
+- `netzero+` + `min_value=100`
+  - if dynamic result is too small, runtime forces at least `100 W` charge
+- `max_value=200`
+  - runtime will not exceed `200 W` magnitude for that dynamic slot
 
 ## 5. Price Graph Behavior
 
@@ -114,3 +131,4 @@ If schedule changes do not appear:
 ## 10. Related Manuals
 
 - Rules editor manual: `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/edit_rules_user_manual.md`
+- Min/max values manual: `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/min-max-values_user_manual.md`

@@ -89,7 +89,7 @@ class PriceGraphComponent extends Component {
         const scheduleMap = {};
         if (scheduleEntries) {
             scheduleEntries.forEach(entry => {
-                scheduleMap[entry.key] = entry.value;
+                scheduleMap[entry.key] = getRawScheduleEntryValue(entry);
             });
         }
         

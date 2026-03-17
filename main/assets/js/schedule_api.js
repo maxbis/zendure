@@ -119,7 +119,7 @@ async function calculateSchedule(apiUrl, simulate = true) {
 async function saveScheduleEntry(apiUrl, key, value, originalKey = null) {
     try {
         const client = getApiClient(apiUrl.split('?')[0]);
-        const body = { key, value };
+        const body = { key, entry: { value } };
         if (originalKey !== null && originalKey !== key) {
             body.originalKey = originalKey;
         }
@@ -127,7 +127,7 @@ async function saveScheduleEntry(apiUrl, key, value, originalKey = null) {
     } catch (error) {
         // Fallback to original implementation if ApiClient not available
         if (typeof ApiClient === 'undefined') {
-            const body = { key, value };
+            const body = { key, entry: { value } };
             if (originalKey !== null && originalKey !== key) {
                 body.originalKey = originalKey;
             }

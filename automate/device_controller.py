@@ -419,6 +419,7 @@ class AutomateController(BaseDeviceController):
         self.device_sn = device_sn
         self.previous_power = None  # Track the last successfully set power value (internal convention)
         self.limit_state = 0  # Battery limit state: -1 (MIN), 0 (OK), 1 (MAX)
+        self._last_dynamic_power_context: Dict[str, Any] = {}
         try:
             reversal_divisor = int(self.config.get("REVERSAL_RAMP_DIVISOR", 2))
         except (TypeError, ValueError):
@@ -686,6 +687,7 @@ class AutomateController(BaseDeviceController):
         self,
         mode: Literal['netzero', 'netzero+'] = 'netzero',
         p1_data: Optional[Dict[str, Any]] = None,
+        schedule_entry: Optional[Dict[str, Any]] = None,
         ) -> int:
         """
         Calculate the actual power value needed to achieve netzero/netzero+ mode.
@@ -694,7 +696,7 @@ class AutomateController(BaseDeviceController):
         then calculates what power setting is needed to achieve zero feed-in.
 
         Args:
-            mode: 'netzero' (can charge or discharge) or 'netzero+' (only charge, no discharge)
+            mode: 'netzero' (discharge only) or 'netzero+' (only charge, no discharge)
             p1_data: Required normalized P1 meter data from the caller.
 
         Returns:
@@ -740,6 +742,14 @@ class AutomateController(BaseDeviceController):
         # Convert to controller convention (positive=charge, negative=discharge)
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
+            raw_target_power = new_input if new_input > 0 else 0
+            self._last_dynamic_power_context = {
+                'mode': mode,
+                'raw_power': raw_target_power,
+                'guarded_power': raw_target_power,
+                'guard_active': False,
+                'reversal_hint': False,
+            }
             # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
             if new_input > 0: # Charging is requested?
                 return new_input
@@ -774,7 +784,158 @@ class AutomateController(BaseDeviceController):
                 f"raw_target={raw_target_power}, guarded_target={guarded_power}"
             )
 
+        self._last_dynamic_power_context = {
+            'mode': mode,
+            'raw_power': raw_target_power,
+            'guarded_power': guarded_power,
+            'guard_active': guarded_power != raw_target_power,
+            'reversal_hint': reversal_hint,
+        }
+
         return guarded_power
+
+    @staticmethod
+    def _normalize_schedule_bound(schedule_entry: Optional[Dict[str, Any]], field_name: str) -> Optional[int]:
+        if not isinstance(schedule_entry, dict):
+            return None
+
+        raw_value = schedule_entry.get(field_name)
+        if raw_value is None or raw_value == '':
+            return None
+
+        if isinstance(raw_value, bool):
+            raise ValueError(f"Schedule field '{field_name}' must be an integer when provided")
+
+        if isinstance(raw_value, int):
+            return raw_value
+
+        if isinstance(raw_value, float):
+            if not raw_value.is_integer():
+                raise ValueError(f"Schedule field '{field_name}' must be an integer when provided")
+            return int(raw_value)
+
+        if isinstance(raw_value, str):
+            trimmed = raw_value.strip()
+            if trimmed == '' or not trimmed.lstrip('-').isdigit():
+                raise ValueError(f"Schedule field '{field_name}' must be an integer when provided")
+            return int(trimmed)
+
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Schedule field '{field_name}' must be an integer when provided") from exc
+
+    def _get_dynamic_power_context(self) -> Dict[str, Any]:
+        context = getattr(self, '_last_dynamic_power_context', None)
+        return context if isinstance(context, dict) else {}
+
+    def _apply_schedule_power_bounds(
+        self,
+        power_value: int,
+        mode: Literal['netzero', 'netzero+'],
+        schedule_entry: Optional[Dict[str, Any]] = None,
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        runtime_context = runtime_context if isinstance(runtime_context, dict) else {}
+        slot_key = None
+        slot_time = None
+        if isinstance(schedule_entry, dict):
+            slot_key = schedule_entry.get('key')
+            slot_time = schedule_entry.get('time')
+
+        try:
+            min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
+        except ValueError as exc:
+            self.log('debug', f"Ignoring invalid min_value for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
+            min_value = None
+        try:
+            max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
+        except ValueError as exc:
+            self.log('debug', f"Ignoring invalid max_value for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
+            max_value = None
+
+        if min_value is not None:
+            min_value = abs(int(min_value))
+        if max_value is not None:
+            max_value = abs(int(max_value))
+
+        if min_value is None and max_value is None:
+            return power_value
+
+        if min_value is not None and max_value is not None and min_value > max_value:
+            self.log(
+                'debug',
+                f"Ignoring schedule bounds for slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+                f"min_value {min_value} is greater than max_value {max_value}"
+            )
+            return power_value
+
+        raw_power = int(runtime_context.get('raw_power', power_value))
+        guarded_power = int(runtime_context.get('guarded_power', power_value))
+        guard_active = bool(runtime_context.get('guard_active', False))
+
+        self.log(
+            'debug',
+            f"Dynamic bounds active for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+            f"raw={raw_power}, guarded={guarded_power}, current={power_value}, min={min_value}, max={max_value}"
+        )
+
+        if guard_active:
+            self.log(
+                'debug',
+                f"ReversalRampGuard deferred min/max handling for {mode} slot {slot_time or '?'} "
+                f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_value}, max={max_value}"
+            )
+            return power_value
+
+        bounded_power = int(power_value)
+        original_power = bounded_power
+
+        if mode == 'netzero':
+            magnitude = abs(bounded_power)
+            direction = -1 if bounded_power < 0 else (1 if bounded_power > 0 else 0)
+
+            if min_value is not None and magnitude < min_value:
+                bounded_power = -min_value
+                self.log(
+                    'debug',
+                    f"min_value forced minimum discharge for {mode} slot {slot_time or '?'} "
+                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
+                )
+            elif max_value is not None and magnitude > max_value:
+                bounded_power = (-max_value if direction < 0 else max_value)
+                self.log(
+                    'debug',
+                    f"max_value capped {mode} slot {slot_time or '?'} "
+                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
+                )
+        else:
+            bounded_power = max(0, bounded_power)
+            magnitude = abs(bounded_power)
+
+            if min_value is not None and magnitude < min_value:
+                bounded_power = min_value
+                self.log(
+                    'debug',
+                    f"min_value forced minimum charge for {mode} slot {slot_time or '?'} "
+                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
+                )
+            elif max_value is not None and magnitude > max_value:
+                bounded_power = max_value
+                self.log(
+                    'debug',
+                    f"max_value capped {mode} slot {slot_time or '?'} "
+                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
+                )
+
+        if bounded_power != power_value:
+            self.log(
+                'info',
+                f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
+            )
+
+        return bounded_power
 
             # # Regular netzero mode
             # if new_output > 0: # Discharging is requested?
@@ -792,6 +953,7 @@ class AutomateController(BaseDeviceController):
             self,
             value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
             p1_data: Optional[Dict[str, Any]] = None,
+            schedule_entry: Optional[Dict[str, Any]] = None,
         ) -> PowerResult:
         """
         Set power feed to the Zendure battery.
@@ -842,7 +1004,18 @@ class AutomateController(BaseDeviceController):
 
             try:
                 # Calculate the actual power value needed
-                calculated_power = self.calculate_netzero_power(mode=mode, p1_data=p1_data)
+                calculated_power = self.calculate_netzero_power(
+                    mode=mode,
+                    p1_data=p1_data,
+                    schedule_entry=schedule_entry,
+                )
+                runtime_context = self._get_dynamic_power_context()
+                calculated_power = self._apply_schedule_power_bounds(
+                    calculated_power,
+                    mode=mode,
+                    schedule_entry=schedule_entry,
+                    runtime_context=runtime_context,
+                )
 
                 # If test mode, just return the calculated value without applying
                 if self.test_mode:
@@ -852,6 +1025,27 @@ class AutomateController(BaseDeviceController):
                 # calculated_power is already in correct convention (positive=charge, negative=discharge)
                 # Send power feed directly without conversion
                 success, error_msg, actual_power = self._send_power_feed(calculated_power)
+
+                if actual_power != calculated_power:
+                    min_value = None
+                    max_value = None
+                    try:
+                        min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
+                    except ValueError:
+                        min_value = None
+                    try:
+                        max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
+                    except ValueError:
+                        max_value = None
+                    if min_value is not None or max_value is not None:
+                        slot_time = schedule_entry.get('time') if isinstance(schedule_entry, dict) else None
+                        slot_key = schedule_entry.get('key') if isinstance(schedule_entry, dict) else None
+                        self.log(
+                            'debug',
+                            f"Battery/device limits overrode bounded result for {mode} slot {slot_time or '?'} "
+                            f"({slot_key or 'no-key'}): bounded={calculated_power}, applied={actual_power}, "
+                            f"min={min_value}, max={max_value}"
+                        )
 
                 if not success:
                     return PowerResult(
@@ -1112,6 +1306,8 @@ class ScheduleController(BaseDeviceController):
                 'key': matching_entry.get('key'),
                 'runtime_conditions': matching_entry.get('runtime_conditions'),
                 'fallback_value': matching_entry.get('fallback_value'),
+                'min_value': matching_entry.get('min_value'),
+                'max_value': matching_entry.get('max_value'),
             }
 
             return matching_entry.get('value')

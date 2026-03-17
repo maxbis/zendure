@@ -172,7 +172,7 @@ Main application orchestrator.
 REST API endpoint supporting:
 - `GET ?date=YYYYMMDD` - Fetch schedule for date
 - `POST {action: "simulate|delete"}` - Clear old entries
-- `POST {key, value, originalKey?}` - Save/update entry
+- `POST {key, entry, originalKey?}` - Save/update entry
 - `DELETE {key}` - Delete entry
 
 Returns JSON:
@@ -187,6 +187,8 @@ Returns JSON:
   "error": "..." // if success=false
 }
 ```
+
+For `netzero` and `netzero+` entries, `entry` may also include optional `min_value` and `max_value` watt bounds.
 
 #### `api/charge_schedule_functions.php`
 Core schedule logic:
@@ -222,10 +224,10 @@ The application reads configuration from `main/config/config.json`:
 
 ```json
 {
-  "202601150930": 300,
-  "202601151200": -200,
-  "20260116****": "netzero",
-  "********0800": "netzero+"
+  "202601150930": { "value": 300 },
+  "202601151200": { "value": -200 },
+  "20260116****": { "value": "netzero", "min_value": 100, "max_value": 700 },
+  "********0800": { "value": "netzero+" }
 }
 ```
 
@@ -238,8 +240,13 @@ The application reads configuration from `main/config/config.json`:
 **Value types:**
 - `number` - Power in watts (positive=charge, negative=discharge)
 - `"auto"` - Resume normal auto/rule resolution from this time onward without forcing a power value
-- `"netzero"` - Net zero mode
-- `"netzero+"` - Solar charge mode
+- `"netzero"` - Discharge-only dynamic mode that reduces grid import toward zero
+- `"netzero+"` - Charge-only dynamic mode that reduces grid export toward zero
+
+For `netzero` and `netzero+`, the optional `min_value` / `max_value` fields are magnitude bounds used by automation at runtime:
+- `min_value` = minimum watt magnitude to apply when the mode is active
+- `max_value` = maximum watt magnitude to apply when the mode is active
+- if both are missing or `null`, runtime behavior is unchanged from the legacy implementation
 
 ### API Response (Resolved)
 
@@ -248,13 +255,25 @@ The application reads configuration from `main/config/config.json`:
   "resolved": [
     {"time": "0000", "value": null, "key": null},
     {"time": "0030", "value": null, "key": null},
-    {"time": "0800", "value": "netzero+", "key": "********0800"},
+    {"time": "0800", "value": "netzero+", "key": "********0800", "min_value": 100, "max_value": 400},
     {"time": "0930", "value": 300, "key": "202601150930"}
   ]
 }
 ```
 
 Every 30-minute slot for the day with resolved values.
+
+### Runtime Notes
+
+At runtime, `automate/device_controller.py` applies bound handling only for dynamic modes:
+
+- `netzero`
+  - below `min_value` -> force minimum discharge
+  - above `max_value` -> cap the magnitude and keep the sign
+- `netzero+`
+  - below `min_value` -> force minimum charge
+  - above `max_value` -> cap the charge magnitude
+- if `ReversalRampGuard` is active during a real reversal, min/max handling is deferred for that cycle
 
 ## UI Components
 

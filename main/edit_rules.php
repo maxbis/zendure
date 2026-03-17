@@ -51,6 +51,33 @@ function validateValue($value): bool
     return $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
 }
 
+function normalizeOptionalRuleBound($value): ?int
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+    if (is_int($value)) {
+        return $value;
+    }
+    if (is_bool($value)) {
+        return null;
+    }
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if (preg_match('/^-?\d+$/', $trimmed) !== 1) {
+            return null;
+        }
+        return (int) $trimmed;
+    }
+    if (is_float($value)) {
+        if ((float) ((int) $value) !== $value) {
+            return null;
+        }
+        return (int) $value;
+    }
+    return null;
+}
+
 function validateCondition(array $condition): bool
 {
     if (!isset($condition['field'], $condition['op'])) {
@@ -116,6 +143,18 @@ function normalizeRules(array $rules): array
         }
         if (array_key_exists('fallback_value', $rule) && $rule['fallback_value'] !== '' && $rule['fallback_value'] !== null && validateValue($rule['fallback_value'])) {
             $normalized['fallback_value'] = is_numeric($rule['fallback_value']) ? (int) $rule['fallback_value'] : (string) $rule['fallback_value'];
+        }
+        if ($normalized['value'] === 'netzero' || $normalized['value'] === 'netzero+') {
+            $minValue = array_key_exists('min_value', $rule) ? normalizeOptionalRuleBound($rule['min_value']) : null;
+            $maxValue = array_key_exists('max_value', $rule) ? normalizeOptionalRuleBound($rule['max_value']) : null;
+            $normalized['min_value'] = $minValue;
+            $normalized['max_value'] = $maxValue;
+            if (
+                $normalized['min_value'] > $normalized['max_value']
+            ) {
+                $normalized['min_value'] = null;
+                $normalized['max_value'] = null;
+            }
         }
 
         if (isset($rule['conditions']) && is_array($rule['conditions'])) {
@@ -276,6 +315,17 @@ if ($isApi) {
                     <div>
                         <label for="inp-max-time">Max Time (optional)</label>
                         <input id="inp-max-time" type="text" placeholder="11">
+                    </div>
+                </div>
+
+                <div class="row split">
+                    <div>
+                        <label for="inp-min-value">Min Value (optional)</label>
+                        <input id="inp-min-value" type="number" step="100" placeholder="100">
+                    </div>
+                    <div>
+                        <label for="inp-max-value">Max Value (optional)</label>
+                        <input id="inp-max-value" type="number" step="100" placeholder="800">
                     </div>
                 </div>
 

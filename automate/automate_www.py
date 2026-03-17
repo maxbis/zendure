@@ -2194,7 +2194,15 @@ class AutomationApp:
         )
 
         if should_apply:
-            result = self.controller.set_power(desired_power, p1_data=p1_data)
+            schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
+            if schedule_entry is not None:
+                result = self.controller.set_power(
+                    desired_power,
+                    p1_data=p1_data,
+                    schedule_entry=schedule_entry,
+                )
+            else:
+                result = self.controller.set_power(desired_power, p1_data=p1_data)
             if result.success:
                 power_log_message = f"Power: {result.power} (desired: {desired_power})"
                 self.logger.debug(power_log_message)

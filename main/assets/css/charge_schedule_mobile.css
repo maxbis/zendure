@@ -1903,6 +1903,10 @@ code {
 .edit-modal-helper {
     margin-bottom: 15px;
 }
+.edit-modal-value-panel {
+    min-height: 116px;
+    margin-top: 10px;
+}
 .edit-modal-mode-options {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1993,28 +1997,47 @@ code {
     color: #fff;
 }
 #edit-modal #inp-date,
-#edit-modal #inp-time {
+#edit-modal #inp-time,
+#edit-modal #inp-watts,
+#edit-modal #inp-min-value,
+#edit-modal #inp-max-value {
     width: 100%;
     max-width: 100%;
     min-height: 44px;
     padding: 10px 12px;
     font-size: 1rem;
+    border-radius: 10px;
+    border: 1px solid #4d4d4d;
+    background: #343434;
+    color: var(--text-primary);
     box-sizing: border-box;
 }
-#edit-modal #inp-watts {
-    width: 180px;
-    max-width: 100%;
-    min-height: 44px;
-    padding: 10px 12px;
-    font-size: 1rem;
+#edit-modal #inp-watts,
+#edit-modal #inp-min-value,
+#edit-modal #inp-max-value {
     font-weight: 600;
-    box-sizing: border-box;
+}
+#edit-modal #inp-watts:disabled,
+#edit-modal #inp-min-value:disabled,
+#edit-modal #inp-max-value:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 #edit-modal #inp-watts.is-charging {
     color: #7fd77f;
     font-weight: 700;
 }
 #edit-modal #inp-watts.is-discharging {
+    color: #ff8b8b;
+    font-weight: 700;
+}
+#edit-modal #inp-min-value.is-charging,
+#edit-modal #inp-max-value.is-charging {
+    color: #7fd77f;
+    font-weight: 700;
+}
+#edit-modal #inp-min-value.is-discharging,
+#edit-modal #inp-max-value.is-discharging {
     color: #ff8b8b;
     font-weight: 700;
 }

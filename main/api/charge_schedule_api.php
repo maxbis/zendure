@@ -37,19 +37,13 @@ $response = ['success' => false];
 
 try {
     if ($method === 'GET') {
+        $schedule = normalizeScheduleMap($schedule, 'charge_schedule_api GET');
         $date = isset($_GET['date']) ? $_GET['date'] : date('Ymd');
         if (!preg_match('/^\d{8}$/', $date)) {
             $date = date('Ymd');
         }
 
-        // UI Entries (Sorted Key ASC)
-        $uiEntries = [];
-        foreach ($schedule as $k => $v) {
-            $uiEntries[] = ['key' => (string) $k, 'value' => $v];
-        }
-        usort($uiEntries, function ($a, $b) {
-            return strcmp($a['key'], $b['key']);
-        });
+        $uiEntries = makeUiScheduleEntries($schedule);
 
         $resolved = resolveScheduleForDateWithConditions($schedule, $date);
 
@@ -63,6 +57,7 @@ try {
         ];
     } elseif ($method === 'PUT' || $method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
+        $schedule = normalizeScheduleMap($schedule, 'charge_schedule_api write');
 
             if (
                 $method === 'POST' &&
@@ -94,30 +89,20 @@ try {
             } else {
             // PUT/POST handles both add and edit operations
             // Validate required fields
-            if (!is_array($input) || !isset($input['key']) || !isset($input['value'])) {
-                throw new Exception("Missing key or value");
+            if (is_array($input) && isset($input['key']) && isset($input['value']) && !isset($input['entry'])) {
+                throw new Exception("Legacy schedule write format is no longer supported. Use { key, entry: { value } }.");
+            }
+            if (!is_array($input) || !isset($input['key']) || !isset($input['entry'])) {
+                throw new Exception("Missing key or entry");
             }
             
             $key = (string) $input['key'];
-            $val = $input['value'];
+            $entry = $input['entry'];
             
             // originalKey is optional - only needed when editing and changing the key
             $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
 
-            // Validate key format
-            if (strlen($key) !== 12) {
-                throw new Exception("Key must be 12 characters");
-            }
-            
-            // Validate value
-            if ($val !== 'auto' && $val !== 'netzero' && $val !== 'netzero+' && !is_numeric($val)) {
-                throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
-            }
-            
-            // Convert numeric value to int
-            if (is_numeric($val)) {
-                $val = (int) $val;
-            }
+            [$key, $normalizedEntry] = normalizeScheduleWritePayload($key, $entry, 'charge_schedule_api write');
 
             // If originalKey is provided and different from new key, remove the old entry
             if ($orig !== null && $orig !== $key) {
@@ -125,7 +110,7 @@ try {
             }
             
             // Set the new entry (or update existing one)
-            $schedule[$key] = $val;
+            $schedule[$key] = $normalizedEntry;
 
             // Automatically drop outdated concrete-date entries on save
             $schedule = cleanOutdatedScheduleEntries($schedule);

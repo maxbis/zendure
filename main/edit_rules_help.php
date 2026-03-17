@@ -144,6 +144,8 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>hour</code> (optional)</td><td>Hour filter list; accepts string list, array, or single value.</td><td><code>"hour": "1,2,17,18"</code></td></tr>
                 <tr><td><code>min_time</code> (optional)</td><td>Lower bound hour (inclusive).</td><td><code>"min_time": "10"</code></td></tr>
                 <tr><td><code>max_time</code> (optional)</td><td>Upper bound hour (inclusive).</td><td><code>"max_time": "11"</code></td></tr>
+                <tr><td><code>min_value</code> (optional)</td><td>Minimum watt magnitude for <code>netzero</code> / <code>netzero+</code> rules. Defaults to <code>null</code>.</td><td><code>"min_value": 100</code></td></tr>
+                <tr><td><code>max_value</code> (optional)</td><td>Maximum watt magnitude for <code>netzero</code> / <code>netzero+</code> rules. Defaults to <code>null</code>.</td><td><code>"max_value": 700</code></td></tr>
                 <tr><td><code>fallback_value</code> (optional)</td><td>Optional fallback power used by runtime integrations when runtime conditions fail. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"fallback_value": 0</code></td></tr>
                 <tr><td><code>conditions</code></td><td>Array of condition objects. All conditions are combined with AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
             </tbody>
@@ -189,6 +191,8 @@ date_default_timezone_set('Europe/Amsterdam');
     <section>
         <h2>Runtime Metadata</h2>
         <p>Rules using <code>electricity_level</code> are saved as normal rules. In resolved schedule output, those conditions are exposed under <code>runtime_conditions</code> while <code>value</code> remains unchanged for backward compatibility.</p>
+        <p>When present, <code>min_value</code> and <code>max_value</code> are also exposed in resolved output for <code>netzero</code> / <code>netzero+</code> rules so the Python runtime can apply them.</p>
+        <p class="muted"><code>fallback_value</code> does not have its own min/max fields.</p>
     </section>
 
     <section>
@@ -229,6 +233,8 @@ date_default_timezone_set('Europe/Amsterdam');
         <h2>Examples</h2>
 <pre>{
   "value": "netzero",
+  "min_value": 100,
+  "max_value": 700,
   "conditions": [
     { "field": "price", "op": ">=", "value": 25 }
   ]

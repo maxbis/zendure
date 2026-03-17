@@ -204,8 +204,9 @@ function getValueLabel($val)
                         // Sort for display
                         uksort($schedule, 'strcmp');
                         $idx = 0;
-                        foreach ($schedule as $k => $v):
+                        foreach ($schedule as $k => $entry):
                             $idx++;
+                            $v = (is_array($entry) && array_key_exists('value', $entry)) ? $entry['value'] : null;
                             $displayVal = getValueLabel($v);
                             $valClass = 'neutral';
                             if ($v === 'netzero') {
@@ -217,7 +218,8 @@ function getValueLabel($val)
                             }
                             ?>
                             <tr data-key="<?php echo htmlspecialchars($k); ?>"
-                                data-value="<?php echo htmlspecialchars($v); ?>">
+                                data-value="<?php echo htmlspecialchars((string) $v); ?>"
+                                data-entry="<?php echo htmlspecialchars(json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>">
                                 <td style="color:var(--text-tertiary);"><?php echo $idx; ?></td>
                                 <td style="font-family:monospace; font-size:0.8rem;"><?php echo htmlspecialchars($k); ?></td>
                                 <td class="<?php echo $valClass; ?>" style="font-weight:500;">

@@ -121,6 +121,40 @@ function getConditionalResolvedForDate($date) {
     return null;
 }
 
+function normalizeDataApiResolvedConditionalMetadata($item) {
+    $meta = [
+        'value' => $item['value'],
+        'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
+            ? array_values($item['runtime_conditions'])
+            : null,
+        'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
+        'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
+            ? trim((string) $item['rule_name'])
+            : null,
+        'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
+            ? ((int) $item['rule_index'])
+            : null,
+    ];
+
+    if (array_key_exists('min_value', $item)) {
+        $meta['min_value'] = normalizeOptionalScheduleBound($item['min_value'], 'min_value');
+    }
+    if (array_key_exists('max_value', $item)) {
+        $meta['max_value'] = normalizeOptionalScheduleBound($item['max_value'], 'max_value');
+    }
+    if (
+        array_key_exists('min_value', $meta) &&
+        array_key_exists('max_value', $meta) &&
+        $meta['min_value'] !== null &&
+        $meta['max_value'] !== null &&
+        $meta['min_value'] > $meta['max_value']
+    ) {
+        throw new Exception("Invalid resolved conditional metadata. 'min_value' cannot be greater than 'max_value'");
+    }
+
+    return $meta;
+}
+
 function mergeResolvedWithConditional($resolved, $date) {
     if (!is_array($resolved)) {
         return $resolved;
@@ -137,19 +171,7 @@ function mergeResolvedWithConditional($resolved, $date) {
             continue;
         }
         $time = str_pad((string) $item['time'], 4, '0', STR_PAD_LEFT);
-        $byTime[$time] = [
-            'value' => $item['value'],
-            'runtime_conditions' => (isset($item['runtime_conditions']) && is_array($item['runtime_conditions']))
-                ? array_values($item['runtime_conditions'])
-                : null,
-            'fallback_value' => array_key_exists('fallback_value', $item) ? $item['fallback_value'] : null,
-            'rule_name' => (isset($item['rule_name']) && is_string($item['rule_name']) && trim($item['rule_name']) !== '')
-                ? trim((string) $item['rule_name'])
-                : null,
-            'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
-                ? ((int) $item['rule_index'])
-                : null,
-        ];
+        $byTime[$time] = normalizeDataApiResolvedConditionalMetadata($item);
     }
 
     if (empty($byTime)) {
@@ -181,6 +203,20 @@ function mergeResolvedWithConditional($resolved, $date) {
                 $slot['fallback_value'] = $slotMeta['fallback_value'];
             } else {
                 unset($slot['fallback_value']);
+            }
+            if (array_key_exists('min_value', $slotMeta)) {
+                if ($slotMeta['min_value'] !== null) {
+                    $slot['min_value'] = $slotMeta['min_value'];
+                } else {
+                    unset($slot['min_value']);
+                }
+            }
+            if (array_key_exists('max_value', $slotMeta)) {
+                if ($slotMeta['max_value'] !== null) {
+                    $slot['max_value'] = $slotMeta['max_value'];
+                } else {
+                    unset($slot['max_value']);
+                }
             }
             if ($slotMeta['rule_name'] !== null) {
                 $slot['rule_name'] = $slotMeta['rule_name'];
@@ -273,10 +309,12 @@ function handleGetData($type) {
             'file' => basename($filePath)
         ];
     }
+    if ($type === 'schedule') {
+        ensureScheduleFunctions();
+    }
     $wantResolved = $type === 'schedule' && (isset($_GET['resolved']) || (isset($_GET['format']) && $_GET['format'] === 'resolved'));
     if ($wantResolved) {
-        ensureScheduleFunctions();
-        $schedule = normalizeScheduleKeys($data);
+        $schedule = normalizeScheduleMap(normalizeScheduleKeys($data), 'GET schedule resolved');
         $date = isset($_GET['date']) ? $_GET['date'] : date('Ymd');
         if (!preg_match('/^\d{8}$/', $date)) {
             $date = date('Ymd');
@@ -285,13 +323,7 @@ function handleGetData($type) {
         if (include_conditions) {
             $resolved = mergeResolvedWithConditional($resolved, $date);
         }
-        $uiEntries = [];
-        foreach ($schedule as $k => $v) {
-            $uiEntries[] = ['key' => (string) $k, 'value' => $v];
-        }
-        usort($uiEntries, function ($a, $b) {
-            return strcmp($a['key'], $b['key']);
-        });
+        $uiEntries = makeUiScheduleEntries($schedule);
         return [
             'success' => true,
             'date' => $date,
@@ -303,7 +335,9 @@ function handleGetData($type) {
     }
     return [
         'success' => true,
-        'data' => $data,
+        'data' => $type === 'schedule'
+            ? normalizeScheduleMap(normalizeScheduleKeys($data), 'GET schedule raw')
+            : $data,
         'file' => basename($filePath),
         'timestamp' => file_exists($filePath) ? filemtime($filePath) : null
     ];
@@ -363,21 +397,17 @@ function handlePostFile($input) {
 }
 
 function validateScheduleKeyValue($keyStr, $value, $context = '') {
-    if (strlen($keyStr) !== 12) {
-        throw new Exception("Key must be 12 characters (YYYYMMDDHHmm format)" . ($context ? " [$context]" : ""));
-    }
-    if ($value !== 'auto' && $value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
-        throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
-    }
+    normalizeScheduleWritePayload($keyStr, $value, $context);
 }
 
-function applyScheduleEntryAndWrite($filePath, $key, $val, $orig, $input) {
+function applyScheduleEntryAndWrite($filePath, $key, $entry, $orig, $input) {
     $schedule = readDataFile($filePath);
-    $schedule = $schedule === null ? [] : normalizeScheduleKeys($schedule);
+    $schedule = $schedule === null ? [] : normalizeScheduleMap(normalizeScheduleKeys($schedule), 'existing schedule');
+    [$key, $normalizedEntry] = normalizeScheduleWritePayload($key, $entry, 'write schedule');
     if ($orig !== null && $orig !== $key) {
         unset($schedule[$orig]);
     }
-    $schedule[$key] = $val;
+    $schedule[$key] = $normalizedEntry;
     if (!function_exists('cleanOutdatedScheduleEntries') && file_exists(SCHEDULE_FUNCTIONS_PATH)) {
         require_once SCHEDULE_FUNCTIONS_PATH;
     }
@@ -398,6 +428,7 @@ function handlePostSchedule($input) {
     if (!is_array($input)) {
         throw new Exception("Schedule data must be an array");
     }
+    ensureScheduleFunctions();
     $filePath = getDataFilePath('schedule', []);
     if ($filePath === null) {
         throw new Exception("Invalid type: schedule");
@@ -405,7 +436,7 @@ function handlePostSchedule($input) {
     if (isset($input['action']) && ($input['action'] === 'simulate' || $input['action'] === 'delete')) {
         ensureScheduleFunctions();
         $schedule = readDataFile($filePath);
-        $schedule = $schedule === null ? [] : normalizeScheduleKeys($schedule);
+        $schedule = $schedule === null ? [] : normalizeScheduleMap(normalizeScheduleKeys($schedule), 'POST schedule action');
         $simulate = ($input['action'] === 'simulate');
         $result = clearOldEntries($schedule, $simulate);
         if ($simulate) {
@@ -423,7 +454,7 @@ function handlePostSchedule($input) {
     }
     if (isset($input['action']) && $input['action'] === 'clear_non_wildcard') {
         $schedule = readDataFile($filePath);
-        $schedule = $schedule === null ? [] : normalizeScheduleKeys($schedule);
+        $schedule = $schedule === null ? [] : normalizeScheduleMap(normalizeScheduleKeys($schedule), 'POST schedule clear_non_wildcard');
 
         $beforeCount = count($schedule);
         $filteredSchedule = [];
@@ -442,30 +473,22 @@ function handlePostSchedule($input) {
 
         return ['success' => true, 'removed' => $removedCount, 'kept' => $keptCount];
     }
-    if (count($input) === 2 && isset($input['key']) && isset($input['value'])) {
+    if (isset($input['key']) && isset($input['value']) && !isset($input['entry'])) {
+        throw new Exception("Legacy schedule write format is no longer supported. Use { key, entry: { value } }.");
+    }
+    if (isset($input['key']) && isset($input['entry'])) {
         $key = (string) $input['key'];
-        $val = $input['value'];
+        $entry = $input['entry'];
         $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
-        validateScheduleKeyValue($key, $val, 'POST single-entry');
-        if (is_numeric($val)) {
-            $val = (int) $val;
-        }
-        $resp = applyScheduleEntryAndWrite($filePath, $key, $val, $orig, $input);
+        validateScheduleKeyValue($key, $entry, 'POST single-entry');
+        $resp = applyScheduleEntryAndWrite($filePath, $key, $entry, $orig, $input);
         if ($resp === null) {
             throw new Exception(buildWriteFailureMessage('POST schedule single-entry', $filePath));
         }
         return $resp;
     }
-    foreach ($input as $key => $value) {
-        $keyStr = (string) $key;
-        if (strlen($keyStr) !== 12 && !preg_match('/^[\d*]{12}$/', $keyStr)) {
-            throw new Exception("Invalid schedule key format: '$keyStr'. Keys must be 12 characters (YYYYMMDDHHmm format) or contain wildcards.");
-        }
-        if ($value !== 'auto' && $value !== 'netzero' && $value !== 'netzero+' && !is_numeric($value)) {
-            throw new Exception("Invalid schedule value for key '$keyStr'. Value must be 'auto', 'netzero', 'netzero+', or a number.");
-        }
-    }
-    if (!writeDataFileAtomic($filePath, $input)) {
+    $normalizedInput = normalizeScheduleMap($input, 'POST schedule full-replace');
+    if (!writeDataFileAtomic($filePath, $normalizedInput)) {
         throw new Exception(buildWriteFailureMessage('POST schedule full-replace', $filePath));
     }
     return [
@@ -493,21 +516,22 @@ function handlePostGeneric($type, $input) {
 // --- PUT handlers ---
 
 function handlePutSchedule($input) {
-    if (!isset($input['key']) || !isset($input['value'])) {
-        throw new Exception("Missing parameters. Required: key, value");
+    ensureScheduleFunctions();
+    if (isset($input['key']) && isset($input['value']) && !isset($input['entry'])) {
+        throw new Exception("Legacy schedule write format is no longer supported. Use { key, entry: { value } }.");
+    }
+    if (!isset($input['key']) || !isset($input['entry'])) {
+        throw new Exception("Missing parameters. Required: key, entry");
     }
     $orig = isset($input['originalKey']) ? (string) $input['originalKey'] : null;
     $key = (string) $input['key'];
-    $val = $input['value'];
-    validateScheduleKeyValue($key, $val, 'PUT');
-    if (is_numeric($val)) {
-        $val = (int) $val;
-    }
+    $entry = $input['entry'];
+    validateScheduleKeyValue($key, $entry, 'PUT');
     $filePath = getDataFilePath('schedule', []);
     if ($filePath === null) {
         throw new Exception("Invalid type: schedule");
     }
-    $resp = applyScheduleEntryAndWrite($filePath, $key, $val, $orig, $input);
+    $resp = applyScheduleEntryAndWrite($filePath, $key, $entry, $orig, $input);
     if ($resp === null) {
         throw new Exception(buildWriteFailureMessage('PUT schedule', $filePath));
     }
@@ -543,6 +567,7 @@ function handleDeletePrice() {
 }
 
 function handleDeleteSchedule($input) {
+    ensureScheduleFunctions();
     if (!isset($input['key'])) {
         throw new Exception("Missing parameters. Required: key");
     }
@@ -555,7 +580,7 @@ function handleDeleteSchedule($input) {
     if ($schedule === null) {
         return ['success' => false, 'error' => 'Schedule file not found'];
     }
-    $schedule = normalizeScheduleKeys($schedule);
+    $schedule = normalizeScheduleMap(normalizeScheduleKeys($schedule), 'DELETE schedule');
     if (!isset($schedule[$key])) {
         return ['success' => false, 'error' => 'Schedule entry not found'];
     }

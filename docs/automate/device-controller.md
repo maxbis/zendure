@@ -110,10 +110,25 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 
 -   **Description**: Orchestrates the net-zero calculation by using caller-supplied P1 meter data plus the latest Zendure device state, then calculating what power setting is needed to achieve zero feed-in.
 -   **Arguments**:
-    -   `mode` ('netzero' or 'netzero+'): In 'netzero' mode, the battery can charge or discharge. In 'netzero+' mode, it can only charge (it will not discharge to the grid). Defaults to 'netzero'.
+    -   `mode` ('netzero' or 'netzero+'): In 'netzero' mode, the battery only discharges to reduce grid import. In 'netzero+' mode, it only charges to reduce grid export. Defaults to 'netzero'.
     -   `p1_data` (Optional[Dict[str, Any]]): Required normalized P1 meter data supplied by the caller for dynamic power modes. Must contain `total_power`.
 -   **Returns**: The calculated power value to set (positive for charge, negative for discharge, 0 for stop).
 -   **Raises**: `ValueError` if caller-supplied P1 meter data is missing/invalid or Zendure data cannot be read. `requests.exceptions.RequestException` on network errors.
+
+### Runtime `min_value` / `max_value`
+
+When the active resolved schedule slot includes `min_value` or `max_value`, `AutomateController` applies them after the raw dynamic result is calculated:
+
+- Bounds are evaluated using `abs(...)`
+- Missing or `null` bounds leave the legacy runtime behavior unchanged
+- `netzero`
+  - below `min_value` -> force minimum discharge
+  - above `max_value` -> cap magnitude while keeping the sign
+- `netzero+`
+  - below `min_value` -> force minimum charge
+  - above `max_value` -> cap charge magnitude
+
+`ReversalRampGuard` still wins during true sign reversals. When the guard changes the raw result, min/max handling is deferred for that cycle and resumes once the reversal settles.
 
 ### `set_power(self, value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> PowerResult`
 
@@ -124,6 +139,13 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 -   **Returns**: A `PowerResult` object indicating the outcome.
 -   **Raises**: `ValueError` if `value` is invalid.
 -   **Note**: Test mode is controlled by `config.jsonc` key `"TEST_MODE"`. When enabled, operations are simulated but not applied.
+
+During dynamic modes, `set_power()` also emits debug/info logs when:
+- bounds are present on the active slot
+- `min_value` forces a larger charge/discharge
+- `max_value` caps a dynamic result
+- reversal protection defers bound handling
+- battery or device limits override the bounded result
 
 ### `set_standby_mode(self) -> PowerResult`
 
@@ -186,6 +208,8 @@ Inherits from `BaseDeviceController`. This class is responsible for managing the
     -   `current_time` (str): Current time in "HHMM" format (e.g., "1811" or "2300").
 -   **Returns**: The value from the matching entry (int, 'netzero', 'netzero+'), or `None` if no match found.
 -   **Raises**: `ValueError` if `current_time` format is invalid.
+
+The matching entry snapshot stored in `last_schedule_entry` also carries `key`, `runtime_conditions`, `fallback_value`, `min_value`, and `max_value` so the automation layer can apply runtime metadata without re-querying the API.
 
 ### `get_desired_power(self, refresh: bool = False) -> Optional[Union[int, Literal['netzero', 'netzero+']]]`
 

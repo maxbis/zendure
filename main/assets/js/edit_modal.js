@@ -32,7 +32,7 @@ class EditModal {
             scheduleTable.addEventListener('click', (e) => {
                 const tr = e.target.closest('tr');
                 if (tr && tr.dataset.key) {
-                    this.open(tr.dataset.key, tr.dataset.value);
+                    this.open(tr.dataset.key, this.parseEntryDataset(tr));
                 }
             });
         }
@@ -65,6 +65,8 @@ class EditModal {
         const dateInput = document.getElementById('inp-date');
         const timeInput = document.getElementById('inp-time');
         const wattsInput = document.getElementById('inp-watts');
+        const minValueInput = document.getElementById('inp-min-value');
+        const maxValueInput = document.getElementById('inp-max-value');
         
         dateInput.addEventListener('input', (e) => {
             this.handleWildcardExpansion(e, 8);
@@ -90,6 +92,11 @@ class EditModal {
         if (wattsInput) {
             wattsInput.addEventListener('input', () => this.updateWattsInputState());
         }
+        [minValueInput, maxValueInput].forEach((input) => {
+            if (input) {
+                input.addEventListener('input', () => this.updateConstraintInputState(input));
+            }
+        });
         
         // Enter key to save
         this.modal.addEventListener('keydown', (e) => {
@@ -134,10 +141,99 @@ class EditModal {
         }
     }
 
-    open(key = null, value = null, prefillKey = null) {
+    parseEntryDataset(row) {
+        if (!row || !row.dataset) return null;
+        if (row.dataset.entry) {
+            try {
+                const parsed = JSON.parse(row.dataset.entry);
+                if (parsed && typeof parsed === 'object') {
+                    return parsed;
+                }
+            } catch (error) {
+                console.warn('Failed to parse schedule entry dataset:', error);
+            }
+        }
+        if (!Object.prototype.hasOwnProperty.call(row.dataset, 'value')) {
+            return null;
+        }
+        return { value: row.dataset.value };
+    }
+
+    getInitialEntry(valueOrEntry) {
+        if (valueOrEntry && typeof valueOrEntry === 'object' && !Array.isArray(valueOrEntry)) {
+            return { ...valueOrEntry };
+        }
+        if (typeof valueOrEntry === 'number') {
+            return { value: valueOrEntry };
+        }
+        if (typeof valueOrEntry === 'string' && valueOrEntry !== '') {
+            if (/^-?\d+$/.test(valueOrEntry)) {
+                return { value: parseInt(valueOrEntry, 10) };
+            }
+            return { value: valueOrEntry };
+        }
+        return { value: null };
+    }
+
+    clearConstraintInputs() {
+        const minValueInput = document.getElementById('inp-min-value');
+        const maxValueInput = document.getElementById('inp-max-value');
+        if (minValueInput) {
+            minValueInput.value = '';
+            minValueInput.classList.remove('is-charging', 'is-discharging');
+        }
+        if (maxValueInput) {
+            maxValueInput.value = '';
+            maxValueInput.classList.remove('is-charging', 'is-discharging');
+        }
+    }
+
+    syncModeInputs(mode, options = {}) {
+        const wattsGroup = document.getElementById('group-watts');
+        const constraintsGroup = document.getElementById('group-constraints');
+        const wattsInput = document.getElementById('inp-watts');
+        const preserveConstraints = options.preserveConstraints === true;
+
+        if (mode === 'fixed') {
+            if (wattsGroup) wattsGroup.style.display = 'block';
+            if (constraintsGroup) constraintsGroup.style.display = 'none';
+            if (wattsInput) {
+                wattsInput.disabled = false;
+            }
+            if (!preserveConstraints) {
+                this.clearConstraintInputs();
+            }
+        } else if (mode === 'netzero' || mode === 'netzero+') {
+            if (wattsGroup) wattsGroup.style.display = 'none';
+            if (constraintsGroup) constraintsGroup.style.display = 'grid';
+            if (wattsInput) {
+                wattsInput.disabled = true;
+                wattsInput.value = '';
+                wattsInput.setAttribute('value', '');
+            }
+        } else {
+            if (wattsGroup) wattsGroup.style.display = 'block';
+            if (constraintsGroup) constraintsGroup.style.display = 'none';
+            if (wattsInput) {
+                wattsInput.disabled = true;
+                wattsInput.value = mode === 'clear' ? '0' : '';
+                wattsInput.setAttribute('value', wattsInput.value);
+            }
+            if (!preserveConstraints) {
+                this.clearConstraintInputs();
+            }
+        }
+
+        this.updateWattsInputState();
+        this.updateConstraintInputState(document.getElementById('inp-min-value'));
+        this.updateConstraintInputState(document.getElementById('inp-max-value'));
+    }
+
+    open(key = null, valueOrEntry = null, prefillKey = null) {
         this.currentOriginalKey = key;
         const isAdd = (key === null);
         const clearModeInput = document.querySelector('input[name="val-mode"][value="clear"]');
+        const entry = this.getInitialEntry(valueOrEntry);
         document.getElementById('modal-title').innerText = isAdd ? 'Add Schedule Entry' : 'Edit Schedule Entry';
         document.getElementById('btn-delete').style.display = isAdd ? 'none' : 'block';
         if (clearModeInput) {
@@ -171,36 +267,38 @@ class EditModal {
             document.getElementById('inp-date').value = dateStr;
             document.getElementById('inp-time').value = timeStr;
             document.getElementById('inp-watts').value = '';
+            this.clearConstraintInputs();
             document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
-            document.getElementById('group-watts').style.display = 'block';
-            document.getElementById('inp-watts').disabled = false;
+            this.syncModeInputs('fixed', { preserveConstraints: false });
         } else {
             document.getElementById('inp-date').value = key.substring(0, 8);
             document.getElementById('inp-time').value = key.substring(8, 12);
 
+            const value = entry.value;
+            const minValue = Object.prototype.hasOwnProperty.call(entry, 'min_value') ? entry.min_value : '';
+            const maxValue = Object.prototype.hasOwnProperty.call(entry, 'max_value') ? entry.max_value : '';
+
             if (value === 'netzero') {
                 document.querySelector('input[name="val-mode"][value="netzero"]').checked = true;
-                document.getElementById('group-watts').style.display = 'block';
-                document.getElementById('inp-watts').disabled = true;
-                document.getElementById('inp-watts').value = '';
+                document.getElementById('inp-min-value').value = minValue ?? '';
+                document.getElementById('inp-max-value').value = maxValue ?? '';
+                this.syncModeInputs('netzero', { preserveConstraints: true });
             } else if (value === 'netzero+') {
                 document.querySelector('input[name="val-mode"][value="netzero+"]').checked = true;
-                document.getElementById('group-watts').style.display = 'block';
-                document.getElementById('inp-watts').disabled = true;
-                document.getElementById('inp-watts').value = '';
+                document.getElementById('inp-min-value').value = minValue ?? '';
+                document.getElementById('inp-max-value').value = maxValue ?? '';
+                this.syncModeInputs('netzero+', { preserveConstraints: true });
             } else if (value === 'auto') {
                 document.querySelector('input[name="val-mode"][value="auto"]').checked = true;
-                document.getElementById('group-watts').style.display = 'block';
-                document.getElementById('inp-watts').disabled = true;
-                document.getElementById('inp-watts').value = '';
+                this.clearConstraintInputs();
+                this.syncModeInputs('auto', { preserveConstraints: false });
             } else {
                 document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
-                document.getElementById('group-watts').style.display = 'block';
-                document.getElementById('inp-watts').disabled = false;
-                document.getElementById('inp-watts').value = value || '';
+                document.getElementById('inp-watts').value = value ?? '';
+                this.clearConstraintInputs();
+                this.syncModeInputs('fixed', { preserveConstraints: false });
             }
         }
-        this.updateWattsInputState();
         this.modal.classList.add('active');
         
         // Auto-focus on first input for quicker editing
@@ -215,16 +313,7 @@ class EditModal {
     }
 
     handleModeChange(mode) {
-        const wattsInput = document.getElementById('inp-watts');
-        if (mode === 'netzero' || mode === 'netzero+' || mode === 'auto' || mode === 'clear') {
-            wattsInput.disabled = true;
-            wattsInput.value = '';
-            wattsInput.setAttribute('value', '');
-        } else {
-            wattsInput.disabled = false;
-            // Leave watts empty when switching to fixed mode - user can enter value
-        }
-        this.updateWattsInputState();
+        this.syncModeInputs(mode, { preserveConstraints: false });
     }
 
     updateWattsInputState() {
@@ -241,6 +330,40 @@ class EditModal {
         if (!Number.isFinite(numericValue) || numericValue === 0) return;
 
         wattsInput.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+    }
+
+    updateConstraintInputState(input) {
+        if (!input) return;
+
+        input.classList.remove('is-charging', 'is-discharging');
+
+        const rawValue = input.value.trim();
+        if (rawValue === '') return;
+
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue) || numericValue === 0) return;
+
+        input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+    }
+
+    getOptionalBoundValue(inputId, label) {
+        const input = document.getElementById(inputId);
+        if (!input) return null;
+
+        const rawValue = input.value.trim();
+        if (rawValue === '') {
+            return null;
+        }
+
+        if (!/^-?\d+$/.test(rawValue)) {
+            throw new Error(`Invalid ${label} value`);
+        }
+
+        const parsed = parseInt(rawValue, 10);
+        if (Number.isNaN(parsed)) {
+            throw new Error(`Invalid ${label} value`);
+        }
+        return parsed;
     }
 
     showConfirmDialog(message) {
@@ -329,10 +452,16 @@ class EditModal {
 
         const mode = document.querySelector('input[name="val-mode"]:checked').value;
         let val;
+        let minValue = null;
+        let maxValue = null;
         if (mode === 'netzero') {
             val = 'netzero';
+            minValue = this.getOptionalBoundValue('inp-min-value', 'minimum power limit');
+            maxValue = this.getOptionalBoundValue('inp-max-value', 'maximum power limit');
         } else if (mode === 'netzero+') {
             val = 'netzero+';
+            minValue = this.getOptionalBoundValue('inp-min-value', 'minimum power limit');
+            maxValue = this.getOptionalBoundValue('inp-max-value', 'maximum power limit');
         } else if (mode === 'auto') {
             val = 'auto';
         } else if (mode === 'clear') {
@@ -353,11 +482,20 @@ class EditModal {
             }
         }
 
-        const key = d + t;
-        const payload = { key, value: val };
+        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+            return alert('Minimum power limit cannot be greater than maximum power limit');
+        }
 
-        // Use PUT for both add and edit (originalKey is optional)
-        // POST is still supported on the backend for backward compatibility
+        const key = d + t;
+        const payload = { key, entry: { value: val } };
+        if (minValue !== null) {
+            payload.entry.min_value = minValue;
+        }
+        if (maxValue !== null) {
+            payload.entry.max_value = maxValue;
+        }
+
+        // Use PUT for both add and edit (originalKey is optional).
         if (this.currentOriginalKey) {
             payload.originalKey = this.currentOriginalKey;
         }
@@ -384,7 +522,7 @@ class EditModal {
             return;
         }
 
-        const payload = { key, value: val };
+        const payload = { key, entry: { value: val } };
         if (options.originalKey) {
             payload.originalKey = options.originalKey;
         }

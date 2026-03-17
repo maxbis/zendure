@@ -6,7 +6,7 @@
 /** 24 cent – used for bar height when no price data; bars stay grey and tooltip says no data */
 const PRICE_PROXY_NO_DATA = 0.24;
 const POPUP_POWER_EFFICIENCY = 0.9;
-const POPUP_NETZERO_REFERENCE_W = 250;
+const POPUP_NETZERO_REFERENCE_W = 200;
 const POPUP_NETZERO_PLUS_REFERENCE_W = 300;
 
 /**
@@ -1371,7 +1371,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const scheduleMap = {};
     if (scheduleEntryList) {
         scheduleEntryList.forEach(entry => {
-            scheduleMap[entry.key] = entry.value;
+            scheduleMap[entry.key] = getRawScheduleEntryValue(entry);
         });
     }
     
@@ -1428,7 +1428,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             scheduleByDate[dateKey].push({
                 key: entry.key,
-                value: entry.value
+                value: getRawScheduleEntryValue(entry)
             });
         });
         Object.values(scheduleByDate).forEach((entries) => {
@@ -1476,7 +1476,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         for (const entry of entries) {
             const entryHour = entry.key.slice(8, 10);
             if (entryHour <= hourKey) {
-                activeValue = entry.value;
+                activeValue = getRawScheduleEntryValue(entry);
             } else {
                 break;
             }

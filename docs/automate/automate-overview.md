@@ -14,8 +14,8 @@ This module provides object-oriented wrappers for interacting with the Zendure b
 
 - **`AutomateController`**: The main class for controlling the Zendure battery's power settings. It can:
     - Set specific charge or discharge power levels.
-    - Implement a "net-zero" feed-in mode, where the battery charges or discharges to keep the grid power usage close to zero.
-    - Implement "net-zero+" mode, which only charges (never discharges to the grid).
+    - Implement a `netzero` mode that only discharges to reduce grid import toward zero.
+    - Implement a `netzero+` mode that only charges to reduce grid export toward zero.
     - Respect battery charge level limits (e.g., not charging above 90% or discharging below 20%).
     - Use `PowerAccumulator` to track and log power usage over time.
     - Put the device into standby mode when appropriate.
@@ -54,6 +54,12 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
     The loop interval can be overridden per selected power meter via `powerMeter.<type>.loopIntervalSeconds`.
 
 4.  **Control**: Using the `AutomateController`, the script sends the appropriate commands to the Zendure battery to set its charge or discharge rate. The app/runtime layer owns power-meter reads and passes normalized `p1_data` into dynamic netzero calculations.
+
+Dynamic mode summary:
+
+- `netzero` = discharge-only, never actively charges
+- `netzero+` = charge-only, never actively discharges
+- a separate bidirectional "full netzero" mode does not exist today
 
 5.  **Monitoring**: The script stores status updates in a local SQLite database and exposes them through the built-in HTTP API, which the web app can read for health and activity.
 
@@ -105,16 +111,22 @@ When a specific integer power value is set (e.g., via schedule or manual command
 
 In **NetZero** modes, the system dynamically calculates the required power based on the P1 meter reading.
 
-*   **Calculated Power > 0 (Charge)**:
-    *   **Device Command:** `{"acMode": 1, "inputLimit": <value>, "outputLimit": 0, "smartMode": 1}`
+*   **`netzero`**
+    *   Uses discharge only.
+    *   If the dynamic calculation would imply charge, the controller uses `0` instead of actively charging.
+*   **`netzero+`**
+    *   Uses charge only.
+    *   If the dynamic calculation would imply discharge, the controller uses `0` instead of actively discharging.
 *   **Calculated Power < 0 (Discharge)**:
     *   **Device Command:** `{"acMode": 2, "inputLimit": 0, "outputLimit": <abs(value)>, "smartMode": 1}`
+*   **Calculated Power > 0 (Charge)**:
+    *   **Device Command:** `{"acMode": 1, "inputLimit": <value>, "outputLimit": 0, "smartMode": 1}`
 *   **Calculated Power is 0 or very low (Deadband)**:
     *   When the calculated power is exactly 0 or within the small "deadband" (e.g., -10W where threshold is 30W), the system targets 0W.
     *   **Device Command:** `{"inputLimit": 0, "outputLimit": 0, "smartMode": 1}`
     *   **Critical Detail:** **`acMode` is NOT included** in the payload. This is intentional to prevent the device from switching to Standby Mode (acMode 0), allowing it to stay in its current mode (e.g., Output) but with 0 limits, which often results in a smoother response when power is needed again.
 
-**NetZero+ Mode**: Similar to NetZero, but the battery will only charge (never discharge to the grid). If the calculation indicates discharge is needed, the system sets power to 0 instead.
+**Important:** the current implementation does not have a bidirectional "full netzero" mode. `netzero` and `netzero+` are intentionally asymmetric.
 
 ### 3. Charging Limits (Battery Protection)
 

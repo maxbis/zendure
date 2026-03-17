@@ -150,15 +150,17 @@ function renderEntries(entries) {
     entries.sort((a, b) => String(a.key).localeCompare(String(b.key)));
 
     entries.forEach((entry, idx) => {
+        const entryValue = getRawScheduleEntryValue(entry);
         const tr = document.createElement('tr');
         tr.dataset.key = entry.key;
-        tr.dataset.value = entry.value;
+        tr.dataset.value = entryValue;
+        tr.dataset.entry = JSON.stringify(entry.entry || { value: entryValue });
 
         // Ensure key is string
         const keyStr = String(entry.key);
         const isWild = keyStr.includes('*');
-        const displayVal = getValueLabel(entry.value);
-        const valClass = getValueClass(entry.value);
+        const displayVal = getValueLabel(entryValue);
+        const valClass = getValueClass(entryValue);
         const keyBgColor = isWild ? '#fff9c4' : '#e8f5e9';
 
         tr.innerHTML = `
@@ -285,7 +287,7 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
     const scheduleMap = {};
     if (scheduleEntries) {
         scheduleEntries.forEach(entry => {
-            scheduleMap[entry.key] = entry.value;
+            scheduleMap[entry.key] = getRawScheduleEntryValue(entry);
         });
     }
 

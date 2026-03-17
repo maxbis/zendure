@@ -30,6 +30,8 @@
         inpHour: document.getElementById('inp-hour'),
         inpMinTime: document.getElementById('inp-min-time'),
         inpMaxTime: document.getElementById('inp-max-time'),
+        inpMinValue: document.getElementById('inp-min-value'),
+        inpMaxValue: document.getElementById('inp-max-value'),
         inpFallbackValue: document.getElementById('inp-fallback-value'),
         conditionsList: document.getElementById('conditions-list'),
     };
@@ -52,6 +54,8 @@
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
+        'inp-min-value': 'Optional minimum watt bound for netzero and netzero+ rules only.',
+        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only.',
         'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
     };
 
@@ -96,6 +100,10 @@
         }
         if (rule.max_time !== undefined && rule.max_time !== null && rule.max_time !== '') {
             out.max_time = String(rule.max_time);
+        }
+        if (rule.value === 'netzero' || rule.value === 'netzero+') {
+            out.min_value = rule.min_value !== undefined && rule.min_value !== '' ? Number(rule.min_value) : null;
+            out.max_value = rule.max_value !== undefined && rule.max_value !== '' ? Number(rule.max_value) : null;
         }
         if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
             out.fallback_value = rule.fallback_value;
@@ -255,11 +263,30 @@
         els.inpHour.value = '';
         els.inpMinTime.value = '';
         els.inpMaxTime.value = '';
+        els.inpMinValue.value = '';
+        els.inpMaxValue.value = '';
         els.inpFallbackValue.value = '';
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
+        els.inpMinValue.disabled = true;
+        els.inpMaxValue.disabled = true;
         els.conditionsList.innerHTML = '';
         renderTable();
+    }
+
+    function updateValueModeFields() {
+        const isFixed = els.inpValueMode.value === 'fixed';
+        const allowBounds = !isFixed;
+        els.inpFixedValue.disabled = !isFixed;
+        if (!isFixed) {
+            els.inpFixedValue.value = '';
+        }
+        els.inpMinValue.disabled = !allowBounds;
+        els.inpMaxValue.disabled = !allowBounds;
+        if (!allowBounds) {
+            els.inpMinValue.value = '';
+            els.inpMaxValue.value = '';
+        }
     }
 
     function fillEditor(rule, idx) {
@@ -275,13 +302,15 @@
         } else {
             els.inpValueMode.value = 'fixed';
             els.inpFixedValue.value = String(rule.value);
-            els.inpFixedValue.disabled = false;
         }
         els.inpMonth.value = rule.month || '';
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
+        els.inpMinValue.value = rule.min_value !== undefined ? String(rule.min_value) : '';
+        els.inpMaxValue.value = rule.max_value !== undefined ? String(rule.max_value) : '';
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
+        updateValueModeFields();
 
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
@@ -370,6 +399,32 @@
 
         const maxTime = els.inpMaxTime.value.trim();
         if (maxTime) rule.max_time = maxTime;
+
+        if (mode === 'netzero' || mode === 'netzero+') {
+            const minValue = els.inpMinValue.value.trim();
+            const maxValue = els.inpMaxValue.value.trim();
+            rule.min_value = null;
+            rule.max_value = null;
+            if (minValue) {
+                if (!/^-?\d+$/.test(minValue)) {
+                    throw new Error('Min value must be an integer.');
+                }
+                rule.min_value = parseInt(minValue, 10);
+            }
+            if (maxValue) {
+                if (!/^-?\d+$/.test(maxValue)) {
+                    throw new Error('Max value must be an integer.');
+                }
+                rule.max_value = parseInt(maxValue, 10);
+            }
+            if (
+                rule.min_value !== undefined &&
+                rule.max_value !== undefined &&
+                rule.min_value > rule.max_value
+            ) {
+                throw new Error('Min value cannot be greater than max value.');
+            }
+        }
 
         const fallbackRaw = els.inpFallbackValue.value.trim();
         if (fallbackRaw) {
@@ -503,11 +558,7 @@
         });
 
         els.inpValueMode.addEventListener('change', function () {
-            const isFixed = els.inpValueMode.value === 'fixed';
-            els.inpFixedValue.disabled = !isFixed;
-            if (!isFixed) {
-                els.inpFixedValue.value = '';
-            }
+            updateValueModeFields();
         });
 
         els.btnAddCondition.addEventListener('click', function () {
@@ -645,5 +696,6 @@
     }
 
     attachEvents();
+    updateValueModeFields();
     loadRules();
 })();

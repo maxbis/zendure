@@ -247,14 +247,16 @@ class SchedulePanelComponent extends Component {
         );
         
         sortedEntries.forEach((entry, idx) => {
+            const entryValue = getRawScheduleEntryValue(entry);
             const tr = document.createElement('tr');
             tr.dataset.key = entry.key;
-            tr.dataset.value = entry.value;
+            tr.dataset.value = entryValue;
+            tr.dataset.entry = JSON.stringify(entry.entry || { value: entryValue });
             
             const keyStr = String(entry.key);
             const isWild = keyStr.includes('*');
-            const displayVal = getValueLabel(entry.value);
-            const valClass = getValueClass(entry.value);
+            const displayVal = getValueLabel(entryValue);
+            const valClass = getValueClass(entryValue);
             
             tr.innerHTML = `
                 <td style="color:#888;">${idx + 1}</td>
