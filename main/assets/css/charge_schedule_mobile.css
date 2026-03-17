@@ -1479,7 +1479,7 @@ code {
 }
 
 .price-graph-mobile-popup.active .price-graph-mobile-popup-dialog {
-    _transform: scale(1) translateY(-60px);
+    transform: scale(1) translateY(-60px);
     opacity: 1;
 }
 
