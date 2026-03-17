@@ -860,6 +860,7 @@ class AutomateController(BaseDeviceController):
             max_value = abs(int(max_value))
 
         if min_value is None and max_value is None:
+            self._last_schedule_bounds_log_signature = None
             return power_value
 
         if min_value is not None and max_value is not None and min_value > max_value:
@@ -868,6 +869,7 @@ class AutomateController(BaseDeviceController):
                 f"Ignoring schedule bounds for slot {slot_time or '?'} ({slot_key or 'no-key'}): "
                 f"min_value {min_value} is greater than max_value {max_value}"
             )
+            self._last_schedule_bounds_log_signature = None
             return power_value
 
         raw_power = int(runtime_context.get('raw_power', power_value))
@@ -886,6 +888,7 @@ class AutomateController(BaseDeviceController):
                 f"ReversalRampGuard deferred min/max handling for {mode} slot {slot_time or '?'} "
                 f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_value}, max={max_value}"
             )
+            self._last_schedule_bounds_log_signature = None
             return power_value
 
         bounded_power = int(power_value)
@@ -929,11 +932,25 @@ class AutomateController(BaseDeviceController):
                 )
 
         if bounded_power != power_value:
-            self.log(
-                'info',
-                f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
+            bounds_log_signature = (
+                mode,
+                slot_time or '?',
+                slot_key or 'no-key',
+                raw_power,
+                power_value,
+                bounded_power,
+                min_value,
+                max_value,
             )
+            if getattr(self, '_last_schedule_bounds_log_signature', None) != bounds_log_signature:
+                self.log(
+                    'info',
+                    f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+                    f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
+                )
+                self._last_schedule_bounds_log_signature = bounds_log_signature
+        else:
+            self._last_schedule_bounds_log_signature = None
 
         return bounded_power
 
