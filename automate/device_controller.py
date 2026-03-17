@@ -14,7 +14,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, date
 from pathlib import Path
-from typing import Optional, Dict, Any, Union, Literal, List
+from typing import Optional, Tuple, Dict, Any, Union, Literal, List
 from zoneinfo import ZoneInfo
 
 import requests
