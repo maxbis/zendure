@@ -10,10 +10,11 @@ functionality in zero_feed_in_controller.py.
 import json
 import time
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, date
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, Union, Literal, List
+from typing import Optional, Dict, Any, Union, Literal, List
 from zoneinfo import ZoneInfo
 
 import requests
@@ -140,6 +141,7 @@ class BaseDeviceController:
     # Network settings
     REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
     _DEFAULT_LOG_LEVEL = "INFO"
+    _INFO_SPAM_WINDOW = 5
     _LOG_LEVEL_PRIORITY = {
         "DEBUG": 10,
         "INFO": 20,
@@ -201,8 +203,8 @@ class BaseDeviceController:
         self.max_discharge_power = max(0, max_discharge_power)
         self.max_charge_power = max(0, max_charge_power)
 
-        # Track last emitted log message (level + message) to avoid duplicates.
-        self._last_log_key: Optional[Tuple[str, str]] = None
+        # Track the last N emitted info messages to suppress repeating spam.
+        self._recent_info_messages = deque(maxlen=self._INFO_SPAM_WINDOW)
 
     def _find_config_file(self) -> Path:
         """
@@ -274,11 +276,10 @@ class BaseDeviceController:
         if self._LOG_LEVEL_PRIORITY[level_upper] < self._LOG_LEVEL_PRIORITY[self.log_level]:
             return
 
-        # Avoid repeating the exact same log line (same level + message) consecutively.
-        message_key = (level_upper, message)
-        if getattr(self, "_last_log_key", None) == message_key:
+        # INFO-only spam protector: suppress when the same message appears
+        # anywhere in the last N emitted info messages.
+        if level_upper == 'INFO' and message in self._recent_info_messages:
             return
-        self._last_log_key = message_key
 
         emoji = emoji_map.get(level_lower, '')
 
@@ -298,6 +299,9 @@ class BaseDeviceController:
 
         # Print to stdout
         print(output)
+
+        if level_upper == 'INFO':
+            self._recent_info_messages.append(message)
 
         # Write to file if specified
         if file_path:
@@ -860,7 +864,6 @@ class AutomateController(BaseDeviceController):
             max_value = abs(int(max_value))
 
         if min_value is None and max_value is None:
-            self._last_schedule_bounds_log_signature = None
             return power_value
 
         if min_value is not None and max_value is not None and min_value > max_value:
@@ -869,7 +872,6 @@ class AutomateController(BaseDeviceController):
                 f"Ignoring schedule bounds for slot {slot_time or '?'} ({slot_key or 'no-key'}): "
                 f"min_value {min_value} is greater than max_value {max_value}"
             )
-            self._last_schedule_bounds_log_signature = None
             return power_value
 
         raw_power = int(runtime_context.get('raw_power', power_value))
@@ -888,7 +890,6 @@ class AutomateController(BaseDeviceController):
                 f"ReversalRampGuard deferred min/max handling for {mode} slot {slot_time or '?'} "
                 f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_value}, max={max_value}"
             )
-            self._last_schedule_bounds_log_signature = None
             return power_value
 
         bounded_power = int(power_value)
@@ -932,25 +933,11 @@ class AutomateController(BaseDeviceController):
                 )
 
         if bounded_power != power_value:
-            bounds_log_signature = (
-                mode,
-                slot_time or '?',
-                slot_key or 'no-key',
-                raw_power,
-                power_value,
-                bounded_power,
-                min_value,
-                max_value,
+            self.log(
+                'info',
+                f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
             )
-            if getattr(self, '_last_schedule_bounds_log_signature', None) != bounds_log_signature:
-                self.log(
-                    'info',
-                    f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                    f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
-                )
-                self._last_schedule_bounds_log_signature = bounds_log_signature
-        else:
-            self._last_schedule_bounds_log_signature = None
 
         return bounded_power
 
