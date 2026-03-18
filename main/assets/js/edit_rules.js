@@ -58,6 +58,27 @@
         'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only.',
         'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
     };
+    const trackedFieldIds = [
+        'inp-name',
+        'inp-value-mode',
+        'inp-fixed-value',
+        'inp-month',
+        'inp-hour',
+        'inp-min-time',
+        'inp-max-time',
+        'inp-min-value',
+        'inp-max-value',
+        'inp-fallback-value',
+    ];
+    const optionalFieldIds = [
+        'inp-month',
+        'inp-hour',
+        'inp-min-time',
+        'inp-max-time',
+        'inp-min-value',
+        'inp-max-value',
+        'inp-fallback-value',
+    ];
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -126,6 +147,22 @@
             }
         }
         return out;
+    }
+
+    function updateFieldState(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const label = document.querySelector('label[for="' + inputId + '"]');
+        const hasValue = String(input.value || '').trim() !== '';
+        const isOptional = optionalFieldIds.includes(inputId);
+        input.classList.toggle('is-field-filled', hasValue);
+        if (label && isOptional) {
+            label.classList.toggle('is-optional-filled', hasValue);
+        }
+    }
+
+    function updateAllFieldStates() {
+        trackedFieldIds.forEach(updateFieldState);
     }
 
     function renderTable() {
@@ -275,6 +312,7 @@
         els.inpMinValue.disabled = true;
         els.inpMaxValue.disabled = true;
         els.conditionsList.innerHTML = '';
+        updateAllFieldStates();
         renderTable();
     }
 
@@ -291,6 +329,7 @@
             els.inpMinValue.value = '';
             els.inpMaxValue.value = '';
         }
+        updateAllFieldStates();
     }
 
     function fillEditor(rule, idx) {
@@ -315,6 +354,7 @@
         els.inpMaxValue.value = rule.max_value !== undefined && rule.max_value !== null ? String(rule.max_value) : '';
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
+        updateAllFieldStates();
 
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
@@ -565,6 +605,17 @@
             updateValueModeFields();
         });
 
+        trackedFieldIds.forEach(function (inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.addEventListener('input', function () {
+                updateFieldState(inputId);
+            });
+            input.addEventListener('change', function () {
+                updateFieldState(inputId);
+            });
+        });
+
         els.btnAddCondition.addEventListener('click', function () {
             els.conditionsList.appendChild(createConditionRow());
         });
@@ -701,5 +752,6 @@
 
     attachEvents();
     updateValueModeFields();
+    updateAllFieldStates();
     loadRules();
 })();

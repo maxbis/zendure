@@ -13,6 +13,7 @@ import sqlite3
 import shutil
 import subprocess
 import sys
+from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -400,10 +401,10 @@ def _build_app_with_slot(slot: dict, electric_level: int):
 
     logs: list[tuple[str, str]] = []
     app.logger = SimpleNamespace(
-        info=lambda msg: logs.append(("info", str(msg))),
-        warning=lambda msg: logs.append(("warning", str(msg))),
-        error=lambda msg: logs.append(("error", str(msg))),
-        debug=lambda msg: logs.append(("debug", str(msg))),
+        info=lambda msg, *_args, **_kwargs: logs.append(("info", str(msg))),
+        warning=lambda msg, *_args, **_kwargs: logs.append(("warning", str(msg))),
+        error=lambda msg, *_args, **_kwargs: logs.append(("error", str(msg))),
+        debug=lambda msg, *_args, **_kwargs: logs.append(("debug", str(msg))),
     )
     app.schedule_controller = SimpleNamespace(last_schedule_entry=slot)
     app.controller = SimpleNamespace(config_path=Path("/tmp/config.jsonc"))
@@ -688,10 +689,10 @@ def test_refresh_p1_for_api_uses_power_meter_reader():
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()
     app.logger = SimpleNamespace(
-        info=lambda msg: None,
-        warning=lambda msg: None,
-        error=lambda msg: None,
-        debug=lambda msg: None,
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
     )
     app.controller = SimpleNamespace(config_path=Path("/tmp/config.jsonc"))
 
@@ -710,10 +711,10 @@ def test_apply_dynamic_power_command_reads_meter_once_and_passes_same_data():
     device_controller = _import_device_controller_module()
     app = automate_www.AutomationApp()
     app.logger = SimpleNamespace(
-        info=lambda msg: None,
-        warning=lambda msg: None,
-        error=lambda msg: None,
-        debug=lambda msg: None,
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
     )
     app.controller = SimpleNamespace(
         config_path=Path("/tmp/config.jsonc"),
@@ -743,10 +744,10 @@ def test_command_handler_uses_dynamic_power_setter_for_netzero():
         schedule_controller=SimpleNamespace(),
         status_api=SimpleNamespace(post_update=lambda *args, **kwargs: calls.append(("status", args, kwargs))),
         logger=SimpleNamespace(
-            info=lambda msg: logs.append(("info", str(msg))),
-            warning=lambda msg: logs.append(("warning", str(msg))),
-            error=lambda msg: logs.append(("error", str(msg))),
-            debug=lambda msg: logs.append(("debug", str(msg))),
+            info=lambda msg, *_args, **_kwargs: logs.append(("info", str(msg))),
+            warning=lambda msg, *_args, **_kwargs: logs.append(("warning", str(msg))),
+            error=lambda msg, *_args, **_kwargs: logs.append(("error", str(msg))),
+            debug=lambda msg, *_args, **_kwargs: logs.append(("debug", str(msg))),
         ),
         dynamic_power_setter=lambda mode: (True, 321, None),
     )
@@ -928,6 +929,86 @@ def test_schedule_power_bounds_defer_to_reversal_guard():
 
     assert bounded == 150
     assert any("ReversalRampGuard deferred min/max handling" in msg for _, msg in logs)
+
+
+def test_base_logger_debug_never_dedups_even_with_message_key(capsys):
+    device_controller = _import_device_controller_module()
+    controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
+    controller.log_level = "DEBUG"
+    controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
+
+    device_controller.BaseDeviceController.log(controller, "debug", "debug trace", message_key="debug_trace")
+    device_controller.BaseDeviceController.log(controller, "debug", "debug trace", message_key="debug_trace")
+
+    lines = [line for line in capsys.readouterr().out.splitlines() if "debug trace" in line]
+    assert len(lines) == 2
+
+
+def test_base_logger_only_dedups_keyed_non_debug_logs(capsys):
+    device_controller = _import_device_controller_module()
+    controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
+    controller.log_level = "DEBUG"
+    controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
+
+    device_controller.BaseDeviceController.log(controller, "info", "same event", message_key="same_event")
+    device_controller.BaseDeviceController.log(controller, "info", "same event", message_key="same_event")
+    device_controller.BaseDeviceController.log(controller, "info", "same event without key")
+    device_controller.BaseDeviceController.log(controller, "info", "same event without key")
+
+    lines = [line for line in capsys.readouterr().out.splitlines() if "same event" in line]
+    assert len(lines) == 3
+    assert sum("same event without key" in line for line in lines) == 2
+
+
+def test_base_logger_dedup_is_separated_by_level(capsys):
+    device_controller = _import_device_controller_module()
+    controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
+    controller.log_level = "DEBUG"
+    controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
+
+    device_controller.BaseDeviceController.log(controller, "info", "same key", message_key="shared_key")
+    device_controller.BaseDeviceController.log(controller, "warning", "same key", message_key="shared_key")
+
+    lines = [line for line in capsys.readouterr().out.splitlines() if "same key" in line]
+    assert len(lines) == 2
+
+
+def test_base_logger_keyed_log_can_emit_again_after_window_rollover(capsys):
+    device_controller = _import_device_controller_module()
+    controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
+    controller.log_level = "DEBUG"
+    controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
+
+    device_controller.BaseDeviceController.log(controller, "info", "target", message_key="target")
+    for index in range(device_controller.BaseDeviceController._RECENT_LOG_WINDOW):
+        device_controller.BaseDeviceController.log(
+            controller,
+            "info",
+            f"other-{index}",
+            message_key=f"other_{index}",
+        )
+    device_controller.BaseDeviceController.log(controller, "info", "target", message_key="target")
+
+    lines = [line for line in capsys.readouterr().out.splitlines() if "target" in line]
+    assert len(lines) == 2
+
+
+def test_schedule_power_bounds_log_uses_message_key():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message), kwargs.get("message_key")))
+
+    bounded = device_controller.AutomateController._apply_schedule_power_bounds(
+        controller,
+        900,
+        mode="netzero+",
+        schedule_entry={"time": "1500", "key": "202603181400", "max_value": 400},
+        runtime_context={"raw_power": 896, "guarded_power": 896, "guard_active": False},
+    )
+
+    assert bounded == 400
+    assert ("info", "Applied schedule bounds for netzero+ slot 1500 (202603181400): raw=896, guarded=900, bounded=400, min=None, max=400", "schedule_bounds_applied") in logs
 
 
 def test_controller_set_power_logs_when_device_limits_override_bounded_result():

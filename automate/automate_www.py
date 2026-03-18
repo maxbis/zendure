@@ -1083,31 +1083,31 @@ class Logger:
         """
         self.controller = controller
 
-    def info(self, message: str, include_timestamp: bool = True):
+    def info(self, message: str, include_timestamp: bool = True, message_key: Optional[str] = None):
         """Log info message."""
         if self.controller:
-            self.controller.log('info', message, include_timestamp)
+            self.controller.log('info', message, include_timestamp, message_key=message_key)
         else:
             print(message)
 
-    def warning(self, message: str, include_timestamp: bool = True):
+    def warning(self, message: str, include_timestamp: bool = True, message_key: Optional[str] = None):
         """Log warning message."""
         if self.controller:
-            self.controller.log('warning', message, include_timestamp)
+            self.controller.log('warning', message, include_timestamp, message_key=message_key)
         else:
             print(f"WARNING: {message}")
 
-    def debug(self, message: str, include_timestamp: bool = True):
+    def debug(self, message: str, include_timestamp: bool = True, message_key: Optional[str] = None):
         """Log debug message."""
         if self.controller:
-            self.controller.log('debug', message, include_timestamp)
+            self.controller.log('debug', message, include_timestamp, message_key=message_key)
         else:
             print(f"DEBUG: {message}")
 
-    def error(self, message: str, include_timestamp: bool = True):
+    def error(self, message: str, include_timestamp: bool = True, message_key: Optional[str] = None):
         """Log error message."""
         if self.controller:
-            self.controller.log('error', message, include_timestamp)
+            self.controller.log('error', message, include_timestamp, message_key=message_key)
         else:
             print(f"ERROR: {message}")
 
@@ -2178,10 +2178,16 @@ class AutomationApp:
 
         if isinstance(validation_power, int):
             if validation_power > 0 and self.controller.limit_state == 1:
-                self.logger.warning("Battery at MAX_CHARGE_LEVEL, preventing charge")
+                self.logger.warning(
+                    "Battery at MAX_CHARGE_LEVEL, preventing charge",
+                    message_key="battery_max_charge_block",
+                )
                 return 0
             if validation_power < 0 and self.controller.limit_state == -1:
-                self.logger.warning("Battery at MIN_CHARGE_LEVEL, preventing discharge")
+                self.logger.warning(
+                    "Battery at MIN_CHARGE_LEVEL, preventing discharge",
+                    message_key="battery_min_discharge_block",
+                )
                 return 0
 
         return desired_power

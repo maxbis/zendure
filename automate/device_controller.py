@@ -141,7 +141,7 @@ class BaseDeviceController:
     # Network settings
     REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
     _DEFAULT_LOG_LEVEL = "INFO"
-    _INFO_SPAM_WINDOW = 5
+    _RECENT_LOG_WINDOW = 3
     _LOG_LEVEL_PRIORITY = {
         "DEBUG": 10,
         "INFO": 20,
@@ -203,8 +203,8 @@ class BaseDeviceController:
         self.max_discharge_power = max(0, max_discharge_power)
         self.max_charge_power = max(0, max_charge_power)
 
-        # Track the last N emitted info messages to suppress repeating spam.
-        self._recent_info_messages = deque(maxlen=self._INFO_SPAM_WINDOW)
+        # Track the last N emitted keyed log entries to suppress repeats.
+        self._recent_log_messages = deque(maxlen=self._RECENT_LOG_WINDOW)
 
     def _find_config_file(self) -> Path:
         """
@@ -246,7 +246,14 @@ class BaseDeviceController:
         except ValueError as e:
             raise e
 
-    def log(self, level: str, message: str, include_timestamp: bool = True, file_path: str = None):
+    def log(
+        self,
+        level: str,
+        message: str,
+        include_timestamp: bool = True,
+        file_path: str = None,
+        message_key: Optional[str] = None,
+    ):
         """
         Log a message with the specified level.
 
@@ -255,6 +262,8 @@ class BaseDeviceController:
             message: Log message
             include_timestamp: If True, include timestamp in log output
             file_path: Optional path to log file. If provided, message will also be written to file.
+            message_key: Optional event-style key used to deduplicate repeated
+                        non-debug log entries within the recent window.
         """
         # Map log levels to emoji
         emoji_map = {
@@ -276,9 +285,10 @@ class BaseDeviceController:
         if self._LOG_LEVEL_PRIORITY[level_upper] < self._LOG_LEVEL_PRIORITY[self.log_level]:
             return
 
-        # INFO-only spam protector: suppress when the same message appears
-        # anywhere in the last N emitted info messages.
-        if level_upper == 'INFO' and message in self._recent_info_messages:
+        log_key = None
+        if level_upper != 'DEBUG' and message_key:
+            log_key = (level_upper, str(message_key))
+        if log_key is not None and log_key in self._recent_log_messages:
             return
 
         emoji = emoji_map.get(level_lower, '')
@@ -300,8 +310,8 @@ class BaseDeviceController:
         # Print to stdout
         print(output)
 
-        if level_upper == 'INFO':
-            self._recent_info_messages.append(message)
+        if log_key is not None:
+            self._recent_log_messages.append(log_key)
 
         # Write to file if specified
         if file_path:
@@ -356,10 +366,10 @@ class PowerAccumulator:
         # Expected shape: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
         self.last_schedule_entry: Optional[Dict[str, Any]] = None
 
-    def _log(self, level: str, message: str):
+    def _log(self, level: str, message: str, message_key: Optional[str] = None):
         """Helper method to log messages using the logger if available."""
         if self.logger:
-            self.logger.log(level, message, file_path=self.log_file_path)
+            self.logger.log(level, message, file_path=self.log_file_path, message_key=message_key)
 
 class AutomateController(BaseDeviceController):
     """
@@ -507,7 +517,11 @@ class AutomateController(BaseDeviceController):
         zendure_data = reader.read_zendure(update_json=True)
 
         if not zendure_data:
-            self.log('warning', "Failed to read Zendure data for battery limit check, assuming OK")
+            self.log(
+                'warning',
+                "Failed to read Zendure data for battery limit check, assuming OK",
+                message_key='battery_limit_read_failed',
+            )
             self.limit_state = 0
             return
 
@@ -518,7 +532,11 @@ class AutomateController(BaseDeviceController):
         battery_level = props.get("electricLevel")
 
         if battery_level is None:
-            self.log('warning', "Battery level not found in Zendure data, assuming OK")
+            self.log(
+                'warning',
+                "Battery level not found in Zendure data, assuming OK",
+                message_key='battery_level_missing',
+            )
             self.limit_state = 0
             return
 
@@ -547,19 +565,35 @@ class AutomateController(BaseDeviceController):
         # Check battery limits before processing
         # If charging (power_feed > 0) and at MAX_CHARGE_LEVEL, prevent charge
         if power_feed > 0 and self.limit_state == 1:
-            self.log('warning', f"Battery at max_charge_level ({self.max_charge_level}%), preventing charge")
+            self.log(
+                'warning',
+                f"Battery at max_charge_level ({self.max_charge_level}%), preventing charge",
+                message_key='battery_max_charge_block',
+            )
             power_feed = 0
 
         # If discharging (power_feed < 0) and at MIN_CHARGE_LEVEL, prevent discharge
         if power_feed < 0 and self.limit_state == -1:
-            self.log('warning', f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge")
+            self.log(
+                'warning',
+                f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge",
+                message_key='battery_min_discharge_block',
+            )
             power_feed = 0
 
         if power_feed < -self.max_discharge_power:
-            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_DISCHARGE_POWER ({self.max_discharge_power} W), limiting discharge.")
+            self.log(
+                'warning',
+                f"Power feed ({power_feed} W) exceeds MAX_DISCHARGE_POWER ({self.max_discharge_power} W), limiting discharge.",
+                message_key='max_discharge_power_limit',
+            )
             power_feed = -self.max_discharge_power
         if power_feed > self.max_charge_power:
-            self.log('warning', f"Power feed ({power_feed} W) exceeds MAX_CHARGE_POWER ({self.max_charge_power} W), limiting charge")
+            self.log(
+                'warning',
+                f"Power feed ({power_feed} W) exceeds MAX_CHARGE_POWER ({self.max_charge_power} W), limiting charge",
+                message_key='max_charge_power_limit',
+            )
             power_feed = self.max_charge_power
 
         # Check if the new power value is the same as the previous one
@@ -653,11 +687,19 @@ class AutomateController(BaseDeviceController):
             # Too full to charge
             if electric_level >= self.max_charge_level and effective_desired < 0:
                 effective_desired = 0
-                self.log('warning', f"Charge level at/above {self.max_charge_level}%, preventing charge")
+                self.log(
+                    'warning',
+                    f"Charge level at/above {self.max_charge_level}%, preventing charge",
+                    message_key='battery_max_charge_block',
+                )
             # Too empty to discharge
             if electric_level <= self.min_charge_level and effective_desired > 0:
                 effective_desired = 0
-                self.log('warning', f"Charge level at/below {self.min_charge_level}%, preventing discharge")
+                self.log(
+                    'warning',
+                    f"Charge level at/below {self.min_charge_level}%, preventing discharge",
+                    message_key='battery_min_discharge_block',
+                )
 
         # Clamp effective desired feed using the configured power caps.
         effective_desired = max(-self.max_charge_power, min(self.max_discharge_power, effective_desired))
@@ -772,7 +814,8 @@ class AutomateController(BaseDeviceController):
             self.log(
                 'warning',
                 f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, "
-                "reversal detected (possible measurement lag)"
+                "reversal detected (possible measurement lag)",
+                message_key='reversal_detected',
             )
 
         guarded_power = self.reversal_ramp_guard.apply(
@@ -785,7 +828,8 @@ class AutomateController(BaseDeviceController):
             self.log(
                 'warning',
                 f"  reversal ramp active: previous={self.previous_power}, "
-                f"raw_target={raw_target_power}, guarded_target={guarded_power}"
+                f"raw_target={raw_target_power}, guarded_target={guarded_power}",
+                message_key='reversal_ramp_active',
             )
 
         self._last_dynamic_power_context = {
@@ -936,7 +980,8 @@ class AutomateController(BaseDeviceController):
             self.log(
                 'info',
                 f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}"
+                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}",
+                message_key='schedule_bounds_applied',
             )
 
         return bounded_power
@@ -1240,7 +1285,11 @@ class ScheduleController(BaseDeviceController):
             self.schedule_date = datetime.now(tz=tz).date()
 
             current_time_str = self._get_current_time_str()
-            self.log('info', f"Schedule fetched successfully. Current time: {current_time_str}, Resolved entries: {len(resolved)}")
+            self.log(
+                'info',
+                f"Schedule fetched successfully. Current time: {current_time_str}, Resolved entries: {len(resolved)}",
+                message_key='schedule_fetch_success',
+            )
 
             return data
 
@@ -1297,7 +1346,11 @@ class ScheduleController(BaseDeviceController):
                     continue
 
             if not valid_entries_with_int_time:
-                self.log('warning', f"No valid entries found for current time {current_time}")
+                self.log(
+                    'warning',
+                    f"No valid entries found for current time {current_time}",
+                    message_key='schedule_no_valid_entries',
+                )
                 self.last_schedule_entry = None
                 return None
 
