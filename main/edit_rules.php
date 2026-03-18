@@ -277,7 +277,7 @@ if ($isApi) {
 
         <section class="card">
             <h2 id="editor-title">Rule Editor</h2>
-            <form id="rule-form">
+            <form id="rule-form" novalidate>
                 <div class="row">
                     <label for="inp-name">Name</label>
                     <input id="inp-name" type="text" placeholder="Rule name" required>

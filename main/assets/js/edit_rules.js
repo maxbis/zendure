@@ -54,8 +54,8 @@
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
-        'inp-min-value': 'Optional minimum watt bound for netzero and netzero+ rules only.',
-        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only.',
+        'inp-min-value': 'Optional minimum watt bound for netzero and netzero+ rules only. Any integer is allowed; spinner uses 100 W steps.',
+        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only. Any integer is allowed; spinner uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
     };
     const trackedFieldIds = [
