@@ -506,6 +506,44 @@ function estimateSchedulePowerForPopup(scheduleValue) {
     return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
+const POPUP_RUNTIME_BATTERY_FIELDS = new Set(['electricity_level', 'electric_level', 'electricLevel']);
+
+/**
+ * From rule runtime_conditions, minimum SoC implied by electricity_level > / >= (tightest lower bound).
+ * @param {unknown} conditions
+ * @returns {number|null}
+ */
+function getDischargeSocFloorFromRuntimeConditions(conditions) {
+    if (!Array.isArray(conditions) || conditions.length === 0) {
+        return null;
+    }
+    let maxV = null;
+    for (let i = 0; i < conditions.length; i++) {
+        const c = conditions[i];
+        if (!c || typeof c !== 'object') continue;
+        const field = String(c.field || '');
+        if (!POPUP_RUNTIME_BATTERY_FIELDS.has(field)) continue;
+        const op = String(c.op || '==');
+        if (op !== '>' && op !== '>=') continue;
+        const v = Number(c.value);
+        if (!Number.isFinite(v)) continue;
+        maxV = maxV === null ? v : Math.max(maxV, v);
+    }
+    return maxV;
+}
+
+function parseBarDatasetRuntimeConditions(bar) {
+    if (!bar || !bar.dataset || bar.dataset.runtimeConditions === undefined || bar.dataset.runtimeConditions === '') {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(bar.dataset.runtimeConditions);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function getPopupForecastUniqueBars() {
     const uniqueBars = new Map();
     const bars = document.querySelectorAll('.price-graph-bar[data-key][data-date][data-hour]');
@@ -566,15 +604,34 @@ function getPopupForecastForBar(targetBar) {
             continue;
         }
 
-        const estimatedPowerW = estimateSchedulePowerForPopup(bar.dataset.scheduleValue);
-        const percentPerHour = powerToCapacityPercent(estimatedPowerW);
+        const rawScheduledPowerW = estimateSchedulePowerForPopup(bar.dataset.scheduleValue);
+        const percentPerHour = powerToCapacityPercent(rawScheduledPowerW);
         const rawDeltaPercent = percentPerHour == null ? 0 : percentPerHour * durationHours;
-        const signedDeltaPercent = estimatedPowerW < 0 ? -rawDeltaPercent : rawDeltaPercent;
+        const signedDeltaPercent = rawScheduledPowerW < 0 ? -rawDeltaPercent : rawDeltaPercent;
         const startPercent = runningPercent;
-        const endPercent = Math.max(
+        let endPercent = Math.max(
             batteryState.minChargeLevel,
             Math.min(batteryState.maxChargeLevel, startPercent + signedDeltaPercent)
         );
+        let estimatedPowerW = rawScheduledPowerW;
+
+        const ruleFloor = getDischargeSocFloorFromRuntimeConditions(parseBarDatasetRuntimeConditions(bar));
+        if (ruleFloor != null && rawScheduledPowerW < 0) {
+            if (startPercent <= ruleFloor) {
+                endPercent = startPercent;
+                estimatedPowerW = 0;
+            } else {
+                endPercent = Math.max(ruleFloor, endPercent);
+                endPercent = Math.max(
+                    batteryState.minChargeLevel,
+                    Math.min(batteryState.maxChargeLevel, endPercent)
+                );
+                if (Math.abs(endPercent - startPercent) < 1e-6) {
+                    estimatedPowerW = 0;
+                }
+            }
+        }
+
         const appliedDeltaPercent = endPercent - startPercent;
 
         if (bar === targetBar) {
@@ -1374,6 +1431,50 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     };
 
     /**
+     * Build an expanded hour -> runtime_conditions[] map from resolved schedule slots.
+     * Mirrors buildExpandedRuntimeConditionMap: clearing when a slot omits runtime_conditions
+     * or supplies an empty array; forward-fills the last non-empty array across later hours.
+     */
+    const buildExpandedRuntimeConditionsArrayMap = (resolved) => {
+        if (!Array.isArray(resolved) || resolved.length === 0) return null;
+
+        const baseMap = {};
+        let lastRuntimeConditions = undefined;
+
+        resolved.forEach((slot) => {
+            if (!slot || slot.time === undefined) return;
+            const hour = parseInt(String(slot.time).substring(0, 2), 10);
+            if (Number.isNaN(hour)) return;
+
+            if (Object.prototype.hasOwnProperty.call(slot, 'runtime_conditions')) {
+                const runtimeConditions = slot.runtime_conditions;
+                if (Array.isArray(runtimeConditions) && runtimeConditions.length > 0) {
+                    lastRuntimeConditions = runtimeConditions.slice();
+                } else {
+                    lastRuntimeConditions = [];
+                }
+            } else {
+                lastRuntimeConditions = [];
+            }
+            baseMap[hour] = lastRuntimeConditions;
+        });
+
+        if (Object.keys(baseMap).length === 0) {
+            return null;
+        }
+
+        const expanded = {};
+        let current = undefined;
+        for (let h = 0; h < 24; h++) {
+            if (Object.prototype.hasOwnProperty.call(baseMap, h)) {
+                current = baseMap[h];
+            }
+            expanded[h] = current;
+        }
+        return expanded;
+    };
+
+    /**
      * Build an expanded hour -> rule metadata map from resolved schedule slots.
      * Propagates last known rule_name/rule_index forward across the day.
      */
@@ -1426,6 +1527,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const scheduleHourMapByDate = {};
     const scheduleSourceMapByDate = {};
     const scheduleRuntimeConditionMapByDate = {};
+    const scheduleRuntimeConditionsArrayMapByDate = {};
     const scheduleRuleMetaMapByDate = {};
 
     // Build a map of schedule entries for quick lookup
@@ -1507,8 +1609,11 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         let value;
         let source;
         let hasRuntimeCondition;
+        let runtimeConditions;
         let ruleName;
         let ruleIndex;
+
+        const runtimeConditionsArrayMap = scheduleRuntimeConditionsArrayMapByDate[dateStr];
 
         if (hourMap) {
             value = hourMap[hourIndex];
@@ -1519,18 +1624,21 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         if (runtimeConditionMap) {
             hasRuntimeCondition = runtimeConditionMap[hourIndex];
         }
+        if (runtimeConditionsArrayMap && Object.prototype.hasOwnProperty.call(runtimeConditionsArrayMap, hourIndex)) {
+            runtimeConditions = runtimeConditionsArrayMap[hourIndex];
+        }
         if (ruleMetaMap && Object.prototype.hasOwnProperty.call(ruleMetaMap, hourIndex) && ruleMetaMap[hourIndex]) {
             ruleName = ruleMetaMap[hourIndex].ruleName;
             ruleIndex = ruleMetaMap[hourIndex].ruleIndex;
         }
 
         if (value !== undefined || source !== undefined || hasRuntimeCondition !== undefined || ruleName !== undefined || ruleIndex !== undefined) {
-            return { value, source, hasRuntimeCondition, ruleName, ruleIndex };
+            return { value, source, hasRuntimeCondition, runtimeConditions, ruleName, ruleIndex };
         }
 
         const entries = scheduleByDate[dateStr];
         if (!entries || entries.length === 0) {
-            return { value: undefined, source: undefined, hasRuntimeCondition: undefined, ruleName: undefined, ruleIndex: undefined };
+            return { value: undefined, source: undefined, hasRuntimeCondition: undefined, runtimeConditions: undefined, ruleName: undefined, ruleIndex: undefined };
         }
 
         let activeValue = undefined;
@@ -1542,7 +1650,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 break;
             }
         }
-        return { value: activeValue, source: undefined, hasRuntimeCondition: undefined, ruleName: undefined, ruleIndex: undefined };
+        return { value: activeValue, source: undefined, hasRuntimeCondition: undefined, runtimeConditions: undefined, ruleName: undefined, ruleIndex: undefined };
     };
 
     // Extract price data
@@ -1643,7 +1751,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hourTime = hourKey + '00';
             const key = dateStr + hourTime;
             
-            const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition, ruleName, ruleIndex } = getActiveScheduleInfo(dateStr, hourKey);
+            const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition, runtimeConditions, ruleName, ruleIndex } = getActiveScheduleInfo(dateStr, hourKey);
             const rawScheduleEntry = scheduleMap[key];
 
             // Create bar element
@@ -1664,6 +1772,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                     barDiv.classList.add('has-runtime-condition');
                     barDiv.dataset.runtimeCondition = 'true';
                 }
+            }
+            if (Array.isArray(runtimeConditions) && runtimeConditions.length > 0) {
+                barDiv.dataset.runtimeConditions = JSON.stringify(runtimeConditions);
             }
             if (scheduledSource !== undefined && scheduledSource !== null && scheduledSource !== '') {
                 barDiv.dataset.scheduleSource = String(scheduledSource);
@@ -1745,6 +1856,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     const tomorrowSourceMap = buildExpandedSourceMap(resolvedTomorrow);
     const todayRuntimeConditionMap = buildExpandedRuntimeConditionMap(resolvedToday);
     const tomorrowRuntimeConditionMap = buildExpandedRuntimeConditionMap(resolvedTomorrow);
+    const todayRuntimeConditionsArrayMap = buildExpandedRuntimeConditionsArrayMap(resolvedToday);
+    const tomorrowRuntimeConditionsArrayMap = buildExpandedRuntimeConditionsArrayMap(resolvedTomorrow);
     const todayRuleMetaMap = buildExpandedRuleMetaMap(resolvedToday);
     const tomorrowRuleMetaMap = buildExpandedRuleMetaMap(resolvedTomorrow);
     if (todaySourceMap) {
@@ -1758,6 +1871,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
     }
     if (tomorrowRuntimeConditionMap) {
         scheduleRuntimeConditionMapByDate[tomorrowDateStr] = tomorrowRuntimeConditionMap;
+    }
+    if (todayRuntimeConditionsArrayMap) {
+        scheduleRuntimeConditionsArrayMapByDate[currentDate] = todayRuntimeConditionsArrayMap;
+    }
+    if (tomorrowRuntimeConditionsArrayMap) {
+        scheduleRuntimeConditionsArrayMapByDate[tomorrowDateStr] = tomorrowRuntimeConditionsArrayMap;
     }
     if (todayRuleMetaMap) {
         scheduleRuleMetaMapByDate[currentDate] = todayRuleMetaMap;

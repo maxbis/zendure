@@ -79,6 +79,8 @@ The mobile page auto-scrolls the price graph to the current hour on load/refresh
 - If current bar is found, it scrolls to center it.
 - If not, it scrolls near the estimated current-hour position.
 
+Tapping a price bar opens a popup that can include **Estimated battery level** (start/end SoC and power). That model is documented in [`docs/main/assets/js/price-overview-bar-popup-estimate.md`](../main/assets/js/price-overview-bar-popup-estimate.md) (algorithm, constants, and where config is injected).
+
 ## 6. Auto Refresh
 
 Status and schedule-related UI refresh periodically through the page scripts.

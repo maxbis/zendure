@@ -147,6 +147,7 @@ Shows electricity prices, color-coded; bars are clickable to edit schedule entri
     - Fetches prices and renders bars (handles hiding/showing tomorrow card based on current hour).
   - `main/assets/js/components/price_graph_component.js` (optional component wrapper; attaches to `.price-graph-wrapper`)
   - Orchestrated by `main/assets/js/charge_schedule.js` (calls `fetchAndRenderPrices(...)` when `PRICE_API_URL` is available).
+- **Documentation**: popup battery estimate algorithm and constants — [`docs/main/assets/js/price-overview-bar-popup-estimate.md`](assets/js/price-overview-bar-popup-estimate.md)
 
 ---
 
