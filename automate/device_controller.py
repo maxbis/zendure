@@ -517,9 +517,15 @@ class AutomateController(BaseDeviceController):
         zendure_data = reader.read_zendure(update_json=True)
 
         if not zendure_data:
+            device_ip = reader.config.get(reader.CONFIG_KEY_DEVICE_IP) if hasattr(reader, "config") else None
+            device_url = (
+                f"http://{device_ip}{reader.API_ENDPOINT_PROPERTIES_REPORT}"
+                if device_ip
+                else "configured Zendure device endpoint"
+            )
             self.log(
                 'warning',
-                "Failed to read Zendure data for battery limit check, assuming OK",
+                f"Failed to read Zendure device data from {device_url} during battery limit check, assuming OK",
                 message_key='battery_limit_read_failed',
             )
             self.limit_state = 0
@@ -1195,7 +1201,7 @@ class DeviceDataReader(BaseDeviceController):
             return data
 
         except requests.exceptions.RequestException as e:
-            self.log('error', f"Error reading from Zendure device at {self.device_ip}: {e}")
+            self.log('error', f"Error reading Zendure device state from {url}: {e}")
             return None
         except (json.JSONDecodeError, KeyError) as e:
             self.log('error', f"Error parsing Zendure response: {e}")
