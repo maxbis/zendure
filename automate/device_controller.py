@@ -419,6 +419,11 @@ class AutomateController(BaseDeviceController):
         # Normalize to sane non-negative values
         self.power_feed_min_threshold = max(0, self.power_feed_min_threshold)
         self.power_feed_min_delta = max(0, self.power_feed_min_delta)
+        try:
+            self.power_feed_max_delta = int(self.config.get("POWER_FEED_MAX_DELTA", 300))
+        except (TypeError, ValueError):
+            self.power_feed_max_delta = 300
+        self.power_feed_max_delta = max(0, self.power_feed_max_delta)
 
         # Validate required keys for AutomateController
         device_ip = self.config.get("deviceIp")
@@ -616,6 +621,7 @@ class AutomateController(BaseDeviceController):
 
         if self.test_mode:
             self.log('debug', f"TEST MODE: Would set power feed to {power_feed} W")
+            self.previous_power = power_feed
             return (True, None, power_feed)
 
         try:
@@ -883,6 +889,56 @@ class AutomateController(BaseDeviceController):
         context = getattr(self, '_last_dynamic_power_context', None)
         return context if isinstance(context, dict) else {}
 
+    def _resolve_power_target(
+        self,
+        value: Union[int, Literal['netzero', 'netzero+'], None],
+        p1_data: Optional[Dict[str, Any]] = None,
+        schedule_entry: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        if isinstance(value, int):
+            return value
+
+        if value == 'netzero' or value == 'netzero+' or value is None:
+            mode = value if value is not None else 'netzero'
+            if p1_data is None:
+                raise ValueError("P1 meter data must be supplied by the caller for dynamic power modes")
+
+            calculated_power = self.calculate_netzero_power(
+                mode=mode,
+                p1_data=p1_data,
+                schedule_entry=schedule_entry,
+            )
+            runtime_context = self._get_dynamic_power_context()
+            return self._apply_schedule_power_bounds(
+                calculated_power,
+                mode=mode,
+                schedule_entry=schedule_entry,
+                runtime_context=runtime_context,
+            )
+
+        raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', or None")
+
+    def _apply_power_feed_max_delta(self, target_power: int) -> int:
+        if not isinstance(target_power, int):
+            return target_power
+        if not isinstance(self.previous_power, int):
+            return target_power
+
+        delta = target_power - self.previous_power
+        if abs(delta) <= self.power_feed_max_delta:
+            return target_power
+
+        limited_power = self.previous_power + (
+            self.power_feed_max_delta if delta > 0 else -self.power_feed_max_delta
+        )
+        self.log(
+            'warning',
+            f"Max delta limit hit: previous={self.previous_power}, target={target_power}, "
+            f"power_feed_max_delta={self.power_feed_max_delta}, limited={limited_power}",
+            message_key='power_feed_max_delta_limit',
+        )
+        return limited_power
+
     def _apply_schedule_power_bounds(
         self,
         power_value: int,
@@ -1031,93 +1087,59 @@ class AutomateController(BaseDeviceController):
             Test mode is controlled by config.jsonc key "TEST_MODE".
             When enabled, operations are simulated but not applied.
         """
-        # Handle specific power feed (int), charge is positive, discharge is negative
-        if isinstance(value, int):
+        try:
+            target_power = self._resolve_power_target(
+                value=value,
+                p1_data=p1_data,
+                schedule_entry=schedule_entry,
+            )
+        except ValueError as exc:
+            error_message = str(exc)
+            dynamic_mode = value == 'netzero' or value == 'netzero+' or value is None
+            if dynamic_mode and "must be supplied by the caller" not in error_message:
+                error_message = f"Zero feed-in calculation failed: {error_message}"
+            return PowerResult(success=False, power=0, error=error_message)
+        except Exception as exc:
+            return PowerResult(
+                success=False,
+                power=0,
+                error=f"Zero feed-in calculation failed: {str(exc)}"
+            )
 
-            # Send power feed
-            success, error_msg, actual_power = self._send_power_feed(value)
+        target_power = self._apply_power_feed_max_delta(target_power)
 
-            if not success:
-                return PowerResult(
-                    success=False,
-                    power=actual_power,
-                    error=f"Failed to set power feed: {error_msg}"
-                )
+        success, error_msg, actual_power = self._send_power_feed(target_power)
 
-            return PowerResult(success=True, power=actual_power)
-
-        # Handle dynamic zero feed-in ('netzero' or None)
-        if value == 'netzero' or value == 'netzero+' or value is None:
-            # Determine mode (default to 'netzero' if None)
-            mode = value if value is not None else 'netzero'
-            if p1_data is None:
-                return PowerResult(
-                    success=False,
-                    power=0,
-                    error="P1 meter data must be supplied by the caller for dynamic power modes",
-                )
-
+        if actual_power != target_power:
+            min_value = None
+            max_value = None
             try:
-                # Calculate the actual power value needed
-                calculated_power = self.calculate_netzero_power(
-                    mode=mode,
-                    p1_data=p1_data,
-                    schedule_entry=schedule_entry,
+                min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
+            except ValueError:
+                min_value = None
+            try:
+                max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
+            except ValueError:
+                max_value = None
+            if min_value is not None or max_value is not None:
+                mode_label = value if value in ('netzero', 'netzero+') else 'fixed'
+                slot_time = schedule_entry.get('time') if isinstance(schedule_entry, dict) else None
+                slot_key = schedule_entry.get('key') if isinstance(schedule_entry, dict) else None
+                self.log(
+                    'debug',
+                    f"Battery/device limits overrode bounded result for {mode_label} slot {slot_time or '?'} "
+                    f"({slot_key or 'no-key'}): bounded={target_power}, applied={actual_power}, "
+                    f"min={min_value}, max={max_value}"
                 )
-                runtime_context = self._get_dynamic_power_context()
-                calculated_power = self._apply_schedule_power_bounds(
-                    calculated_power,
-                    mode=mode,
-                    schedule_entry=schedule_entry,
-                    runtime_context=runtime_context,
-                )
 
-                # If test mode, just return the calculated value without applying
-                if self.test_mode:
-                    return PowerResult(success=True, power=calculated_power)
+        if not success:
+            return PowerResult(
+                success=False,
+                power=actual_power,
+                error=f"Failed to set power feed: {error_msg}"
+            )
 
-                # Apply the calculated power
-                # calculated_power is already in correct convention (positive=charge, negative=discharge)
-                # Send power feed directly without conversion
-                success, error_msg, actual_power = self._send_power_feed(calculated_power)
-
-                if actual_power != calculated_power:
-                    min_value = None
-                    max_value = None
-                    try:
-                        min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
-                    except ValueError:
-                        min_value = None
-                    try:
-                        max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
-                    except ValueError:
-                        max_value = None
-                    if min_value is not None or max_value is not None:
-                        slot_time = schedule_entry.get('time') if isinstance(schedule_entry, dict) else None
-                        slot_key = schedule_entry.get('key') if isinstance(schedule_entry, dict) else None
-                        self.log(
-                            'debug',
-                            f"Battery/device limits overrode bounded result for {mode} slot {slot_time or '?'} "
-                            f"({slot_key or 'no-key'}): bounded={calculated_power}, applied={actual_power}, "
-                            f"min={min_value}, max={max_value}"
-                        )
-
-                if not success:
-                    return PowerResult(
-                        success=False,
-                        power=actual_power,
-                        error=f"Failed to set power feed: {error_msg}"
-                    )
-
-                return PowerResult(success=True, power=actual_power)
-
-            except Exception as e:
-                return PowerResult(
-                    success=False,
-                    power=0,
-                    error=f"Zero feed-in calculation failed: {str(e)}"
-                )
-        raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', or None")
+        return PowerResult(success=True, power=actual_power)
 
     def set_standby_mode(self) -> PowerResult:
         """

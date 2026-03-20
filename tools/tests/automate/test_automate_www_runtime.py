@@ -395,6 +395,38 @@ def _import_device_controller_module():
     return device_controller
 
 
+def _make_minimal_automate_controller(device_controller_module):
+    controller = device_controller_module.AutomateController.__new__(device_controller_module.AutomateController)
+    controller.test_mode = True
+    controller.previous_power = None
+    controller.power_feed_max_delta = 300
+    controller.limit_state = 0
+    controller.min_charge_level = 15
+    controller.max_charge_level = 96
+    controller.max_discharge_power = 800
+    controller.max_charge_power = 1200
+    controller.device_ip = "127.0.0.1"
+    controller.device_sn = "TEST-SN"
+    controller.log = lambda *args, **kwargs: None
+    controller._build_device_properties = device_controller_module.AutomateController._build_device_properties.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._send_power_feed = device_controller_module.AutomateController._send_power_feed.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._apply_power_feed_max_delta = device_controller_module.AutomateController._apply_power_feed_max_delta.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._resolve_power_target = device_controller_module.AutomateController._resolve_power_target.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._get_dynamic_power_context = device_controller_module.AutomateController._get_dynamic_power_context.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._normalize_schedule_bound = device_controller_module.AutomateController._normalize_schedule_bound
+    return controller
+
+
 def _build_app_with_slot(slot: dict, electric_level: int):
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()
@@ -803,13 +835,10 @@ def test_controller_find_current_schedule_value_keeps_min_max_metadata():
 
 def test_controller_set_power_clamps_netzero_to_schedule_bounds():
     device_controller = _import_device_controller_module()
-    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
-    controller.test_mode = True
+    controller = _make_minimal_automate_controller(device_controller)
     controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
-    controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
-    controller.log = lambda *args, **kwargs: None
 
     result = device_controller.AutomateController.set_power(
         controller,
@@ -824,13 +853,10 @@ def test_controller_set_power_clamps_netzero_to_schedule_bounds():
 
 def test_controller_set_power_clamps_netzero_plus_without_discharge():
     device_controller = _import_device_controller_module()
-    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
-    controller.test_mode = True
+    controller = _make_minimal_automate_controller(device_controller)
     controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: 50
     controller._last_dynamic_power_context = {"raw_power": 50, "guarded_power": 50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
-    controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
-    controller.log = lambda *args, **kwargs: None
 
     result = device_controller.AutomateController.set_power(
         controller,
@@ -841,6 +867,112 @@ def test_controller_set_power_clamps_netzero_plus_without_discharge():
 
     assert result.success is True
     assert result.power == 100
+
+
+def test_controller_set_power_applies_max_delta_to_fixed_values():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.previous_power = 0
+
+    result = device_controller.AutomateController.set_power(controller, 800)
+
+    assert result.success is True
+    assert result.power == 300
+
+
+def test_controller_set_power_applies_max_delta_to_netzero_values():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.previous_power = -179
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -1000
+    controller._last_dynamic_power_context = {"raw_power": -1000, "guarded_power": -1000, "guard_active": False}
+    controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 200},
+        schedule_entry={"time": "1500", "key": "********1500"},
+    )
+
+    assert result.success is True
+    assert result.power == -479
+
+
+def test_controller_set_power_skips_max_delta_without_previous_power():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+
+    result = device_controller.AutomateController.set_power(controller, -650)
+
+    assert result.success is True
+    assert result.power == -650
+
+
+def test_controller_test_mode_updates_previous_power_for_simulated_send():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+
+    result = device_controller.AutomateController.set_power(controller, -147)
+
+    assert result.success is True
+    assert result.power == -147
+    assert controller.previous_power == -147
+
+
+def test_controller_test_mode_uses_simulated_previous_power_for_next_max_delta_step():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -800
+    controller._last_dynamic_power_context = {"raw_power": -800, "guarded_power": -800, "guard_active": False}
+    controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+
+    first = device_controller.AutomateController.set_power(controller, -147)
+    second = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 200},
+        schedule_entry={"time": "1500", "key": "********1500"},
+    )
+
+    assert first.success is True
+    assert second.success is True
+    assert second.power == -447
+    assert controller.previous_power == -447
+
+
+def test_controller_test_mode_skips_network_calls():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+
+    def _fail_post(*_args, **_kwargs):
+        raise AssertionError("requests.post should not be called in test mode")
+
+    original_post = requests.post
+    requests.post = _fail_post
+    try:
+        result = device_controller.AutomateController.set_power(controller, 200)
+    finally:
+        requests.post = original_post
+
+    assert result.success is True
+    assert result.power == 200
+    assert controller.previous_power == 200
+
+
+def test_controller_test_mode_skips_duplicate_simulated_send_after_state_update():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
+
+    first = device_controller.AutomateController.set_power(controller, 150)
+    second = device_controller.AutomateController.set_power(controller, 150)
+
+    assert first.success is True
+    assert second.success is True
+    assert controller.previous_power == 150
+    assert any("Power value unchanged (150 W), skipping device update" in msg for _, msg in logs)
 
 
 def test_schedule_power_bounds_cap_netzero_magnitude_and_keep_direction():
@@ -1016,9 +1148,13 @@ def test_controller_set_power_logs_when_device_limits_override_bounded_result():
     controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
     logs = []
     controller.test_mode = False
+    controller.previous_power = None
+    controller.power_feed_max_delta = 300
     controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
+    controller._apply_power_feed_max_delta = device_controller.AutomateController._apply_power_feed_max_delta.__get__(controller, device_controller.AutomateController)
+    controller._resolve_power_target = device_controller.AutomateController._resolve_power_target.__get__(controller, device_controller.AutomateController)
     controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
     controller._get_dynamic_power_context = device_controller.AutomateController._get_dynamic_power_context.__get__(controller, device_controller.AutomateController)
     controller._send_power_feed = lambda value: (True, None, 0)

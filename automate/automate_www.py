@@ -1704,7 +1704,6 @@ class AutomationApp:
         self.stop_posted = False
         self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
-        self.power_feed_max_delta = 300
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self.zero_count_threshold_standby = ZERO_COUNT_THRESHOLD_STANDBY
         self._runtime_condition_warning_cache: set[str] = set()
@@ -1804,12 +1803,6 @@ class AutomationApp:
             loop_interval = LOOP_INTERVAL_SECONDS
         self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
-
-        try:
-            power_feed_max_delta = int(self.controller.config.get("POWER_FEED_MAX_DELTA", 2400))
-        except (TypeError, ValueError):
-            power_feed_max_delta = 2400
-        self.power_feed_max_delta = max(0, power_feed_max_delta)
 
         try:
             api_refresh = int(self.controller.config.get("API_REFRESH_INTERVAL_SECONDS", API_REFRESH_INTERVAL_SECONDS))
@@ -2385,21 +2378,6 @@ class AutomationApp:
             timestamp=int(time.time()),
         )
 
-    def _limit_delta_step(self, desired_power: any) -> any:
-        if not isinstance(desired_power, int) or not isinstance(self.old_value, int):
-            return desired_power
-        delta = desired_power - self.old_value
-        if abs(delta) <= self.power_feed_max_delta:
-            return desired_power
-        limited_power = self.old_value + (
-            self.power_feed_max_delta if delta > 0 else -self.power_feed_max_delta
-        )
-        self.logger.warning(
-            f"Max delta limit hit: old={self.old_value}, desired={desired_power}, "
-            f"power_feed_max_delta={self.power_feed_max_delta}, limited={limited_power}"
-        )
-        return limited_power
-
     def _run_cycle(self) -> bool:
         # 0. Sleep
         self._sleep_interrupted()
@@ -2425,8 +2403,6 @@ class AutomationApp:
             desired_power = self._apply_runtime_conditions(desired_power)
             desired_power = self._check_battery_limits(desired_power, prechecked=True)
         self._update_zendure_state()
-        if not self.pause_override_active:
-            desired_power = self._limit_delta_step(desired_power)
 
         # 5. Apply settings
         self._apply_power_settings(desired_power, p1_data)
