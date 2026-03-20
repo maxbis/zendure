@@ -327,7 +327,7 @@ if ($isApi) {
                     </div>
                     <div>
                         <label for="inp-max-value">Max Value (optional)</label>
-                        <input id="inp-max-value" type="number" step="100" placeholder="None">
+                        <input id="inp-max-value" type="number" min="100" step="100" placeholder="None">
                     </div>
                 </div>
 

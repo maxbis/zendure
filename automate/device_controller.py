@@ -844,6 +844,17 @@ class AutomateController(BaseDeviceController):
                 message_key='reversal_ramp_active',
             )
 
+        self.log(
+            'debug',
+            "Netzero calc: "
+            f"mode={mode}, p1_power={p1_power}, current_input={current_input}, "
+            f"current_output={current_output}, electric_level={electric_level}, "
+            f"new_input={new_input}, new_output={new_output}, "
+            f"raw_target={raw_target_power}, guarded_target={guarded_power}, "
+            f"previous_power={self.previous_power}, reversal_hint={reversal_hint}",
+            message_key='netzero_calc_debug',
+        )
+
         self._last_dynamic_power_context = {
             'mode': mode,
             'raw_power': raw_target_power,
@@ -1420,6 +1431,19 @@ class ScheduleController(BaseDeviceController):
             ValueError: If schedule data is invalid or missing required fields
             requests.exceptions.RequestException: On network errors when refresh=True
         """
+        tz = ZoneInfo('Europe/Amsterdam')
+        today = datetime.now(tz=tz).date()
+
+        # Invalidate the cached schedule when the local day changes so the first
+        # lookup after midnight always uses the newly resolved API data.
+        if self.schedule_date is not None and self.schedule_date != today:
+            self.log(
+                'info',
+                f"Schedule cache date rollover detected ({self.schedule_date} -> {today}); refreshing schedule",
+                message_key='schedule_date_rollover_refresh',
+            )
+            refresh = True
+
         # Fetch schedule if refresh requested or no cached data
         if refresh or self.schedule_data is None:
             self.fetch_schedule()

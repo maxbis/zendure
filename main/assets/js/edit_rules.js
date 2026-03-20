@@ -55,7 +55,7 @@
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
         'inp-min-value': 'Optional minimum watt bound for netzero and netzero+ rules only. Any integer is allowed; spinner uses 100 W steps.',
-        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only. Any integer is allowed; spinner uses 100 W steps.',
+        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only. Minimum is 100 W; spinner uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
     };
     const trackedFieldIds = [
@@ -175,6 +175,18 @@
         }
 
         state.rules.forEach((rule, idx) => {
+            const hasMinLimit = rule.min_value !== undefined && rule.min_value !== null && rule.min_value !== '';
+            const hasMaxLimit = rule.max_value !== undefined && rule.max_value !== null && rule.max_value !== '';
+            const hasLimits = hasMinLimit || hasMaxLimit;
+            const limitLabel = hasMinLimit && hasMaxLimit
+                ? ('Limits: ' + rule.min_value + '-' + rule.max_value + ' W')
+                : (hasMinLimit ? ('Limit: min ' + rule.min_value + ' W') : (hasMaxLimit ? ('Limit: max ' + rule.max_value + ' W') : ''));
+            const indicatorHtml = hasLimits
+                ? '<span class="rule-limit-indicator" aria-hidden="true"></span>'
+                : '';
+            const nameTitle = hasLimits
+                ? ' title="' + escapeHtml(limitLabel) + '"'
+                : '';
             const enabledAttr = rule.enabled === false ? '' : ' checked';
             const isFirst = idx === 0;
             const isLast = idx === state.rules.length - 1;
@@ -188,7 +200,7 @@
             tr.innerHTML = [
                 '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
-                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"><code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
+                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + indicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
                 '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
@@ -460,6 +472,9 @@
                     throw new Error('Max value must be an integer.');
                 }
                 rule.max_value = parseInt(maxValue, 10);
+                if (rule.max_value < 100) {
+                    throw new Error('Max value must be at least 100.');
+                }
             }
             if (
                 rule.min_value !== null &&
