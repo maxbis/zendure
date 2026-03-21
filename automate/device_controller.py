@@ -506,20 +506,20 @@ class AutomateController(BaseDeviceController):
         }
 
 
-    def check_battery_limits(self) -> None:
+    def check_battery_limits(self, zendure_data: Optional[dict] = None) -> None:
         """
         Check battery level against limits and update limit_state property.
 
-        Reads battery level from Zendure device via read_zendure() method.
+        Reads battery level from caller-supplied Zendure data or via read_zendure().
 
         Sets limit_state:
             -1: Battery at or below min_charge_level (discharge not allowed)
              0: Battery within acceptable range (no limits) or if read fails
              1: Battery at or above max_charge_level (charge not allowed)
         """
-        # Read Zendure data to get battery level
         reader = get_reader(self.config_path)
-        zendure_data = reader.read_zendure(update_json=True)
+        if zendure_data is None:
+            zendure_data = reader.read_zendure(update_json=True)
 
         if not zendure_data:
             device_ip = reader.config.get(reader.CONFIG_KEY_DEVICE_IP) if hasattr(reader, "config") else None
@@ -746,6 +746,7 @@ class AutomateController(BaseDeviceController):
         mode: Literal['netzero', 'netzero+'] = 'netzero',
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
+        zendure_data: Optional[Dict[str, Any]] = None,
         ) -> int:
         """
         Calculate the actual power value needed to achieve netzero/netzero+ mode.
@@ -773,9 +774,10 @@ class AutomateController(BaseDeviceController):
 
         self.log('debug', f"P1 power (grid-status): {p1_power}")
 
-        # Read Zendure state
-        reader = get_reader(self.config_path)
-        zendure_data = reader.read_zendure(update_json=True)
+        # Read Zendure state unless the caller already supplied this iteration's snapshot.
+        if zendure_data is None:
+            reader = get_reader(self.config_path)
+            zendure_data = reader.read_zendure(update_json=True)
         if not zendure_data:
             raise ValueError("Failed to read Zendure device data")
 
@@ -905,6 +907,7 @@ class AutomateController(BaseDeviceController):
         value: Union[int, Literal['netzero', 'netzero+'], None],
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
+        zendure_data: Optional[Dict[str, Any]] = None,
     ) -> int:
         if isinstance(value, int):
             return value
@@ -918,6 +921,7 @@ class AutomateController(BaseDeviceController):
                 mode=mode,
                 p1_data=p1_data,
                 schedule_entry=schedule_entry,
+                zendure_data=zendure_data,
             )
             runtime_context = self._get_dynamic_power_context()
             return self._apply_schedule_power_bounds(
@@ -1076,6 +1080,7 @@ class AutomateController(BaseDeviceController):
             value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
             p1_data: Optional[Dict[str, Any]] = None,
             schedule_entry: Optional[Dict[str, Any]] = None,
+            zendure_data: Optional[Dict[str, Any]] = None,
         ) -> PowerResult:
         """
         Set power feed to the Zendure battery.
@@ -1103,6 +1108,7 @@ class AutomateController(BaseDeviceController):
                 value=value,
                 p1_data=p1_data,
                 schedule_entry=schedule_entry,
+                zendure_data=zendure_data,
             )
         except ValueError as exc:
             error_message = str(exc)

@@ -199,7 +199,7 @@ def _hour_start_ts(ts: int, tz: ZoneInfo) -> int:
 
 def _mark_hour_anchor_indices(
     raw_points: list[tuple[int, float, Optional[int]]], tz: ZoneInfo
-) -> set[int]:
+    ) -> set[int]:
     anchors: dict[int, tuple[int, int]] = {}
     for idx, (ts, _power, _level) in enumerate(raw_points):
         hour_start_ts = _hour_start_ts(ts, tz)
@@ -259,7 +259,7 @@ def _load_change_points(db_path: str, window_start_ts: int, tz: ZoneInfo) -> lis
 
 def _load_electric_levels_by_hour(
     db_path: str, allowed_dates: set[str], tz: ZoneInfo, window_start_ts: int
-) -> dict[str, dict[str, int]]:
+    ) -> dict[str, dict[str, int]]:
     levels_by_date_hour: dict[str, dict[str, int]] = {}
     with sqlite3.connect(db_path) as conn:
         for hour_offset in range((len(allowed_dates) * 24)):
@@ -300,7 +300,7 @@ def _accumulate_wh_segment(
     t_start: int,
     t_end: int,
     power: float,
-) -> None:
+    ) -> None:
     def _slice_for_hour(cur_ts: int) -> tuple[int, str, str, int]:
         dt_start = datetime.fromtimestamp(cur_ts, tz=tz)
         hour_start = int(dt_start.strftime("%H"))
@@ -339,7 +339,7 @@ def _accumulate_wh_segment(
 
 def _integrate_wh_points(
     points: list[tuple[int, float]], now: int, allowed_dates: set[str], tz: ZoneInfo
-) -> dict[str, dict[str, dict[str, float]]]:
+    ) -> dict[str, dict[str, dict[str, float]]]:
     wh_by_date_hour: dict[str, dict[str, dict[str, float]]] = {}
     for idx, (t_start, power) in enumerate(points):
         if idx < len(points) - 1:
@@ -364,7 +364,7 @@ def _build_wh_result(
     wh_by_date_hour: dict[str, dict[str, dict[str, float]]],
     electric_levels_by_date_hour: dict[str, dict[str, int]],
     allowed_dates: list[str],
-) -> dict:
+    ) -> dict:
     result = {}
     for date_key in sorted(allowed_dates):
         hours = wh_by_date_hour.get(date_key, {})
@@ -2022,6 +2022,18 @@ class AutomationApp:
         except Exception:
             return None
 
+    def _read_zendure_snapshot(self) -> Optional[dict]:
+        """Read Zendure once for the current loop iteration and refresh the shared cache."""
+        try:
+            reader = get_reader(self.controller.config_path)
+            zendure_data = reader.read_zendure(update_json=True)
+            if isinstance(zendure_data, dict):
+                self.controller.accumulator.last_zendure_data = zendure_data
+            return zendure_data
+        except Exception as e:
+            self.logger.warning(f"Failed to read Zendure device data: {e}")
+            return None
+
     def _compare_runtime_condition(self, left: float, op: str, right: float) -> Optional[bool]:
         if op == '>':
             return left > right
@@ -2161,6 +2173,7 @@ class AutomationApp:
     def _check_battery_limits(self, desired_power: any, prechecked: bool = False) -> any:
         """Check availability and modify desired power if limited."""
         if not prechecked:
+            self.logger.warning("Battery level check not pre-checked; invoking battery limit check now.", message_key="battery_limit_not_prechecked")
             self.controller.check_battery_limits()
 
         validation_power = desired_power
@@ -2185,53 +2198,62 @@ class AutomationApp:
 
         return desired_power
 
-    def _apply_power_settings(self, desired_power: any, p1_data: Optional[dict]):
+    def _apply_power_settings(
+        self,
+        desired_power: any,
+        p1_data: Optional[dict],
+        zendure_data: Optional[dict] = None,
+    ):
         """Apply the power settings if changed."""
         should_apply = (
             self.old_value != desired_power
             or (desired_power in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS])
         )
-
-        if should_apply:
-            schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
-            if schedule_entry is not None:
-                result = self.controller.set_power(
-                    desired_power,
-                    p1_data=p1_data,
-                    schedule_entry=schedule_entry,
-                )
-            else:
-                result = self.controller.set_power(desired_power, p1_data=p1_data)
-            if result.success:
-                power_log_message = f"Power: {result.power} (desired: {desired_power})"
-                self.logger.debug(power_log_message)
-                if result.power != self.old_value:
-                    self.logger.info(power_log_message)
-                p1_w = None
-                if p1_data is not None and p1_data.get('total_power') is not None:
-                    try:
-                        p1_w = int(p1_data['total_power'])
-                    except (TypeError, ValueError):
-                        pass
-                # Avoid refreshing the "latest change" timestamp for dynamic modes when
-                # the effective watt value did not actually change. Otherwise the main UI
-                # can remain stuck in a perpetual "Pending..." state.
-                if result.power != self.old_value:
-                    self.status_api.post_update(
-                        EVENT_TYPE_CHANGE,
-                        self.old_value,
-                        result.power,
-                        p1_total_power=p1_w,
-                    )
-                # Update self.value with the actual power that was set (result.power)
-                # This is important for netzero modes where calculated power may differ from 'netzero'
-                self.value = result.power
-            else:
-                self.logger.error(f"Failed to set power: {result.error}")
-                # Don't update self.value if setting failed - keep previous value
-        else:
-            # Power didn't change, but still update self.value to desired_power for consistency
+        if not should_apply:
             self.value = desired_power
+            return
+
+        schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
+        result = self.controller.set_power(
+            desired_power,
+            p1_data=p1_data,
+            schedule_entry=schedule_entry,
+            zendure_data=zendure_data,
+        )
+
+        if not result.success:
+            self.logger.error(f"Failed to set power: {result.error}")
+            return
+
+        power_log_message = f"Power: {result.power} (desired: {desired_power})"
+        if result.power != self.old_value:
+            self.logger.info(power_log_message)
+        else:
+            self.logger.debug(power_log_message)
+
+        p1_w = None
+
+        if p1_data is not None and p1_data.get('total_power') is not None:
+            try:
+                p1_w = int(p1_data['total_power'])
+            except (TypeError, ValueError):
+                pass
+
+        # Avoid refreshing the "latest change" timestamp for dynamic modes when
+        # the effective watt value did not actually change. Otherwise the main UI
+        # can remain stuck in a perpetual "Pending..." state.
+        if result.power != self.old_value:
+            self.status_api.post_update(
+                EVENT_TYPE_CHANGE,
+                self.old_value,
+                result.power,
+                p1_total_power=p1_w,
+            )
+
+        # Update self.value with the actual power that was set (result.power)
+        # This is important for netzero modes where calculated power may differ from 'netzero'
+        self.value = result.power
+
 
     def _handle_standby_check(self):
         """Check if we need to enter standby mode."""
@@ -2385,7 +2407,7 @@ class AutomationApp:
             return False
 
         # 1. Accumulate Power Meter Data
-        p1_data = self._accumulate_p1_data() # reads the configured power meter
+        p1_data = self._accumulate_p1_data() # reads the configured power meter via the API
         self._update_p1_state(p1_data)       # updates self.last_p1_total_power
 
         # 2. Check input
@@ -2393,7 +2415,7 @@ class AutomationApp:
             return False
 
         # 3. Schedule Logic
-        self._refresh_schedule_if_needed()
+        self._refresh_schedule_if_needed() # API call to the schedule API to get the current schedule entry
         self.old_value = self.value
         if self.pause_override_active: 
             desired_power = 0
@@ -2401,14 +2423,17 @@ class AutomationApp:
             desired_power = self._calculate_desired_power()
 
         # 4. Battery limits + runtime conditions + state updates
+        zendure_data = None
+        zendure_data = self._read_zendure_snapshot() # reads Zendure API once for this loop iteration
+
         if not self.pause_override_active:
-            self.controller.check_battery_limits()
-            desired_power = self._apply_runtime_conditions(desired_power)
-            desired_power = self._check_battery_limits(desired_power, prechecked=True)
-        self._update_zendure_state()
+            self.controller.check_battery_limits(zendure_data=zendure_data) # updates limit_state from the iteration snapshot
+            desired_power = self._apply_runtime_conditions(desired_power) # Checks if desired power is withing battery dynamic limits (uses cached Zendure data)
+            desired_power = self._check_battery_limits(desired_power, prechecked=True) # uses limit_state property to prevent charging a full battery or discharging an empty one
+        self._update_zendure_state() # stores the last Zendure data in self.api_state.last_zendure, this lead to GUI data
 
         # 5. Apply settings
-        self._apply_power_settings(desired_power, p1_data)
+        self._apply_power_settings(desired_power, p1_data, zendure_data=zendure_data) # translates the desired power into a (dedubbed) command to the Zendure device and sends it to the device
 
         # 6. Standby check
         self._handle_standby_check()
