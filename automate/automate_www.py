@@ -1313,9 +1313,9 @@ class StatusApi:
         """
         timestamp = int(datetime.now(ZoneInfo(STATUS_TIMEZONE)).timestamp())
         if self.on_update:
-            self.on_update(event_type, old_value, new_value, p1_total_power, timestamp)
+            self.on_update(event_type, old_value, new_value, p1_total_power, timestamp) # updates the in memory api_state.last_status property
 
-        self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp)
+        self._insert_status(event_type, old_value, new_value, p1_total_power, timestamp) # inserts the status update into the SQLite database
         return True
 
 
