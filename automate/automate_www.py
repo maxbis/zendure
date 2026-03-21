@@ -2384,9 +2384,9 @@ class AutomationApp:
         if self.shutdown_requested:
             return False
 
-        # 1. Accumulate Data
-        p1_data = self._accumulate_p1_data()
-        self._update_p1_state(p1_data)
+        # 1. Accumulate Power Meter Data
+        p1_data = self._accumulate_p1_data() # reads the configured power meter
+        self._update_p1_state(p1_data)       # updates self.last_p1_total_power
 
         # 2. Check input
         if not self._handle_user_input() or self.shutdown_requested:
@@ -2395,7 +2395,10 @@ class AutomationApp:
         # 3. Schedule Logic
         self._refresh_schedule_if_needed()
         self.old_value = self.value
-        desired_power = 0 if self.pause_override_active else self._calculate_desired_power()
+        if self.pause_override_active: 
+            desired_power = 0
+        else:
+            desired_power = self._calculate_desired_power()
 
         # 4. Battery limits + runtime conditions + state updates
         if not self.pause_override_active:

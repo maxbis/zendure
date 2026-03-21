@@ -323,11 +323,11 @@ if ($isApi) {
                 <div class="row split">
                     <div>
                         <label for="inp-min-value">Min Value (optional)</label>
-                        <input id="inp-min-value" type="number" step="100" placeholder="None">
+                        <input id="inp-min-value" type="number" min="100" step="100" placeholder="None">
                     </div>
                     <div>
                         <label for="inp-max-value">Max Value (optional)</label>
-                        <input id="inp-max-value" type="number" min="100" step="100" placeholder="None">
+                        <input id="inp-max-value" type="number" min="200" step="100" placeholder="None">
                     </div>
                 </div>
 
