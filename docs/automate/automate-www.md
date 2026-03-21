@@ -50,10 +50,10 @@ The current repository only contains `automate_www.py`. Compared with legacy `au
   - Default: `300`
   - Config override: `API_REFRESH_INTERVAL_SECONDS`
   - Meaning: schedule refresh interval (clamped 60-3600)
-- `ZERO_COUNT_THRESHOLD_STANDBY`
-  - Default: `21`
-  - Config override: `ZERO_COUNT_THRESHOLD_STANDBY`
-  - Meaning: consecutive 0-power iterations before standby (clamped 1-100)
+- `STANDBY_DELAY_SECONDS`
+  - Default: `300`
+  - Config override: none
+  - Meaning: seconds at continuous 0 power before standby
 - `HTTP_API_PORT`
   - Default: `1611`
   - Config override: none
@@ -140,7 +140,7 @@ Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_
    - Apply power step delta limiting (max change per iteration)
    - Apply power settings via `AutomateController`
    - Post status updates to `StatusApi` (SQLite + callback)
-   - Check standby threshold (consecutive zeros)
+   - Check standby delay (time at 0 power)
    - Update `api_state.last_zendure` and `api_state.last_status` as applicable
 
 5. **Status storage**: `StatusApi` writes to `{dataDir}/status_updates.db` and invokes `on_update`, which updates `api_state.last_status` for HTTP consumers. Data is retained for `statusUpdatesRetentionDays` (default 7).

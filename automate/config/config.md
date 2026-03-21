@@ -70,7 +70,6 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 |-----|------|-------------|------------|
 | **LOOP_INTERVAL_SECONDS** | number | Fallback seconds between main automation loop iterations when the selected power meter does not define its own interval. | `automate_www.py`: main loop sleep interval. |
 | **API_REFRESH_INTERVAL_SECONDS** | number | How often (seconds) to refresh data from external APIs (e.g. schedule) within the loop. | `automate_www.py`: throttles API calls. |
-| **ZERO_COUNT_THRESHOLD_STANDBY** | number | Number of consecutive “zero” readings before treating the system as standby. | `automate_www.py`: standby detection logic. |
 
 ---
 

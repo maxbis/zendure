@@ -42,8 +42,8 @@ LOOP_INTERVAL_SECONDS = 20
 # Time between schedule API refreshes (seconds) - 5 minutes
 API_REFRESH_INTERVAL_SECONDS = 300
 
-# Number of consecutive 0-power iterations before setting device to standby
-ZERO_COUNT_THRESHOLD_STANDBY = 21
+# Time at 0 power before setting device to standby (seconds)
+STANDBY_DELAY_SECONDS = 300
 
 # HTTP API port for /api/test endpoint
 HTTP_API_PORT = 1611
@@ -1698,14 +1698,13 @@ class AutomationApp:
         self.last_api_refresh_time = 0
         self.old_value = None
         self.value = 0
-        self.zero_count = 0
+        self.zero_power_since: Optional[float] = None
         self.pause_override_active = False
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
         self.stop_posted = False
         self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
-        self.zero_count_threshold_standby = ZERO_COUNT_THRESHOLD_STANDBY
         self._runtime_condition_warning_cache: set[str] = set()
         self._last_runtime_decision_signature: Optional[str] = None
 
@@ -1809,12 +1808,6 @@ class AutomationApp:
         except (TypeError, ValueError):
             api_refresh = API_REFRESH_INTERVAL_SECONDS
         self.api_refresh_interval_seconds = max(60, min(api_refresh, 3600))  # clamp 1–60 minutes
-
-        try:
-            zero_threshold = int(self.controller.config.get("ZERO_COUNT_THRESHOLD_STANDBY", ZERO_COUNT_THRESHOLD_STANDBY))
-        except (TypeError, ValueError):
-            zero_threshold = ZERO_COUNT_THRESHOLD_STANDBY
-        self.zero_count_threshold_standby = max(1, min(zero_threshold, 100))
 
     def _signal_handler(self, signum, frame=None):
         """Handle shutdown signals; force-exit on repeated Ctrl-C."""
@@ -2258,13 +2251,19 @@ class AutomationApp:
     def _handle_standby_check(self):
         """Check if we need to enter standby mode."""
         if self.value == 0:
-            self.zero_count += 1
-        else:
-            self.zero_count = 0
+            if self.zero_power_since is None:
+                self.zero_power_since = time.time()
+                return
 
-        if self.zero_count == self.zero_count_threshold_standby:
-            self.logger.info(f"0 power for {self.zero_count_threshold_standby} consecutive iterations, setting device in standby mode")
-            self.controller.set_standby_mode()
+            zero_duration = time.time() - self.zero_power_since
+            if zero_duration >= STANDBY_DELAY_SECONDS:
+                self.logger.info(
+                    f"0 power for {int(zero_duration)} seconds, setting device in standby mode"
+                )
+                self.controller.set_standby_mode()
+                self.zero_power_since = None
+        else:
+            self.zero_power_since = None
 
     def _handle_user_input(self) -> bool:
         """Process any pending user input. Returns False if quit requested."""

@@ -1,6 +1,6 @@
 # `_run_cycle()` Read Call Tree
 
-This note documents the current read behavior of [`_run_cycle()`](/D:/www/zendure/automate/automate_www.py#L2380) in `automate_www.py`.
+This note documents the current read behavior of [`_run_cycle()`](/D:/www/zendure/automate/automate_www.py#L2405) in `automate_www.py`.
 It focuses on which calls perform real reads, which only use cached state, and the worst-case number of reads in a single iteration.
 
 ## Call Tree
@@ -32,12 +32,16 @@ _run_cycle()
 |   |   `-- uses already-fetched schedule data
 |   `-- no direct API read in this function
 |
+|-- _read_zendure_snapshot()
+|   |-- get_reader(...)
+|   `-- reader.read_zendure(update_json=True)
+|       `-- READ: Zendure device API
+|
 |-- if not pause_override_active:
 |   |
-|   |-- controller.check_battery_limits()
-|   |   |-- get_reader(...)
-|   |   `-- reader.read_zendure(update_json=True)
-|   |       `-- READ: Zendure device API
+|   |-- controller.check_battery_limits(zendure_data=zendure_data)
+|   |   `-- uses the iteration snapshot to update limit_state
+|   |       no API read
 |   |
 |   |-- _apply_runtime_conditions(desired_power)
 |   |   `-- uses cached reader.last_zendure_data only
@@ -52,16 +56,15 @@ _run_cycle()
 |       no API read
 |
 |-- _apply_power_settings(desired_power, p1_data)
-|   `-- controller.set_power(desired_power, p1_data, schedule_entry)
+|   `-- controller.set_power(desired_power, p1_data, schedule_entry, zendure_data)
 |       |
 |       |-- fixed power mode (for example 0, 500, -800)
 |       |   `-- no extra READ before send
 |       |
 |       `-- dynamic mode ('netzero' / 'netzero+')
 |           `-- [calculate_netzero_power()](/D:/www/zendure/automate/device_controller.py#L747)
-|               |-- get_reader(...)
-|               `-- reader.read_zendure(update_json=True)
-|                   `-- READ: Zendure device API
+|               `-- uses caller-supplied zendure_data when available
+|                   no API read in the normal _run_cycle() path
 |           `-- _send_power_feed(target_power)
 |               `-- WRITE: Zendure device API
 |
@@ -70,8 +73,8 @@ _run_cycle()
         `-- WRITE only, no read
 ```
 
-The first Zendure read in the normal loop path comes from [`check_battery_limits()`](/D:/www/zendure/automate/device_controller.py#L509).
-The second Zendure read only happens when `_apply_power_settings()` resolves a dynamic power mode through `set_power(...) -> calculate_netzero_power(...)`.
+The loop now takes one pre-write Zendure snapshot and reuses it for battery-limit handling and dynamic power resolution.
+[`check_battery_limits()`](/D:/www/zendure/automate/device_controller.py#L509) still supports doing its own read, but in the normal `_run_cycle()` path it receives caller-supplied data instead.
 
 ## Worst Case Per Iteration
 
@@ -79,13 +82,12 @@ Worst case in one normal `_run_cycle()` iteration:
 
 - 1 read from the configured power meter via `_accumulate_p1_data()`
 - 1 read from the schedule API via `_refresh_schedule_if_needed()`
-- 1 Zendure read via `check_battery_limits()`
-- 1 extra Zendure read via `_apply_power_settings() -> set_power() -> calculate_netzero_power()` when the desired power is `netzero` or `netzero+`
+- 1 Zendure read via `_read_zendure_snapshot()`
 
 That means:
 
-- 4 total reads per iteration in the worst case
-- 2 of those reads are Zendure device reads
+- 3 total reads per iteration in the worst case
+- 1 of those reads is a Zendure device read
 
 ## Assumptions
 

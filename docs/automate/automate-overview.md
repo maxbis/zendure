@@ -150,7 +150,7 @@ When the battery reaches its **Minimum Charge Level** (e.g., 20%):
 
 ### 4. Standby Mode
 
-When the device has been at 0 power for a configurable number of consecutive iterations (default: 10), the system automatically puts the device into standby mode using a sequence: 1W → 2s sleep → 0W. This ensures the device properly enters standby state.
+When the device has been at 0 power continuously for 5 minutes, the system automatically puts the device into standby mode using a sequence: 1W → 2s sleep → 0W. This ensures the device properly enters standby state.
 
 ## API Calls Used by `automate_www.py`
 
