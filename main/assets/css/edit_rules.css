@@ -76,6 +76,11 @@ code {
     flex-wrap: wrap;
 }
 
+#btn-save-imported:not([hidden]) {
+    background: #0f766e;
+    border-color: #115e59;
+}
+
 .card-hero {
     display: grid;
     gap: 10px;
@@ -516,5 +521,9 @@ button.danger.condition-remove-btn:hover {
 
     .status {
         font-size: 1rem;
+    }
+
+    .card-header-row {
+        align-items: flex-start;
     }
 }

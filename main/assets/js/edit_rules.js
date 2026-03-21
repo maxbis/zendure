@@ -5,6 +5,7 @@
         rules: [],
         editIndex: null,
         initialRuleIndex: Number.isInteger(window.EDIT_RULES_INITIAL_RULE) ? window.EDIT_RULES_INITIAL_RULE - 1 : null,
+        hasPendingImportedRules: false,
     };
 
     const els = {
@@ -15,6 +16,10 @@
         rawJsonCard: document.getElementById('raw-json-card'),
         rawJsonTextarea: document.getElementById('raw-json-textarea'),
         rulesFilePath: document.getElementById('rules-file-path'),
+        importJsonInput: document.getElementById('import-json-input'),
+        btnExportJson: document.getElementById('btn-export-json'),
+        btnImportJson: document.getElementById('btn-import-json'),
+        btnSaveImported: document.getElementById('btn-save-imported'),
         btnRawJson: document.getElementById('btn-raw-json'),
         btnCopyRawJson: document.getElementById('btn-copy-raw-json'),
         btnCopyFilePath: document.getElementById('btn-copy-file-path'),
@@ -87,6 +92,12 @@
     function setStatus(text, type) {
         els.status.className = 'status ' + (type || '');
         els.status.textContent = text || '';
+    }
+
+    function updatePendingImportState() {
+        if (!els.btnSaveImported) return;
+        els.btnSaveImported.hidden = !state.hasPendingImportedRules;
+        els.btnSaveImported.disabled = !state.hasPendingImportedRules;
     }
 
     function renderRawJson() {
@@ -328,6 +339,12 @@
         renderTable();
     }
 
+    function resetImportedFileInput() {
+        if (els.importJsonInput) {
+            els.importJsonInput.value = '';
+        }
+    }
+
     function updateValueModeFields() {
         const isFixed = els.inpValueMode.value === 'fixed';
         const allowBounds = !isFixed;
@@ -540,6 +557,8 @@
     async function saveRulesToFile(successMessage) {
         try {
             const result = await apiSave();
+            state.hasPendingImportedRules = false;
+            updatePendingImportState();
             setStatus(successMessage || (result.message + ' (' + result.count + ' rules)'), 'ok');
             return true;
         } catch (e) {
@@ -565,6 +584,9 @@
         try {
             const rules = await apiGet();
             state.rules = rules.map(normalizeRule);
+            state.hasPendingImportedRules = false;
+            updatePendingImportState();
+            resetImportedFileInput();
             renderTable();
             clearEditor();
             if (!applyInitialRuleSelection()) {
@@ -575,8 +597,133 @@
         }
     }
 
+    function getExportFilename() {
+        const now = new Date();
+        const parts = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0'),
+            '-',
+            String(now.getHours()).padStart(2, '0'),
+            String(now.getMinutes()).padStart(2, '0'),
+            String(now.getSeconds()).padStart(2, '0'),
+        ];
+        return 'charge_schedule_conditions-' + parts.join('') + '.json';
+    }
+
+    function downloadRulesJson() {
+        const payload = JSON.stringify(state.rules, null, 2);
+        const blob = new Blob([payload], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = getExportFilename();
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(function () {
+            URL.revokeObjectURL(url);
+        }, 0);
+        setStatus('Exported ' + state.rules.length + ' rules to JSON.', 'ok');
+    }
+
+    function normalizeImportedRules(rawRules) {
+        if (!Array.isArray(rawRules)) {
+            throw new Error('Imported JSON must be an array of rules.');
+        }
+        const normalized = rawRules
+            .filter(function (rule) {
+                return !!rule && typeof rule === 'object';
+            })
+            .map(normalizeRule)
+            .filter(function (rule) {
+                if (!rule || !rule.name) return false;
+                if (rule.value === 'netzero' || rule.value === 'netzero+') return true;
+                return Number.isFinite(Number(rule.value));
+            });
+        return normalized;
+    }
+
+    function applyImportedRules(normalizedRules, originalCount) {
+        state.rules = normalizedRules;
+        state.hasPendingImportedRules = true;
+        updatePendingImportState();
+        clearEditor();
+        resetImportedFileInput();
+        const droppedCount = Math.max(0, originalCount - normalizedRules.length);
+        const message = droppedCount > 0
+            ? ('Imported ' + normalizedRules.length + ' of ' + originalCount + ' rules. ' + droppedCount + ' invalid entries were skipped. Save Imported Rules to persist.')
+            : ('Imported ' + normalizedRules.length + ' rules locally. Click Save Imported Rules to persist.');
+        setStatus(message, droppedCount > 0 ? 'error' : 'ok');
+    }
+
+    function readImportedFile(file) {
+        return new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                resolve(String(reader.result || ''));
+            };
+            reader.onerror = function () {
+                reject(new Error('Failed to read the selected JSON file.'));
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    async function importRulesFromFile(file) {
+        if (!file) return;
+        const previousRules = cloneDeep(state.rules);
+        const previousEditIndex = state.editIndex;
+        const previousPending = state.hasPendingImportedRules;
+        try {
+            const rawText = await readImportedFile(file);
+            let parsed;
+            try {
+                parsed = JSON.parse(rawText);
+            } catch (e) {
+                throw new Error('Imported file does not contain valid JSON.');
+            }
+            const originalCount = Array.isArray(parsed) ? parsed.length : 0;
+            const normalizedRules = normalizeImportedRules(parsed);
+            state.editIndex = previousEditIndex;
+            applyImportedRules(normalizedRules, originalCount);
+        } catch (e) {
+            state.rules = previousRules;
+            state.editIndex = previousEditIndex;
+            state.hasPendingImportedRules = previousPending;
+            updatePendingImportState();
+            resetImportedFileInput();
+            renderTable();
+            setStatus(e.message || 'Failed to import rules JSON.', 'error');
+        }
+    }
+
     function attachEvents() {
         applyEditorHelpTooltips();
+        updatePendingImportState();
+
+        if (els.btnExportJson) {
+            els.btnExportJson.addEventListener('click', function () {
+                downloadRulesJson();
+            });
+        }
+
+        if (els.btnImportJson && els.importJsonInput) {
+            els.btnImportJson.addEventListener('click', function () {
+                els.importJsonInput.click();
+            });
+            els.importJsonInput.addEventListener('change', function (e) {
+                const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                importRulesFromFile(file);
+            });
+        }
+
+        if (els.btnSaveImported) {
+            els.btnSaveImported.addEventListener('click', async function () {
+                if (!state.hasPendingImportedRules) return;
+                await saveRulesToFile('Imported rules saved.');
+            });
+        }
 
         els.btnRawJson.addEventListener('click', function () {
             renderRawJson();
