@@ -74,6 +74,32 @@ function showReloadOverlay() {
     });
 }
 
+async function requestScheduleReloadBeforePageReload() {
+    const response = await fetch('api/refresh_schedule_proxy.php', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    });
+
+    let payload = null;
+    try {
+        payload = await response.json();
+    } catch (error) {
+        throw new Error('Refresh schedule proxy returned invalid JSON');
+    }
+
+    if (!response.ok || !payload || payload.ok !== true) {
+        const message = payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Failed to reload schedule before page refresh';
+        throw new Error(message);
+    }
+
+    return payload;
+}
+
 /**
  * Setup long-press handler for mobile refresh button
  * Long-press reloads page directly without dialog
@@ -155,7 +181,7 @@ function setupMobileLongPressHandler(button) {
         }, 16); // ~60fps
         
         // Start timer
-        longPressTimer = setTimeout(() => {
+        longPressTimer = setTimeout(async () => {
             hasLongPressTriggered = true;
             shouldPreventClick = true;
             
@@ -171,7 +197,13 @@ function setupMobileLongPressHandler(button) {
             
             // Show reload overlay
             showReloadOverlay();
-            
+
+            try {
+                await requestScheduleReloadBeforePageReload();
+            } catch (error) {
+                console.error('Long-press schedule reload failed before page reload:', error);
+            }
+
             // Reload page after a short delay to show the overlay
             setTimeout(() => {
                 window.location.reload();
