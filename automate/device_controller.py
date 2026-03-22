@@ -822,7 +822,9 @@ class AutomateController(BaseDeviceController):
             #     return new_input if new_input > 0 else 0
 
         # netzero mode: use discharge when needed, otherwise stop.
-        raw_target_power = -new_output if new_output > 0 else 0
+        # raw_target_power = -new_output if new_output > 0 else 0
+        raw_target_power = -new_output
+
         reversal_hint = new_input > 0
         if reversal_hint:
             self.log(
