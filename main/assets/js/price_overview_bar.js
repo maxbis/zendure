@@ -506,6 +506,28 @@ function estimateSchedulePowerForPopup(scheduleValue) {
     return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
+function clampSchedulePowerForPopup(scheduleValue, minValue, maxValue) {
+    const defaultPowerW = estimateSchedulePowerForPopup(scheduleValue);
+    const direction = defaultPowerW < 0 ? -1 : (defaultPowerW > 0 ? 1 : 0);
+    if (direction === 0) {
+        return defaultPowerW;
+    }
+
+    let effectiveMagnitude = Math.abs(defaultPowerW);
+
+    const parsedMin = Number(minValue);
+    if (Number.isFinite(parsedMin)) {
+        effectiveMagnitude = Math.max(effectiveMagnitude, Math.abs(parsedMin));
+    }
+
+    const parsedMax = Number(maxValue);
+    if (Number.isFinite(parsedMax)) {
+        effectiveMagnitude = Math.min(effectiveMagnitude, Math.abs(parsedMax));
+    }
+
+    return direction * effectiveMagnitude;
+}
+
 const POPUP_RUNTIME_BATTERY_FIELDS = new Set(['electricity_level', 'electric_level', 'electricLevel']);
 
 /**
@@ -604,19 +626,23 @@ function getPopupForecastForBar(targetBar) {
             continue;
         }
 
-        const rawScheduledPowerW = estimateSchedulePowerForPopup(bar.dataset.scheduleValue);
-        const percentPerHour = powerToCapacityPercent(rawScheduledPowerW);
+        const scheduledPowerW = clampSchedulePowerForPopup(
+            bar.dataset.scheduleValue,
+            bar.dataset.minValue,
+            bar.dataset.maxValue
+        );
+        const percentPerHour = powerToCapacityPercent(scheduledPowerW);
         const rawDeltaPercent = percentPerHour == null ? 0 : percentPerHour * durationHours;
-        const signedDeltaPercent = rawScheduledPowerW < 0 ? -rawDeltaPercent : rawDeltaPercent;
+        const signedDeltaPercent = scheduledPowerW < 0 ? -rawDeltaPercent : rawDeltaPercent;
         const startPercent = runningPercent;
         let endPercent = Math.max(
             batteryState.minChargeLevel,
             Math.min(batteryState.maxChargeLevel, startPercent + signedDeltaPercent)
         );
-        let estimatedPowerW = rawScheduledPowerW;
+        let estimatedPowerW = scheduledPowerW;
 
         const ruleFloor = getDischargeSocFloorFromRuntimeConditions(parseBarDatasetRuntimeConditions(bar));
-        if (ruleFloor != null && rawScheduledPowerW < 0) {
+        if (ruleFloor != null && scheduledPowerW < 0) {
             if (startPercent <= ruleFloor) {
                 endPercent = startPercent;
                 estimatedPowerW = 0;
@@ -1476,7 +1502,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
 
     /**
      * Build an expanded hour -> rule metadata map from resolved schedule slots.
-     * Propagates last known rule_name/rule_index forward across the day.
+     * Propagates last known rule_name/rule_index/min_value/max_value forward across the day.
      */
     const buildExpandedRuleMetaMap = (resolved) => {
         if (!Array.isArray(resolved) || resolved.length === 0) return null;
@@ -1497,11 +1523,23 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 slot.rule_index !== undefined &&
                 slot.rule_index !== null &&
                 !Number.isNaN(Number(slot.rule_index));
+            const hasMinValue = Object.prototype.hasOwnProperty.call(slot, 'min_value') &&
+                slot.min_value !== undefined &&
+                slot.min_value !== null &&
+                slot.min_value !== '' &&
+                Number.isFinite(Number(slot.min_value));
+            const hasMaxValue = Object.prototype.hasOwnProperty.call(slot, 'max_value') &&
+                slot.max_value !== undefined &&
+                slot.max_value !== null &&
+                slot.max_value !== '' &&
+                Number.isFinite(Number(slot.max_value));
 
-            if (hasRuleName || hasRuleIndex) {
+            if (hasRuleName || hasRuleIndex || hasMinValue || hasMaxValue) {
                 lastRuleMeta = {
                     ruleName: hasRuleName ? String(slot.rule_name).trim() : undefined,
-                    ruleIndex: hasRuleIndex ? String(parseInt(slot.rule_index, 10)) : undefined
+                    ruleIndex: hasRuleIndex ? String(parseInt(slot.rule_index, 10)) : undefined,
+                    minValue: hasMinValue ? Number(slot.min_value) : undefined,
+                    maxValue: hasMaxValue ? Number(slot.max_value) : undefined
                 };
             } else {
                 lastRuleMeta = undefined;
@@ -1612,6 +1650,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         let runtimeConditions;
         let ruleName;
         let ruleIndex;
+        let minValue;
+        let maxValue;
 
         const runtimeConditionsArrayMap = scheduleRuntimeConditionsArrayMapByDate[dateStr];
 
@@ -1630,15 +1670,34 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
         if (ruleMetaMap && Object.prototype.hasOwnProperty.call(ruleMetaMap, hourIndex) && ruleMetaMap[hourIndex]) {
             ruleName = ruleMetaMap[hourIndex].ruleName;
             ruleIndex = ruleMetaMap[hourIndex].ruleIndex;
+            minValue = ruleMetaMap[hourIndex].minValue;
+            maxValue = ruleMetaMap[hourIndex].maxValue;
         }
 
-        if (value !== undefined || source !== undefined || hasRuntimeCondition !== undefined || ruleName !== undefined || ruleIndex !== undefined) {
-            return { value, source, hasRuntimeCondition, runtimeConditions, ruleName, ruleIndex };
+        if (
+            value !== undefined ||
+            source !== undefined ||
+            hasRuntimeCondition !== undefined ||
+            ruleName !== undefined ||
+            ruleIndex !== undefined ||
+            minValue !== undefined ||
+            maxValue !== undefined
+        ) {
+            return { value, source, hasRuntimeCondition, runtimeConditions, ruleName, ruleIndex, minValue, maxValue };
         }
 
         const entries = scheduleByDate[dateStr];
         if (!entries || entries.length === 0) {
-            return { value: undefined, source: undefined, hasRuntimeCondition: undefined, runtimeConditions: undefined, ruleName: undefined, ruleIndex: undefined };
+            return {
+                value: undefined,
+                source: undefined,
+                hasRuntimeCondition: undefined,
+                runtimeConditions: undefined,
+                ruleName: undefined,
+                ruleIndex: undefined,
+                minValue: undefined,
+                maxValue: undefined
+            };
         }
 
         let activeValue = undefined;
@@ -1650,7 +1709,16 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 break;
             }
         }
-        return { value: activeValue, source: undefined, hasRuntimeCondition: undefined, runtimeConditions: undefined, ruleName: undefined, ruleIndex: undefined };
+        return {
+            value: activeValue,
+            source: undefined,
+            hasRuntimeCondition: undefined,
+            runtimeConditions: undefined,
+            ruleName: undefined,
+            ruleIndex: undefined,
+            minValue: undefined,
+            maxValue: undefined
+        };
     };
 
     // Extract price data
@@ -1751,7 +1819,16 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             const hourTime = hourKey + '00';
             const key = dateStr + hourTime;
             
-            const { value: scheduledValue, source: scheduledSource, hasRuntimeCondition, runtimeConditions, ruleName, ruleIndex } = getActiveScheduleInfo(dateStr, hourKey);
+            const {
+                value: scheduledValue,
+                source: scheduledSource,
+                hasRuntimeCondition,
+                runtimeConditions,
+                ruleName,
+                ruleIndex,
+                minValue,
+                maxValue
+            } = getActiveScheduleInfo(dateStr, hourKey);
             const rawScheduleEntry = scheduleMap[key];
 
             // Create bar element
@@ -1787,6 +1864,12 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             if (ruleIndex !== undefined && ruleIndex !== null && String(ruleIndex).trim() !== '') {
                 barDiv.dataset.ruleIndex = String(ruleIndex);
+            }
+            if (minValue !== undefined && minValue !== null && Number.isFinite(Number(minValue))) {
+                barDiv.dataset.minValue = String(minValue);
+            }
+            if (maxValue !== undefined && maxValue !== null && Number.isFinite(Number(maxValue))) {
+                barDiv.dataset.maxValue = String(maxValue);
             }
             barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             

@@ -803,17 +803,11 @@ class AutomateController(BaseDeviceController):
         # Handle netzero+ mode (no discharge, only charge)
         if mode == 'netzero+':
             raw_target_power = new_input if new_input > 0 else 0
-            self._last_dynamic_power_context = {
-                'mode': mode,
-                'raw_power': raw_target_power,
-                'guarded_power': raw_target_power,
-                'guard_active': False,
-                'reversal_hint': False,
-            }
+
             # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
-            if new_input > 0: # Charging is requested?
-                return new_input
-            return 0
+            # if new_input > 0: # Charging is requested?
+            #     return new_input
+            # return 0
 
             # if new_output > 0: # Discharging is requested?
             #     return 0 # Netzero+ doesn't discharge, return 0
@@ -821,11 +815,20 @@ class AutomateController(BaseDeviceController):
             #     # Charging or stopped - if stopped (0), return 1 to avoid standby
             #     return new_input if new_input > 0 else 0
 
-        # netzero mode: use discharge when needed, otherwise stop.
-        # raw_target_power = -new_output if new_output > 0 else 0
-        raw_target_power = -new_output
+        else:
 
-        reversal_hint = new_input > 0
+            if self.config.get('NETZERO_BI_DIRECTIONAL', False): # experimental to make netzero a true bi directional netzero mode
+                raw_target_power = -new_output + new_input
+            else: # default to the original netzero mode
+                raw_target_power = -new_output if new_output > 0 else 0
+
+        # reversal_hint, if power flips direction, we need to ramp down to 0
+        # power slides to 50, 0 and can then reverse direction.
+        if self.previous_power is not None:
+            reversal_hint = self.previous_power * raw_target_power < 0
+        else:
+            reversal_hint = False
+        
         if reversal_hint:
             self.log(
                 'warning',
