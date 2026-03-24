@@ -4,8 +4,8 @@ declare(strict_types=1);
 const SHORTWAVE_CACHE_FILE = __DIR__ . '/shortwave_radiation_cache.json';
 const SHORTWAVE_CACHE_TTL = 6 * 60 * 60;
 
-$latitude = isset($_GET['latitude']) ? (float) $_GET['latitude'] : 52.3;
-$longitude = isset($_GET['longitude']) ? (float) $_GET['longitude'] : 4.863;
+$latitude = isset($_GET['latitude']) ? (float) $_GET['latitude'] : 52.3099;
+$longitude = isset($_GET['longitude']) ? (float) $_GET['longitude'] : 4.8540;
 $timezone = isset($_GET['timezone']) && is_string($_GET['timezone']) && $_GET['timezone'] !== ''
     ? $_GET['timezone']
     : 'Europe/Amsterdam';
