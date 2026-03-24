@@ -244,6 +244,9 @@ if ($isApi) {
             <h1>⚡ Zendure Rules Editor</h1>
             <div class="actions">
                 <a class="btn-link" href="./">Back to /main</a>
+                <button id="btn-export-json" type="button">Export JSON</button>
+                <button id="btn-import-json" type="button">Import JSON</button>
+                <button id="btn-save-imported" type="button" hidden disabled>Save Imported Rules</button>
                 <button id="btn-raw-json" type="button">Raw JSON</button>
                 <button id="btn-reload" type="button">Reload</button>
                 <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
@@ -251,6 +254,7 @@ if ($isApi) {
         </div>
         <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>
         <div id="status" class="status"></div>
+        <input id="import-json-input" type="file" accept=".json,application/json" hidden>
     </section>
 
     <section class="card raw-json-card" id="raw-json-card" hidden>

@@ -1,0 +1,1 @@
+pytest test_zendure_command_scenarios.py -v -s

@@ -398,7 +398,10 @@ def _import_device_controller_module():
 def _make_minimal_automate_controller(device_controller_module):
     controller = device_controller_module.AutomateController.__new__(device_controller_module.AutomateController)
     controller.test_mode = True
+    controller.config_path = Path("/tmp/config.jsonc")
     controller.previous_power = None
+    controller.power_feed_min_threshold = 30
+    controller.power_feed_min_delta = 0
     controller.power_feed_max_delta = 300
     controller.limit_state = 0
     controller.min_charge_level = 15
@@ -407,6 +410,9 @@ def _make_minimal_automate_controller(device_controller_module):
     controller.max_charge_power = 1200
     controller.device_ip = "127.0.0.1"
     controller.device_sn = "TEST-SN"
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.reversal_ramp_guard = device_controller_module.ReversalRampGuard(enabled=True    )
+    controller._last_dynamic_power_context = {}
     controller.log = lambda *args, **kwargs: None
     controller._build_device_properties = device_controller_module.AutomateController._build_device_properties.__get__(
         controller, device_controller_module.AutomateController
@@ -836,7 +842,7 @@ def test_controller_find_current_schedule_value_keeps_min_max_metadata():
 def test_controller_set_power_clamps_netzero_to_schedule_bounds():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -854,7 +860,7 @@ def test_controller_set_power_clamps_netzero_to_schedule_bounds():
 def test_controller_set_power_clamps_netzero_plus_without_discharge():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: 50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: 50
     controller._last_dynamic_power_context = {"raw_power": 50, "guarded_power": 50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -869,6 +875,44 @@ def test_controller_set_power_clamps_netzero_plus_without_discharge():
     assert result.power == 100
 
 
+def test_calculate_netzero_power_never_charges_in_netzero_mode():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+    controller._calculate_new_settings = lambda p1_power, current_input, current_output, electric_level: (250, 0)
+
+    result = device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero",
+        p1_data={"total_power": -250},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert result == 0
+
+
+def test_calculate_netzero_plus_power_never_discharges():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+    controller._calculate_new_settings = lambda p1_power, current_input, current_output, electric_level: (0, 250)
+
+    result = device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero+",
+        p1_data={"total_power": 250},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert result == 0
+
+
 def test_controller_set_power_applies_max_delta_to_fixed_values():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
@@ -880,11 +924,112 @@ def test_controller_set_power_applies_max_delta_to_fixed_values():
     assert result.power == 300
 
 
+def test_controller_send_power_feed_limits_discharge_to_configured_max():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.max_discharge_power = 1200
+
+    success, error, actual_power = device_controller.AutomateController._send_power_feed(controller, -1500)
+
+    assert success is True
+    assert error is None
+    assert actual_power == -1200
+    assert controller.previous_power == -1200
+
+
+def test_controller_send_power_feed_limits_charge_to_configured_max():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.max_charge_power = 1200
+
+    success, error, actual_power = device_controller.AutomateController._send_power_feed(controller, 1500)
+
+    assert success is True
+    assert error is None
+    assert actual_power == 1200
+    assert controller.previous_power == 1200
+
+
+def test_controller_set_power_reaches_target_in_300w_steps():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.previous_power = 0
+
+    step_one = device_controller.AutomateController.set_power(controller, 1000)
+    step_two = device_controller.AutomateController.set_power(controller, 1000)
+    step_three = device_controller.AutomateController.set_power(controller, 1000)
+    step_four = device_controller.AutomateController.set_power(controller, 1000)
+
+    assert step_one.success is True
+    assert step_two.success is True
+    assert step_three.success is True
+    assert step_four.success is True
+    assert [step_one.power, step_two.power, step_three.power, step_four.power] == [300, 600, 900, 1000]
+    assert controller.previous_power == 1000
+
+
+def test_controller_set_power_netzero_from_zero_with_p1_400_sends_expected_zendure_command(monkeypatch):
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.test_mode = False
+    controller.previous_power = 0
+    sent_requests = []
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"success": True}
+
+    def _fake_post(url, json, timeout, headers):
+        sent_requests.append(
+            {
+                "url": url,
+                "json": json,
+                "timeout": timeout,
+                "headers": headers,
+            }
+        )
+        return _Response()
+
+    monkeypatch.setattr(device_controller.requests, "post", _fake_post)
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 400},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    print("Zendure API request:", json.dumps(sent_requests[0], indent=2, sort_keys=True))
+    print("Applied power:", result.power)
+
+    assert result.success is True
+    assert result.power == -300
+    assert sent_requests == [
+        {
+            "url": "http://127.0.0.1/properties/write",
+            "json": {
+                "sn": "TEST-SN",
+                "properties": {
+                    "acMode": 2,
+                    "outputLimit": 300,
+                    "inputLimit": 0,
+                    "smartMode": 1,
+                },
+            },
+            "timeout": device_controller.BaseDeviceController.REQUEST_TIMEOUT,
+            "headers": {"Content-Type": "application/json"},
+        }
+    ]
+
+
 def test_controller_set_power_applies_max_delta_to_netzero_values():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
     controller.previous_power = -179
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -1000
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -1000
     controller._last_dynamic_power_context = {"raw_power": -1000, "guarded_power": -1000, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -923,7 +1068,7 @@ def test_controller_test_mode_updates_previous_power_for_simulated_send():
 def test_controller_test_mode_uses_simulated_previous_power_for_next_max_delta_step():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -800
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -800
     controller._last_dynamic_power_context = {"raw_power": -800, "guarded_power": -800, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1150,7 +1295,7 @@ def test_controller_set_power_logs_when_device_limits_override_bounded_result():
     controller.test_mode = False
     controller.previous_power = None
     controller.power_feed_max_delta = 300
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None: -50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
     controller._apply_power_feed_max_delta = device_controller.AutomateController._apply_power_feed_max_delta.__get__(controller, device_controller.AutomateController)
