@@ -65,7 +65,7 @@ if ($payload !== null) {
     $units = $payload['hourly_units'] ?? [];
     $times = is_array($hourly['time'] ?? null) ? $hourly['time'] : [];
     $values = is_array($hourly['shortwave_radiation'] ?? null) ? $hourly['shortwave_radiation'] : [];
-    $unit = isset($units['shortwave_radiation']) ? (string) $units['shortwave_radiation'] : $unit;
+    $unit = hourlyRadiationUnit();
     $timezoneLabel = isset($payload['timezone']) ? (string) $payload['timezone'] : $timezone;
 
     if (count($times) === 0 || count($times) !== count($values)) {
@@ -326,7 +326,7 @@ function buildDaySummaries(array $times, array $values, float $paddingLeft, floa
             'date_label' => $group['date_label'],
             'center_x' => ($startX + $endX) / 2.0,
             'start_x' => $startX,
-            'total' => number_format($group['total'], 0) . ' Wh/mÂ²',
+            'total' => number_format($group['total'], 0) . ' ' . dailyEnergyUnit(),
         ];
     }
 
@@ -386,6 +386,26 @@ function formatSummaryDateTime(string $timestamp): string
     } catch (Exception $e) {
         return $timestamp;
     }
+}
+
+function normalizeShortwaveUnit(string $unit): string
+{
+    $normalized = str_replace(["Â²", "Ã‚Â²"], "²", $unit);
+    $normalized = trim($normalized);
+    if ($normalized === '' || stripos($normalized, 'w/m') === false) {
+        return hourlyRadiationUnit();
+    }
+    return $normalized;
+}
+
+function hourlyRadiationUnit(): string
+{
+    return "W/m\u{00B2}";
+}
+
+function dailyEnergyUnit(): string
+{
+    return "Wh/m\u{00B2}";
 }
 
 function h(string $value): string
@@ -804,10 +824,11 @@ function h(string $value): string
                             <?php endforeach; ?>
 
                             <text
-                                x="18"
-                                y="<?= h((string) ($chart['padding_top'] + 10)) ?>"
-                                font-size="12"
-                                fill="#9fb8d0"
+                                x="0"
+                                y="<?= h((string) ($chart['padding_top'] + 30)) ?>"
+                                font-size="14"
+                                font-weight="400"
+                                fill="#7ec8ff"
                             ><?= h((string) $chart['unit']) ?></text>
 
                             <line
@@ -868,14 +889,14 @@ function h(string $value): string
                                     x="<?= h((string) $day['center_x']) ?>"
                                     y="<?= h((string) ($chart['height'] - $chart['padding_bottom'] + 72)) ?>"
                                     text-anchor="middle"
-                                    font-size="11"
+                                    font-size="14"
                                     fill="#8ea0b0"
                                 ><?= h((string) $day['date_label']) ?></text>
                                 <text
                                     x="<?= h((string) $day['center_x']) ?>"
                                     y="<?= h((string) ($chart['height'] - $chart['padding_bottom'] + 92)) ?>"
                                     text-anchor="middle"
-                                    font-size="12"
+                                    font-size="16"
                                     fill="#9fd3ff"
                                 ><?= h((string) $day['total']) ?></text>
                             <?php endforeach; ?>
@@ -930,4 +951,3 @@ function h(string $value): string
 </script>
 </body>
 </html>
-
