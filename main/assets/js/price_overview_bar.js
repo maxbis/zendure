@@ -4,10 +4,15 @@
  */
 
 /** 24 cent – used for bar height when no price data; bars stay grey and tooltip says no data */
-const PRICE_PROXY_NO_DATA = 0.24;
-const POPUP_POWER_EFFICIENCY = 0.9;
-const POPUP_NETZERO_REFERENCE_W = 200;
-const POPUP_NETZERO_PLUS_REFERENCE_W = 300;
+function getPriceOverviewNumberConfig(key, fallback) {
+    const value = window.PRICE_OVERVIEW_CONFIG ? window.PRICE_OVERVIEW_CONFIG[key] : undefined;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+const PRICE_PROXY_NO_DATA = getPriceOverviewNumberConfig('priceProxyNoData', 0.24);
+const POPUP_POWER_EFFICIENCY = getPriceOverviewNumberConfig('popupPowerEfficiency', 0.9);
+const POPUP_NETZERO_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroReferenceW', 200);
+const POPUP_NETZERO_PLUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroPlusReferenceW', 300);
 
 /**
  * Interpolates between two RGB colors

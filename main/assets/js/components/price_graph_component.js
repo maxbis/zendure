@@ -3,7 +3,10 @@
  * Manages the price overview bar graph display
  * Uses same proxy value as price_overview_bar.js (0.24) but local name to avoid duplicate global.
  */
-const PRICE_PROXY_CENTS = 0.24;
+const PRICE_PROXY_CENTS = (() => {
+    const value = window.PRICE_OVERVIEW_CONFIG ? window.PRICE_OVERVIEW_CONFIG.priceProxyNoData : undefined;
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0.24;
+})();
 
 class PriceGraphComponent extends Component {
     constructor(container, options = {}) {
