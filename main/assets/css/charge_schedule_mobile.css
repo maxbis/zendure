@@ -1085,6 +1085,13 @@ body.mobile-dark {
     gap: 8px;
 }
 
+.schedule-rules-actions > a.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
 .schedule-rules-link {
     font-size: 0.76rem;
     letter-spacing: 0.02em;

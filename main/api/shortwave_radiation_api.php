@@ -44,13 +44,18 @@ try {
     $responsePayload = readShortwaveCache($cachePath);
     if ($responsePayload === null || isCacheExpired($responsePayload, $cacheTtlSeconds)) {
         $payload = fetchOpenMeteoJson($apiUrl);
+        $hourlySeries = extractHourlyShortwaveSeries($payload);
         $responsePayload = [
             'success' => true,
             'latitude' => $latitude,
             'longitude' => $longitude,
             'timezone' => isset($payload['timezone']) ? (string) $payload['timezone'] : $timezone,
             'unit' => dailyShortwaveUnit(),
-            'days' => extractDailyShortwaveTotals($payload),
+            'days' => extractDailyShortwaveTotals($hourlySeries['time'], $hourlySeries['shortwave_radiation']),
+            'hourly' => $hourlySeries,
+            'hourly_units' => [
+                'shortwave_radiation' => hourlyShortwaveUnit($payload),
+            ],
             'cachedAt' => time(),
         ];
         writeShortwaveCache($cachePath, $responsePayload);
@@ -63,6 +68,8 @@ try {
         'timezone' => $responsePayload['timezone'],
         'unit' => $responsePayload['unit'],
         'days' => $responsePayload['days'],
+        'hourly' => $responsePayload['hourly'],
+        'hourly_units' => $responsePayload['hourly_units'],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(resolveStatusCode($e->getMessage()));
@@ -122,12 +129,24 @@ function fetchOpenMeteoJson(string $url): array
     return $decoded;
 }
 
-function extractDailyShortwaveTotals(array $payload): array
+function extractHourlyShortwaveSeries(array $payload): array
 {
     $hourly = $payload['hourly'] ?? null;
     $times = is_array($hourly['time'] ?? null) ? $hourly['time'] : [];
     $values = is_array($hourly['shortwave_radiation'] ?? null) ? $hourly['shortwave_radiation'] : [];
 
+    if (count($times) === 0 || count($times) !== count($values)) {
+        throw new RuntimeException('The API returned invalid hourly shortwave radiation data.');
+    }
+
+    return [
+        'time' => array_map(static fn ($time): string => (string) $time, $times),
+        'shortwave_radiation' => array_map(static fn ($value): float => (float) $value, $values),
+    ];
+}
+
+function extractDailyShortwaveTotals(array $times, array $values): array
+{
     if (count($times) === 0 || count($times) !== count($values)) {
         throw new RuntimeException('The API returned invalid hourly shortwave radiation data.');
     }
@@ -183,8 +202,22 @@ function readShortwaveCache(string $path): ?array
     $decoded = json_decode($raw, true);
     if (
         !is_array($decoded) ||
-        !isset($decoded['cachedAt'], $decoded['latitude'], $decoded['longitude'], $decoded['timezone'], $decoded['unit'], $decoded['days']) ||
-        !is_array($decoded['days'])
+        !isset(
+            $decoded['cachedAt'],
+            $decoded['latitude'],
+            $decoded['longitude'],
+            $decoded['timezone'],
+            $decoded['unit'],
+            $decoded['days'],
+            $decoded['hourly'],
+            $decoded['hourly_units']
+        ) ||
+        !is_array($decoded['days']) ||
+        !is_array($decoded['hourly']) ||
+        !is_array($decoded['hourly_units']) ||
+        !is_array($decoded['hourly']['time'] ?? null) ||
+        !is_array($decoded['hourly']['shortwave_radiation'] ?? null) ||
+        !isset($decoded['hourly_units']['shortwave_radiation'])
     ) {
         return null;
     }
@@ -232,4 +265,17 @@ function resolveStatusCode(string $message): int
 function dailyShortwaveUnit(): string
 {
     return "Wh/m\u{00B2}";
+}
+
+function hourlyShortwaveUnit(array $payload): string
+{
+    $units = $payload['hourly_units'] ?? [];
+    $raw = is_string($units['shortwave_radiation'] ?? null) ? $units['shortwave_radiation'] : '';
+    $normalized = str_replace(["Â²", "Ã‚Â²"], "²", trim($raw));
+
+    if ($normalized === '' || stripos($normalized, 'w/m') === false) {
+        return "W/m\u{00B2}";
+    }
+
+    return $normalized;
 }

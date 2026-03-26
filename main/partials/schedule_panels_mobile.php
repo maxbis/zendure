@@ -237,7 +237,7 @@ function getValueLabel($val)
             <div class="schedule-rules-header">
                 <h3 class="card-header">⚙️ Rules</h3>
                 <div class="schedule-rules-actions">
-                    <a class="schedule-rules-link" href="edit_rules.php" title="Open full rules editor">Edit</a>
+                    <a class="btn btn-outline" href="edit_rules.php" title="Open full rules editor">Edit</a>
                     <button type="button" class="btn btn-outline" id="rules-refresh-btn">Reload</button>
                 </div>
             </div>

@@ -85,6 +85,10 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <?php include __DIR__ . '/partials/energy_graph_mobile.php'; ?>
         </div>
 
+        <div class="shortwave-radiation-wrapper-mobile">
+            <?php include __DIR__ . '/partials/shortwave_radiation_graph.php'; ?>
+        </div>
+
         <!-- 5. Automation Status -->
         <div class="automation-status-wrapper">
             <?php include __DIR__ . '/partials/automation_status.php'; ?>
