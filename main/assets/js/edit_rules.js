@@ -250,6 +250,24 @@
             return;
         }
 
+        if (minValue < 0 && maxValue === 0) {
+            indicator.textContent = `Discharge-to-idle range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-discharge');
+            return;
+        }
+
+        if (minValue === 0 && maxValue > 0) {
+            indicator.textContent = `Idle-to-charge range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-charge');
+            return;
+        }
+
+        if (minValue === 0 && maxValue === 0) {
+            indicator.textContent = 'Idle only: 0 W';
+            indicator.classList.add('is-partial');
+            return;
+        }
+
         indicator.textContent = `Bidirectional range: ${minValue} to ${maxValue} W`;
         indicator.classList.add('is-bidirectional');
     }
