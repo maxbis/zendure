@@ -62,7 +62,7 @@ All schedule entries use a **12-character key** with the pattern `YYYYMMDDHHmm`:
 | `300` | integer (watts) | Charge at 300 W from grid |
 | `-800` | integer (watts) | Discharge at 800 W to grid |
 | `0` | integer | Zero output (idle) |
-| `"netzero"` | string | Discharge-only dynamic mode that reduces grid import toward zero |
+| `"netzero"` | string | Dynamic mode that reduces grid import/export toward zero; charging depends on `NETZERO_BI_DIRECTIONAL` |
 | `"netzero+"` | string | Charge-only dynamic mode that reduces grid export toward zero |
 
 ---
@@ -77,12 +77,12 @@ All schedule entries use a **12-character key** with the pattern `YYYYMMDDHHmm`:
   "********0000": { "value": 0 },
   "********1030": { "value": "netzero+" },
   "********1530": { "value": 0 },
-  "********1800": { "value": "netzero", "min_value": 100, "max_value": 700 },
+  "********1800": { "value": "netzero", "min_power": -700, "max_power": -100 },
   "********2000": { "value": 0 }
 }
 ```
 
-Optional `min_value` and `max_value` are allowed only for `"netzero"` and `"netzero+"` entries. They are stored in `charge_schedule.json`, propagated into resolved slots, and used by automation to clamp the dynamic watt result.
+Optional `min_power` and `max_power` are allowed only for `"netzero"` and `"netzero+"` entries. They are stored in `charge_schedule.json`, propagated into resolved slots, and used by automation to clamp the dynamic watt result.
 
 This file is read and written atomically by `writeScheduleAtomic()` / `writeDataFileAtomic()` (write to `.tmp` then rename) to avoid partial reads.
 
@@ -105,7 +105,7 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
      3. Higher specificity (fewer wildcards) wins
      4. Lexicographically descending key as a tie-breaker
    - First result is the **selected value**; `null` if no match.
-3. **Output:** Array of `{ time, value, key }` objects for every slot, with optional `min_value` / `max_value` when the selected raw entry defines them.
+3. **Output:** Array of `{ time, value, key }` objects for every slot, with optional `min_power` / `max_power` when the selected raw entry defines them.
 
 ```json
 [
@@ -113,7 +113,7 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
   { "time": "0100", "value": 0,         "key": "********0000" },
   { "time": "1030", "value": "netzero+","key": "********1030" },
   { "time": "1530", "value": 0,         "key": "********1530" },
-  { "time": "1800", "value": "netzero", "key": "********1800", "min_value": 100, "max_value": 700 },
+  { "time": "1800", "value": "netzero", "key": "********1800", "min_power": -700, "max_power": -100 },
   { "time": "2000", "value": 0,         "key": "********2000" }
 ]
 ```
@@ -157,8 +157,8 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
 | `hour` | string | Comma-separated hours (0–23), e.g. `"17,18,19"` |
 | `min_time` | int/string | Inclusive lower hour bound |
 | `max_time` | int/string | Inclusive upper hour bound |
-| `min_value` | int/null | Optional minimum watt magnitude for `netzero` / `netzero+` |
-| `max_value` | int/null | Optional maximum watt magnitude for `netzero` / `netzero+` |
+| `min_power` | int/null | Optional lower signed watt bound for `netzero` / `netzero+` |
+| `max_power` | int/null | Optional upper signed watt bound for `netzero` / `netzero+` |
 | `fallback_value` | int/string | Used at runtime if `electricity_level` condition can't be evaluated |
 | `conditions` | array | All conditions must match (AND logic) |
 
@@ -224,7 +224,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
    - Evaluate all **static** conditions (all must pass — AND logic)
    - **Runtime-only** conditions (`electricity_level`) are skipped here; they are passed through as metadata
    - **First matching rule fires** — break
-5. Emit `{ time, value, ranking, rule_name?, rule_index?, runtime_conditions?, fallback_value?, min_value?, max_value? }` per matched hour
+5. Emit `{ time, value, ranking, rule_name?, rule_index?, runtime_conditions?, fallback_value?, min_power?, max_power? }` per matched hour
 
 ### Output Format
 
@@ -258,8 +258,8 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
           "ranking": 20,
           "rule_name": "Top 10 50% PM",
           "rule_index": 6,
-          "min_value": 100,
-          "max_value": 700,
+          "min_power": -700,
+          "max_power": -100,
           "runtime_conditions": [
             { "field": "electricity_level", "op": ">=", "value": 50 }
           ],
@@ -292,7 +292,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
      - **Priority model during merge:**
        - Slot has exact-date key **and value ≠ 0** → **keep base value, ignore condition**
        - Slot is empty, has a wildcard key, **or has value = 0** → **replace with condition value**
-      - Adds metadata: `source: "condition"`, `rule_name`, `rule_index`, `runtime_conditions`, `fallback_value`, `min_value`, `max_value`
+      - Adds metadata: `source: "condition"`, `rule_name`, `rule_index`, `runtime_conditions`, `fallback_value`, `min_power`, `max_power`
 4. Build UI entries (all raw schedule entries, sorted by key)
 5. Return full response
 
@@ -318,7 +318,7 @@ When `false` (or absent), the conditions system is entirely bypassed and only th
     { "time": "0000", "value": 0,         "key": "********0000" },
     { "time": "0300", "value": 800,       "key": null,            "source": "condition", "rule_name": "Charge on Spread", "rule_index": 3 },
     { "time": "1030", "value": "netzero+","key": "********1030" },
-    { "time": "1400", "value": "netzero", "key": null,            "source": "condition", "rule_name": "Top 10 50% PM",    "rule_index": 6, "min_value": 100, "max_value": 700,
+    { "time": "1400", "value": "netzero", "key": null,            "source": "condition", "rule_name": "Top 10 50% PM",    "rule_index": 6, "min_power": -700, "max_power": -100,
       "runtime_conditions": [{ "field": "electricity_level", "op": ">=", "value": 50 }] },
     { "time": "1800", "value": "netzero", "key": "********1800" }
   ],
@@ -339,51 +339,35 @@ When `false` (or absent), the conditions system is entirely bypassed and only th
 
 ## 9. Runtime Bound Enforcement — `device_controller.py`
 
-Resolved `min_value` and `max_value` metadata is consumed at runtime by `automate/device_controller.py` when the active slot value is `netzero` or `netzero+`.
+Resolved `min_power` and `max_power` metadata is consumed at runtime by `automate/device_controller.py` when the active slot value is `netzero` or `netzero+`.
 
 ### Runtime Order
 
 1. Calculate raw dynamic result
 2. Apply `ReversalRampGuard`
-3. Apply `min_value` / `max_value` if reversal protection did not override the result
+3. Apply `min_power` / `max_power` as a signed clamp if reversal protection did not override the result
 4. Apply battery SoC and hardware/device caps
 
 ### Bound Semantics
 
-- Bounds are always compared using `abs(...)`
+- Bounds are applied directly as signed power limits
 - Missing or `null` bounds mean "leave the old behavior unchanged"
 - Invalid bounds are ignored for that cycle
-- If both are present and `min_value > max_value`, both are ignored for that cycle
-
-### `netzero`
-
-- If `abs(raw_result) < min_value`, runtime forces a minimum discharge at `-min_value`
-- If `abs(raw_result) > max_value`, runtime caps magnitude to `max_value` and keeps the sign of the raw result
+- If both are present and `min_power > max_power`, both are ignored for that cycle
 
 Examples:
 
-- raw `0`, `min_value=100` -> `-100`
-- raw `-50`, `min_value=100` -> `-100`
-- raw `-300`, `max_value=200` -> `-200`
-
-### `netzero+`
-
-- Never discharges
-- If `abs(raw_result) < min_value`, runtime forces a minimum charge at `+min_value`
-- If `abs(raw_result) > max_value`, runtime caps to `+max_value`
-
-Examples:
-
-- raw `0`, `min_value=100` -> `+100`
-- raw `+50`, `min_value=100` -> `+100`
-- raw `+300`, `max_value=200` -> `+200`
+- raw `-50`, `min_power=-700`, `max_power=-100` -> `-100`
+- raw `-300`, `min_power=-200`, `max_power=-100` -> `-200`
+- raw `+300`, `min_power=100`, `max_power=200` -> `+200`
+- raw `-50`, `min_power=-300`, `max_power=300` -> `-50`
 
 ### Reversal Guard Interaction
 
 `ReversalRampGuard` has priority during true charge/discharge reversals.
 
-- When the guard changes the raw dynamic result, `min_value` / `max_value` is deferred for that cycle
-- Once the reversal settles and the guard is no longer active, min/max enforcement resumes normally
+- When the guard changes the raw dynamic result, `min_power` / `max_power` is deferred for that cycle
+- Once the reversal settles and the guard is no longer active, signed-range enforcement resumes normally
 
 This keeps reversal protection intact while still allowing bounded dynamic behavior in stable conditions.
 
@@ -478,5 +462,5 @@ PHP's `date_sun_info()` is used to compute sunrise/sunset timestamps in Europe/A
 - [schedule-overview.md](../main/schedule-overview.md) — UI/JS module architecture, data flow from the frontend perspective
 - [edit_rules_user_manual.md](../user_manuals/edit_rules_user_manual.md) — How to use the rule editor UI
 - [charge_schedule_mobile_user_manual.md](../user_manuals/charge_schedule_mobile_user_manual.md) — Mobile UI user manual
-- [min-max-values_user_manual.md](../user_manuals/min-max-values_user_manual.md) — User guide for `min_value` / `max_value`
+- [min-max-values_user_manual.md](../user_manuals/min-max-values_user_manual.md) — User guide for `min_power` / `max_power`
 - [data-api.md](api/data-api.md) — Full data API reference

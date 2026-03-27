@@ -78,33 +78,33 @@ function normalizeRawScheduleEntry($entry)
     $normalizedValue = normalizeScheduleValue($entry['value']);
     $normalized = ['value' => $normalizedValue];
 
-    $hasMin = array_key_exists('min_value', $entry);
-    $hasMax = array_key_exists('max_value', $entry);
+    $hasMin = array_key_exists('min_power', $entry);
+    $hasMax = array_key_exists('max_power', $entry);
     if (($hasMin || $hasMax) && $normalizedValue !== 'netzero' && $normalizedValue !== 'netzero+') {
-        throw new Exception("Fields 'min_value' and 'max_value' are only allowed for 'netzero' and 'netzero+' entries");
+        throw new Exception("Fields 'min_power' and 'max_power' are only allowed for 'netzero' and 'netzero+' entries");
     }
 
     if ($hasMin) {
-        $normalizedMin = normalizeOptionalScheduleBound($entry['min_value'], 'min_value');
+        $normalizedMin = normalizeOptionalScheduleBound($entry['min_power'], 'min_power');
         if ($normalizedMin !== null) {
-            $normalized['min_value'] = $normalizedMin;
+            $normalized['min_power'] = $normalizedMin;
         }
     }
 
     if ($hasMax) {
-        $normalizedMax = normalizeOptionalScheduleBound($entry['max_value'], 'max_value');
+        $normalizedMax = normalizeOptionalScheduleBound($entry['max_power'], 'max_power');
         if ($normalizedMax !== null) {
-            $normalized['max_value'] = $normalizedMax;
+            $normalized['max_power'] = $normalizedMax;
         }
     }
 
-    if (isset($normalized['min_value'], $normalized['max_value']) && $normalized['min_value'] > $normalized['max_value']) {
-        throw new Exception("Invalid schedule entry. 'min_value' cannot be greater than 'max_value'");
+    if (isset($normalized['min_power'], $normalized['max_power']) && $normalized['min_power'] > $normalized['max_power']) {
+        throw new Exception("Invalid schedule entry. 'min_power' cannot be greater than 'max_power'");
     }
 
     foreach ($entry as $key => $value) {
         $keyStr = (string) $key;
-        if ($keyStr === 'value' || $keyStr === 'min_value' || $keyStr === 'max_value') {
+        if ($keyStr === 'value' || $keyStr === 'min_power' || $keyStr === 'max_power') {
             continue;
         }
         $normalized[$keyStr] = $value;
@@ -168,20 +168,20 @@ function normalizeResolvedConditionalMetadata($item)
             : null,
     ];
 
-    if (array_key_exists('min_value', $item)) {
-        $meta['min_value'] = normalizeOptionalScheduleBound($item['min_value'], 'min_value');
+    if (array_key_exists('min_power', $item)) {
+        $meta['min_power'] = normalizeOptionalScheduleBound($item['min_power'], 'min_power');
     }
-    if (array_key_exists('max_value', $item)) {
-        $meta['max_value'] = normalizeOptionalScheduleBound($item['max_value'], 'max_value');
+    if (array_key_exists('max_power', $item)) {
+        $meta['max_power'] = normalizeOptionalScheduleBound($item['max_power'], 'max_power');
     }
     if (
-        array_key_exists('min_value', $meta) &&
-        array_key_exists('max_value', $meta) &&
-        $meta['min_value'] !== null &&
-        $meta['max_value'] !== null &&
-        $meta['min_value'] > $meta['max_value']
+        array_key_exists('min_power', $meta) &&
+        array_key_exists('max_power', $meta) &&
+        $meta['min_power'] !== null &&
+        $meta['max_power'] !== null &&
+        $meta['min_power'] > $meta['max_power']
     ) {
-        throw new Exception("Invalid resolved conditional metadata. 'min_value' cannot be greater than 'max_value'");
+        throw new Exception("Invalid resolved conditional metadata. 'min_power' cannot be greater than 'max_power'");
     }
 
     return $meta;
@@ -306,8 +306,8 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
             'key' => (string) $k,
             'value' => $value,
             'time' => extractTimeFromKey((string) $k),
-            'min_value' => array_key_exists('min_value', $entry) ? $entry['min_value'] : null,
-            'max_value' => array_key_exists('max_value', $entry) ? $entry['max_value'] : null,
+            'min_power' => array_key_exists('min_power', $entry) ? $entry['min_power'] : null,
+            'max_power' => array_key_exists('max_power', $entry) ? $entry['max_power'] : null,
         ];
     }
 
@@ -393,11 +393,11 @@ function resolveScheduleForDate($schedule, $dateYYYYMMDD)
             'value' => $selected ? $selected['value'] : null, // or 0? Spec doesn't strictly say default. Null is safer.
             'key' => $selected ? $selected['key'] : null
         ];
-        if ($selected && array_key_exists('min_value', $selected) && $selected['min_value'] !== null) {
-            $resolvedSlot['min_value'] = $selected['min_value'];
+        if ($selected && array_key_exists('min_power', $selected) && $selected['min_power'] !== null) {
+            $resolvedSlot['min_power'] = $selected['min_power'];
         }
-        if ($selected && array_key_exists('max_value', $selected) && $selected['max_value'] !== null) {
-            $resolvedSlot['max_value'] = $selected['max_value'];
+        if ($selected && array_key_exists('max_power', $selected) && $selected['max_power'] !== null) {
+            $resolvedSlot['max_power'] = $selected['max_power'];
         }
         $result[] = $resolvedSlot;
     }
@@ -518,18 +518,18 @@ function cs_mergeResolvedWithConditional($resolved, $dateYYYYMMDD)
         } else {
             unset($slot['fallback_value']);
         }
-        if (array_key_exists('min_value', $slotMeta)) {
-            if ($slotMeta['min_value'] !== null) {
-                $slot['min_value'] = $slotMeta['min_value'];
+        if (array_key_exists('min_power', $slotMeta)) {
+            if ($slotMeta['min_power'] !== null) {
+                $slot['min_power'] = $slotMeta['min_power'];
             } else {
-                unset($slot['min_value']);
+                unset($slot['min_power']);
             }
         }
-        if (array_key_exists('max_value', $slotMeta)) {
-            if ($slotMeta['max_value'] !== null) {
-                $slot['max_value'] = $slotMeta['max_value'];
+        if (array_key_exists('max_power', $slotMeta)) {
+            if ($slotMeta['max_power'] !== null) {
+                $slot['max_power'] = $slotMeta['max_power'];
             } else {
-                unset($slot['max_value']);
+                unset($slot['max_power']);
             }
         }
         if ($slotMeta['rule_name'] !== null) {

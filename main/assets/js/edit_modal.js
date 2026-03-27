@@ -9,6 +9,7 @@ class EditModal {
         this.scheduleEntriesByKey = {};
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
+        this.powerRangeIndicator = document.getElementById('power-range-indicator');
         this.confirmResolve = null;
         
         this.init();
@@ -226,6 +227,7 @@ class EditModal {
             maxValueInput.value = '';
             maxValueInput.classList.remove('is-charging', 'is-discharging');
         }
+        this.updatePowerRangeIndicator();
     }
 
     syncModeInputs(mode, options = {}) {
@@ -267,6 +269,7 @@ class EditModal {
         this.updateWattsInputState();
         this.updateConstraintInputState(document.getElementById('inp-min-value'));
         this.updateConstraintInputState(document.getElementById('inp-max-value'));
+        this.updatePowerRangeIndicator();
     }
 
     open(key = null, valueOrEntry = null, prefillKey = null) {
@@ -315,8 +318,8 @@ class EditModal {
             document.getElementById('inp-time').value = key.substring(8, 12);
 
             const value = entry.value;
-            const minValue = Object.prototype.hasOwnProperty.call(entry, 'min_value') ? entry.min_value : '';
-            const maxValue = Object.prototype.hasOwnProperty.call(entry, 'max_value') ? entry.max_value : '';
+            const minValue = Object.prototype.hasOwnProperty.call(entry, 'min_power') ? entry.min_power : '';
+            const maxValue = Object.prototype.hasOwnProperty.call(entry, 'max_power') ? entry.max_power : '';
 
             if (value === 'netzero') {
                 document.querySelector('input[name="val-mode"][value="netzero"]').checked = true;
@@ -384,6 +387,73 @@ class EditModal {
         if (!Number.isFinite(numericValue) || numericValue === 0) return;
 
         input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+        this.updatePowerRangeIndicator();
+    }
+
+    updatePowerRangeIndicator() {
+        const indicator = this.powerRangeIndicator;
+        if (!indicator) return;
+
+        const minInput = document.getElementById('inp-min-value');
+        const maxInput = document.getElementById('inp-max-value');
+        const minRaw = minInput ? String(minInput.value || '').trim() : '';
+        const maxRaw = maxInput ? String(maxInput.value || '').trim() : '';
+        const mode = document.querySelector('input[name="val-mode"]:checked')?.value;
+        const enabled = mode === 'netzero' || mode === 'netzero+';
+
+        indicator.hidden = true;
+        indicator.textContent = '';
+        indicator.className = 'power-range-indicator';
+
+        if (!enabled) return;
+
+        if (minRaw === '' && maxRaw === '') {
+            return;
+        }
+
+        const minValid = minRaw === '' || /^-?\d+$/.test(minRaw);
+        const maxValid = maxRaw === '' || /^-?\d+$/.test(maxRaw);
+        if (!minValid || !maxValid) {
+            indicator.hidden = false;
+            indicator.textContent = 'Invalid range';
+            indicator.classList.add('is-invalid');
+            return;
+        }
+
+        const minValue = minRaw === '' ? null : parseInt(minRaw, 10);
+        const maxValue = maxRaw === '' ? null : parseInt(maxRaw, 10);
+
+        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+            indicator.hidden = false;
+            indicator.textContent = 'Invalid range';
+            indicator.classList.add('is-invalid');
+            return;
+        }
+
+        indicator.hidden = false;
+
+        if (minValue === null || maxValue === null) {
+            indicator.textContent = minValue !== null
+                ? `Minimum bound only: ${minValue} W`
+                : `Maximum bound only: ${maxValue} W`;
+            indicator.classList.add('is-partial');
+            return;
+        }
+
+        if (minValue < 0 && maxValue < 0) {
+            indicator.textContent = `Discharge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-discharge');
+            return;
+        }
+
+        if (minValue > 0 && maxValue > 0) {
+            indicator.textContent = `Charge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-charge');
+            return;
+        }
+
+        indicator.textContent = `Bidirectional range: ${minValue} to ${maxValue} W`;
+        indicator.classList.add('is-bidirectional');
     }
 
     getOptionalBoundValue(inputId, label) {
@@ -529,10 +599,10 @@ class EditModal {
         const key = d + t;
         const payload = { key, entry: { value: val } };
         if (minValue !== null) {
-            payload.entry.min_value = minValue;
+            payload.entry.min_power = minValue;
         }
         if (maxValue !== null) {
-            payload.entry.max_value = maxValue;
+            payload.entry.max_power = maxValue;
         }
 
         // Use PUT for both add and edit (originalKey is optional).

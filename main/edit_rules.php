@@ -145,17 +145,17 @@ function normalizeRules(array $rules): array
             $normalized['fallback_value'] = is_numeric($rule['fallback_value']) ? (int) $rule['fallback_value'] : (string) $rule['fallback_value'];
         }
         if ($normalized['value'] === 'netzero' || $normalized['value'] === 'netzero+') {
-            $minValue = array_key_exists('min_value', $rule) ? normalizeOptionalRuleBound($rule['min_value']) : null;
-            $maxValue = array_key_exists('max_value', $rule) ? normalizeOptionalRuleBound($rule['max_value']) : null;
-            $normalized['min_value'] = $minValue;
-            $normalized['max_value'] = $maxValue;
+            $minValue = array_key_exists('min_power', $rule) ? normalizeOptionalRuleBound($rule['min_power']) : null;
+            $maxValue = array_key_exists('max_power', $rule) ? normalizeOptionalRuleBound($rule['max_power']) : null;
+            $normalized['min_power'] = $minValue;
+            $normalized['max_power'] = $maxValue;
             if (
-                $normalized['min_value'] !== null &&
-                $normalized['max_value'] !== null &&
-                $normalized['min_value'] > $normalized['max_value']
+                $normalized['min_power'] !== null &&
+                $normalized['max_power'] !== null &&
+                $normalized['min_power'] > $normalized['max_power']
             ) {
-                $normalized['min_value'] = null;
-                $normalized['max_value'] = null;
+                $normalized['min_power'] = null;
+                $normalized['max_power'] = null;
             }
         }
 
@@ -326,13 +326,14 @@ if ($isApi) {
 
                 <div class="row split">
                     <div>
-                        <label for="inp-min-value">Min Value (optional)</label>
-                        <input id="inp-min-value" type="number" min="100" step="100" placeholder="None">
+                        <label for="inp-min-value">Min Power (optional)</label>
+                        <input id="inp-min-value" type="number" step="100" placeholder="None">
                     </div>
                     <div>
-                        <label for="inp-max-value">Max Value (optional)</label>
-                        <input id="inp-max-value" type="number" min="200" step="100" placeholder="None">
+                        <label for="inp-max-value">Max Power (optional)</label>
+                        <input id="inp-max-value" type="number" step="100" placeholder="None">
                     </div>
+                    <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                 </div>
 
                 <div class="row">

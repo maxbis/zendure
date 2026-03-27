@@ -173,6 +173,13 @@ Supported commands:
 
 Dynamic commands (`p netzero`, `nz`, `nzp`) first read the configured power meter in the app/runtime layer and then pass the normalized reading into `AutomateController`.
 
+`netzero` behavior depends on `NETZERO_BI_DIRECTIONAL` in `automate/config/config.jsonc`:
+
+- `false`: `netzero` will not actively charge
+- `true`: `netzero` may charge and discharge
+
+When the active schedule slot contains signed `min_power` / `max_power`, the runtime clamps the dynamic result into that signed range before battery/device safety limits are applied.
+
 ### Example HTTP usage
 
 ```bash

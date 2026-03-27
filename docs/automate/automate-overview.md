@@ -57,9 +57,9 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
 
 Dynamic mode summary:
 
-- `netzero` = discharge-only, never actively charges
+- `netzero` = dynamic import/export balancing mode; with `NETZERO_BI_DIRECTIONAL=false` it does not actively charge, with `true` it may charge and discharge
 - `netzero+` = charge-only, never actively discharges
-- a separate bidirectional "full netzero" mode does not exist today
+- signed `min_power` / `max_power` clamp the dynamic result after calculation and after `ReversalRampGuard`
 
 5.  **Monitoring**: The script stores status updates in a local SQLite database and exposes them through the built-in HTTP API, which the web app can read for health and activity.
 

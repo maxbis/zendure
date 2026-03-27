@@ -45,13 +45,13 @@ Each rule has:
   - `hour` (e.g. `1,2,17,18`)
   - `min_time` (inclusive lower hour)
   - `max_time` (inclusive upper hour)
-  - `min_value` (optional minimum watt magnitude for `netzero` / `netzero+`)
-  - `max_value` (optional maximum watt magnitude for `netzero` / `netzero+`)
+  - `min_power` (optional minimum signed watt bound for `netzero` / `netzero+`)
+  - `max_power` (optional maximum signed watt bound for `netzero` / `netzero+`)
   - `conditions`: all conditions are ANDed
 
 Notes:
 
-- `min_value` and `max_value` are only used for rules whose `value` is `netzero` or `netzero+`
+- `min_power` and `max_power` are only used for rules whose `value` is `netzero` or `netzero+`
 - they default to `null`
 - they do not apply to `fallback_value`
 - the editor uses `100 W` steps for these inputs
@@ -152,7 +152,7 @@ At API merge time (`data_api.php`):
 - Ensure JSON is valid (no trailing commas)
 - Always provide `name`
 - For hour-like fields use 0..23
-- For `min_value` / `max_value`, use integer watt values
+- For `min_power` / `max_power`, use integer watt values
 - Use `Raw JSON` + `Copy` to review/export config quickly
 
 ## 11. Related Manuals

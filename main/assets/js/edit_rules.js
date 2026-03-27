@@ -38,6 +38,7 @@
         inpMinValue: document.getElementById('inp-min-value'),
         inpMaxValue: document.getElementById('inp-max-value'),
         inpFallbackValue: document.getElementById('inp-fallback-value'),
+        powerRangeIndicator: document.getElementById('power-range-indicator'),
         conditionsList: document.getElementById('conditions-list'),
     };
 
@@ -59,8 +60,8 @@
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
-        'inp-min-value': 'Optional minimum watt bound for netzero and netzero+ rules only. Any integer is allowed; spinner uses 100 W steps.',
-        'inp-max-value': 'Optional maximum watt bound for netzero and netzero+ rules only. Minimum is 100 W; spinner uses 100 W steps.',
+        'inp-min-value': 'Optional signed minimum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
+        'inp-max-value': 'Optional signed maximum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
     };
     const trackedFieldIds = [
@@ -134,11 +135,11 @@
             out.max_time = String(rule.max_time);
         }
         if (rule.value === 'netzero' || rule.value === 'netzero+') {
-            out.min_value = rule.min_value !== undefined && rule.min_value !== null && rule.min_value !== ''
-                ? Number(rule.min_value)
+            out.min_power = rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== ''
+                ? Number(rule.min_power)
                 : null;
-            out.max_value = rule.max_value !== undefined && rule.max_value !== null && rule.max_value !== ''
-                ? Number(rule.max_value)
+            out.max_power = rule.max_power !== undefined && rule.max_power !== null && rule.max_power !== ''
+                ? Number(rule.max_power)
                 : null;
         }
         if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
@@ -174,6 +175,83 @@
 
     function updateAllFieldStates() {
         trackedFieldIds.forEach(updateFieldState);
+        updatePowerInputState(els.inpMinValue);
+        updatePowerInputState(els.inpMaxValue);
+        updatePowerRangeIndicator();
+    }
+
+    function updatePowerInputState(input) {
+        if (!input) return;
+
+        input.classList.remove('is-charging', 'is-discharging');
+
+        const rawValue = String(input.value || '').trim();
+        if (rawValue === '') return;
+
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue) || numericValue === 0) return;
+
+        input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+    }
+
+    function updatePowerRangeIndicator() {
+        if (!els.powerRangeIndicator) return;
+
+        const indicator = els.powerRangeIndicator;
+        const minRaw = String(els.inpMinValue?.value || '').trim();
+        const maxRaw = String(els.inpMaxValue?.value || '').trim();
+        const enabled = !els.inpMinValue.disabled && !els.inpMaxValue.disabled;
+
+        indicator.hidden = true;
+        indicator.textContent = '';
+        indicator.className = 'power-range-indicator';
+
+        if (!enabled) return;
+        if (minRaw === '' && maxRaw === '') return;
+
+        const minValid = minRaw === '' || /^-?\d+$/.test(minRaw);
+        const maxValid = maxRaw === '' || /^-?\d+$/.test(maxRaw);
+        if (!minValid || !maxValid) {
+            indicator.hidden = false;
+            indicator.textContent = 'Invalid range';
+            indicator.classList.add('is-invalid');
+            return;
+        }
+
+        const minValue = minRaw === '' ? null : parseInt(minRaw, 10);
+        const maxValue = maxRaw === '' ? null : parseInt(maxRaw, 10);
+
+        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+            indicator.hidden = false;
+            indicator.textContent = 'Invalid range';
+            indicator.classList.add('is-invalid');
+            return;
+        }
+
+        indicator.hidden = false;
+
+        if (minValue === null || maxValue === null) {
+            indicator.textContent = minValue !== null
+                ? `Minimum bound only: ${minValue} W`
+                : `Maximum bound only: ${maxValue} W`;
+            indicator.classList.add('is-partial');
+            return;
+        }
+
+        if (minValue < 0 && maxValue < 0) {
+            indicator.textContent = `Discharge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-discharge');
+            return;
+        }
+
+        if (minValue > 0 && maxValue > 0) {
+            indicator.textContent = `Charge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-charge');
+            return;
+        }
+
+        indicator.textContent = `Bidirectional range: ${minValue} to ${maxValue} W`;
+        indicator.classList.add('is-bidirectional');
     }
 
     function renderTable() {
@@ -186,12 +264,12 @@
         }
 
         state.rules.forEach((rule, idx) => {
-            const hasMinLimit = rule.min_value !== undefined && rule.min_value !== null && rule.min_value !== '';
-            const hasMaxLimit = rule.max_value !== undefined && rule.max_value !== null && rule.max_value !== '';
+            const hasMinLimit = rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== '';
+            const hasMaxLimit = rule.max_power !== undefined && rule.max_power !== null && rule.max_power !== '';
             const hasLimits = hasMinLimit || hasMaxLimit;
             const limitLabel = hasMinLimit && hasMaxLimit
-                ? ('Limits: ' + rule.min_value + '-' + rule.max_value + ' W')
-                : (hasMinLimit ? ('Limit: min ' + rule.min_value + ' W') : (hasMaxLimit ? ('Limit: max ' + rule.max_value + ' W') : ''));
+                ? ('Limits: ' + rule.min_power + ' to ' + rule.max_power + ' W')
+                : (hasMinLimit ? ('Limit: min ' + rule.min_power + ' W') : (hasMaxLimit ? ('Limit: max ' + rule.max_power + ' W') : ''));
             const indicatorHtml = hasLimits
                 ? '<span class="rule-limit-indicator" aria-hidden="true"></span>'
                 : '';
@@ -336,6 +414,7 @@
         els.inpMaxValue.disabled = true;
         els.conditionsList.innerHTML = '';
         updateAllFieldStates();
+        updatePowerRangeIndicator();
         renderTable();
     }
 
@@ -359,6 +438,7 @@
             els.inpMaxValue.value = '';
         }
         updateAllFieldStates();
+        updatePowerRangeIndicator();
     }
 
     function fillEditor(rule, idx) {
@@ -379,11 +459,12 @@
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
-        els.inpMinValue.value = rule.min_value !== undefined && rule.min_value !== null ? String(rule.min_value) : '';
-        els.inpMaxValue.value = rule.max_value !== undefined && rule.max_value !== null ? String(rule.max_value) : '';
+        els.inpMinValue.value = rule.min_power !== undefined && rule.min_power !== null ? String(rule.min_power) : '';
+        els.inpMaxValue.value = rule.max_power !== undefined && rule.max_power !== null ? String(rule.max_power) : '';
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
         updateAllFieldStates();
+        updatePowerRangeIndicator();
 
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
@@ -476,29 +557,26 @@
         if (mode === 'netzero' || mode === 'netzero+') {
             const minValue = els.inpMinValue.value.trim();
             const maxValue = els.inpMaxValue.value.trim();
-            rule.min_value = null;
-            rule.max_value = null;
+            rule.min_power = null;
+            rule.max_power = null;
             if (minValue) {
                 if (!/^-?\d+$/.test(minValue)) {
-                    throw new Error('Min value must be an integer.');
+                    throw new Error('Min power must be an integer.');
                 }
-                rule.min_value = parseInt(minValue, 10);
+                rule.min_power = parseInt(minValue, 10);
             }
             if (maxValue) {
                 if (!/^-?\d+$/.test(maxValue)) {
-                    throw new Error('Max value must be an integer.');
+                    throw new Error('Max power must be an integer.');
                 }
-                rule.max_value = parseInt(maxValue, 10);
-                if (rule.max_value < 100) {
-                    throw new Error('Max value must be at least 100.');
-                }
+                rule.max_power = parseInt(maxValue, 10);
             }
             if (
-                rule.min_value !== null &&
-                rule.max_value !== null &&
-                rule.min_value > rule.max_value
+                rule.min_power !== null &&
+                rule.max_power !== null &&
+                rule.min_power > rule.max_power
             ) {
-                throw new Error('Min value cannot be greater than max value.');
+                throw new Error('Min power cannot be greater than max power.');
             }
         }
 
@@ -772,9 +850,17 @@
             if (!input) return;
             input.addEventListener('input', function () {
                 updateFieldState(inputId);
+                if (inputId === 'inp-min-value' || inputId === 'inp-max-value' || inputId === 'inp-value-mode') {
+                    updatePowerInputState(input);
+                    updatePowerRangeIndicator();
+                }
             });
             input.addEventListener('change', function () {
                 updateFieldState(inputId);
+                if (inputId === 'inp-min-value' || inputId === 'inp-max-value' || inputId === 'inp-value-mode') {
+                    updatePowerInputState(input);
+                    updatePowerRangeIndicator();
+                }
             });
         });
 

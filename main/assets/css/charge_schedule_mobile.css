@@ -2057,3 +2057,44 @@ code {
     color: #ff8b8b;
     font-weight: 700;
 }
+
+#edit-modal .power-range-indicator {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #4d4d4d;
+    background: rgba(255, 255, 255, 0.04);
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+#edit-modal .power-range-indicator.is-charge {
+    color: #7fd77f;
+    border-color: rgba(127, 215, 127, 0.45);
+    background: rgba(127, 215, 127, 0.08);
+}
+
+#edit-modal .power-range-indicator.is-discharge {
+    color: #ff8b8b;
+    border-color: rgba(255, 139, 139, 0.45);
+    background: rgba(255, 139, 139, 0.08);
+}
+
+#edit-modal .power-range-indicator.is-bidirectional {
+    color: #8ec5ff;
+    border-color: rgba(142, 197, 255, 0.45);
+    background: rgba(142, 197, 255, 0.08);
+}
+
+#edit-modal .power-range-indicator.is-partial {
+    color: #f4d98b;
+    border-color: rgba(244, 217, 139, 0.45);
+    background: rgba(244, 217, 139, 0.08);
+}
+
+#edit-modal .power-range-indicator.is-invalid {
+    color: #ff8b8b;
+    border-color: rgba(255, 139, 139, 0.6);
+    background: rgba(153, 27, 27, 0.24);
+}

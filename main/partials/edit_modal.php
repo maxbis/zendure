@@ -46,13 +46,16 @@
                 </div>
                 <div class="edit-modal-grid" id="group-constraints" style="display:none;">
                     <div class="form-group">
-                        <label>Min Power Limit (W)</label>
+                        <label>Min Power (W)</label>
                         <input type="number" id="inp-min-value" placeholder="Optional" step="100">
+                        <small>Signed value: negative = discharge, positive = charge.</small>
                     </div>
                     <div class="form-group">
-                        <label>Max Power Limit (W)</label>
+                        <label>Max Power (W)</label>
                         <input type="number" id="inp-max-value" placeholder="Optional" step="100">
+                        <small>Signed value: negative = discharge, positive = charge.</small>
                     </div>
+                    <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                 </div>
             </div>
         </div>

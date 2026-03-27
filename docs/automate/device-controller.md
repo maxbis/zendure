@@ -115,20 +115,17 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 -   **Returns**: The calculated power value to set (positive for charge, negative for discharge, 0 for stop).
 -   **Raises**: `ValueError` if caller-supplied P1 meter data is missing/invalid or Zendure data cannot be read. `requests.exceptions.RequestException` on network errors.
 
-### Runtime `min_value` / `max_value`
+### Runtime `min_power` / `max_power`
 
-When the active resolved schedule slot includes `min_value` or `max_value`, `AutomateController` applies them after the raw dynamic result is calculated:
+When the active resolved schedule slot includes `min_power` or `max_power`, `AutomateController` applies them after the raw dynamic result is calculated:
 
-- Bounds are evaluated using `abs(...)`
-- Missing or `null` bounds leave the legacy runtime behavior unchanged
-- `netzero`
-  - below `min_value` -> force minimum discharge
-  - above `max_value` -> cap magnitude while keeping the sign
-- `netzero+`
-  - below `min_value` -> force minimum charge
-  - above `max_value` -> cap charge magnitude
+- Bounds are applied as a direct signed clamp
+- Missing or `null` bounds leave the runtime behavior unchanged
+- Negative values represent discharge
+- Positive values represent charge
+- If both bounds are present, runtime clamps into the inclusive signed range `[min_power, max_power]`
 
-`ReversalRampGuard` still wins during true sign reversals. When the guard changes the raw result, min/max handling is deferred for that cycle and resumes once the reversal settles.
+`ReversalRampGuard` still wins during true sign reversals. When the guard changes the raw result, signed-bound handling is deferred for that cycle and resumes once the reversal settles.
 
 ### `set_power(self, value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> PowerResult`
 
@@ -142,8 +139,7 @@ When the active resolved schedule slot includes `min_value` or `max_value`, `Aut
 
 During dynamic modes, `set_power()` also emits debug/info logs when:
 - bounds are present on the active slot
-- `min_value` forces a larger charge/discharge
-- `max_value` caps a dynamic result
+- signed bounds clamp a dynamic result
 - reversal protection defers bound handling
 - battery or device limits override the bounded result
 
@@ -209,7 +205,7 @@ Inherits from `BaseDeviceController`. This class is responsible for managing the
 -   **Returns**: The value from the matching entry (int, 'netzero', 'netzero+'), or `None` if no match found.
 -   **Raises**: `ValueError` if `current_time` format is invalid.
 
-The matching entry snapshot stored in `last_schedule_entry` also carries `key`, `runtime_conditions`, `fallback_value`, `min_value`, and `max_value` so the automation layer can apply runtime metadata without re-querying the API.
+The matching entry snapshot stored in `last_schedule_entry` also carries `key`, `runtime_conditions`, `fallback_value`, `min_power`, and `max_power` so the automation layer can apply runtime metadata without re-querying the API.
 
 ### `get_desired_power(self, refresh: bool = False) -> Optional[Union[int, Literal['netzero', 'netzero+']]]`
 

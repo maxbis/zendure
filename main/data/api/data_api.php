@@ -136,20 +136,20 @@ function normalizeDataApiResolvedConditionalMetadata($item) {
             : null,
     ];
 
-    if (array_key_exists('min_value', $item)) {
-        $meta['min_value'] = normalizeOptionalScheduleBound($item['min_value'], 'min_value');
+    if (array_key_exists('min_power', $item)) {
+        $meta['min_power'] = normalizeOptionalScheduleBound($item['min_power'], 'min_power');
     }
-    if (array_key_exists('max_value', $item)) {
-        $meta['max_value'] = normalizeOptionalScheduleBound($item['max_value'], 'max_value');
+    if (array_key_exists('max_power', $item)) {
+        $meta['max_power'] = normalizeOptionalScheduleBound($item['max_power'], 'max_power');
     }
     if (
-        array_key_exists('min_value', $meta) &&
-        array_key_exists('max_value', $meta) &&
-        $meta['min_value'] !== null &&
-        $meta['max_value'] !== null &&
-        $meta['min_value'] > $meta['max_value']
+        array_key_exists('min_power', $meta) &&
+        array_key_exists('max_power', $meta) &&
+        $meta['min_power'] !== null &&
+        $meta['max_power'] !== null &&
+        $meta['min_power'] > $meta['max_power']
     ) {
-        throw new Exception("Invalid resolved conditional metadata. 'min_value' cannot be greater than 'max_value'");
+        throw new Exception("Invalid resolved conditional metadata. 'min_power' cannot be greater than 'max_power'");
     }
 
     return $meta;
@@ -204,18 +204,18 @@ function mergeResolvedWithConditional($resolved, $date) {
             } else {
                 unset($slot['fallback_value']);
             }
-            if (array_key_exists('min_value', $slotMeta)) {
-                if ($slotMeta['min_value'] !== null) {
-                    $slot['min_value'] = $slotMeta['min_value'];
+            if (array_key_exists('min_power', $slotMeta)) {
+                if ($slotMeta['min_power'] !== null) {
+                    $slot['min_power'] = $slotMeta['min_power'];
                 } else {
-                    unset($slot['min_value']);
+                    unset($slot['min_power']);
                 }
             }
-            if (array_key_exists('max_value', $slotMeta)) {
-                if ($slotMeta['max_value'] !== null) {
-                    $slot['max_value'] = $slotMeta['max_value'];
+            if (array_key_exists('max_power', $slotMeta)) {
+                if ($slotMeta['max_power'] !== null) {
+                    $slot['max_power'] = $slotMeta['max_power'];
                 } else {
-                    unset($slot['max_value']);
+                    unset($slot['max_power']);
                 }
             }
             if ($slotMeta['rule_name'] !== null) {

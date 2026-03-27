@@ -974,29 +974,24 @@ class AutomateController(BaseDeviceController):
             slot_time = schedule_entry.get('time')
 
         try:
-            min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
+            min_power = self._normalize_schedule_bound(schedule_entry, 'min_power')
         except ValueError as exc:
-            self.log('debug', f"Ignoring invalid min_value for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
-            min_value = None
+            self.log('debug', f"Ignoring invalid min_power for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
+            min_power = None
         try:
-            max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
+            max_power = self._normalize_schedule_bound(schedule_entry, 'max_power')
         except ValueError as exc:
-            self.log('debug', f"Ignoring invalid max_value for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
-            max_value = None
+            self.log('debug', f"Ignoring invalid max_power for slot {slot_time or '?'} ({slot_key or 'no-key'}): {exc}")
+            max_power = None
 
-        if min_value is not None:
-            min_value = abs(int(min_value))
-        if max_value is not None:
-            max_value = abs(int(max_value))
-
-        if min_value is None and max_value is None:
+        if min_power is None and max_power is None:
             return power_value
 
-        if min_value is not None and max_value is not None and min_value > max_value:
+        if min_power is not None and max_power is not None and min_power > max_power:
             self.log(
                 'debug',
                 f"Ignoring schedule bounds for slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                f"min_value {min_value} is greater than max_value {max_value}"
+                f"min_power {min_power} is greater than max_power {max_power}"
             )
             return power_value
 
@@ -1007,62 +1002,37 @@ class AutomateController(BaseDeviceController):
         self.log(
             'debug',
             f"Dynamic bounds active for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-            f"raw={raw_power}, guarded={guarded_power}, current={power_value}, min={min_value}, max={max_value}"
+            f"raw={raw_power}, guarded={guarded_power}, current={power_value}, min={min_power}, max={max_power}"
         )
 
         if guard_active:
             self.log(
                 'debug',
-                f"ReversalRampGuard deferred min/max handling for {mode} slot {slot_time or '?'} "
-                f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_value}, max={max_value}"
+                f"ReversalRampGuard deferred signed bound handling for {mode} slot {slot_time or '?'} "
+                f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_power}, max={max_power}"
             )
             return power_value
 
         bounded_power = int(power_value)
         original_power = bounded_power
 
-        if mode == 'netzero':
-            magnitude = abs(bounded_power)
-            direction = -1 if bounded_power < 0 else (1 if bounded_power > 0 else 0)
+        if min_power is not None:
+            bounded_power = max(bounded_power, min_power)
+        if max_power is not None:
+            bounded_power = min(bounded_power, max_power)
 
-            if min_value is not None and magnitude < min_value:
-                bounded_power = -min_value
-                self.log(
-                    'debug',
-                    f"min_value forced minimum discharge for {mode} slot {slot_time or '?'} "
-                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
-                )
-            elif max_value is not None and magnitude > max_value:
-                bounded_power = (-max_value if direction < 0 else max_value)
-                self.log(
-                    'debug',
-                    f"max_value capped {mode} slot {slot_time or '?'} "
-                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
-                )
-        else:
-            bounded_power = max(0, bounded_power)
-            magnitude = abs(bounded_power)
-
-            if min_value is not None and magnitude < min_value:
-                bounded_power = min_value
-                self.log(
-                    'debug',
-                    f"min_value forced minimum charge for {mode} slot {slot_time or '?'} "
-                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
-                )
-            elif max_value is not None and magnitude > max_value:
-                bounded_power = max_value
-                self.log(
-                    'debug',
-                    f"max_value capped {mode} slot {slot_time or '?'} "
-                    f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
-                )
+        if bounded_power != original_power:
+            self.log(
+                'debug',
+                f"Signed power bounds clamped {mode} slot {slot_time or '?'} "
+                f"({slot_key or 'no-key'}): {original_power} -> {bounded_power}"
+            )
 
         if bounded_power != power_value:
             self.log(
                 'info',
                 f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_value}, max={max_value}",
+                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_power}, max={max_power}",
                 message_key='schedule_bounds_applied',
             )
 
@@ -1133,17 +1103,17 @@ class AutomateController(BaseDeviceController):
         success, error_msg, actual_power = self._send_power_feed(target_power)
 
         if actual_power != target_power:
-            min_value = None
-            max_value = None
+            min_power = None
+            max_power = None
             try:
-                min_value = self._normalize_schedule_bound(schedule_entry, 'min_value')
+                min_power = self._normalize_schedule_bound(schedule_entry, 'min_power')
             except ValueError:
-                min_value = None
+                min_power = None
             try:
-                max_value = self._normalize_schedule_bound(schedule_entry, 'max_value')
+                max_power = self._normalize_schedule_bound(schedule_entry, 'max_power')
             except ValueError:
-                max_value = None
-            if min_value is not None or max_value is not None:
+                max_power = None
+            if min_power is not None or max_power is not None:
                 mode_label = value if value in ('netzero', 'netzero+') else 'fixed'
                 slot_time = schedule_entry.get('time') if isinstance(schedule_entry, dict) else None
                 slot_key = schedule_entry.get('key') if isinstance(schedule_entry, dict) else None
@@ -1151,7 +1121,7 @@ class AutomateController(BaseDeviceController):
                     'debug',
                     f"Battery/device limits overrode bounded result for {mode_label} slot {slot_time or '?'} "
                     f"({slot_key or 'no-key'}): bounded={target_power}, applied={actual_power}, "
-                    f"min={min_value}, max={max_value}"
+                    f"min={min_power}, max={max_power}"
                 )
 
         if not success:
@@ -1413,8 +1383,8 @@ class ScheduleController(BaseDeviceController):
                 'key': matching_entry.get('key'),
                 'runtime_conditions': matching_entry.get('runtime_conditions'),
                 'fallback_value': matching_entry.get('fallback_value'),
-                'min_value': matching_entry.get('min_value'),
-                'max_value': matching_entry.get('max_value'),
+                'min_power': matching_entry.get('min_power'),
+                'max_power': matching_entry.get('max_power'),
             }
 
             return matching_entry.get('value')

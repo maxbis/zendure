@@ -645,20 +645,20 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
         $rule['fallback_value'] = normalizeRuleValue($entry['fallback_value']);
     }
     if ($rule['value'] === 'netzero' || $rule['value'] === 'netzero+') {
-        $minValue = array_key_exists('min_value', $entry) ? normalizeOptionalRuleBoundValue($entry['min_value']) : null;
-        $maxValue = array_key_exists('max_value', $entry) ? normalizeOptionalRuleBoundValue($entry['max_value']) : null;
+        $minValue = array_key_exists('min_power', $entry) ? normalizeOptionalRuleBoundValue($entry['min_power']) : null;
+        $maxValue = array_key_exists('max_power', $entry) ? normalizeOptionalRuleBoundValue($entry['max_power']) : null;
         if ($minValue !== null) {
-            $rule['min_value'] = $minValue;
+            $rule['min_power'] = $minValue;
         }
         if ($maxValue !== null) {
-            $rule['max_value'] = $maxValue;
+            $rule['max_power'] = $maxValue;
         }
         if (
-            array_key_exists('min_value', $rule) &&
-            array_key_exists('max_value', $rule) &&
-            $rule['min_value'] > $rule['max_value']
+            array_key_exists('min_power', $rule) &&
+            array_key_exists('max_power', $rule) &&
+            $rule['min_power'] > $rule['max_power']
         ) {
-            unset($rule['min_value'], $rule['max_value']);
+            unset($rule['min_power'], $rule['max_power']);
         }
     }
     return $rule;
@@ -752,11 +752,11 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
             if (array_key_exists('fallback_value', $rule)) {
                 $items[count($items) - 1]['fallback_value'] = $rule['fallback_value'];
             }
-            if (array_key_exists('min_value', $rule)) {
-                $items[count($items) - 1]['min_value'] = $rule['min_value'];
+            if (array_key_exists('min_power', $rule)) {
+                $items[count($items) - 1]['min_power'] = $rule['min_power'];
             }
-            if (array_key_exists('max_value', $rule)) {
-                $items[count($items) - 1]['max_value'] = $rule['max_value'];
+            if (array_key_exists('max_power', $rule)) {
+                $items[count($items) - 1]['max_power'] = $rule['max_power'];
             }
             break;
         }

@@ -188,7 +188,7 @@ Returns JSON:
 }
 ```
 
-For `netzero` and `netzero+` entries, `entry` may also include optional `min_value` and `max_value` watt bounds.
+For `netzero` and `netzero+` entries, `entry` may also include optional `min_power` and `max_power` watt bounds.
 
 #### `api/charge_schedule_functions.php`
 Core schedule logic:
@@ -226,7 +226,7 @@ The application reads configuration from `main/config/config.json`:
 {
   "202601150930": { "value": 300 },
   "202601151200": { "value": -200 },
-  "20260116****": { "value": "netzero", "min_value": 100, "max_value": 700 },
+  "20260116****": { "value": "netzero", "min_power": -700, "max_power": -100 },
   "********0800": { "value": "netzero+" }
 }
 ```
@@ -240,13 +240,15 @@ The application reads configuration from `main/config/config.json`:
 **Value types:**
 - `number` - Power in watts (positive=charge, negative=discharge)
 - `"auto"` - Resume normal auto/rule resolution from this time onward without forcing a power value
-- `"netzero"` - Discharge-only dynamic mode that reduces grid import toward zero
+- `"netzero"` - Dynamic mode that reduces grid import/export toward zero; charging depends on `NETZERO_BI_DIRECTIONAL`
 - `"netzero+"` - Charge-only dynamic mode that reduces grid export toward zero
 
-For `netzero` and `netzero+`, the optional `min_value` / `max_value` fields are magnitude bounds used by automation at runtime:
-- `min_value` = minimum watt magnitude to apply when the mode is active
-- `max_value` = maximum watt magnitude to apply when the mode is active
-- if both are missing or `null`, runtime behavior is unchanged from the legacy implementation
+For `netzero` and `netzero+`, the optional `min_power` / `max_power` fields are signed bounds used by automation at runtime:
+- `min_power` = lower signed bound
+- `max_power` = upper signed bound
+- negative values = discharge
+- positive values = charge
+- if both are missing or `null`, runtime behavior is unchanged
 
 ### API Response (Resolved)
 
@@ -255,7 +257,7 @@ For `netzero` and `netzero+`, the optional `min_value` / `max_value` fields are 
   "resolved": [
     {"time": "0000", "value": null, "key": null},
     {"time": "0030", "value": null, "key": null},
-    {"time": "0800", "value": "netzero+", "key": "********0800", "min_value": 100, "max_value": 400},
+    {"time": "0800", "value": "netzero+", "key": "********0800", "min_power": 100, "max_power": 400},
     {"time": "0930", "value": 300, "key": "202601150930"}
   ]
 }
@@ -265,15 +267,10 @@ Every 30-minute slot for the day with resolved values.
 
 ### Runtime Notes
 
-At runtime, `automate/device_controller.py` applies bound handling only for dynamic modes:
+At runtime, `automate/device_controller.py` applies signed bound handling only for dynamic modes:
 
-- `netzero`
-  - below `min_value` -> force minimum discharge
-  - above `max_value` -> cap the magnitude and keep the sign
-- `netzero+`
-  - below `min_value` -> force minimum charge
-  - above `max_value` -> cap the charge magnitude
-- if `ReversalRampGuard` is active during a real reversal, min/max handling is deferred for that cycle
+- runtime clamps the raw dynamic result into the inclusive signed range `[min_power, max_power]`
+- if `ReversalRampGuard` is active during a real reversal, bound handling is deferred for that cycle
 
 ## UI Components
 

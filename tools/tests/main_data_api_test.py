@@ -178,7 +178,7 @@ def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]
             elif "value" not in entry["entry"]:
                 failures.append(f"Expected entries[{idx}].entry.value")
             else:
-                for bound_field in ("min_value", "max_value"):
+                for bound_field in ("min_power", "max_power"):
                     if bound_field in entry["entry"] and not isinstance(entry["entry"][bound_field], int):
                         failures.append(f"Expected entries[{idx}].entry.{bound_field} to be an integer when present")
     return len(failures) == 0, failures
@@ -211,7 +211,7 @@ def validate_schedule_raw(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
                 continue
             if "value" not in entry:
                 failures.append(f"Expected raw schedule entry '{key}' to contain 'value'")
-            for bound_field in ("min_value", "max_value"):
+            for bound_field in ("min_power", "max_power"):
                 if bound_field in entry and not isinstance(entry[bound_field], int):
                     failures.append(f"Expected raw schedule entry '{key}'.{bound_field} to be an integer when present")
     return len(failures) == 0, failures
@@ -280,6 +280,7 @@ def validate_error_response(result: Dict[str, Any], status_ok: bool = True) -> T
 # Schedule key used for add/list/delete test (YYYYMMDDHHmm; far future to avoid collision)
 SCHEDULE_TEST_KEY = "203012010000"
 SCHEDULE_TEST_VALUE = 99
+SCHEDULE_TEST_DATE = SCHEDULE_TEST_KEY[:8]
 
 
 def run_schedule_add_list_delete(
@@ -424,15 +425,15 @@ def run_schedule_min_max_roundtrip(
     params = {"type": "schedule"}
     add_body = {
         "key": SCHEDULE_TEST_KEY,
-        "entry": {"value": "netzero", "min_value": 100, "max_value": 800},
+        "entry": {"value": "netzero", "min_power": 100, "max_power": 800},
     }
     invalid_body = {
         "key": SCHEDULE_TEST_KEY,
-        "entry": {"value": 150, "min_value": 100, "max_value": 800},
+        "entry": {"value": 150, "min_power": 100, "max_power": 800},
     }
     invalid_decimal_body = {
         "key": SCHEDULE_TEST_KEY,
-        "entry": {"value": "netzero", "min_value": 100.5, "max_value": 800},
+        "entry": {"value": "netzero", "min_power": 100.5, "max_power": 800},
     }
     delete_body = {"key": SCHEDULE_TEST_KEY}
 
@@ -459,12 +460,12 @@ def run_schedule_min_max_roundtrip(
         else:
             if entry.get("value") != "netzero":
                 failures.append(f"GET raw after min/max add: expected value=netzero, got {entry}")
-            if entry.get("min_value") != 100 or entry.get("max_value") != 800:
+            if entry.get("min_power") != 100 or entry.get("max_power") != 800:
                 failures.append(f"GET raw after min/max add: expected min/max 100/800, got {entry}")
     if failures:
         return False, failures, steps
 
-    steps["get_resolved"] = run_get(base_url, {"type": "schedule", "resolved": "1"}, timeout)
+    steps["get_resolved"] = run_get(base_url, {"type": "schedule", "resolved": "1", "date": SCHEDULE_TEST_DATE}, timeout)
     body = steps["get_resolved"].get("body")
     if not isinstance(body, dict) or not body.get("success"):
         failures.append("GET resolved after min/max add: success or body missing")
@@ -473,7 +474,7 @@ def run_schedule_min_max_roundtrip(
         if not isinstance(slot, dict):
             failures.append("GET resolved after min/max add: matching slot missing")
         else:
-            if slot.get("min_value") != 100 or slot.get("max_value") != 800:
+            if slot.get("min_power") != 100 or slot.get("max_power") != 800:
                 failures.append(f"GET resolved after min/max add: expected min/max 100/800, got {slot}")
     if failures:
         return False, failures, steps
@@ -811,7 +812,7 @@ def main() -> int:
     })
     status = "PASS" if passed_min_max else "FAIL"
     print(f"[{status}] {desc_schedule_min_max}")
-    print(f"  Key: {SCHEDULE_TEST_KEY}  Payload: {{\"key\": \"{SCHEDULE_TEST_KEY}\", \"entry\": {{\"value\": \"netzero\", \"min_value\": 100, \"max_value\": 800}}}}")
+    print(f"  Key: {SCHEDULE_TEST_KEY}  Payload: {{\"key\": \"{SCHEDULE_TEST_KEY}\", \"entry\": {{\"value\": \"netzero\", \"min_power\": 100, \"max_power\": 800}}}}")
     for f in failures_min_max:
         print(f"  Validation: {f}")
     if not args.quiet:

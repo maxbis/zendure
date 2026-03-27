@@ -54,23 +54,23 @@ Use the schedule section to manage entries.
 Notes:
 
 - Wildcards are supported in both date and time patterns.
-- For `netzero` and `netzero+`, the modal can also show optional `min_value` / `max_value` fields.
-- `min_value` and `max_value` use watt values and step in `100 W`.
+- For `netzero` and `netzero+`, the modal can also show optional `min_power` / `max_power` fields.
+- `min_power` and `max_power` use watt values and step in `100 W`.
 - If both are empty, runtime behaves as before with no extra min/max enforcement.
 
-### `min_value` / `max_value` meaning
+### `min_power` / `max_power` meaning
 
-- `min_value` = minimum watt magnitude while the dynamic mode is active
-- `max_value` = maximum watt magnitude while the dynamic mode is active
+- `min_power` = minimum signed watt bound while the dynamic mode is active
+- `max_power` = maximum signed watt bound while the dynamic mode is active
 
 Examples:
 
-- `netzero` + `min_value=100`
-  - if dynamic result is too small, runtime forces at least `100 W` discharge
-- `netzero+` + `min_value=100`
-  - if dynamic result is too small, runtime forces at least `100 W` charge
-- `max_value=200`
-  - runtime will not exceed `200 W` magnitude for that dynamic slot
+- `min_power=-700`, `max_power=-100`
+  - runtime clamps the dynamic result into a discharge-only range
+- `min_power=100`, `max_power=700`
+  - runtime clamps the dynamic result into a charge-only range
+- `min_power=-300`, `max_power=300`
+  - runtime allows both charge and discharge but clamps both sides
 
 ## 5. Price Graph Behavior
 

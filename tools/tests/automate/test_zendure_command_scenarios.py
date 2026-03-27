@@ -69,6 +69,7 @@ def _make_scenario_controller(device_controller_module):
     controller = device_controller_module.AutomateController.__new__(device_controller_module.AutomateController)
     controller.test_mode = False
     controller.config_path = Path("/tmp/config.jsonc")
+    controller.config = {"NETZERO_BI_DIRECTIONAL": True}
     controller.previous_power = None
     controller.power_feed_min_threshold = 30
     controller.power_feed_min_delta = 0
@@ -164,4 +165,3 @@ def test_print_zendure_api_command_for_scenario(monkeypatch, scenario):
 
     # assert result.success is True
     # assert len(sent_requests) == 1
-

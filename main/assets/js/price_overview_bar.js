@@ -146,17 +146,17 @@ function formatScheduleLimitsText(scheduleEntry) {
         return '';
     }
 
-    const hasMin = Object.prototype.hasOwnProperty.call(entry, 'min_value')
-        && entry.min_value !== null
-        && entry.min_value !== '';
-    const hasMax = Object.prototype.hasOwnProperty.call(entry, 'max_value')
-        && entry.max_value !== null
-        && entry.max_value !== '';
+    const hasMin = Object.prototype.hasOwnProperty.call(entry, 'min_power')
+        && entry.min_power !== null
+        && entry.min_power !== '';
+    const hasMax = Object.prototype.hasOwnProperty.call(entry, 'max_power')
+        && entry.max_power !== null
+        && entry.max_power !== '';
 
     if (!hasMin && !hasMax) return '';
-    if (hasMin && hasMax) return `Limits: ${entry.min_value}\u2013${entry.max_value} W`;
-    if (hasMin) return `Limits: min ${entry.min_value} W`;
-    return `Limits: max ${entry.max_value} W`;
+    if (hasMin && hasMax) return `Limits: ${entry.min_power} to ${entry.max_power} W`;
+    if (hasMin) return `Limits: min ${entry.min_power} W`;
+    return `Limits: max ${entry.max_power} W`;
 }
 
 function escapePopupHtml(value) {
@@ -277,8 +277,8 @@ function renderRuleDetailBody(rule) {
 
     if (isDynamicOutput) {
         [
-            { key: 'min_value', label: 'Min power' },
-            { key: 'max_value', label: 'Max power' }
+            { key: 'min_power', label: 'Min power' },
+            { key: 'max_power', label: 'Max power' }
         ].forEach(({ key, label }) => {
             if (!Object.prototype.hasOwnProperty.call(rule, key) || rule[key] === '' || rule[key] === null) return;
             fields.push({
@@ -1507,7 +1507,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
 
     /**
      * Build an expanded hour -> rule metadata map from resolved schedule slots.
-     * Propagates last known rule_name/rule_index/min_value/max_value forward across the day.
+     * Propagates last known rule_name/rule_index/min_power/max_power forward across the day.
      */
     const buildExpandedRuleMetaMap = (resolved) => {
         if (!Array.isArray(resolved) || resolved.length === 0) return null;
@@ -1528,23 +1528,23 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
                 slot.rule_index !== undefined &&
                 slot.rule_index !== null &&
                 !Number.isNaN(Number(slot.rule_index));
-            const hasMinValue = Object.prototype.hasOwnProperty.call(slot, 'min_value') &&
-                slot.min_value !== undefined &&
-                slot.min_value !== null &&
-                slot.min_value !== '' &&
-                Number.isFinite(Number(slot.min_value));
-            const hasMaxValue = Object.prototype.hasOwnProperty.call(slot, 'max_value') &&
-                slot.max_value !== undefined &&
-                slot.max_value !== null &&
-                slot.max_value !== '' &&
-                Number.isFinite(Number(slot.max_value));
+            const hasMinValue = Object.prototype.hasOwnProperty.call(slot, 'min_power') &&
+                slot.min_power !== undefined &&
+                slot.min_power !== null &&
+                slot.min_power !== '' &&
+                Number.isFinite(Number(slot.min_power));
+            const hasMaxValue = Object.prototype.hasOwnProperty.call(slot, 'max_power') &&
+                slot.max_power !== undefined &&
+                slot.max_power !== null &&
+                slot.max_power !== '' &&
+                Number.isFinite(Number(slot.max_power));
 
             if (hasRuleName || hasRuleIndex || hasMinValue || hasMaxValue) {
                 lastRuleMeta = {
                     ruleName: hasRuleName ? String(slot.rule_name).trim() : undefined,
                     ruleIndex: hasRuleIndex ? String(parseInt(slot.rule_index, 10)) : undefined,
-                    minValue: hasMinValue ? Number(slot.min_value) : undefined,
-                    maxValue: hasMaxValue ? Number(slot.max_value) : undefined
+                    minValue: hasMinValue ? Number(slot.min_power) : undefined,
+                    maxValue: hasMaxValue ? Number(slot.max_power) : undefined
                 };
             } else {
                 lastRuleMeta = undefined;

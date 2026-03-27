@@ -116,6 +116,62 @@ button {
     cursor: pointer;
 }
 
+#inp-min-value,
+#inp-max-value {
+    font-weight: 700;
+}
+
+#inp-min-value.is-charging,
+#inp-max-value.is-charging {
+    color: #7fd77f;
+    font-weight: 700;
+}
+
+#inp-min-value.is-discharging,
+#inp-max-value.is-discharging {
+    color: #ff8b8b;
+    font-weight: 700;
+}
+
+.power-range-indicator {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.04);
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.power-range-indicator.is-charge {
+    color: #7fd77f;
+    border-color: rgba(127, 215, 127, 0.45);
+    background: rgba(127, 215, 127, 0.08);
+}
+
+.power-range-indicator.is-discharge {
+    color: #ff8b8b;
+    border-color: rgba(255, 139, 139, 0.45);
+    background: rgba(255, 139, 139, 0.08);
+}
+
+.power-range-indicator.is-bidirectional {
+    color: #8ec5ff;
+    border-color: rgba(142, 197, 255, 0.45);
+    background: rgba(142, 197, 255, 0.08);
+}
+
+.power-range-indicator.is-partial {
+    color: #f4d98b;
+    border-color: rgba(244, 217, 139, 0.45);
+    background: rgba(244, 217, 139, 0.08);
+}
+
+.power-range-indicator.is-invalid {
+    color: #ff8b8b;
+    border-color: rgba(255, 139, 139, 0.6);
+    background: rgba(153, 27, 27, 0.24);
+}
+
 .btn-link {
     display: inline-flex;
     align-items: center;
@@ -382,6 +438,11 @@ form {
     grid-template-columns: 1fr 1fr;
 }
 
+.row.split .power-range-indicator {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+}
+
 .conditions-header {
     display: flex;
     justify-content: space-between;
@@ -430,10 +491,12 @@ form {
 button.danger.condition-remove-btn {
     border-color: #a61b1b;
     background: #7f1d1d;
+    opacity: 0.5;
 }
 
 button.danger.condition-remove-btn:hover {
     filter: brightness(1.08);
+    opacity: 1;
 }
 
 .condition-remove-icon {
