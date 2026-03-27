@@ -231,10 +231,38 @@
         indicator.hidden = false;
 
         if (minValue === null || maxValue === null) {
-            indicator.textContent = minValue !== null
-                ? `Minimum bound only: ${minValue} W`
-                : `Maximum bound only: ${maxValue} W`;
-            indicator.classList.add('is-partial');
+            if (minValue !== null) {
+                if (minValue > 0) {
+                    indicator.textContent = `Charge-only from ${minValue} W`;
+                    indicator.classList.add('is-charge');
+                    return;
+                }
+                if (minValue < 0) {
+                    indicator.textContent = `Open range from ${minValue} W upward`;
+                    indicator.classList.add('is-partial');
+                    return;
+                }
+                indicator.textContent = 'Minimum bound only: 0 W';
+                indicator.classList.add('is-partial');
+                return;
+            }
+
+            if (maxValue !== null) {
+                if (maxValue < 0) {
+                    indicator.textContent = `Discharge-only up to ${maxValue} W`;
+                    indicator.classList.add('is-discharge');
+                    return;
+                }
+                if (maxValue > 0) {
+                    indicator.textContent = `Open range up to ${maxValue} W`;
+                    indicator.classList.add('is-partial');
+                    return;
+                }
+                indicator.textContent = 'Maximum bound only: 0 W';
+                indicator.classList.add('is-partial');
+                return;
+            }
+
             return;
         }
 
