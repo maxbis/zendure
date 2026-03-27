@@ -9,7 +9,7 @@ This is a **UI estimate only**; it does not drive automation.
 ## Location
 
 - Implementation: [`main/assets/js/price_overview_bar.js`](../../../../main/assets/js/price_overview_bar.js)
-- Primary functions: `getPopupForecastBatteryState`, `getPopupForecastForBar`, `formatPopupForecastHtml`, `powerToCapacityPercent`, `estimateSchedulePowerForPopup`, `getDischargeSocFloorFromRuntimeConditions`
+- Primary functions: `getPopupForecastBatteryState`, `getPopupForecastForBar`, `formatPopupForecastHtml`, `powerToCapacityPercent`, `estimateSchedulePowerForPopup`, `clampSchedulePowerForPopup`, `getDischargeSocFloorFromRuntimeConditions`
 - Live SoC for the model comes from `window.currentBatteryForecastState`, which is set when charge status is rendered (see [`main/assets/js/schedule_renderer.js`](../../../../main/assets/js/schedule_renderer.js) in `renderChargeStatus`)
 
 ## Injected configuration (page script)
@@ -62,7 +62,7 @@ Runtime rule parsing:
 
 4. **Duration** — For a **future** full hour, duration is 1 hour. For the **current** hour, duration is the **remaining** fraction of the hour from now until the end of the slot.
 
-5. **Scheduled power** — `estimateSchedulePowerForPopup` maps `data-schedule-value` to watts (numeric as-is; `netzero` → `-POPUP_NETZERO_REFERENCE_W`; `netzero+` → `+POPUP_NETZERO_PLUS_REFERENCE_W`).
+5. **Scheduled power** — `estimateSchedulePowerForPopup` maps `data-schedule-value` to watts (numeric as-is; `netzero` → `-POPUP_NETZERO_REFERENCE_W`; `netzero+` → `+POPUP_NETZERO_PLUS_REFERENCE_W`). `clampSchedulePowerForPopup` then applies `min_power` / `max_power` as signed bounds, consistent with the runtime logic.
 
 6. **Percent delta for the interval** — `powerToCapacityPercent(abs(powerW))` is “percent points per hour” at that power:
 

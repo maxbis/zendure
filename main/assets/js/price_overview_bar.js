@@ -512,25 +512,19 @@ function estimateSchedulePowerForPopup(scheduleValue) {
 }
 
 function clampSchedulePowerForPopup(scheduleValue, minValue, maxValue) {
-    const defaultPowerW = estimateSchedulePowerForPopup(scheduleValue);
-    const direction = defaultPowerW < 0 ? -1 : (defaultPowerW > 0 ? 1 : 0);
-    if (direction === 0) {
-        return defaultPowerW;
-    }
-
-    let effectiveMagnitude = Math.abs(defaultPowerW);
+    let effectivePowerW = estimateSchedulePowerForPopup(scheduleValue);
 
     const parsedMin = Number(minValue);
     if (Number.isFinite(parsedMin)) {
-        effectiveMagnitude = Math.max(effectiveMagnitude, Math.abs(parsedMin));
+        effectivePowerW = Math.max(effectivePowerW, parsedMin);
     }
 
     const parsedMax = Number(maxValue);
     if (Number.isFinite(parsedMax)) {
-        effectiveMagnitude = Math.min(effectiveMagnitude, Math.abs(parsedMax));
+        effectivePowerW = Math.min(effectivePowerW, parsedMax);
     }
 
-    return direction * effectiveMagnitude;
+    return effectivePowerW;
 }
 
 const POPUP_RUNTIME_BATTERY_FIELDS = new Set(['electricity_level', 'electric_level', 'electricLevel']);
