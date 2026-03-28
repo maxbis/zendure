@@ -18,7 +18,9 @@ const BELASTING = 0.08980;
 const BTW = 1.21;
 const TOMORROW_FETCH_HOUR = 14;
 
-define('PRICE_DIR', __DIR__ . '/../data/price');
+if (!defined('PRICE_DIR')) {
+    define('PRICE_DIR', __DIR__ . '/../data/price');
+}
 
 function isRunningInCLI(): bool {
     return php_sapi_name() === 'cli' || php_sapi_name() === 'phpdbg';
@@ -339,6 +341,68 @@ function buildPriceFilesByDate(array $hours): array {
     return $byDate;
 }
 
+function isSpringDstTransitionDay(string $dateYmd): bool {
+    $tzNl = new DateTimeZone(TIMEZONE_NL);
+    $start = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateYmd . ' 00:00:00', $tzNl);
+    if ($start === false) {
+        return false;
+    }
+
+    $end = $start->modify('+1 day');
+    $hoursInDay = (int)round(($end->getTimestamp() - $start->getTimestamp()) / 3600);
+    if ($hoursInDay !== 23) {
+        return false;
+    }
+
+    return $start->getOffset() < $end->getOffset();
+}
+
+function findNearestEarlierHourKey(array $hourPrices, string $targetHourKey): ?string {
+    $targetHour = (int)$targetHourKey;
+    for ($hour = $targetHour - 1; $hour >= 0; $hour--) {
+        $hourKey = str_pad((string)$hour, 2, '0', STR_PAD_LEFT);
+        if (array_key_exists($hourKey, $hourPrices) && is_numeric($hourPrices[$hourKey])) {
+            return $hourKey;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @param array<string, float>|null $hourPrices
+ * @return array<string, float>|null
+ */
+function normalizeSpringDstHourMap(?array $hourPrices, string $selectedDateYmd, array &$diagnostics = []): ?array {
+    if (!is_array($hourPrices) || count($hourPrices) !== 23 || !isSpringDstTransitionDay($selectedDateYmd)) {
+        return $hourPrices;
+    }
+
+    if (array_key_exists('02', $hourPrices)) {
+        return $hourPrices;
+    }
+
+    $sourceHourKey = null;
+    if (array_key_exists('01', $hourPrices) && is_numeric($hourPrices['01'])) {
+        $sourceHourKey = '01';
+    } else {
+        $sourceHourKey = findNearestEarlierHourKey($hourPrices, '02');
+    }
+
+    if ($sourceHourKey === null) {
+        return $hourPrices;
+    }
+
+    $hourPrices['02'] = (float)$hourPrices[$sourceHourKey];
+    ksort($hourPrices);
+
+    $diagnostics['proFormaHourAdded'] = true;
+    $diagnostics['proFormaHourKey'] = '02';
+    $diagnostics['proFormaHourSource'] = $sourceHourKey;
+
+    return $hourPrices;
+}
+
 /**
  * @param array<string, float> $prices
  * @return string|false
@@ -424,6 +488,7 @@ function fetchJeroenForPeriod(string $period, string $expectedDateStr, array &$d
     }
 
     $hourPrices = $byDate[$selectedDateYmd] ?? null;
+    $hourPrices = normalizeSpringDstHourMap($hourPrices, $selectedDateYmd, $diagnostics);
     if ($hourPrices === null || count($hourPrices) < 24) {
         $diagnostics['status'] = 'insufficient_hour_data';
         $diagnostics['hoursFound'] = is_array($hourPrices) ? count($hourPrices) : 0;
