@@ -215,6 +215,14 @@ function fetchJson(string $url, string $label, array &$errors): ?array
         return null;
     }
 
+    if (array_key_exists('success', $decoded) && $decoded['success'] === false) {
+        $message = isset($decoded['error']) && is_string($decoded['error']) && trim($decoded['error']) !== ''
+            ? trim($decoded['error'])
+            : ('Upstream ' . $label . ' returned success=false.');
+        $errors[] = $message;
+        return null;
+    }
+
     return $decoded;
 }
 
@@ -227,6 +235,11 @@ function extractCurrentSoc(?array $chargeStatus): float
     $properties = null;
     if (isset($chargeStatus['data']['properties']) && is_array($chargeStatus['data']['properties'])) {
         $properties = $chargeStatus['data']['properties'];
+    } elseif (
+        isset($chargeStatus['zendure']['readings']['properties']) &&
+        is_array($chargeStatus['zendure']['readings']['properties'])
+    ) {
+        $properties = $chargeStatus['zendure']['readings']['properties'];
     } elseif (isset($chargeStatus['properties']) && is_array($chargeStatus['properties'])) {
         $properties = $chargeStatus['properties'];
     }
