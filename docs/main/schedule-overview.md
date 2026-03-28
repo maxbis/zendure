@@ -55,22 +55,33 @@ main/
 Scripts are loaded in a specific order to ensure dependencies are available:
 
 ```html
-<!-- 1. Core modules (must load first) -->
+<!-- 1. Infrastructure modules (must load first) -->
+<script src="assets/js/api_client.js"></script>
+<script src="assets/js/notification_service.js"></script>
+<script src="assets/js/state_manager.js"></script>
+<script src="assets/js/utils_performance.js"></script>
+<script src="assets/js/component_base.js"></script>
+
+<!-- 2. Schedule core modules -->
 <script src="assets/js/schedule_utils.js"></script>
 <script src="assets/js/schedule_api.js"></script>
 <script src="assets/js/schedule_renderer.js"></script>
 
-<!-- 2. UI components -->
+<!-- 3. UI components -->
 <script src="assets/js/edit_modal.js"></script>
 <script src="assets/js/confirm_dialog.js"></script>
 
-<!-- 3. Feature modules -->
+<!-- 4. Component modules -->
+<script src="assets/js/components/schedule_panel_component.js"></script>
+<script src="assets/js/components/price_graph_component.js"></script>
+
+<!-- 5. Feature modules -->
 <script src="assets/js/price_overview_bar.js"></script>
 <script src="assets/js/automation_status.js"></script>
 <script src="assets/js/charge_status.js"></script>
 <script src="assets/js/energy_graph_refresh.js"></script>
 
-<!-- 4. Main application (must load last) -->
+<!-- 6. Main application (must load last) -->
 <script src="assets/js/charge_schedule.js"></script>
 ```
 
@@ -227,9 +238,12 @@ The application reads configuration from `main/config/config.json`:
   "202601150930": { "value": 300 },
   "202601151200": { "value": -200 },
   "20260116****": { "value": "netzero", "min_power": -700, "max_power": -100 },
-  "********0800": { "value": "netzero+" }
+  "********0800": { "value": "netzero+" },
+  "********1800": { "value": "netzero", "min_power": 100 }
 }
 ```
+
+**Note**: The actual current `charge_schedule.json` uses incorrect field name `min_value` instead of `min_power`. This should be corrected to align with the PHP validation layer and API response format.
 
 **Key format:** `YYYYMMDDHHNN` (12 characters)
 - `*` = wildcard (matches any value)
@@ -249,6 +263,8 @@ For `netzero` and `netzero+`, the optional `min_power` / `max_power` fields are 
 - negative values = discharge
 - positive values = charge
 - if both are missing or `null`, runtime behavior is unchanged
+
+**IMPORTANT DISCREPANCY**: The example below and actual `charge_schedule.json` file currently use `min_value` (incorrect), but the PHP validation code (charge_schedule_functions.php) expects and validates `min_power` and `max_power`. The JSON file should be corrected to use the proper field names.
 
 ### API Response (Resolved)
 

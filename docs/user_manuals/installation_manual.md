@@ -18,7 +18,7 @@ In practice, this project is split into three parts:
    - These scripts are for testing, inspection, API probing, and local emulation.
    - They are useful during setup and troubleshooting, but they are not required for a normal end-user installation.
 
-This manual starts with the first part: the automation controller in [`automate/`](/Users/maxbisschop/dev/www/zendure/automate).
+This manual starts with the first part: the automation controller in [`automate/`]([install_dir]/automate).
 
 ## 2. Automation Controller (`automate/`)
 
@@ -28,7 +28,7 @@ The automation controller is the part that actually drives the battery.
 
 The active runtime is:
 
-- [`automate/automate_www.py`](/Users/maxbisschop/dev/www/zendure/automate/automate_www.py)
+- [`automate/automate_www.py`]([install_dir]/automate/automate_www.py)
 
 This script runs continuously on a Python-capable device and acts as the bridge between:
 
@@ -43,7 +43,7 @@ It also exposes its own local monitoring API on port `1611`, which the web app c
 
 At a high level, the automation loop works like this:
 
-1. Load configuration from [`automate/config/config.jsonc`](/Users/maxbisschop/dev/www/zendure/automate/config/config.jsonc).
+1. Load configuration from [`automate/config/config.jsonc`]([install_dir]/automate/config/config.jsonc).
 2. Read the configured power meter.
 3. Read the current Zendure device status.
 4. Fetch or reuse the resolved schedule from the schedule API.
@@ -86,7 +86,7 @@ The controller combines multiple inputs:
 
 The automation controller is driven by one config file:
 
-- [`automate/config/config.jsonc`](/Users/maxbisschop/dev/www/zendure/automate/config/config.jsonc)
+- [`automate/config/config.jsonc`]([install_dir]/automate/config/config.jsonc)
 
 This is a JSON-based configuration file with comment support. The loader accepts:
 
@@ -156,12 +156,12 @@ A working automation installation also depends on:
 
 The main automation files are:
 
-- [`automate/automate_www.py`](/Users/maxbisschop/dev/www/zendure/automate/automate_www.py)
-- [`automate/device_controller.py`](/Users/maxbisschop/dev/www/zendure/automate/device_controller.py)
-- [`automate/power_metere_loader.py`](/Users/maxbisschop/dev/www/zendure/automate/power_metere_loader.py)
-- [`automate/power_metere_p1_hw.py`](/Users/maxbisschop/dev/www/zendure/automate/power_metere_p1_hw.py)
-- [`automate/power_metere_shelly.py`](/Users/maxbisschop/dev/www/zendure/automate/power_metere_shelly.py)
-- [`automate/config_loader.py`](/Users/maxbisschop/dev/www/zendure/automate/config_loader.py)
+- [`automate/automate_www.py`]([install_dir]/automate/automate_www.py)
+- [`automate/device_controller.py`]([install_dir]/automate/device_controller.py)
+- [`automate/power_metere_loader.py`]([install_dir]/automate/power_metere_loader.py)
+- [`automate/power_metere_p1_hw.py`]([install_dir]/automate/power_metere_p1_hw.py)
+- [`automate/power_metere_shelly.py`]([install_dir]/automate/power_metere_shelly.py)
+- [`automate/config_loader.py`]([install_dir]/automate/config_loader.py)
 
 ### 2.7 Key config entries for first installation
 
@@ -205,7 +205,7 @@ The `main/` application is the browser-based control and monitoring interface.
 
 Its main entry point is:
 
-- [`main/charge_schedule_mobile.php`](/Users/maxbisschop/dev/www/zendure/main/charge_schedule_mobile.php)
+- [`main/charge_schedule_mobile.php`]([install_dir]/main/charge_schedule_mobile.php)
 
 This application does not directly control the battery hardware itself. Instead, it:
 
@@ -268,8 +268,8 @@ The web application depends on:
 - PHP `8.x`
 - a web server such as Apache or Nginx with PHP support
 - read/write access for the PHP process to:
-  - [`main/data/charge_schedule.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule.json)
-  - [`main/data/charge_schedule_conditions.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule_conditions.json)
+  - [`main/data/charge_schedule.json`]([install_dir]/main/data/charge_schedule.json)
+  - [`main/data/charge_schedule_conditions.json`]([install_dir]/main/data/charge_schedule_conditions.json)
   - any cached data files used by the data API
 - access from the web server to the automation runtime API, typically:
   - `http://YOUR_CONTROL_DEVICE:1611`
@@ -296,7 +296,7 @@ This means the web app is both:
 
 The main web-app config file is:
 
-- [`main/config/config.json`](/Users/maxbisschop/dev/www/zendure/main/config/config.json)
+- [`main/config/config.json`]([install_dir]/main/config/config.json)
 
 This config tells the UI where to find:
 
@@ -322,27 +322,27 @@ The main user-facing pages are:
 
 Core schedule and rules files:
 
-- [`main/data/charge_schedule.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule.json)
-- [`main/data/charge_schedule_conditions.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule_conditions.json)
+- [`main/data/charge_schedule.json`]([install_dir]/main/data/charge_schedule.json)
+- [`main/data/charge_schedule_conditions.json`]([install_dir]/main/data/charge_schedule_conditions.json)
 
 Important endpoints:
 
 - resolved schedule API:
   - `main/data/api/data_api.php?type=schedule&resolved=1`
 - schedule modification API:
-  - [`main/api/charge_schedule_api.php`](/Users/maxbisschop/dev/www/zendure/main/api/charge_schedule_api.php)
+  - [`main/api/charge_schedule_api.php`]([install_dir]/main/api/charge_schedule_api.php)
 - schedule auto-calculation API:
-  - [`main/api/calculate_schedule_api.php`](/Users/maxbisschop/dev/www/zendure/main/api/calculate_schedule_api.php)
+  - [`main/api/calculate_schedule_api.php`]([install_dir]/main/api/calculate_schedule_api.php)
 - automation-status proxy:
-  - [`main/api/automation_status_proxy.php`](/Users/maxbisschop/dev/www/zendure/main/api/automation_status_proxy.php)
+  - [`main/api/automation_status_proxy.php`]([install_dir]/main/api/automation_status_proxy.php)
 - charge-status proxy:
-  - [`main/api/charge_status_all_proxy.php`](/Users/maxbisschop/dev/www/zendure/main/api/charge_status_all_proxy.php)
+  - [`main/api/charge_status_all_proxy.php`]([install_dir]/main/api/charge_status_all_proxy.php)
 - energy-graph proxy:
-  - [`main/api/energy_graph_proxy.php`](/Users/maxbisschop/dev/www/zendure/main/api/energy_graph_proxy.php)
+  - [`main/api/energy_graph_proxy.php`]([install_dir]/main/api/energy_graph_proxy.php)
 
 ### 3.8 User installation checklist for `main/`
 
-For a normal installation, verify these settings in [`main/config/config.json`](/Users/maxbisschop/dev/www/zendure/main/config/config.json):
+For a normal installation, verify these settings in [`main/config/config.json`]([install_dir]/main/config/config.json):
 
 - `scheduleApiUrl`
 - `priceApiUrl`
@@ -362,7 +362,7 @@ For a normal installation, verify these settings in [`main/config/config.json`](
 
 The schedule editor in `charge_schedule_mobile.php` lets the user manage schedule entries that are stored in:
 
-- [`main/data/charge_schedule.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule.json)
+- [`main/data/charge_schedule.json`]([install_dir]/main/data/charge_schedule.json)
 
 Each entry uses a 12-character key:
 
@@ -391,11 +391,11 @@ Supported schedule values are:
 
 The condition editor is:
 
-- [`main/edit_rules.php`](/Users/maxbisschop/dev/www/zendure/main/edit_rules.php)
+- [`main/edit_rules.php`]([install_dir]/main/edit_rules.php)
 
 It manages the rules stored in:
 
-- [`main/data/charge_schedule_conditions.json`](/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule_conditions.json)
+- [`main/data/charge_schedule_conditions.json`]([install_dir]/main/data/charge_schedule_conditions.json)
 
 The condition editor is used to define conditional schedule behavior based on price and derived metrics.
 
@@ -456,7 +456,7 @@ The file is written atomically, so save operations replace the target file safel
 
 This manual assumes the project is available at:
 
-- `/Users/maxbisschop/dev/www/zendure`
+- `[install_dir]`
 
 And served at:
 
@@ -466,7 +466,7 @@ And served at:
 
 Main web config:
 
-- `/Users/maxbisschop/dev/www/zendure/main/config/config.json`
+- `[install_dir]/main/config/config.json`
 
 Important keys to set:
 
@@ -502,7 +502,7 @@ Important keys to set:
 
 Automation config:
 
-- `/Users/maxbisschop/dev/www/zendure/automate/config/config.jsonc`
+- `[install_dir]/automate/config/config.jsonc`
 
 Important keys to set:
 
@@ -518,14 +518,14 @@ Important keys to set:
 
 Reference:
 
-- `/Users/maxbisschop/dev/www/zendure/automate/config/config.md`
+- `[install_dir]/automate/config/config.md`
 
 ## 8. Schedule + Condition Data Files
 
 Core schedule files:
 
-- `/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule.json`
-- `/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule_conditions.json`
+- `[install_dir]/main/data/charge_schedule.json`
+- `[install_dir]/main/data/charge_schedule_conditions.json`
 
 Condition resolver endpoint:
 
@@ -537,12 +537,12 @@ Rules editor:
 
 Manuals:
 
-- `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/edit_rules_user_manual.md`
-- `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/charge_schedule_mobile_user_manual.md`
+- `[install_dir]/docs/user_manuals/edit_rules_user_manual.md`
+- `[install_dir]/docs/user_manuals/charge_schedule_mobile_user_manual.md`
 
 ## 9. Automation Runtime API
 
-The Python automation runtime in [`automate/automate_www.py`](/Users/maxbisschop/dev/www/zendure/automate/automate_www.py) exposes an HTTP API on port `1611`.
+The Python automation runtime in [`automate/automate_www.py`]([install_dir]/automate/automate_www.py) exposes an HTTP API on port `1611`.
 
 Typical base URL:
 
@@ -645,15 +645,15 @@ If this port is blocked, the `main/` dashboard can still load, but live status a
 
 Authentication is validated by:
 
-- `/Users/maxbisschop/dev/www/zendure/login/validate.php`
+- `[install_dir]/login/validate.php`
 
 Login page:
 
-- `/Users/maxbisschop/dev/www/zendure/login/index.php`
+- `[install_dir]/login/index.php`
 
 Allowed key storage:
 
-- `/Users/maxbisschop/dev/www/zendure/login/validkeys.txt`
+- `[install_dir]/login/validkeys.txt`
 
 ### How it works
 
@@ -676,7 +676,7 @@ Allowed key storage:
    - enter your key
    - copy shown hash
 2. Add hash as a separate line in:
-   - `/Users/maxbisschop/dev/www/zendure/login/validkeys.txt`
+   - `[install_dir]/login/validkeys.txt`
 3. Retry protected page, e.g.:
    - `http://localhost/zendure/main/charge_schedule_mobile.php`
 

@@ -2,11 +2,11 @@
 
 This manual explains how to configure condition rules in:
 
-- `/Users/maxbisschop/dev/www/zendure/main/edit_rules.php`
+- `[install_dir]/main/edit_rules.php`
 
 Rules are saved to:
 
-- `/Users/maxbisschop/dev/www/zendure/main/data/charge_schedule_conditions.json`
+- `[install_dir]/main/data/charge_schedule_conditions.json`
 
 ## 1. Purpose
 
@@ -48,6 +48,7 @@ Each rule has:
   - `min_power` (optional minimum signed watt bound for `netzero` / `netzero+`)
   - `max_power` (optional maximum signed watt bound for `netzero` / `netzero+`)
   - `conditions`: all conditions are ANDed
+- `fallback_value` (optional): fallback power value used by runtime integrations when runtime conditions fail (integer watts, `netzero`, or `netzero+`)
 
 Notes:
 
@@ -55,6 +56,7 @@ Notes:
 - they default to `null`
 - they do not apply to `fallback_value`
 - the editor uses `100 W` steps for these inputs
+- `fallback_value` is optional and independent of `value` type
 
 ## 5. Condition Fields
 
@@ -62,15 +64,20 @@ Supported `field` values:
 
 - `price`: current hour price (cents/kWh)
 - `ranking`: daily rank 1..24 (sorted by price asc, then hour asc)
-- `min_price`
-- `max_price`
-- `spread_price` (`max_price - min_price`)
-- `min_price_hour`
-- `max_price_hour`
-- `month`
-- `hour`
-- `min_time`
-- `max_time`
+- `min_price`: lowest daily price (cents/kWh)
+- `max_price`: highest daily price (cents/kWh)
+- `spread_price`: daily spread (`max_price - min_price` in cents/kWh)
+- `min_price_hour`: hour (0-23) when min price occurs (first occurrence)
+- `max_price_hour`: hour (0-23) when max price occurs (first occurrence)
+- `month`: current month (1-12)
+- `hour`: current hour (0-23)
+- `min_time`: lower bound hour (inclusive, equivalent to `hour >= value`)
+- `max_time`: upper bound hour (inclusive, equivalent to `hour <= value`)
+- `sunrise_hour`: sunrise hour derived per rendered date using configured latitude/longitude (floored)
+- `sunset_hour`: sunset hour derived per rendered date using configured latitude/longitude (ceiled)
+- `sunrise_offset_hour`: compares current hour to `sunrise_hour + offset`. Provide offset as numeric `value`
+- `sunset_offset_hour`: compares current hour to `sunset_hour + offset`. Provide offset as numeric `value`
+- `electricity_level`: battery SoC percent condition for runtime evaluation (stored in rules and exposed as runtime metadata; static resolver does not evaluate this field)
 
 Supported operators:
 
@@ -81,17 +88,21 @@ Supported operators:
 A condition can use:
 
 - `value`: literal number/string
-- `value_ref`: dynamic reference
+- `value_ref`: dynamic reference to a calculated field
 
 Supported `value_ref`:
 
-- `min_price`
-- `max_price`
-- `spread_price`
-- `min_price_hour`
-- `max_price_hour`
+- `min_price`: lowest daily price
+- `max_price`: highest daily price
+- `spread_price`: daily price spread
+- `min_price_hour`: hour of lowest daily price
+- `max_price_hour`: hour of highest daily price
+- `sunrise_hour`: sunrise hour for the date
+- `sunset_hour`: sunset hour for the date
 
-If `value_ref` is present, it is used as the comparison target.
+**Note**: `sunrise_offset_hour` and `sunset_offset_hour` cannot be used as `value_ref`. They must use literal `value` for the offset.
+
+If `value_ref` is present, it is used as the right-hand side operand in the comparison.
 
 ## 7. Save Behavior
 
@@ -157,4 +168,4 @@ At API merge time (`data_api.php`):
 
 ## 11. Related Manuals
 
-- `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/min-max-values_user_manual.md`
+- `[install_dir]/docs/user_manuals/min-max-values_user_manual.md`

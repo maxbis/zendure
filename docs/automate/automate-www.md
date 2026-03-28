@@ -104,20 +104,29 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 - Triggers a schedule refresh: fetch from schedule API and post a `Rescan` status update.
 - Returns `{"ok": true}` on success, or `{"ok": false, "error": "..."}` with status 500 on failure.
 
-9. `GET /api/pause`
+9. `GET /api/status_updates_delta`
+- Returns status update rows from the SQLite `status_updates` table since a given row ID.
+- Required query param: `after_id` (integer, 0-based).
+- Optional query params: `limit` (default `500`, max `2000`).
+- Optional auth: `token` query param or `X-API-Token` header (if configured).
+- Returns `{"rows": [...], "max_id_returned": int, "has_more": bool}`.
+- Each row contains: `id`, `type`, `old_value`, `new_value`, `p1_total_power`, `electric_level`, `timestamp`.
+- Returns 401 if authentication is required but not provided; 400 if `after_id` is missing or invalid; 503 if database is unavailable.
+
+11. `GET /api/pause`
 - Returns the current pause-override state.
 
-10. `POST /api/pause?state=on|off`
+12. `POST /api/pause?state=on|off`
 - Enables or disables pause override.
 - When pause is enabled, desired power is forced to `0`.
 
-11. `GET /api/loglevel`
+13. `GET /api/loglevel`
 - Returns the current runtime log level and the allowed values.
 
-12. `POST /api/loglevel?level=DEBUG|INFO|WARNING|ERROR`
+14. `POST /api/loglevel?level=DEBUG|INFO|WARNING|ERROR`
 - Changes the runtime log level immediately.
 
-13. `POST /api/restart`
+15. `POST /api/restart`
 - Requests a graceful restart of the automation process.
 
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.

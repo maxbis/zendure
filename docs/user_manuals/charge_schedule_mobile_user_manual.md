@@ -31,10 +31,13 @@ Top-to-bottom layout:
 2. **System & Grid Details**
 3. **Price Overview (mobile bars)**
 4. **Energy Graph (Wh per hour)**
-5. **Schedule Panels**
+5. **Shortwave Radiation Graph**
+   - Hourly and daily solar radiation data (W/m²)
+   - Interactive chart showing multiple days
+6. **Automation Status**
+7. **Schedule Panels**
    - Schedule tab (today/tomorrow)
    - Schedule entries tab
-6. **Automation Status**
 
 ## 4. Schedule Editing
 
@@ -92,7 +95,7 @@ Status and schedule-related UI refresh periodically through the page scripts.
 
 The page loads core values from:
 
-- `/Users/maxbisschop/dev/www/zendure/main/config/config.json`
+- `[install_dir]/main/config/config.json`
 
 Used config includes (examples):
 
@@ -132,5 +135,5 @@ If schedule changes do not appear:
 
 ## 10. Related Manuals
 
-- Rules editor manual: `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/edit_rules_user_manual.md`
-- Min/max values manual: `/Users/maxbisschop/dev/www/zendure/docs/user_manuals/min-max-values_user_manual.md`
+- Rules editor manual: `[install_dir]/docs/user_manuals/edit_rules_user_manual.md`
+- Min/max values manual: `[install_dir]/docs/user_manuals/min-max-values_user_manual.md`

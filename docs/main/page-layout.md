@@ -41,7 +41,7 @@ Executed before any HTML is emitted.
 
 ## `<head>` assets (icons + CSS)
 
-- **Order**: 1
+- **Order**: 0.5
 - **Rendered by**: `main/charge_schedule_mobile.php`
 - **Dependencies (CSS)**:
   - `main/assets/css/general_mobile.css`
@@ -56,7 +56,7 @@ Executed before any HTML is emitted.
 
 ## Header (page title)
 
-- **Order**: 2
+- **Order**: 1
 - **Rendered by**: `main/charge_schedule_mobile.php`
 - **DOM hooks**:
 - **CSS**:
@@ -64,11 +64,126 @@ Executed before any HTML is emitted.
 
 ---
 
+## Charge/Discharge (core summary)
+
+Server renders the mobile shell; JS fetches Zendure/P1 and updates live.
+
+- **Order**: 2
+- **Rendered by (PHP partial)**: `main/partials/charge_status_mobile.php`
+- **Server-side dependencies**:
+  - Uses same-origin proxy `main/api/charge_status_all_proxy.php` via `CHARGE_STATUS_ALL_API_URL` injected by `main/charge_schedule_mobile.php`.
+  - Reads threshold/grid constants injected by `main/charge_schedule_mobile.php`.
+- **DOM hooks**:
+  - Containers: `#charge-status-content`, `#charge-status-error`, `#charge-status-empty`
+- **Client code dependencies**:
+  - `main/assets/js/charge_status.js`
+    - Fetches from injected API URLs and updates DOM via renderer functions.
+  - `main/assets/js/schedule_renderer.js`
+    - Contains renderers for charge status and details (used by refresh).
+- **CSS**:
+  - `main/assets/css/charge_status_defines.css`
+  - `main/assets/css/charge_status.css`
+
+---
+
+## System & Grid (charge status details, collapsible)
+
+Additional detail view with a toggle button.
+
+- **Order**: 3
+- **Rendered by (PHP partial)**: `main/partials/charge_status_details_mobile.php`
+- **Server-side dependencies**:
+  - Uses same data source as charge status (`CHARGE_STATUS_ALL_API_URL`).
+- **DOM hooks**:
+  - Main details container: `#charge-status-details-content`
+  - Collapsible area: `#charge-status-details-collapsible`
+  - Toggle button: `#charge-details-toggle` (calls `toggleChargeStatusDetails()`)
+- **Client code dependencies**:
+  - `main/assets/js/charge_status.js`
+    - Provides: `toggleChargeStatusDetails()` and unified refresh logic.
+  - `main/assets/js/schedule_renderer.js`
+    - Provides: `renderChargeStatusDetails(...)` for live updates.
+
+---
+
+## Price Overview Bar Graph (Today + conditional Tomorrow)
+
+Shows electricity prices, color-coded; bars are clickable to edit schedule entries for that hour.
+
+- **Order**: 4
+- **Rendered by (PHP partial)**: `main/partials/price_overview_bar_mobile.php`
+- **Inputs required from parent**:
+  - `$today` (display only)
+  - Server-time dependency: shows Tomorrow column only when PHP `date('H') >= 15`
+- **DOM hooks**:
+  - `#price-graph-today`
+  - `#price-graph-tomorrow` (may or may not exist depending on hour)
+- **Dependencies (config)**:
+  - `PRICE_API_URL` is injected by `main/charge_schedule_mobile.php` from config.
+- **Client code dependencies**:
+  - `main/assets/js/price_overview_bar.js`
+    - Fetches prices and renders bars (handles hiding/showing tomorrow card based on current hour).
+  - `main/assets/js/components/price_graph_component.js` (optional component wrapper; attaches to `.price-graph-wrapper`)
+  - Orchestrated by `main/assets/js/charge_schedule.js` (calls `fetchAndRenderPrices(...)` when `PRICE_API_URL` is available).
+- **Documentation**: popup battery estimate algorithm and constants — [`docs/main/assets/js/price-overview-bar-popup-estimate.md`](assets/js/price-overview-bar-popup-estimate.md)
+
+---
+
+## Energy Graph (Wh per hour)
+
+- **Order**: 5
+- **Rendered by (PHP partial)**: `main/partials/energy_graph_mobile.php`
+- **DOM hooks**:
+  - chart canvas and wrappers defined by the partial
+- **Client code dependencies**:
+  - `main/assets/js/energy_graph_refresh.js`
+- **Server-side dependencies**:
+  - same-origin proxy `main/api/energy_graph_proxy.php`
+
+---
+
+## Shortwave Radiation Graph
+
+Displays solar radiation data for energy generation estimation.
+
+- **Order**: 6
+- **Rendered by (PHP partial)**: `main/partials/shortwave_radiation_graph.php`
+- **DOM hooks**:
+  - chart canvas and wrappers defined by the partial
+- **Client code dependencies**:
+  - Solar radiation rendering and refresh functionality
+- **Server-side dependencies**:
+  - Solar radiation data API (via proxy if applicable)
+
+---
+
+## Automation Status (recent automation events)
+
+Server tries to fetch and render initial state; JS supports refresh + expand/collapse.
+
+- **Order**: 7
+- **Rendered by (PHP partial)**: `main/partials/automation_status.php`
+- **Server-side dependencies**:
+  - Injects: `AUTOMATION_STATUS_API_URL` (inline `<script>`), built from:
+    - same-origin proxy `main/api/automation_status_proxy.php`
+    - proxy config keys `automationStatusApi` and `apiBaseUrlPiControl`
+- **DOM hooks**:
+  - Refresh button: `#automation-refresh-btn`
+  - Entries container (server-rendered or re-rendered by JS): `#automation-entries-wrapper`, `#automation-entries-list`
+- **Client code dependencies**:
+  - `main/assets/js/automation_status.js` (refresh button + toggle behavior)
+  - `main/assets/js/schedule_renderer.js` (contains `renderAutomationStatus(...)` used by refresh flows)
+  - `main/assets/js/charge_status.js` (exports `refreshAllStatus()` which the refresh button calls; refreshes automation + charge status together)
+- **CSS**:
+  - `main/assets/css/automation_status.css`
+
+---
+
 ## Schedule Panels (two-column layout)
 
 This is the main “editing” area: **Today’s resolved schedule** (left) and **Schedule Entries table** (right).
 
-- **Order**: 3
+- **Order**: 8
 - **Rendered by (PHP partial)**: `main/partials/schedule_panels_mobile.php`
 - **Inputs required from parent**:
   - `$today`, `$resolvedToday`, `$currentTime`, `$schedule`
@@ -96,7 +211,7 @@ This is the main “editing” area: **Today’s resolved schedule** (left) and 
 
 This section is required for adding/editing schedule entries.
 
-- **Order**: 4
+- **Order**: 9
 - **Rendered by (PHP partial)**: `main/partials/edit_modal.php`
 - **DOM hooks**:
   - Modal:
@@ -116,7 +231,7 @@ This section is required for adding/editing schedule entries.
 
 Used for “Clear old entries”, “Auto calculate schedule”, etc.
 
-- **Order**: 5
+- **Order**: 10
 - **Rendered by (PHP partial)**: `main/partials/confirm_dialog.php`
 - **DOM hooks**:
   - `#confirm-dialog-generic`
@@ -128,103 +243,17 @@ Used for “Clear old entries”, “Auto calculate schedule”, etc.
 
 ---
 
-## Price Overview Bar Graph (Today + conditional Tomorrow)
+## No Backend Dialog (502 error fallback)
 
-Shows electricity prices, color-coded; bars are clickable to edit schedule entries for that hour.
-
-- **Order**: 7
-- **Rendered by (PHP partial)**: `main/partials/price_overview_bar_mobile.php`
-- **Inputs required from parent**:
-  - `$today` (display only)
-  - Server-time dependency: shows Tomorrow column only when PHP `date('H') >= 15`
-- **DOM hooks**:
-  - `#price-graph-today`
-  - `#price-graph-tomorrow` (may or may not exist depending on hour)
-- **Dependencies (config)**:
-  - `PRICE_API_URL` is injected by `main/charge_schedule_mobile.php` from config.
-- **Client code dependencies**:
-  - `main/assets/js/price_overview_bar.js`
-    - Fetches prices and renders bars (handles hiding/showing tomorrow card based on current hour).
-  - `main/assets/js/components/price_graph_component.js` (optional component wrapper; attaches to `.price-graph-wrapper`)
-  - Orchestrated by `main/assets/js/charge_schedule.js` (calls `fetchAndRenderPrices(...)` when `PRICE_API_URL` is available).
-- **Documentation**: popup battery estimate algorithm and constants — [`docs/main/assets/js/price-overview-bar-popup-estimate.md`](assets/js/price-overview-bar-popup-estimate.md)
-
----
-
-## Energy Graph (Wh per hour)
-
-- **Order**: 8
-- **Rendered by (PHP partial)**: `main/partials/energy_graph_mobile.php`
-- **DOM hooks**:
-  - chart canvas and wrappers defined by the partial
-- **Client code dependencies**:
-  - `main/assets/js/energy_graph_refresh.js`
-- **Server-side dependencies**:
-  - same-origin proxy `main/api/energy_graph_proxy.php`
-
----
-
-## Automation Status (recent automation events)
-
-Server tries to fetch and render initial state; JS supports refresh + expand/collapse.
-
-- **Order**: 9
-- **Rendered by (PHP partial)**: `main/partials/automation_status.php`
-- **Server-side dependencies**:
-  - Injects: `AUTOMATION_STATUS_API_URL` (inline `<script>`), built from:
-    - same-origin proxy `main/api/automation_status_proxy.php`
-    - proxy config keys `automationStatusApi` and `apiBaseUrlPiControl`
-- **DOM hooks**:
-  - Refresh button: `#automation-refresh-btn`
-  - Entries container (server-rendered or re-rendered by JS): `#automation-entries-wrapper`, `#automation-entries-list`
-- **Client code dependencies**:
-  - `main/assets/js/automation_status.js` (refresh button + toggle behavior)
-  - `main/assets/js/schedule_renderer.js` (contains `renderAutomationStatus(...)` used by refresh flows)
-  - `main/assets/js/charge_status.js` (exports `refreshAllStatus()` which the refresh button calls; refreshes automation + charge status together)
-- **CSS**:
-  - `main/assets/css/automation_status.css`
-
----
-
-## Charge/Discharge (core summary)
-
-Server renders the mobile shell; JS fetches Zendure/P1 and updates live.
-
-- **Order**: 10
-- **Rendered by (PHP partial)**: `main/partials/charge_status_mobile.php`
-- **Server-side dependencies**:
-  - Uses same-origin proxy `main/api/charge_status_all_proxy.php` via `CHARGE_STATUS_ALL_API_URL` injected by `main/charge_schedule_mobile.php`.
-  - Reads threshold/grid constants injected by `main/charge_schedule_mobile.php`.
-- **DOM hooks**:
-  - Containers: `#charge-status-content`, `#charge-status-error`, `#charge-status-empty`
-- **Client code dependencies**:
-  - `main/assets/js/charge_status.js`
-    - Fetches from injected API URLs and updates DOM via renderer functions.
-  - `main/assets/js/schedule_renderer.js`
-    - Contains renderers for charge status and details (used by refresh).
-- **CSS**:
-  - `main/assets/css/charge_status_defines.css`
-  - `main/assets/css/charge_status.css`
-
----
-
-## System & Grid (charge status details, collapsible)
-
-Additional detail view with a toggle button.
+Displayed when the backend is unreachable or returns a 502 error, allowing users to acknowledge the error.
 
 - **Order**: 11
-- **Rendered by (PHP partial)**: `main/partials/charge_status_details_mobile.php`
-- **Server-side dependencies**:
-  - Uses same data source as charge status (`CHARGE_STATUS_ALL_API_URL`).
+- **Rendered by (PHP partial)**: `main/partials/no_backend_dialog.php`
 - **DOM hooks**:
-  - Main details container: `#charge-status-details-content`
-  - Collapsible area: `#charge-status-details-collapsible`
-  - Toggle button: `#charge-details-toggle` (calls `toggleChargeStatusDetails()`)
+  - `#no-backend-dialog` (modal backdrop)
+  - Dialog message and close/acknowledge button
 - **Client code dependencies**:
-  - `main/assets/js/charge_status.js`
-    - Provides: `toggleChargeStatusDetails()` and unified refresh logic.
-  - `main/assets/js/schedule_renderer.js`
-    - Provides: `renderChargeStatusDetails(...)` for live updates.
+  - JS that triggers display on API failures (typically in `main/assets/js/charge_status.js` or `main/assets/js/schedule_api.js`)
 
 ---
 

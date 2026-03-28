@@ -10,11 +10,16 @@ Used directly by `main/charge_schedule_mobile.php`:
 - `priceApiUrl`
 - `calculate_schedule_apiUrl`
 - `zendureFetchApiUrl` (via `ConfigLoader::getWithLocation(...)`)
-- `MIN_CHARGE_LEVEL`
-- `MAX_CHARGE_LEVEL`
-- `baseWh`
-- `minGridPower`
-- `maxGridPower`
+- `MIN_CHARGE_LEVEL` (default: 20)
+- `MAX_CHARGE_LEVEL` (default: 90)
+- `baseWh` (default: 5760)
+- `minGridPower` (default: -1200)
+- `maxGridPower` (default: 1200)
+- `include_conditions` (boolean, enables condition-rule resolution in schedule)
+- `priceProxyNoData` (default: 0.24, fallback price when proxy has no data)
+- `popupPowerEfficiency` (default: 0.9, efficiency factor for power calculations)
+- `popupNetzeroReferenceW` (default: 200, reference power in watts for netzero mode)
+- `popupNetzeroPlusReferenceW` (default: 300, reference power in watts for netzero+ mode)
 
 ## Proxy/API Keys
 
