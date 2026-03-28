@@ -138,25 +138,39 @@ function getRawScheduleEntry(scheduleEntry) {
     return entry;
 }
 
-function formatScheduleLimitsText(scheduleEntry) {
-    const entry = getRawScheduleEntry(scheduleEntry);
-    if (!entry) return '';
+function parseOptionalScheduleBound(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
 
-    if (entry.value !== 'netzero' && entry.value !== 'netzero+') {
+function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry) {
+    if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero+') {
         return '';
     }
 
-    const hasMin = Object.prototype.hasOwnProperty.call(entry, 'min_power')
-        && entry.min_power !== null
-        && entry.min_power !== '';
-    const hasMax = Object.prototype.hasOwnProperty.call(entry, 'max_power')
-        && entry.max_power !== null
-        && entry.max_power !== '';
+    let resolvedMin = parseOptionalScheduleBound(minValue);
+    let resolvedMax = parseOptionalScheduleBound(maxValue);
+
+    if (resolvedMin === null || resolvedMax === null) {
+        const entry = getRawScheduleEntry(scheduleEntry);
+        if (entry && entry.value === scheduleValue) {
+            if (resolvedMin === null) {
+                resolvedMin = parseOptionalScheduleBound(entry.min_power);
+            }
+            if (resolvedMax === null) {
+                resolvedMax = parseOptionalScheduleBound(entry.max_power);
+            }
+        }
+    }
+
+    const hasMin = resolvedMin !== null;
+    const hasMax = resolvedMax !== null;
 
     if (!hasMin && !hasMax) return '';
-    if (hasMin && hasMax) return `Limits: ${entry.min_power} to ${entry.max_power} W`;
-    if (hasMin) return `Limits: min ${entry.min_power} W`;
-    return `Limits: max ${entry.max_power} W`;
+    if (hasMin && hasMax) return `Limits: ${resolvedMin} to ${resolvedMax} W`;
+    if (hasMin) return `Limits: min ${resolvedMin} W`;
+    return `Limits: max ${resolvedMax} W`;
 }
 
 function escapePopupHtml(value) {
@@ -1102,7 +1116,9 @@ function renderPriceGraphMobilePopupContent() {
     const scheduleValue = bar.dataset.scheduleValue;
     const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
     const scheduleEntry = scheduleMap && Object.prototype.hasOwnProperty.call(scheduleMap, key) ? scheduleMap[key] : null;
-    const limitsDisplay = formatScheduleLimitsText(scheduleEntry);
+    const minValue = bar.dataset.minValue;
+    const maxValue = bar.dataset.maxValue;
+    const limitsDisplay = formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
@@ -1285,7 +1301,9 @@ function showPriceGraphPopup(bar, container) {
             console.warn('Failed to parse popup schedule entry dataset:', error);
         }
     }
-    const limitsDisplay = formatScheduleLimitsText(scheduleEntry);
+    const minValue = bar.dataset.minValue;
+    const maxValue = bar.dataset.maxValue;
+    const limitsDisplay = formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry);
 
     const scheduleSource = bar.dataset.scheduleSource;
     const hasRuntimeCondition = bar.dataset.runtimeCondition === 'true';
