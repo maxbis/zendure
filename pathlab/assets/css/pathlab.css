@@ -1,0 +1,341 @@
+:root {
+    --bg-top: #08131a;
+    --bg-bottom: #132630;
+    --card-bg: rgba(10, 21, 29, 0.78);
+    --card-stroke: rgba(160, 209, 214, 0.16);
+    --text-main: #e8f0e6;
+    --text-soft: #a7bbb3;
+    --text-muted: #7f938b;
+    --accent-path: #9ce365;
+    --accent-actual: #ffd166;
+    --accent-solar: rgba(253, 214, 88, 0.26);
+    --accent-usage: rgba(233, 117, 96, 0.22);
+    --badge-ahead: #4bc27f;
+    --badge-behind: #f77f5f;
+    --badge-neutral: #8fb8c9;
+    --shadow-soft: 0 28px 60px rgba(0, 0, 0, 0.3);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: var(--text-main);
+    background:
+        radial-gradient(circle at top left, rgba(114, 196, 152, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(255, 209, 102, 0.11), transparent 24%),
+        linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+}
+
+.pathlab-shell {
+    width: min(1220px, calc(100vw - 32px));
+    margin: 0 auto;
+    padding: 28px 0 44px;
+}
+
+.hero-card,
+.chart-card,
+.summary-card,
+.detail-card {
+    backdrop-filter: blur(10px);
+    background: var(--card-bg);
+    border: 1px solid var(--card-stroke);
+    box-shadow: var(--shadow-soft);
+}
+
+.hero-card {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 18px;
+    padding: 24px 24px 20px;
+    border-radius: 28px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -80px -80px auto;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(156, 227, 101, 0.22), transparent 70%);
+    pointer-events: none;
+}
+
+.eyebrow,
+.chart-kicker {
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.hero-copy h1,
+.chart-card__header h2,
+.detail-card h3 {
+    margin: 0;
+    font-weight: 700;
+}
+
+.hero-copy h1 {
+    font-size: clamp(2.4rem, 6vw, 4.3rem);
+    line-height: 0.95;
+}
+
+.hero-text {
+    margin: 14px 0 0;
+    max-width: 60ch;
+    color: var(--text-soft);
+    line-height: 1.55;
+}
+
+.hero-meta {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+}
+
+.meta-pill {
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.meta-label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+}
+
+.meta-value {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.status-grid,
+.detail-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+}
+
+.summary-card,
+.detail-card {
+    border-radius: 22px;
+    padding: 18px 20px;
+}
+
+.summary-card--primary {
+    background:
+        linear-gradient(140deg, rgba(156, 227, 101, 0.12), rgba(255, 209, 102, 0.05)),
+        var(--card-bg);
+}
+
+.summary-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.summary-value {
+    margin-top: 10px;
+    font-size: clamp(1.8rem, 4vw, 2.7rem);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.summary-subtle {
+    margin-top: 8px;
+    color: var(--text-soft);
+}
+
+.summary-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    margin-top: 10px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(143, 184, 201, 0.14);
+    color: var(--badge-neutral);
+}
+
+.summary-badge.is-ahead {
+    background: rgba(75, 194, 127, 0.14);
+    color: var(--badge-ahead);
+}
+
+.summary-badge.is-behind {
+    background: rgba(247, 127, 95, 0.14);
+    color: var(--badge-behind);
+}
+
+.chart-card {
+    margin-top: 18px;
+    padding: 20px 20px 18px;
+    border-radius: 28px;
+}
+
+.chart-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+}
+
+.chart-card__header h2 {
+    font-size: clamp(1.5rem, 2.8vw, 2.4rem);
+}
+
+.chart-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    color: var(--text-soft);
+    font-size: 0.9rem;
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    border-radius: 999px;
+    vertical-align: middle;
+}
+
+.legend-swatch--path { background: var(--accent-path); }
+.legend-swatch--actual { background: var(--accent-actual); }
+.legend-swatch--solar { background: rgba(253, 214, 88, 0.7); }
+.legend-swatch--usage { background: rgba(233, 117, 96, 0.7); }
+
+.chart-status {
+    margin-top: 12px;
+    min-height: 1.4rem;
+    color: var(--text-soft);
+}
+
+.chart-wrap {
+    margin-top: 10px;
+    border-radius: 22px;
+    padding: 14px 10px 6px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+        rgba(255, 255, 255, 0.02);
+}
+
+.pathlab-chart {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.detail-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 14px;
+}
+
+.detail-list {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--text-soft);
+    line-height: 1.55;
+}
+
+.metric-list {
+    margin: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.metric-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.metric-list div:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.metric-list dt {
+    color: var(--text-muted);
+}
+
+.metric-list dd {
+    margin: 0;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+@media (max-width: 920px) {
+    .hero-card,
+    .status-grid,
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card__header {
+        align-items: start;
+        flex-direction: column;
+    }
+
+    .chart-legend {
+        justify-content: start;
+    }
+}
+
+@media (max-width: 640px) {
+    .pathlab-shell {
+        width: min(100vw - 20px, 1220px);
+        padding-top: 18px;
+        padding-bottom: 28px;
+    }
+
+    .hero-card,
+    .chart-card,
+    .summary-card,
+    .detail-card {
+        border-radius: 20px;
+    }
+
+    .hero-card,
+    .chart-card {
+        padding: 18px 16px;
+    }
+
+    .summary-card,
+    .detail-card {
+        padding: 16px;
+    }
+}
