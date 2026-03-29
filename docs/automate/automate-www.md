@@ -66,6 +66,10 @@ The current repository only contains `automate_www.py`. Compared with legacy `au
   - Default: `3`
   - Config override: none
   - Meaning: default days for Wh-per-hour API
+- `WH_PER_HOUR_DAYS_MAX`
+  - Default: `30`
+  - Config override: none
+  - Meaning: maximum accepted `days` query value for Wh-per-hour API
 
 Additional config keys used: `dataDir`, `statusUpdatesRetentionDays`, `POWER_FEED_MAX_DELTA` (default 2400).
 
@@ -98,6 +102,10 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 7. `GET /api/wh_per_hour`
 - Watt-hours charged/discharged per calendar hour for the last N days.
 - Uses SQLite `status_updates` table.
+- Optional query param: `days`
+  - default: `3`
+  - max: `30`
+  - invalid or missing values fall back to default
 - Returns `{"YYYY-MM-DD": [{"hour": "HH", "charged_wh": float, "discharged_wh": float, "electric_level": int|null}, ...], ...}`.
 
 8. `GET /api/refresh`
@@ -201,6 +209,9 @@ curl http://localhost:1611/api/all
 # Get Wh per hour
 curl http://localhost:1611/api/wh_per_hour
 
+# Get Wh per hour for a 7-day window
+curl "http://localhost:1611/api/wh_per_hour?days=7"
+
 # Trigger schedule refresh
 curl http://localhost:1611/api/refresh
 
@@ -229,4 +240,4 @@ See [automate-overview.md](automate-overview.md#power-control-logic--behavior) f
 
 ## Wh-per-hour Calculation
 
-The `/api/wh_per_hour` endpoint computes charged and discharged watt-hours per calendar hour from the `status_updates` SQLite table. It uses step integration (power assumed constant between consecutive change readings). The timezone and number of days are configurable via module constants (`WH_PER_HOUR_TIMEZONE`, `WH_PER_HOUR_DAYS_DEFAULT`).
+The `/api/wh_per_hour` endpoint computes charged and discharged watt-hours per calendar hour from the `status_updates` SQLite table. It uses step integration (power assumed constant between consecutive change readings). The timezone and default day window are configurable via module constants (`WH_PER_HOUR_TIMEZONE`, `WH_PER_HOUR_DAYS_DEFAULT`), and callers may optionally request a larger history window with `?days=N` up to `WH_PER_HOUR_DAYS_MAX`.

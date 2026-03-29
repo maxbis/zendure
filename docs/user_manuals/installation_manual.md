@@ -571,6 +571,9 @@ These endpoints are mainly consumed by the web app:
   - recent automation events
 - `GET /api/wh_per_hour`
   - charged/discharged Wh per hour
+  - optional query param: `days`
+  - example: `/api/wh_per_hour?days=7`
+  - default is `3`, maximum is `30`
 - `GET /api/status_updates_delta?after_id=...`
   - incremental status rows from SQLite
 

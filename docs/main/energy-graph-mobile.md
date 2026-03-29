@@ -52,6 +52,12 @@ Config keys used by proxy:
 - `whPerHourCacheMinutes`
 - `baseWh`
 
+Proxy query support:
+- optional `days` query parameter
+- example: `main/api/energy_graph_proxy.php?days=7`
+- invalid values fall back to `3`
+- values above `30` are clamped
+
 ## Chart Notes
 
 The mobile chart:

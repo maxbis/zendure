@@ -68,6 +68,7 @@ The Charge Schedule Manager (`charge_schedule_mobile.php`) is a comprehensive da
 **Data Source**:
 - same-origin proxy: `main/api/energy_graph_proxy.php`
 - source data from the automation runtime `/api/wh_per_hour` endpoint
+- optional history window may be requested with `?days=N` on both the proxy and upstream runtime endpoint
 
 ---
 
