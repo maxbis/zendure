@@ -7,13 +7,28 @@
 ?>
 
 <div class="card energy-graph-mobile">
-    <h3 class="card-header">Energy per Hour <span class="energy-unit">(Wh)</span></h3>
+    <div class="energy-graph-card-header">
+        <h3 class="card-header">Energy per Hour <span class="energy-unit">(Wh)</span></h3>
+        <button
+            type="button"
+            class="energy-graph-zoom-toggle"
+            data-energy-graph-zoom-toggle
+            aria-pressed="false"
+            aria-controls="energy-graph-focus-nav energyChartMobile">
+            Zoom
+        </button>
+    </div>
     <div class="energy-graph-mobile-tabs" role="tablist">
         <button type="button" class="energy-graph-mobile-tab active" data-tab="graph" role="tab" aria-selected="true">Graph</button>
         <button type="button" class="energy-graph-mobile-tab" data-tab="daily" role="tab" aria-selected="false">Daily totals</button>
     </div>
     <div class="energy-graph-mobile-tab-panels">
         <div class="energy-graph-mobile-tab-panel active" data-tab="graph" role="tabpanel" aria-hidden="false">
+            <div class="energy-graph-focus-nav" id="energy-graph-focus-nav" hidden>
+                <button type="button" class="energy-graph-focus-nav-btn" data-energy-graph-nav="prev" aria-label="Previous day">Prev</button>
+                <div class="energy-graph-focus-nav-label" data-energy-graph-focus-label aria-live="polite">Today</div>
+                <button type="button" class="energy-graph-focus-nav-btn" data-energy-graph-nav="next" aria-label="Next day">Next</button>
+            </div>
             <div class="energy-graph-canvas-mobile">
                 <canvas id="energyChartMobile"></canvas>
             </div>

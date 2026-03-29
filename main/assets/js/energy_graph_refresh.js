@@ -8,6 +8,7 @@
     var API_URL = typeof ENERGY_GRAPH_API_URL !== 'undefined' ? ENERGY_GRAPH_API_URL : 'api/energy_graph_api.php';
     var selectedMobileDay = null;
     var latestWhPerHour = [];
+    var energyGraphControlsBound = false;
     // In focused-day mode, show labels every N hours on the X axis.
     var FOCUSED_TICK_INTERVAL_HOURS = 2;
 
@@ -16,8 +17,8 @@
         var sign = v < 0 ? -1 : 1;
         var abs = Math.abs(v);
         if (abs <= 200) return sign * (abs / 200);
-        if (abs <= 400) return sign * (1 + (abs - 200) / 200);
-        if (abs <= 800) return sign * (2 + (abs - 400) / 400);
+        if (abs <= 500) return sign * (1 + (abs - 200) / 300);
+        if (abs <= 1200) return sign * (2 + (abs - 500) / 700);
         return sign * 3;
     }
 
@@ -26,8 +27,8 @@
         var sign = tv < 0 ? -1 : 1;
         var abs = Math.abs(tv);
         if (abs <= 1) return sign * (abs * 200);
-        if (abs <= 2) return sign * (200 + (abs - 1) * 200);
-        return sign * (400 + (abs - 2) * 400);
+        if (abs <= 2) return sign * (200 + (abs - 1) * 300);
+        return sign * (500 + (abs - 2) * 700);
     }
 
     function computeIsDateLabel(hourLabels) {
@@ -63,6 +64,131 @@
         updateMobileChart(cdMobile);
     }
 
+    function getAvailableMobileDays() {
+        if (!Array.isArray(latestWhPerHour) || latestWhPerHour.length === 0) return [];
+        var seen = {};
+        var days = [];
+        latestWhPerHour.forEach(function(entry) {
+            var day = extractDatePart(entry && entry.hourLabel);
+            if (!day || seen[day]) return;
+            seen[day] = true;
+            days.push(day);
+        });
+        days.sort();
+        return days;
+    }
+
+    function getDefaultMobileDay() {
+        var days = getAvailableMobileDays();
+        if (days.length === 0) return null;
+        var today = new Date().toISOString().slice(0, 10);
+        return days.indexOf(today) !== -1 ? today : days[days.length - 1];
+    }
+
+    function formatFocusedDayLabel(day) {
+        if (!day) return 'All days';
+        var today = new Date().toISOString().slice(0, 10);
+        var yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        var yesterday = yesterdayDate.toISOString().slice(0, 10);
+        if (day === today) return 'Today';
+        if (day === yesterday) return 'Yesterday';
+        var date = new Date(day + 'T12:00:00');
+        if (isNaN(date.getTime())) return day;
+        var weekday = date.toLocaleDateString([], { weekday: 'short' });
+        var dateLabel = date.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+        return weekday + ' ' + dateLabel;
+    }
+
+    function syncMobileZoomUi() {
+        var card = document.querySelector('.energy-graph-mobile');
+        if (!card) return;
+        var toggle = card.querySelector('[data-energy-graph-zoom-toggle]');
+        var nav = card.querySelector('#energy-graph-focus-nav');
+        var label = card.querySelector('[data-energy-graph-focus-label]');
+        var prevBtn = card.querySelector('[data-energy-graph-nav="prev"]');
+        var nextBtn = card.querySelector('[data-energy-graph-nav="next"]');
+        var isFocused = !!selectedMobileDay;
+        var days = getAvailableMobileDays();
+        var dayIndex = selectedMobileDay ? days.indexOf(selectedMobileDay) : -1;
+
+        card.classList.toggle('energy-graph-mobile-focused', isFocused);
+        if (toggle) {
+            toggle.setAttribute('aria-pressed', isFocused ? 'true' : 'false');
+            toggle.textContent = isFocused ? 'All days' : 'Zoom';
+        }
+        if (nav) nav.hidden = !isFocused;
+        if (label) label.textContent = formatFocusedDayLabel(selectedMobileDay);
+        if (prevBtn) prevBtn.disabled = !isFocused || dayIndex <= 0;
+        if (nextBtn) nextBtn.disabled = !isFocused || dayIndex === -1 || dayIndex >= days.length - 1;
+    }
+
+    function setSelectedMobileDay(day, options) {
+        options = options || {};
+        var availableDays = getAvailableMobileDays();
+        if (!day || availableDays.indexOf(day) === -1) {
+            selectedMobileDay = null;
+        } else {
+            selectedMobileDay = day;
+        }
+        syncMobileZoomUi();
+        if (options.rerender !== false) {
+            var chart = window.energyChartMobile;
+            if (chart) {
+                chart.$energyGraphSuppressTooltipRestore = !!options.suppressTooltipRestore;
+                if (options.suppressTooltipRestore) {
+                    chart.$energyGraphActiveHourLabel = null;
+                }
+            }
+            rerenderMobileChartFromSelection();
+        }
+    }
+
+    function toggleMobileZoom() {
+        if (selectedMobileDay) {
+            setSelectedMobileDay(null, { suppressTooltipRestore: true });
+            return;
+        }
+        setSelectedMobileDay(getDefaultMobileDay(), { suppressTooltipRestore: true });
+    }
+
+    function stepMobileZoomDay(direction) {
+        var days = getAvailableMobileDays();
+        if (days.length === 0) return;
+        var currentDay = selectedMobileDay || getDefaultMobileDay();
+        var currentIndex = days.indexOf(currentDay);
+        if (currentIndex === -1) currentIndex = days.length - 1;
+        var nextIndex = currentIndex + direction;
+        if (nextIndex < 0 || nextIndex >= days.length) return;
+        setSelectedMobileDay(days[nextIndex], { suppressTooltipRestore: true });
+    }
+
+    function ensureMobileControlsBound() {
+        if (energyGraphControlsBound) return;
+        var card = document.querySelector('.energy-graph-mobile');
+        if (!card) return;
+        var toggle = card.querySelector('[data-energy-graph-zoom-toggle]');
+        var prevBtn = card.querySelector('[data-energy-graph-nav="prev"]');
+        var nextBtn = card.querySelector('[data-energy-graph-nav="next"]');
+        if (toggle) {
+            toggle.addEventListener('click', function() {
+                toggleMobileZoom();
+            });
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function() {
+                stepMobileZoomDay(-1);
+            });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function() {
+                stepMobileZoomDay(1);
+            });
+        }
+        energyGraphControlsBound = true;
+        syncMobileZoomUi();
+    }
+
     function isChartInstance(obj) {
         return !!(obj &&
             typeof obj.update === 'function' &&
@@ -87,7 +213,7 @@
             if (!isFinite(parsed)) return null;
             return Math.max(0, Math.min(100, parsed));
         });
-        var clippedValues = originalValues.map(function(v) { return Math.max(-800, Math.min(800, v)); });
+        var clippedValues = originalValues.map(function(v) { return Math.max(-1200, Math.min(1200, v)); });
         var values = clippedValues.map(transformWh);
         var barColors = originalValues.map(function(v) {
             return v >= 0 ? 'rgba(129, 199, 132, 0.7)' : 'rgba(229, 115, 115, 0.7)';
@@ -161,11 +287,40 @@
                 }
                 var v = cd.originalValues[i] || 0;
                 var whLabel = v.toFixed(0) + ' Wh';
-                if (v > 800) whLabel += ' (clipped at 800)';
-                else if (v < -800) whLabel += ' (clipped at -800)';
+                if (v > 1200) whLabel += ' (clipped at 1200)';
+                else if (v < -1200) whLabel += ' (clipped at -1200)';
                 return whLabel;
             }
         };
+        chart.update('none');
+
+        var shouldRestoreTooltip = !chart.$energyGraphSuppressTooltipRestore;
+        chart.$energyGraphSuppressTooltipRestore = false;
+        if (!shouldRestoreTooltip || !chart.tooltip || typeof chart.setActiveElements !== 'function') {
+            if (chart.tooltip && typeof chart.setActiveElements === 'function') {
+                chart.setActiveElements([]);
+                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                chart.update('none');
+            }
+            return;
+        }
+
+        var activeHourLabel = chart.$energyGraphActiveHourLabel;
+        var tooltipIndex = activeHourLabel ? cd.hourLabels.indexOf(activeHourLabel) : -1;
+        if (tooltipIndex === -1) {
+            chart.$energyGraphActiveHourLabel = null;
+            chart.setActiveElements([]);
+            chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update('none');
+            return;
+        }
+
+        var meta = chart.getDatasetMeta(0);
+        var element = meta && meta.data ? meta.data[tooltipIndex] : null;
+        if (!element) return;
+        var centerPoint = typeof element.getCenterPoint === 'function' ? element.getCenterPoint() : { x: element.x, y: element.y };
+        chart.setActiveElements([{ datasetIndex: 0, index: tooltipIndex }]);
+        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: tooltipIndex }], centerPoint);
         chart.update('none');
     }
 
@@ -237,10 +392,14 @@
                     if (idx === null || idx < 0) return;
                     var hourLabels = chartObj.$energyGraphHourLabels || [];
                     if (idx >= hourLabels.length) return;
-                    var day = extractDatePart(hourLabels[idx]);
-                    if (!day) return;
-                    selectedMobileDay = (selectedMobileDay === day) ? null : day;
-                    rerenderMobileChartFromSelection();
+                    var meta = chartObj.getDatasetMeta(0);
+                    var element = meta && meta.data ? meta.data[idx] : null;
+                    if (!element || !chartObj.tooltip || typeof chartObj.setActiveElements !== 'function') return;
+                    var centerPoint = typeof element.getCenterPoint === 'function' ? element.getCenterPoint() : { x: element.x, y: element.y };
+                    chartObj.$energyGraphActiveHourLabel = hourLabels[idx] || null;
+                    chartObj.setActiveElements([{ datasetIndex: 0, index: idx }]);
+                    chartObj.tooltip.setActiveElements([{ datasetIndex: 0, index: idx }], centerPoint);
+                    chartObj.update('none');
                 },
                 responsive: true,
                 maintainAspectRatio: false,
@@ -316,6 +475,8 @@
         });
         chart.$energyGraphIsDateLabel = [];
         chart.$energyGraphHourLabels = [];
+        chart.$energyGraphActiveHourLabel = null;
+        chart.$energyGraphSuppressTooltipRestore = false;
         window.energyChartMobile = chart;
     }
 
@@ -418,16 +579,20 @@
             var cacheInfo = json.cacheInfo || null;
 
             latestWhPerHour = Array.isArray(whPerHour) ? whPerHour : [];
+            ensureMobileControlsBound();
             if (selectedMobileDay) {
                 var hasSelectedDay = latestWhPerHour.some(function(d) {
                     return extractDatePart(d && d.hourLabel) === selectedMobileDay;
                 });
-                if (!hasSelectedDay) selectedMobileDay = null;
+                if (!hasSelectedDay) {
+                    selectedMobileDay = getDefaultMobileDay();
+                }
             }
 
             var cdMobile = buildChartDataMobile(filterWhPerHourByDay(latestWhPerHour, selectedMobileDay));
             ensureMobileChartExists();
             updateMobileChart(cdMobile);
+            syncMobileZoomUi();
             renderMobileDailyTable(whPerDay, baseWh);
             renderCacheStatus(cacheInfo);
         } catch (e) {
