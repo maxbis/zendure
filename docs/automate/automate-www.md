@@ -187,7 +187,7 @@ Dynamic commands (`p netzero`, `nz`, `nzp`) first read the configured power mete
 - `false`: `netzero` will not actively charge
 - `true`: `netzero` may charge and discharge
 
-When the active schedule slot contains signed `min_power` / `max_power`, the runtime clamps the dynamic result into that signed range before battery/device safety limits are applied.
+When the active schedule slot contains signed `min_power` / `max_power`, the runtime clamps the raw dynamic result into that signed range before reversal handling, max-delta limiting, and final battery/device safety limits are applied.
 
 ### Example HTTP usage
 

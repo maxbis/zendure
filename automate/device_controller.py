@@ -822,55 +822,23 @@ class AutomateController(BaseDeviceController):
             else: # default to the original netzero mode
                 raw_target_power = -new_output if new_output > 0 else 0
 
-        # reversal_hint, if power flips direction, we need to ramp down to 0
-        # power slides to 50, 0 and can then reverse direction.
-        if self.previous_power is not None:
-            reversal_hint = self.previous_power * raw_target_power < 0
-        else:
-            reversal_hint = False
-        
-        if reversal_hint:
-            self.log(
-                'warning',
-                f"mode: {mode}, new_input: {new_input}, new_output: {new_output}, "
-                "reversal detected (possible measurement lag)",
-                message_key='reversal_detected',
-            )
-
-        guarded_power = self.reversal_ramp_guard.apply(
-            previous_power=self.previous_power,
-            desired_power=raw_target_power,
-            reversal_hint=reversal_hint,
-        )
-
-        if guarded_power != raw_target_power:
-            self.log(
-                'warning',
-                f"  reversal ramp active: previous={self.previous_power}, "
-                f"raw_target={raw_target_power}, guarded_target={guarded_power}",
-                message_key='reversal_ramp_active',
-            )
-
-        self.log(
-            'debug',
-            "Netzero calc: "
-            f"mode={mode}, p1_power={p1_power}, current_input={current_input}, "
-            f"current_output={current_output}, electric_level={electric_level}, "
-            f"new_input={new_input}, new_output={new_output}, "
-            f"raw_target={raw_target_power}, guarded_target={guarded_power}, "
-            f"previous_power={self.previous_power}, reversal_hint={reversal_hint}",
-            message_key='netzero_calc_debug',
-        )
-
         self._last_dynamic_power_context = {
             'mode': mode,
+            'p1_power': p1_power,
+            'current_input': current_input,
+            'current_output': current_output,
+            'electric_level': electric_level,
+            'new_input': new_input,
+            'new_output': new_output,
             'raw_power': raw_target_power,
-            'guarded_power': guarded_power,
-            'guard_active': guarded_power != raw_target_power,
-            'reversal_hint': reversal_hint,
+            'bounded_power': raw_target_power,
+            'final_power': raw_target_power,
+            'guarded_power': raw_target_power,
+            'guard_active': False,
+            'reversal_hint': False,
         }
 
-        return guarded_power
+        return raw_target_power
 
     @staticmethod
     def _normalize_schedule_bound(schedule_entry: Optional[Dict[str, Any]], field_name: str) -> Optional[int]:
@@ -929,12 +897,66 @@ class AutomateController(BaseDeviceController):
                 zendure_data=zendure_data,
             )
             runtime_context = self._get_dynamic_power_context()
-            return self._apply_schedule_power_bounds(
+            bounded_power = self._apply_schedule_power_bounds(
                 calculated_power,
                 mode=mode,
                 schedule_entry=schedule_entry,
                 runtime_context=runtime_context,
             )
+            if self.previous_power is not None:
+                reversal_hint = self.previous_power * bounded_power < 0
+            else:
+                reversal_hint = False
+
+            if reversal_hint:
+                self.log(
+                    'warning',
+                    f"mode: {mode}, bounded_target={bounded_power}, raw_target={calculated_power}, "
+                    "reversal detected after bounds",
+                    message_key='reversal_detected',
+                )
+
+            final_power = self.reversal_ramp_guard.apply(
+                previous_power=self.previous_power,
+                desired_power=bounded_power,
+                reversal_hint=reversal_hint,
+            )
+
+            if final_power != bounded_power:
+                self.log(
+                    'warning',
+                    f"  reversal ramp active: previous={self.previous_power}, "
+                    f"bounded_target={bounded_power}, final_target={final_power}",
+                    message_key='reversal_ramp_active',
+                )
+
+            updated_context = dict(runtime_context)
+            updated_context.update({
+                'mode': mode,
+                'bounded_power': bounded_power,
+                'final_power': final_power,
+                'guarded_power': final_power,
+                'guard_active': final_power != bounded_power,
+                'reversal_hint': reversal_hint,
+            })
+            self._last_dynamic_power_context = updated_context
+
+            self.log(
+                'debug',
+                "Netzero calc: "
+                f"mode={mode}, p1_power={updated_context.get('p1_power')}, "
+                f"current_input={updated_context.get('current_input')}, "
+                f"current_output={updated_context.get('current_output')}, "
+                f"electric_level={updated_context.get('electric_level')}, "
+                f"new_input={updated_context.get('new_input')}, "
+                f"new_output={updated_context.get('new_output')}, "
+                f"raw_target={updated_context.get('raw_power')}, "
+                f"bounded_target={bounded_power}, final_target={final_power}, "
+                f"previous_power={self.previous_power}, reversal_hint={reversal_hint}",
+                message_key='netzero_calc_debug',
+            )
+
+            return final_power
 
         raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', or None")
 
@@ -996,22 +1018,12 @@ class AutomateController(BaseDeviceController):
             return power_value
 
         raw_power = int(runtime_context.get('raw_power', power_value))
-        guarded_power = int(runtime_context.get('guarded_power', power_value))
-        guard_active = bool(runtime_context.get('guard_active', False))
 
         self.log(
             'debug',
             f"Dynamic bounds active for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-            f"raw={raw_power}, guarded={guarded_power}, current={power_value}, min={min_power}, max={max_power}"
+            f"raw={raw_power}, current={power_value}, min={min_power}, max={max_power}"
         )
-
-        if guard_active:
-            self.log(
-                'debug',
-                f"ReversalRampGuard deferred signed bound handling for {mode} slot {slot_time or '?'} "
-                f"({slot_key or 'no-key'}): raw={raw_power}, guarded={guarded_power}, min={min_power}, max={max_power}"
-            )
-            return power_value
 
         bounded_power = int(power_value)
         original_power = bounded_power
@@ -1032,7 +1044,7 @@ class AutomateController(BaseDeviceController):
             self.log(
                 'info',
                 f"Applied schedule bounds for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
-                f"raw={raw_power}, guarded={power_value}, bounded={bounded_power}, min={min_power}, max={max_power}",
+                f"raw={raw_power}, bounded={bounded_power}, min={min_power}, max={max_power}",
                 message_key='schedule_bounds_applied',
             )
 

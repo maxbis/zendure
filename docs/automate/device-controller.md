@@ -108,7 +108,7 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 
 ### `calculate_netzero_power(self, mode: Literal['netzero', 'netzero+'] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> int`
 
--   **Description**: Orchestrates the net-zero calculation by using caller-supplied P1 meter data plus the latest Zendure device state, then calculating what power setting is needed to achieve zero feed-in.
+-   **Description**: Orchestrates the raw net-zero calculation by using caller-supplied P1 meter data plus the latest Zendure device state, then calculating the unsigned/ signed dynamic target before schedule bounds, reversal protection, max-delta limiting, and final send-time safety clamps are applied.
 -   **Arguments**:
     -   `mode` ('netzero' or 'netzero+'): In 'netzero' mode, the battery only discharges to reduce grid import. In 'netzero+' mode, it only charges to reduce grid export. Defaults to 'netzero'.
     -   `p1_data` (Optional[Dict[str, Any]]): Required normalized P1 meter data supplied by the caller for dynamic power modes. Must contain `total_power`.
@@ -124,8 +124,48 @@ When the active resolved schedule slot includes `min_power` or `max_power`, `Aut
 - Negative values represent discharge
 - Positive values represent charge
 - If both bounds are present, runtime clamps into the inclusive signed range `[min_power, max_power]`
+- Bounds are applied before `ReversalRampGuard`, so reversal smoothing runs on the bounded target rather than the raw target
 
-`ReversalRampGuard` still wins during true sign reversals. When the guard changes the raw result, signed-bound handling is deferred for that cycle and resumes once the reversal settles.
+### Dynamic power order
+
+For dynamic modes (`netzero`, `netzero+`, or `None`), `AutomateController` resolves the final target in this order:
+
+1. `calculate_netzero_power()` computes the raw dynamic target from P1 + Zendure state
+2. `_apply_schedule_power_bounds()` clamps the raw target to signed `min_power` / `max_power`
+3. `ReversalRampGuard` compares `previous_power` with the bounded target and ramps only if the bounded target crosses sign
+4. `_apply_power_feed_max_delta()` limits the step size against `previous_power`
+5. `_send_power_feed()` reapplies battery charge/discharge guards plus `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` as final safety clamps before the device write
+
+### Order of checks
+
+For dynamic modes, the effective precedence is:
+
+1. Read current Zendure state: `inputLimit`, `outputLimit`, `electricLevel`
+2. Compute the effective current battery contribution and the desired correction from `p1_power`
+3. Apply battery-level guards inside `_calculate_new_settings()`
+   - block charging when the battery is too full
+   - block discharging when the battery is too empty
+4. Clamp the dynamic desired feed to `MAX_CHARGE_POWER` / `MAX_DISCHARGE_POWER`
+5. Apply the minimum absolute threshold and minimum delta threshold
+6. Convert the result back into `new_input` / `new_output`
+7. Convert `new_input` / `new_output` into `raw_target_power` for `netzero` or `netzero+`
+8. Apply signed schedule bounds from `min_power` / `max_power`, producing `bounded_target`
+9. Compare `previous_power` against `bounded_target`
+10. If the bounded target crosses sign, `ReversalRampGuard` ramps toward zero, producing `final_target`
+11. Apply `power_feed_max_delta` step limiting against `previous_power`
+12. In `_send_power_feed()`, apply battery limit-state safety again
+   - block charge if `limit_state == 1`
+   - block discharge if `limit_state == -1`
+13. Apply hard config caps again
+   - clamp below `-MAX_DISCHARGE_POWER`
+   - clamp above `+MAX_CHARGE_POWER`
+14. Skip sending if the final value equals `previous_power`
+15. Send to the device and only then update `previous_power`
+
+`MAX_DISCHARGE_POWER` and `MAX_CHARGE_POWER` are therefore checked twice:
+
+- once in the dynamic calculation stage
+- once again in `_send_power_feed()` as final safety clamps before the device write
 
 ### `set_power(self, value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero', p1_data: Optional[Dict[str, Any]] = None) -> PowerResult`
 
@@ -140,7 +180,7 @@ When the active resolved schedule slot includes `min_power` or `max_power`, `Aut
 During dynamic modes, `set_power()` also emits debug/info logs when:
 - bounds are present on the active slot
 - signed bounds clamp a dynamic result
-- reversal protection defers bound handling
+- reversal protection ramps the bounded target
 - battery or device limits override the bounded result
 
 ### `set_standby_mode(self) -> PowerResult`

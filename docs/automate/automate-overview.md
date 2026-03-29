@@ -59,7 +59,8 @@ Dynamic mode summary:
 
 - `netzero` = dynamic import/export balancing mode; with `NETZERO_BI_DIRECTIONAL=false` it does not actively charge, with `true` it may charge and discharge
 - `netzero+` = charge-only, never actively discharges
-- signed `min_power` / `max_power` clamp the dynamic result after calculation and after `ReversalRampGuard`
+- signed `min_power` / `max_power` clamp the raw dynamic result before `ReversalRampGuard`
+- `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` are enforced inside dynamic calculation and again as final safety clamps before the device write
 
 5.  **Monitoring**: The script stores status updates in a local SQLite database and exposes them through the built-in HTTP API, which the web app can read for health and activity.
 

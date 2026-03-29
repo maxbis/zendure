@@ -1,243 +1,110 @@
-## Netzero / Netzero+ behaviour and ramp-down algorithm
+## Netzero / Netzero+ pipeline and reversal guard
 
-This document explains how the automation loop decides battery power in **netzero** and **netzero+** modes, and how the **ReversalRampGuard** prevents sudden direction flips. It walks through concrete example cycles with P1 readings and resulting battery commands.
+This document explains how the automation loop decides battery power in `netzero` and `netzero+` modes, and where `ReversalRampGuard` fits in the current pipeline.
 
 ---
 
 ### 1. Key concepts
 
-- **P1 total power (`total_power`)**: grid power as seen by the P1 meter.
-  - Positive value → importing from grid.
-  - Negative value → exporting to grid (e.g. solar surplus).
-- **Battery convention in controller**:
-  - Positive power → **charge** (battery takes power from grid/house).
-  - Negative power → **discharge** (battery supplies power to grid/house).
-- **Modes**:
-  - `netzero` → use battery only to **discharge** and reduce grid import to ~0. Never actively charge.
-  - `netzero+` → use battery only to **charge** and reduce grid **export** to ~0. Never actively discharge.
+- P1 `total_power`
+  - Positive: importing from grid
+  - Negative: exporting to grid
+- Controller sign convention
+  - Positive power: charge
+  - Negative power: discharge
+- Modes
+  - `netzero`: discharge-only when `NETZERO_BI_DIRECTIONAL=false`; charge and discharge are both possible when `true`
+  - `netzero+`: charge-only, never actively discharges
 
 Relevant code:
 
-- Mode handling and netzero calculation: `device_controller.py` → `calculate_netzero_power()`.
-- Ramp guard logic: `device_controller.py` → `ReversalRampGuard`.
-- Battery limit checks and schedule integration: `automate_www.py` → `_check_battery_limits()` and `_apply_power_settings()`.
+- Raw dynamic calculation: `device_controller.py` -> `calculate_netzero_power()`
+- Signed schedule clamp: `device_controller.py` -> `_apply_schedule_power_bounds()`
+- Reversal smoothing: `device_controller.py` -> `ReversalRampGuard`
+- Final device safety clamps: `device_controller.py` -> `_send_power_feed()`
 
 ---
 
-### 2. Control loop overview (per cycle)
+### 2. Current control order
 
-Each automation cycle (loop iteration) does, in simplified form:
+For a dynamic command (`netzero`, `netzero+`, or `None`), the controller resolves power in this order:
 
-1. Read **P1 meter** → get `total_power` (grid import/export).
-2. Read **Zendure state** → `inputLimit`, `outputLimit`, `electricLevel`.
-3. Compute new raw battery settings:
-   - `_calculate_new_settings(p1_power, current_input, current_output, electric_level)` → `(new_input, new_output)`.
-4. Convert to controller power convention in `calculate_netzero_power(mode, p1_data)`:
-   - For `netzero+`:
-     - If charging is requested (`new_input > 0`) → return `+new_input`.
-     - Otherwise → return `0` (no discharge).
-   - For `netzero`:
-     - If discharging is requested (`new_output > 0`) → return `-new_output`.
-     - Otherwise → return `0` (no charge).
-5. Apply **ReversalRampGuard** to smooth large or reversing changes.
-6. Call `set_power()` with the guarded value to actually update the device.
+1. Read P1 meter data from the app/runtime layer.
+2. Read Zendure state (`inputLimit`, `outputLimit`, `electricLevel`).
+3. `_calculate_new_settings()` computes `(new_input, new_output)` from current state and P1 power.
+4. `calculate_netzero_power()` converts that into a raw signed target:
+   - `netzero+`: positive charge or `0`
+   - `netzero`: negative discharge or `0`, unless `NETZERO_BI_DIRECTIONAL=true`, in which case it may be positive or negative
+5. `_apply_schedule_power_bounds()` clamps the raw target into signed `min_power` / `max_power`.
+6. `ReversalRampGuard` compares `previous_power` to the bounded target and ramps only if the bounded target reverses sign.
+7. `_apply_power_feed_max_delta()` limits the step size.
+8. `_send_power_feed()` reapplies battery protection and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` before sending the final command to the device.
 
-This repeats every loop interval (configured in `automate_www.py`).
+The important detail is that signed schedule bounds are now evaluated before reversal handling.
 
 ---
 
-### 3. `_calculate_new_settings` — basic feed math
+### 3. `_calculate_new_settings()` and config caps
 
-`_calculate_new_settings` works in a simplified “effective feed” space:
+`_calculate_new_settings()` works in an effective feed space:
 
-- Effective battery contribution \(F\):
-  - \(F > 0\) → discharge (export from battery).
-  - \(F < 0\) → charge (import into battery).
-- It derives:
-  - `effective_current = current_output - current_input`
-  - `effective_desired = effective_current + p1_power`
+- `effective_current = current_output - current_input`
+- `effective_desired = effective_current + p1_power`
 
-Then it:
+Then it applies:
 
-- Applies **battery SoC limits** (prevent charge when too full, discharge when too empty).
-- Clamps to `[POWER_FEED_MIN, POWER_FEED_MAX]`.
-- Applies **minimum absolute threshold**: very small feeds snap to `0`.
-- Applies **minimum delta threshold**: very small changes snap back to the current setting.
-- Finally it reconstructs `(new_input, new_output)`:
-  - `effective_desired > 0` → `new_output = effective_desired`, `new_input = 0` (pure discharge).
-  - `effective_desired < 0` → `new_input = abs(effective_desired)`, `new_output = 0` (pure charge).
-  - `effective_desired == 0` → both zero.
+- battery SoC checks
+- `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER`
+- minimum absolute threshold
+- minimum delta threshold
 
-This returns the “physics-based” suggestion; netzero / netzero+ interpret it differently.
+Finally it reconstructs `(new_input, new_output)`.
+
+This means config power caps are enforced twice:
+
+1. inside the dynamic calculation
+2. again inside `_send_power_feed()` as final safety clamps
 
 ---
 
-### 4. Netzero mode — discharge only
+### 4. Bounds before reversal
 
-In plain `netzero`:
+When the active schedule slot contains signed `min_power` / `max_power`, the controller clamps the raw dynamic target first.
 
-- The controller **ignores charge suggestions** (`new_input`) and only uses discharge (`new_output`):
+Example:
 
-```python
-raw_target_power = -new_output if new_output > 0 else 0
-reversal_hint = new_input > 0
-guarded_power = self.reversal_ramp_guard.apply(
-    previous_power=self.previous_power,
-    desired_power=raw_target_power,
-    reversal_hint=reversal_hint,
-)
-```
+- `previous_power = -200`
+- raw dynamic target = `+327`
+- slot bounds = `min_power=-1200`, `max_power=-400`
 
-- End result:
-  - `new_output > 0` → command **negative power** (`-new_output`) = discharge.
-  - `new_output == 0` → command `0` (no power).
-  - `new_input` is only used as a **reversal hint** for the ramp guard (see below), not as a direct command.
+The bounded target becomes `-400`. Because the bounded target is still negative, there is no sign reversal relative to `previous_power`, so `ReversalRampGuard` does not ramp to `0`.
 
-#### Example 4.1 — importing from grid, then stabilising at zero
-
-- Assume:
-  - Mode: `netzero`
-  - Previous battery power: `0 W`
-  - Current P1: `+300 W` (import)
-
-**Cycle 1**
-
-1. `_calculate_new_settings` sees import, decides to discharge:
-   - Returns `(new_input=0, new_output=80)` (numbers illustrative).
-2. `calculate_netzero_power`:
-   - `raw_target_power = -80` → want **-80 W** (discharge).
-   - `reversal_hint = (new_input > 0) = False`.
-   - Ramp guard likely passes through `-80`.
-3. Controller sets battery to `-80 W`.
-
-**Cycle 2**
-
-- P1 power has moved closer to zero (e.g. `+40 W`) due to the discharge.
-
-1. `_calculate_new_settings` may now propose smaller discharge or zero, say `(0, 20)`.
-2. `calculate_netzero_power` → `raw_target_power = -20`.
-3. Guard may pass through or slightly reduce the step.
-4. Battery moves toward `-20 W`.
-
-**Cycle 3+**
-
-- Eventually P1 is ~`0 W`, `_calculate_new_settings` returns `(0, 0)`, and `netzero` maps that to:
-  - `raw_target_power = 0`.
-  - Guard passes through → battery goes to `0 W`.
-
-So `netzero` behaves as: “discharge just enough to cancel grid import, otherwise sit at 0”.
-
-#### Example 4.2 — solar ramps up while still discharging
-
-Now suppose:
-
-- Mode: `netzero`
-- Battery currently at `-80 W` (decided in a previous cycle while importing).
-- Suddenly solar output increases between cycles, and the **next** P1 reading is `-400 W` (export).
-
-**Cycle N (before ramp)**
-
-- Already described: P1 import → controller chose `-80 W`.
-
-**Between cycles**
-
-- Solar ramps up; by the time the next loop runs, P1 shows export (`-400 W`), but the battery is **still at -80 W** (it only changes when the next command is sent).
-
-**Cycle N+1 (after ramp)**
-
-1. `_calculate_new_settings` sees export:
-   - Effective desired feed trends toward charging or 0.
-   - It may return `(new_input>0, new_output=0)` (i.e. *“you could charge now”*).
-2. In `netzero`:
-   - `raw_target_power = 0` (because `new_output == 0`).
-   - `reversal_hint = (new_input > 0) = True`.
-3. ReversalRampGuard is invoked with:
-   - `previous_power = -80`
-   - `desired_power = 0`
-   - `reversal_hint = True`.
-4. Because of the hint, the guard does **not** jump directly from `-80` to `0`. Instead, it ramps toward zero:
-   - e.g. with divisor=2: `ramp_toward_zero(-80)` → `-40`.
-5. Battery command for this cycle becomes `-40 W` (smaller discharge).
-
-**Cycle N+2**
-
-- P1 may now show something like `-360 W` export (since the battery is discharging less).
-- `_calculate_new_settings` again prefers charge/0 → `(new_input>0, new_output=0)`.
-- `netzero` again maps to `raw_target_power = 0`, with `reversal_hint = True`.
-- Guard ramps `previous_power=-40` toward zero → `-20 W`.
-
-**Subsequent cycles**
-
-- Guard keeps halving the magnitude (or following its divisor rule) until the absolute value drops below `min_abs_power`, at which point it returns `0`.
-- Visually you see the battery:
-  - `-80 W → -40 W → -20 W → 0 W`, while P1 remains in export.
-
-This explains why you may briefly see **discharge while the grid is exporting**: the controller is in the middle of a **guarded ramp-down** toward 0, based on older decisions and the reversal guard.
+This avoids the old oscillation pattern where a positive raw target could trigger reversal handling before the slot bounds forced it back into a negative discharge range.
 
 ---
 
-### 5. Netzero+ mode — charge only
+### 5. When reversal still happens
 
-In `netzero+` the interpretation is flipped:
+`ReversalRampGuard` still applies when the bounded target truly crosses sign relative to `previous_power`.
 
-```python
-if mode == 'netzero+':
-    # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
-    if new_input > 0:  # Charging is requested?
-        return new_input
-    return 0
-```
+Example:
 
-- `new_input > 0` → command **positive** power = charge.
-- Any situation where `_calculate_new_settings` suggests discharge (`new_output > 0`) or 0 results in `0 W` from `calculate_netzero_power`.
-- This mode is meant for:
-  - **Absorbing solar export** (charging to reduce negative P1 values).
-  - Never discharging into the grid.
+- `previous_power = -200`
+- raw target = `+50`
+- slot bounds = `min_power=100`, `max_power=700`
 
-If you want solar surplus to fill the battery instead of going to the grid, `netzero+` is the appropriate mode; plain `netzero` will not actively charge.
+The bounded target becomes `+100`. That is a real sign change relative to `-200`, so the guard ramps toward zero instead of jumping directly to `+100`.
+
+With the default divisor-based guard, that becomes `-100` for the next command.
 
 ---
 
-### 6. ReversalRampGuard details
+### 6. Summary
 
-`ReversalRampGuard` is intentionally small and independent. Its job is to **smooth reversals**:
+- `calculate_netzero_power()` produces the raw dynamic intent.
+- Signed slot bounds (`min_power` / `max_power`) are hard constraints on that raw result.
+- `ReversalRampGuard` smooths only the bounded target.
+- `power_feed_max_delta` then limits the step size.
+- Final battery/device safety checks and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` are applied again before the device write.
 
-- Configuration (from controller init):
-
-```python
-self.reversal_ramp_guard = ReversalRampGuard(
-    enabled=True,
-    divisor=2,
-    min_abs_power=30,
-)
-```
-
-- Core behaviour:
-  - If `reversal_hint` is `True` (e.g. netzero saw a would-be charge situation), it ramps:
-
-    ```python
-    ramped = int(previous_power / divisor)
-    if abs(ramped) < min_abs_power:
-        return 0
-    return ramped
-    ```
-
-  - Otherwise, if both previous and desired powers are non-zero and their **sign flips**, it also ramps instead of jumping directly to the new sign.
-  - If no conditions trigger, it simply returns `desired_power`.
-
-This protects against oscillations when P1 readings flicker around zero or when the schedule suddenly switches direction.
-
----
-
-### 7. Summary
-
-- **Netzero (`"netzero"`)**
-  - Only discharges the battery to reduce **grid import** to ~0.
-  - Ignores opportunities to charge from solar export; in export situations it ramps discharge back to 0 using `ReversalRampGuard`.
-- **Netzero+ (`"netzero+"`)**
-  - Only charges the battery to reduce **grid export** to ~0.
-  - Never actively discharges.
-- **ReversalRampGuard**
-  - When the control logic wants to reverse direction (e.g. from discharge to stop/charge), it **ramps down the previous power toward zero** across multiple cycles.
-  - This is why you may see brief periods of continued discharge even while the grid is exporting: the system is intentionally stepping down instead of flipping direction instantly.
-
+This ordering makes bounded slots authoritative for sign and prevents reversal oscillation when the schedule forbids the sign proposed by the raw netzero calculation.
