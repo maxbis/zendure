@@ -13,16 +13,20 @@ require_once __DIR__ . '/../includes/config_loader.php';
 header('Content-Type: application/json');
 header('Cache-Control: no-store, max-age=0');
 
+const WH_PER_HOUR_DAYS_DEFAULT = 3;
+const WH_PER_HOUR_DAYS_MAX = 30;
+
 // if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 //     http_response_code(200);
 //     exit();
 // }
 
-$cachePath = __DIR__ . '/../data/energy_graph_cache.json';
 $ttlSeconds = (int) ConfigLoader::get('whPerHourCacheMinutes', 5) * 60;
 $baseWh = (int) ConfigLoader::get('baseWh', 5760);
-$energyGraphDaysBack = 3;
-$energyTableDaysBack = 7;
+$requestedDays = resolveRequestedDays($_GET['days'] ?? null);
+$cachePath = __DIR__ . '/../data/energy_graph_cache_days_' . $requestedDays . '.json';
+$energyGraphDaysBack = $requestedDays;
+$energyTableDaysBack = max(7, $requestedDays);
 
 // Resolve upstream URL from config
 $rawUrl = ConfigLoader::get('wh-per-hourApi');
@@ -40,6 +44,26 @@ if (empty($baseUrl) || !is_string($baseUrl)) {
 }
 
 $upstreamUrl = str_replace('${apiBaseUrlPiControl}', $baseUrl, $rawUrl);
+$upstreamUrl = appendDaysQueryParam($upstreamUrl, $requestedDays);
+
+function resolveRequestedDays($rawValue): int {
+    if ($rawValue === null || $rawValue === '') {
+        return WH_PER_HOUR_DAYS_DEFAULT;
+    }
+    if (!is_numeric($rawValue)) {
+        return WH_PER_HOUR_DAYS_DEFAULT;
+    }
+    $days = (int) $rawValue;
+    if ($days < 0) {
+        return WH_PER_HOUR_DAYS_DEFAULT;
+    }
+    return min($days, WH_PER_HOUR_DAYS_MAX);
+}
+
+function appendDaysQueryParam(string $url, int $days): string {
+    $separator = (strpos($url, '?') === false) ? '?' : '&';
+    return $url . $separator . 'days=' . rawurlencode((string) $days);
+}
 
 /**
  * Transform external API response to front-end format.
@@ -157,6 +181,7 @@ if ($cached !== null && (time() - (int) $cached['cachedAt']) <= $ttlSeconds) {
     emitPayload($cached, [
         'source' => 'cache',
         'cachedAt' => (int) $cached['cachedAt'],
+        'days' => $requestedDays,
         'isStale' => false
     ]);
     exit();
@@ -180,6 +205,7 @@ if ($jsonData === false || $jsonData === '') {
         emitPayload($cached, [
             'source' => 'cache',
             'cachedAt' => (int) $cached['cachedAt'],
+            'days' => $requestedDays,
             'isStale' => true,
             'upstreamError' => 'fetch_failed'
         ]);
@@ -196,6 +222,7 @@ if (!is_array($external)) {
         emitPayload($cached, [
             'source' => 'cache',
             'cachedAt' => (int) $cached['cachedAt'],
+            'days' => $requestedDays,
             'isStale' => true,
             'upstreamError' => 'invalid_json'
         ]);
@@ -214,5 +241,6 @@ writeCache($cachePath, $payload);
 emitPayload($payload, [
     'source' => 'upstream',
     'cachedAt' => (int) $payload['cachedAt'],
+    'days' => $requestedDays,
     'isStale' => false
 ]);

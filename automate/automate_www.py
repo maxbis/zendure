@@ -51,6 +51,7 @@ HTTP_API_PORT = 1611
 # Wh-per-hour API: timezone and default days
 WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
 WH_PER_HOUR_DAYS_DEFAULT = 3
+WH_PER_HOUR_DAYS_MAX = 30
 # Cap last segment so we don't extrapolate one power reading to "now" for days (avoids inflated totals)
 WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS = 3600  # 1 hour
 WH_PER_HOUR_CACHE_SECONDS = 60
@@ -528,6 +529,13 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return default
         return value
 
+    def _resolve_wh_per_hour_days(self, parsed) -> int:
+        """Resolve optional days parameter with default fallback and max clamp."""
+        requested = self._parse_non_negative_int_query(parsed, "days", WH_PER_HOUR_DAYS_DEFAULT)
+        if requested is None:
+            return WH_PER_HOUR_DAYS_DEFAULT
+        return min(requested, WH_PER_HOUR_DAYS_MAX)
+
     def _is_status_updates_delta_authorized(self, parsed) -> bool:
         """Optional token auth for status_updates_delta endpoint."""
         required_token = getattr(self.server, "status_updates_delta_token", None)
@@ -589,7 +597,18 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
                 {"path": API_PATH_STATUS, "optional_params": []},
                 {"path": API_PATH_ALL, "optional_params": []},
                 {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
-                {"path": API_PATH_WH_PER_HOUR, "optional_params": []},
+                {
+                    "path": API_PATH_WH_PER_HOUR,
+                    "optional_params": [
+                        {
+                            "name": "days",
+                            "type": "int",
+                            "default": WH_PER_HOUR_DAYS_DEFAULT,
+                            "max": WH_PER_HOUR_DAYS_MAX,
+                            "description": "Optional history window in days including today; values above max are clamped",
+                        },
+                    ],
+                },
                 {
                     "path": API_PATH_STATUS_UPDATES_DELTA,
                     "optional_params": [
@@ -718,20 +737,22 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         self._send_json(self._test_payload(), sort_keys=False)
         return True
 
-    def _handle_wh_per_hour(self, path: str) -> bool:
-        if path != API_PATH_WH_PER_HOUR:
+    def _handle_wh_per_hour(self, parsed) -> bool:
+        if parsed.path != API_PATH_WH_PER_HOUR:
             return False
         db_path = getattr(self.server, "db_path", None)
         if not db_path or not os.path.exists(db_path):
             self._send_json({"error": "Status updates database not available"})
             return True
         now = int(time.time())
+        resolved_days = self._resolve_wh_per_hour_days(parsed)
         cached = None
         with self.server.wh_per_hour_cache_lock:
             cache_entry = self.server.wh_per_hour_cache
             if (
                 cache_entry
                 and cache_entry.get("db_path") == db_path
+                and cache_entry.get("days") == resolved_days
                 and (now - int(cache_entry.get("computed_at", 0))) < WH_PER_HOUR_CACHE_SECONDS
             ):
                 cached = cache_entry.get("data")
@@ -739,10 +760,11 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(cached, sort_keys=True)
             return True
 
-        data = compute_wh_per_hour(db_path, now, WH_PER_HOUR_DAYS_DEFAULT)
+        data = compute_wh_per_hour(db_path, now, resolved_days)
         with self.server.wh_per_hour_cache_lock:
             self.server.wh_per_hour_cache = {
                 "db_path": db_path,
+                "days": resolved_days,
                 "computed_at": now,
                 "data": data,
             }
@@ -1017,7 +1039,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return
         if self._handle_test(parsed.path):
             return
-        if self._handle_wh_per_hour(parsed.path):
+        if self._handle_wh_per_hour(parsed):
             return
         if self._handle_status_updates_delta(parsed):
             return

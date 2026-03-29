@@ -55,7 +55,7 @@ function buildPathPayload(): array
     $rootPath = projectRootPath();
     $localChargeStatusUrl = buildLocalUrl($rootPath . '/main/api/charge_status_all_proxy.php');
     $localShortwaveUrl = buildLocalUrl($rootPath . '/main/api/shortwave_radiation_api.php');
-    $whPerHourUrl = resolveConfiguredUrl('wh-per-hourApi');
+    $whPerHourUrl = appendDaysQueryParam(resolveConfiguredUrl('wh-per-hourApi'), TARGET_LOOKBACK_DAYS);
 
     $errors = [];
 
@@ -190,6 +190,12 @@ function resolveConfiguredUrl(string $configKey): string
     }
 
     return $rawUrl;
+}
+
+function appendDaysQueryParam(string $url, int $days): string
+{
+    $separator = (strpos($url, '?') === false) ? '?' : '&';
+    return $url . $separator . 'days=' . rawurlencode((string) $days);
 }
 
 function fetchJson(string $url, string $label, array &$errors): ?array
