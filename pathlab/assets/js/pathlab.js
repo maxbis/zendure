@@ -1,8 +1,13 @@
 (function () {
     'use strict';
 
+    const constants = window.PATHLAB_CONSTANTS || {};
     const boot = window.PATHLAB_BOOT || {};
-    const apiUrl = boot.apiUrl || 'api/path_data.php';
+    const apiUrl = constants.apiUrl || 'api/path_data.php';
+    const calculationLookbackDays = normalizePositiveInteger(constants.calculationLookbackDays, 7);
+    const graphDays = normalizePositiveInteger(constants.graphDays, 2);
+    const chartConfig = constants.chart || {};
+    const chartMargin = chartConfig.margin || {};
 
     const statusEl = document.querySelector('[data-role="chart-status"]');
     const chartWrapEl = document.querySelector('[data-role="chart-wrap"]');
@@ -15,10 +20,10 @@
     }
 
     const palette = {
-        path: cssColor('--accent-path', '#9ce365'),
-        actual: cssColor('--accent-actual', '#ffd166'),
-        solar: cssColor('--accent-solar', 'rgba(253, 214, 88, 0.26)'),
-        usage: cssColor('--accent-usage', 'rgba(233, 117, 96, 0.22)')
+        path: cssColor('--accent-path', (constants.palette && constants.palette.path) || '#9ce365'),
+        actual: cssColor('--accent-actual', (constants.palette && constants.palette.actual) || '#ffd166'),
+        solar: cssColor('--accent-solar', (constants.palette && constants.palette.solar) || 'rgba(253, 214, 88, 0.26)'),
+        usage: cssColor('--accent-usage', (constants.palette && constants.palette.usage) || 'rgba(233, 117, 96, 0.22)')
     };
 
     function setText(role, value) {
@@ -67,6 +72,21 @@
         const date = new Date(timestamp);
         if (Number.isNaN(date.getTime())) return '';
         return date.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function normalizePositiveInteger(value, fallback) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            return fallback;
+        }
+        return parsed;
+    }
+
+    function buildApiUrl() {
+        const url = new URL(apiUrl, window.location.href);
+        url.searchParams.set('lookback_days', String(calculationLookbackDays));
+        url.searchParams.set('graph_days', String(graphDays));
+        return url.toString();
     }
 
     function scaleY(value, minSoc, maxSoc, top, plotHeight) {
@@ -162,9 +182,14 @@
         const generatedAt = payload.generatedAt ? new Date(payload.generatedAt) : new Date();
         const nowMs = generatedAt.getTime();
 
-        const width = 1200;
-        const height = 420;
-        const margin = { top: 20, right: 18, bottom: 70, left: 52 };
+        const width = Number(chartConfig.width) || 1200;
+        const height = Number(chartConfig.height) || 420;
+        const margin = {
+            top: Number(chartMargin.top) || 20,
+            right: Number(chartMargin.right) || 18,
+            bottom: Number(chartMargin.bottom) || 70,
+            left: Number(chartMargin.left) || 52
+        };
         const plotWidth = width - margin.left - margin.right;
         const plotHeight = height - margin.top - margin.bottom;
 
@@ -278,8 +303,13 @@
         setText('current-soc', formatPercent(Number(summary.currentSoc)));
         setText('expected-soc', formatPercent(Number(summary.expectedSocNow)));
         setText('delta-soc', formatSignedPercent(Number(summary.deltaSocNow)));
-        setText('lookback-days', `${config.effectiveLookbackDays || 0} day(s)`);
-        setText('effective-lookback', `Looking back ${config.effectiveLookbackDays || 0} days`);
+        const targetLookbackDays = Number.isFinite(Number(config.targetLookbackDays)) ? Number(config.targetLookbackDays) : 0;
+        const validLookbackDaysUsed = Number.isFinite(Number(config.validLookbackDaysUsed))
+            ? Number(config.validLookbackDaysUsed)
+            : (Number.isFinite(Number(config.effectiveLookbackDays)) ? Number(config.effectiveLookbackDays) : 0);
+        setText('lookback-days', `${targetLookbackDays} day(s)`);
+        setText('valid-lookback-days', `Valid days used: ${validLookbackDaysUsed}`);
+        setText('effective-lookback', `Using ${validLookbackDaysUsed} valid day(s) from ${targetLookbackDays}`);
         setText('solar-peak', Number.isFinite(Number(summary.solarPeak)) ? `${Number(summary.solarPeak).toFixed(0)} W/m�` : '--');
         setText('anchor-soc', formatPercent(Number(summary.anchorSoc)));
 
@@ -294,7 +324,7 @@
 
     async function init() {
         try {
-            const response = await fetch(apiUrl, { method: 'GET', cache: 'no-store' });
+            const response = await fetch(buildApiUrl(), { method: 'GET', cache: 'no-store' });
             const payload = await response.json();
             if (!response.ok || !payload || payload.success !== true) {
                 throw new Error(payload && payload.error ? payload.error : 'Failed to load PathLab data.');
@@ -307,4 +337,3 @@
 
     init();
 })();
-

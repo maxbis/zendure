@@ -22,10 +22,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     exit();
 }
 
-const TARGET_LOOKBACK_DAYS = 7;
+const DEFAULT_LOOKBACK_DAYS = 7;
+const MAX_LOOKBACK_DAYS = 30;
+const DEFAULT_GRAPH_DAYS = 2;
+const MAX_GRAPH_DAYS = 7;
 const NEUTRAL_BAND_PERCENT = 3.0;
 const POPUP_POWER_EFFICIENCY_FALLBACK = 0.9;
 const SOLAR_REFERENCE_CHARGE_W = 450.0;
+const MIN_VALID_ELECTRIC_LEVEL_HOURS = 20;
+const MIN_PARTIAL_ELECTRIC_LEVEL_HOURS = 12;
+const MIN_VALID_ACTIVITY_HOURS = 3;
 
 try {
     $payload = buildPathPayload();
@@ -42,6 +48,8 @@ function buildPathPayload(): array
 {
     $tz = new DateTimeZone('Europe/Amsterdam');
     $now = new DateTimeImmutable('now', $tz);
+    $targetLookbackDays = requestPositiveInt('lookback_days', DEFAULT_LOOKBACK_DAYS, 1, MAX_LOOKBACK_DAYS);
+    $graphDays = requestPositiveInt('graph_days', DEFAULT_GRAPH_DAYS, 1, MAX_GRAPH_DAYS);
 
     $baseWh = max(1, (int) ConfigLoader::get('baseWh', 5760));
     $minChargeLevel = clampPercent((float) ConfigLoader::get('MIN_CHARGE_LEVEL', 15));
@@ -55,7 +63,7 @@ function buildPathPayload(): array
     $rootPath = projectRootPath();
     $localChargeStatusUrl = buildLocalUrl($rootPath . '/main/api/charge_status_all_proxy.php');
     $localShortwaveUrl = buildLocalUrl($rootPath . '/main/api/shortwave_radiation_api.php');
-    $whPerHourUrl = appendDaysQueryParam(resolveConfiguredUrl('wh-per-hourApi'), TARGET_LOOKBACK_DAYS);
+    $whPerHourUrl = appendDaysQueryParam(resolveConfiguredUrl('wh-per-hourApi'), $targetLookbackDays);
 
     $errors = [];
 
@@ -65,14 +73,20 @@ function buildPathPayload(): array
 
     $currentSoc = extractCurrentSoc($chargeStatus);
     $todayDate = $now->format('Y-m-d');
-    $tomorrowDate = $now->modify('+1 day')->format('Y-m-d');
-
-    $solarByDateHour = extractSolarByDateHour($shortwave, [$todayDate, $tomorrowDate], $tz);
+    $solarByDateHour = extractSolarByDateHour($shortwave, buildGraphDates($now, $graphDays), $tz);
     $solarPeak = maxSolarValue($solarByDateHour);
 
-    $historyProfile = buildUsageMedianProfile($whPerHour, $todayDate, TARGET_LOOKBACK_DAYS, $baseWh, $efficiency);
+    $historyProfile = buildUsageMedianProfile($whPerHour, $todayDate, $targetLookbackDays, $baseWh, $efficiency);
     $effectiveLookbackDays = $historyProfile['effectiveLookbackDays'];
+    $validLookbackDaysUsed = $historyProfile['validLookbackDaysUsed'];
+    $invalidLookbackDays = $historyProfile['invalidLookbackDays'];
     $usageMedianByHour = $historyProfile['usageMedianByHour'];
+    if ($invalidLookbackDays > 0) {
+        $errors[] = 'Ignored ' . $invalidLookbackDays . ' history day(s) with insufficient data.';
+    }
+    if ($validLookbackDaysUsed === 0) {
+        $errors[] = 'No valid history days available for the discharge profile.';
+    }
 
     $todayRows = (is_array($whPerHour) && isset($whPerHour[$todayDate]) && is_array($whPerHour[$todayDate])) ? $whPerHour[$todayDate] : [];
     $anchorSoc = extractDayStartSoc($todayRows, $currentSoc);
@@ -87,7 +101,7 @@ function buildPathPayload(): array
     $expectedNow = null;
 
     $cursor = $now->setTime(0, 0, 0);
-    $end = $cursor->modify('+2 days');
+    $end = $cursor->modify('+' . $graphDays . ' days');
 
     while ($cursor < $end) {
         $slotDate = $cursor->format('Y-m-d');
@@ -145,8 +159,11 @@ function buildPathPayload(): array
             'minChargeLevel' => $minChargeLevel,
             'maxChargeLevel' => $maxChargeLevel,
             'neutralBandPercent' => NEUTRAL_BAND_PERCENT,
-            'targetLookbackDays' => TARGET_LOOKBACK_DAYS,
+            'targetLookbackDays' => $targetLookbackDays,
             'effectiveLookbackDays' => $effectiveLookbackDays,
+            'validLookbackDaysUsed' => $validLookbackDaysUsed,
+            'invalidLookbackDays' => $invalidLookbackDays,
+            'graphDays' => $graphDays,
         ],
         'summary' => [
             'currentSoc' => round($currentSoc, 2),
@@ -165,6 +182,24 @@ function buildPathPayload(): array
         'slots' => $slots,
         'warnings' => $errors,
     ];
+}
+
+function requestPositiveInt(string $key, int $default, int $min, int $max): int
+{
+    $raw = $_GET[$key] ?? null;
+    if ($raw === null || $raw === '') {
+        return $default;
+    }
+    if (!is_scalar($raw)) {
+        return $default;
+    }
+
+    $value = filter_var((string) $raw, FILTER_VALIDATE_INT);
+    if ($value === false) {
+        return $default;
+    }
+
+    return max($min, min($max, (int) $value));
 }
 
 function projectRootPath(): string
@@ -203,6 +238,18 @@ function appendDaysQueryParam(string $url, int $days): string
 {
     $separator = (strpos($url, '?') === false) ? '?' : '&';
     return $url . $separator . 'days=' . rawurlencode((string) $days);
+}
+
+function buildGraphDates(DateTimeImmutable $now, int $graphDays): array
+{
+    $dates = [];
+    $start = $now->setTime(0, 0, 0);
+
+    for ($offset = 0; $offset < $graphDays; $offset++) {
+        $dates[] = $start->modify('+' . $offset . ' days')->format('Y-m-d');
+    }
+
+    return $dates;
 }
 
 function fetchJson(string $url, string $label, array &$errors): ?array
@@ -365,11 +412,20 @@ function buildUsageMedianProfile(?array $whPerHour, string $todayDate, int $targ
         $historyDates = array_slice($historyDates, -$targetLookbackDays);
     }
 
+    $validHistoryDates = [];
+    $invalidLookbackDays = 0;
     foreach ($historyDates as $date) {
         $rows = $whPerHour[$date] ?? [];
         if (!is_array($rows)) {
+            $invalidLookbackDays++;
             continue;
         }
+        $quality = assessLookbackDayQuality($rows);
+        if (!$quality['valid']) {
+            $invalidLookbackDays++;
+            continue;
+        }
+        $validHistoryDates[] = $date;
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
@@ -391,8 +447,42 @@ function buildUsageMedianProfile(?array $whPerHour, string $todayDate, int $targ
     }
 
     return [
-        'effectiveLookbackDays' => count($historyDates),
+        'effectiveLookbackDays' => count($validHistoryDates),
+        'validLookbackDaysUsed' => count($validHistoryDates),
+        'invalidLookbackDays' => $invalidLookbackDays,
         'usageMedianByHour' => $medianByHour,
+    ];
+}
+
+function assessLookbackDayQuality(array $rows): array
+{
+    $electricLevelHours = 0;
+    $activityHours = 0;
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $electricLevel = $row['electric_level'] ?? null;
+        if ($electricLevel !== null && $electricLevel !== '' && is_numeric($electricLevel)) {
+            $electricLevelHours++;
+        }
+
+        $chargedWh = (isset($row['charged_wh']) && is_numeric($row['charged_wh'])) ? (float) $row['charged_wh'] : 0.0;
+        $dischargedWh = (isset($row['discharged_wh']) && is_numeric($row['discharged_wh'])) ? (float) $row['discharged_wh'] : 0.0;
+        if ($chargedWh > 0.0 || $dischargedWh > 0.0) {
+            $activityHours++;
+        }
+    }
+
+    $isValid = $electricLevelHours >= MIN_VALID_ELECTRIC_LEVEL_HOURS
+        || ($electricLevelHours >= MIN_PARTIAL_ELECTRIC_LEVEL_HOURS && $activityHours >= MIN_VALID_ACTIVITY_HOURS);
+
+    return [
+        'valid' => $isValid,
+        'electricLevelHours' => $electricLevelHours,
+        'activityHours' => $activityHours,
     ];
 }
 

@@ -317,6 +317,19 @@ body {
     font-weight: 600;
 }
 
+.metric-list__compound {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.metric-list__helper {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    font-weight: 500;
+}
+
 @media (max-width: 920px) {
     .hero-card,
     .status-grid,

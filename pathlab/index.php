@@ -94,7 +94,10 @@ $baseWh = (int) ConfigLoader::get('baseWh', 5760);
                 <dl class="metric-list">
                     <div>
                         <dt>History window</dt>
-                        <dd data-role="lookback-days">--</dd>
+                        <dd class="metric-list__compound">
+                            <span data-role="lookback-days">--</span>
+                            <span class="metric-list__helper" data-role="valid-lookback-days">Valid days used: --</span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Solar peak</dt>
@@ -109,9 +112,9 @@ $baseWh = (int) ConfigLoader::get('baseWh', 5760);
         </section>
     </main>
 
+    <script src="assets/js/constants.js"></script>
     <script>
         window.PATHLAB_BOOT = {
-            apiUrl: 'api/path_data.php',
             minChargeLevel: <?php echo json_encode($minChargeLevel, JSON_UNESCAPED_SLASHES); ?>,
             maxChargeLevel: <?php echo json_encode($maxChargeLevel, JSON_UNESCAPED_SLASHES); ?>
         };
