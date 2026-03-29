@@ -132,124 +132,85 @@ $sections = [
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Zendure Dev Links</title>
+    <link rel="icon" type="image/x-icon" href="../main/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="../main/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../main/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="../main/apple-touch-icon.png">
+    <link rel="stylesheet" href="../main/assets/css/general_mobile.css">
+    <link rel="stylesheet" href="../main/assets/css/charge_schedule_mobile.css">
     <style>
-        :root {
-            --bg: #f4efe6;
-            --panel: #fffaf2;
-            --panel-strong: #fffdf8;
-            --text: #1f2933;
-            --muted: #52606d;
-            --line: #d7c7af;
-            --accent: #b35c2e;
-            --accent-soft: #fff1e2;
-            --shadow: 0 18px 40px rgba(73, 47, 24, 0.10);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background:
-                radial-gradient(circle at top left, rgba(255, 240, 217, 0.9), transparent 36%),
-                linear-gradient(180deg, #f8f1e7 0%, #f2eadf 52%, #ede3d5 100%);
-            color: var(--text);
-        }
-
-        main {
-            width: min(1080px, calc(100% - 32px));
-            margin: 28px auto 40px;
-        }
-
-        .hero,
-        .section-card {
-            background: color-mix(in srgb, var(--panel) 88%, white);
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-        }
-
-        .hero {
-            padding: 28px;
-            margin-bottom: 18px;
-        }
-
         .eyebrow {
             margin: 0 0 10px;
             font-size: 0.78rem;
             letter-spacing: 0.16em;
             text-transform: uppercase;
-            color: var(--accent);
+            color: #64b5f6;
             font-weight: 700;
         }
 
-        h1 {
-            margin: 0 0 10px;
-            font-size: clamp(2rem, 4vw, 3.2rem);
-            line-height: 1;
+        body.mobile-dark {
+            align-items: flex-start;
         }
 
-        .hero-text {
-            margin: 0;
-            max-width: 760px;
-            color: var(--muted);
-            line-height: 1.55;
-            font-size: 1rem;
+        body.mobile-dark .container {
+            width: 100%;
+            max-width: 600px;
         }
 
-        .note {
-            margin-top: 18px;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: var(--accent-soft);
-            border: 1px solid #e9c8a5;
-            color: #6f3b1c;
-            font-size: 0.94rem;
+        body.mobile-dark .header,
+        body.mobile-dark .card {
+            max-width: 600px;
         }
 
-        .sections {
-            display: grid;
-            gap: 16px;
+        .intro-card p {
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
 
-        .section-card {
-            padding: 22px;
+        .dev-note {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
 
         .section-header {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
-        h2 {
-            margin: 0 0 6px;
-            font-size: 1.25rem;
+        .section-header .card-header {
+            margin-bottom: 8px;
         }
 
         .section-description {
             margin: 0;
-            color: var(--muted);
+            color: var(--text-secondary);
             line-height: 1.5;
         }
 
         .link-list {
             display: grid;
-            gap: 12px;
+            gap: 8px;
         }
 
         .link-item {
-            padding: 14px 16px;
-            border-radius: 14px;
-            background: var(--panel-strong);
-            border: 1px solid #eadcc9;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+            background: color-mix(in srgb, var(--bg-tertiary) 88%, #0b1222);
+            transition: all 0.2s ease-out;
+        }
+
+        .link-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border-color: #555;
         }
 
         .link-title-link {
-            color: var(--accent);
+            color: #64b5f6;
             font-weight: 700;
             text-decoration: none;
         }
@@ -261,57 +222,46 @@ $sections = [
 
         .link-label {
             margin: 0 0 6px;
-            font-size: 1rem;
+            font-size: 0.98rem;
         }
 
         .link-path {
             margin: 0 0 6px;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.92rem;
-            color: var(--muted);
+            font-size: 0.82rem;
+            color: var(--text-tertiary);
             word-break: break-all;
         }
 
         .link-description {
             margin: 0;
-            color: var(--muted);
+            color: var(--text-secondary);
             line-height: 1.5;
+            font-size: 0.9rem;
+        }
+
+        .section-card {
+            margin-bottom: var(--card-gap);
         }
 
         @media (max-width: 720px) {
-            main {
-                width: min(100% - 20px, 1080px);
-                margin: 12px auto 24px;
-            }
-
-            .hero,
-            .section-card {
-                border-radius: 14px;
-            }
-
-            .hero,
-            .section-card {
-                padding: 16px;
-            }
-
-            .note {
-                display: block;
-                border-radius: 14px;
+            .link-item {
+                padding: 10px;
             }
         }
     </style>
 </head>
-<body>
-<main>
-    <section class="hero">
-        <p class="eyebrow">Dev - Test Links</p>
-    </section>
+<body class="mobile-dark">
+<div class="container">
+    <div class="header">
+        <h1>⚡ Zendure Energy Manager Dev Links</h1>
+    </div>
 
-    <div class="sections">
-        <?php foreach ($sections as $section): ?>
-            <section class="section-card">
+
+    <?php foreach ($sections as $section): ?>
+        <section class="card section-card">
                 <div class="section-header">
-                    <h2><?php echo htmlspecialchars($section['title'], ENT_QUOTES, 'UTF-8'); ?></h2>
+                    <h2 class="card-header"><?php echo htmlspecialchars($section['title'], ENT_QUOTES, 'UTF-8'); ?></h2>
                     <p class="section-description"><?php echo htmlspecialchars($section['description'], ENT_QUOTES, 'UTF-8'); ?></p>
                 </div>
 
@@ -330,9 +280,8 @@ $sections = [
                         </article>
                     <?php endforeach; ?>
                 </div>
-            </section>
-        <?php endforeach; ?>
-    </div>
-</main>
+        </section>
+    <?php endforeach; ?>
+</div>
 </body>
 </html>
