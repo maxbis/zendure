@@ -7,9 +7,11 @@
     --text-soft: #a7bbb3;
     --text-muted: #7f938b;
     --accent-path: #9ce365;
-    --accent-actual: #ffd166;
+    --accent-actual: #6476e9;
     --accent-solar: rgba(253, 214, 88, 0.26);
+    --accent-solar-legend: rgba(253, 214, 88, 0.7);
     --accent-usage: rgba(233, 117, 96, 0.22);
+    --accent-usage-legend: rgba(233, 117, 96, 0.7);
     --badge-ahead: #4bc27f;
     --badge-behind: #f77f5f;
     --badge-neutral: #8fb8c9;
@@ -224,17 +226,34 @@ body {
 
 .legend-swatch {
     display: inline-block;
-    width: 12px;
-    height: 12px;
     margin-right: 6px;
-    border-radius: 999px;
     vertical-align: middle;
 }
 
-.legend-swatch--path { background: var(--accent-path); }
+.legend-swatch--line {
+    width: 16px;
+    height: 0;
+    border-top: 3px solid currentColor;
+    border-radius: 999px;
+}
+
+.legend-swatch--path.legend-swatch--line {
+    color: var(--accent-path);
+}
+
+.legend-swatch--actual-path.legend-swatch--line {
+    color: var(--accent-actual);
+}
+
+.legend-swatch:not(.legend-swatch--line) {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+}
+
 .legend-swatch--actual { background: var(--accent-actual); }
-.legend-swatch--solar { background: rgba(253, 214, 88, 0.7); }
-.legend-swatch--usage { background: rgba(233, 117, 96, 0.7); }
+.legend-swatch--solar { background: var(--accent-solar-legend); }
+.legend-swatch--usage { background: var(--accent-usage-legend); }
 
 .chart-status {
     margin-top: 12px;

@@ -65,13 +65,14 @@ $baseWh = (int) ConfigLoader::get('baseWh', 5760);
                     <h2>Today and tomorrow</h2>
                 </div>
                 <div class="chart-legend">
-                    <span><i class="legend-swatch legend-swatch--path"></i>Expected path</span>
+                    <span><i class="legend-swatch legend-swatch--line legend-swatch--path"></i>Expected path</span>
+                    <span><i class="legend-swatch legend-swatch--line legend-swatch--actual-path"></i>Actual path</span>
                     <span><i class="legend-swatch legend-swatch--actual"></i>Actual now</span>
                     <span><i class="legend-swatch legend-swatch--solar"></i>Solar pressure</span>
                     <span><i class="legend-swatch legend-swatch--usage"></i>Usage pressure</span>
                 </div>
             </div>
-            <div class="chart-status" data-role="chart-status">Loading model…</div>
+            <div class="chart-status" data-role="chart-status">Loading model...</div>
             <div class="chart-wrap" data-role="chart-wrap" hidden>
                 <svg class="pathlab-chart" data-role="chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Expected battery path chart"></svg>
             </div>
@@ -81,6 +82,8 @@ $baseWh = (int) ConfigLoader::get('baseWh', 5760);
             <article class="detail-card">
                 <h3>Model Notes</h3>
                 <ul class="detail-list">
+                    <li>Green line shows the expected path for today and tomorrow.</li>
+                    <li>Amber line shows the actual measured SoC so far today.</li>
                     <li>Charge pressure comes from normalized hourly shortwave radiation.</li>
                     <li>Discharge pressure comes from hourly median discharge energy of recent days.</li>
                     <li>This page is advisory only and does not change schedule or automation behavior.</li>

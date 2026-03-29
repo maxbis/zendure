@@ -7,6 +7,19 @@
     const statusEl = document.querySelector('[data-role="chart-status"]');
     const chartWrapEl = document.querySelector('[data-role="chart-wrap"]');
     const chartEl = document.querySelector('[data-role="chart"]');
+    const rootStyles = window.getComputedStyle(document.documentElement);
+
+    function cssColor(variableName, fallback) {
+        const value = rootStyles.getPropertyValue(variableName).trim();
+        return value || fallback;
+    }
+
+    const palette = {
+        path: cssColor('--accent-path', '#9ce365'),
+        actual: cssColor('--accent-actual', '#ffd166'),
+        solar: cssColor('--accent-solar', 'rgba(253, 214, 88, 0.26)'),
+        usage: cssColor('--accent-usage', 'rgba(233, 117, 96, 0.22)')
+    };
 
     function setText(role, value) {
         const el = document.querySelector(`[data-role="${role}"]`);
@@ -56,6 +69,82 @@
         return date.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
     }
 
+    function scaleY(value, minSoc, maxSoc, top, plotHeight) {
+        const clamped = Math.max(minSoc, Math.min(maxSoc, value));
+        const range = Math.max(1, maxSoc - minSoc);
+        const normalized = (clamped - minSoc) / range;
+        return top + plotHeight - (normalized * plotHeight);
+    }
+
+    function escapeXml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function buildExpectedPoints(slots, minSoc, maxSoc, margin, plotWidth, plotHeight) {
+        const points = [];
+        slots.forEach((slot, index) => {
+            const x = margin.left + (index / Math.max(1, slots.length - 1)) * plotWidth;
+            const y = scaleY(Number(slot.start_soc), minSoc, maxSoc, margin.top, plotHeight);
+            points.push({ x, y });
+            if (index === slots.length - 1) {
+                const endX = margin.left + plotWidth;
+                const endY = scaleY(Number(slot.end_soc), minSoc, maxSoc, margin.top, plotHeight);
+                points.push({ x: endX, y: endY });
+            }
+        });
+        return points;
+    }
+
+    function buildActualSegments(actualSlots, timestampToX, minSoc, maxSoc, margin, plotHeight) {
+        const segments = [];
+        let currentSegment = [];
+        let previousTimestamp = null;
+
+        actualSlots.forEach((slot) => {
+            const timestamp = String(slot.timestamp || '');
+            const soc = Number(slot.soc);
+            if (!timestamp || !Number.isFinite(soc) || !Object.prototype.hasOwnProperty.call(timestampToX, timestamp)) {
+                return;
+            }
+
+            const timestampMs = Date.parse(timestamp);
+            const point = {
+                x: timestampToX[timestamp],
+                y: scaleY(soc, minSoc, maxSoc, margin.top, plotHeight),
+                timestampMs
+            };
+
+            const shouldBreak = previousTimestamp !== null && Number.isFinite(timestampMs)
+                && Number.isFinite(previousTimestamp)
+                && (timestampMs - previousTimestamp) > 5400000;
+
+            if (shouldBreak && currentSegment.length > 1) {
+                segments.push(currentSegment);
+                currentSegment = [];
+            } else if (shouldBreak) {
+                currentSegment = [];
+            }
+
+            currentSegment.push(point);
+            previousTimestamp = timestampMs;
+        });
+
+        if (currentSegment.length > 1) {
+            segments.push(currentSegment);
+        }
+
+        return segments;
+    }
+
+    function pointsToPolyline(points) {
+        return points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+    }
+
     function buildChart(payload) {
         const slots = Array.isArray(payload.slots) ? payload.slots : [];
         if (slots.length === 0 || !chartEl) {
@@ -63,6 +152,9 @@
             return;
         }
 
+        const actualSlots = Array.isArray(payload.actualPath && payload.actualPath.slots)
+            ? payload.actualPath.slots
+            : [];
         const summary = payload.summary || {};
         const config = payload.config || {};
         const minSoc = Number.isFinite(config.minChargeLevel) ? config.minChargeLevel : 0;
@@ -76,19 +168,16 @@
         const plotWidth = width - margin.left - margin.right;
         const plotHeight = height - margin.top - margin.bottom;
 
-        const points = [];
+        const points = buildExpectedPoints(slots, minSoc, maxSoc, margin, plotWidth, plotHeight);
+        const pathLine = pointsToPolyline(points);
+
+        const timestampToX = {};
         slots.forEach((slot, index) => {
-            const x = margin.left + (index / Math.max(1, slots.length - 1)) * plotWidth;
-            const y = scaleY(Number(slot.start_soc), minSoc, maxSoc, margin.top, plotHeight);
-            points.push({ x, y });
-            if (index === slots.length - 1) {
-                const endX = margin.left + plotWidth;
-                const endY = scaleY(Number(slot.end_soc), minSoc, maxSoc, margin.top, plotHeight);
-                points.push({ x: endX, y: endY });
-            }
+            timestampToX[String(slot.timestamp)] = margin.left + (index / Math.max(1, slots.length - 1)) * plotWidth;
         });
 
-        const pathLine = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+        const actualSegments = buildActualSegments(actualSlots, timestampToX, minSoc, maxSoc, margin, plotHeight);
+        const actualLines = actualSegments.map((segment) => pointsToPolyline(segment));
 
         const nowIndex = slots.findIndex((slot) => {
             const start = Date.parse(slot.timestamp);
@@ -133,7 +222,7 @@
             const value = Number(slot.solar_score) || 0;
             const x = margin.left + index * underlayWidth;
             const barHeight = Math.max(0, value * plotHeight * 0.35);
-            return `<rect x="${x.toFixed(2)}" y="${(margin.top + plotHeight - barHeight).toFixed(2)}" width="${Math.max(2, underlayWidth - 1).toFixed(2)}" height="${barHeight.toFixed(2)}" fill="rgba(253,214,88,0.22)"></rect>`;
+            return `<rect x="${x.toFixed(2)}" y="${(margin.top + plotHeight - barHeight).toFixed(2)}" width="${Math.max(2, underlayWidth - 1).toFixed(2)}" height="${barHeight.toFixed(2)}" fill="${palette.solar}"></rect>`;
         }).join('');
 
         const usageBars = slots.map((slot, index) => {
@@ -141,7 +230,7 @@
             const normalized = Math.min(1, value / 8);
             const x = margin.left + index * underlayWidth;
             const barHeight = Math.max(0, normalized * plotHeight * 0.22);
-            return `<rect x="${x.toFixed(2)}" y="${(margin.top + plotHeight - barHeight).toFixed(2)}" width="${Math.max(2, underlayWidth - 1).toFixed(2)}" height="${barHeight.toFixed(2)}" fill="rgba(233,117,96,0.18)"></rect>`;
+            return `<rect x="${x.toFixed(2)}" y="${(margin.top + plotHeight - barHeight).toFixed(2)}" width="${Math.max(2, underlayWidth - 1).toFixed(2)}" height="${barHeight.toFixed(2)}" fill="${palette.usage}"></rect>`;
         }).join('');
 
         chartEl.innerHTML = `
@@ -160,9 +249,10 @@
             ${usageBars}
             <line x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${width - margin.right}" y2="${margin.top + plotHeight}" stroke="rgba(255,255,255,0.12)" stroke-width="1"></line>
             <polyline points="${pathLine}" fill="none" stroke="url(#pathlabPathGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+            ${actualLines.map((line) => `<polyline points="${line}" fill="none" stroke="${palette.actual}" stroke-width="1" stroke-dasharray="7 5" stroke-linecap="round" stroke-linejoin="round"></polyline>`).join('')}
             <line x1="${nowX.toFixed(2)}" y1="${margin.top}" x2="${nowX.toFixed(2)}" y2="${(margin.top + plotHeight).toFixed(2)}" stroke="rgba(255,209,102,0.82)" stroke-width="2" stroke-dasharray="7 6"></line>
-            <circle cx="${nowX.toFixed(2)}" cy="${actualY.toFixed(2)}" r="7" fill="#ffd166" stroke="#08131a" stroke-width="3"></circle>
-            <circle cx="${nowX.toFixed(2)}" cy="${expectedY.toFixed(2)}" r="5" fill="#9ce365" stroke="#08131a" stroke-width="2"></circle>
+            <circle cx="${nowX.toFixed(2)}" cy="${actualY.toFixed(2)}" r="7" fill="${palette.actual}" stroke="#08131a" stroke-width="3"></circle>
+            <circle cx="${nowX.toFixed(2)}" cy="${expectedY.toFixed(2)}" r="5" fill="${palette.path}" stroke="#08131a" stroke-width="2"></circle>
             <text x="${Math.min(width - margin.right - 40, nowX + 8).toFixed(2)}" y="${(margin.top + 14).toFixed(2)}" fill="rgba(255,209,102,0.9)" font-size="12" font-weight="700">Now</text>
             ${xTicks.map((tick) => `
                 <line x1="${tick.x.toFixed(2)}" y1="${(margin.top + plotHeight).toFixed(2)}" x2="${tick.x.toFixed(2)}" y2="${(margin.top + plotHeight + 8).toFixed(2)}" stroke="rgba(255,255,255,0.14)" stroke-width="1"></line>
@@ -181,22 +271,6 @@
         setStatus(message);
     }
 
-    function scaleY(value, minSoc, maxSoc, top, plotHeight) {
-        const clamped = Math.max(minSoc, Math.min(maxSoc, value));
-        const range = Math.max(1, maxSoc - minSoc);
-        const normalized = (clamped - minSoc) / range;
-        return top + plotHeight - (normalized * plotHeight);
-    }
-
-    function escapeXml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     function render(payload) {
         const summary = payload.summary || {};
         const config = payload.config || {};
@@ -206,7 +280,7 @@
         setText('delta-soc', formatSignedPercent(Number(summary.deltaSocNow)));
         setText('lookback-days', `${config.effectiveLookbackDays || 0} day(s)`);
         setText('effective-lookback', `Looking back ${config.effectiveLookbackDays || 0} days`);
-        setText('solar-peak', Number.isFinite(Number(summary.solarPeak)) ? `${Number(summary.solarPeak).toFixed(0)} W/m²` : '--');
+        setText('solar-peak', Number.isFinite(Number(summary.solarPeak)) ? `${Number(summary.solarPeak).toFixed(0)} W/m�` : '--');
         setText('anchor-soc', formatPercent(Number(summary.anchorSoc)));
 
         const generatedAt = payload.generatedAt ? new Date(payload.generatedAt) : null;
@@ -233,3 +307,4 @@
 
     init();
 })();
+

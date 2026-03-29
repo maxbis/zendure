@@ -81,6 +81,7 @@ function buildPathPayload(): array
     $peakSolarChargePctPerHour = usableWhToPercent(SOLAR_REFERENCE_CHARGE_W, $usablePercentWh);
 
     $slots = [];
+    $slotIndexByDateHour = [];
     $runningSoc = $anchorSoc;
     $currentHourStart = $now->setTime((int) $now->format('H'), 0, 0);
     $expectedNow = null;
@@ -115,6 +116,7 @@ function buildPathPayload(): array
             'net_delta_pct' => round($runningSoc - $slotStartSoc, 3),
         ];
         $slots[] = $slot;
+        $slotIndexByDateHour[$slotDate . '|' . $hour] = $slot['timestamp'];
 
         if ($cursor == $currentHourStart) {
             $fraction = min(1.0, max(0.0, (((int) $now->format('i')) * 60 + (int) $now->format('s')) / 3600.0));
@@ -128,6 +130,8 @@ function buildPathPayload(): array
     if ($expectedNow === null) {
         $expectedNow = $currentSoc;
     }
+
+    $actualSlots = buildActualPathSlots($whPerHour, $todayDate, $slotIndexByDateHour, $now);
 
     $deltaNow = $currentSoc - $expectedNow;
     $status = classifyDelta($deltaNow, NEUTRAL_BAND_PERCENT);
@@ -154,6 +158,9 @@ function buildPathPayload(): array
         ],
         'profiles' => [
             'usageMedianByHour' => array_map(static fn ($value) => round((float) $value, 3), $usageMedianByHour),
+        ],
+        'actualPath' => [
+            'slots' => $actualSlots,
         ],
         'slots' => $slots,
         'warnings' => $errors,
@@ -387,6 +394,51 @@ function buildUsageMedianProfile(?array $whPerHour, string $todayDate, int $targ
         'effectiveLookbackDays' => count($historyDates),
         'usageMedianByHour' => $medianByHour,
     ];
+}
+
+function buildActualPathSlots(?array $whPerHour, string $todayDate, array $slotIndexByDateHour, DateTimeImmutable $now): array
+{
+    if (!is_array($whPerHour) || !isset($whPerHour[$todayDate]) || !is_array($whPerHour[$todayDate])) {
+        return [];
+    }
+
+    $actualSlots = [];
+    foreach ($whPerHour[$todayDate] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $hour = $row['hour'] ?? null;
+        $electricLevel = $row['electric_level'] ?? null;
+        if (!is_numeric($hour) || !is_numeric($electricLevel)) {
+            continue;
+        }
+
+        $hourInt = (int) $hour;
+        if ($hourInt < 0 || $hourInt > 23) {
+            continue;
+        }
+
+        $slotKey = $todayDate . '|' . $hourInt;
+        if (!isset($slotIndexByDateHour[$slotKey])) {
+            continue;
+        }
+
+        $timestamp = $slotIndexByDateHour[$slotKey];
+        $timestampMs = strtotime($timestamp);
+        if ($timestampMs === false || $timestampMs > $now->getTimestamp()) {
+            continue;
+        }
+
+        $actualSlots[] = [
+            'timestamp' => $timestamp,
+            'soc' => round(clampPercent((float) $electricLevel), 2),
+        ];
+    }
+
+    usort($actualSlots, static fn (array $left, array $right): int => strcmp($left['timestamp'], $right['timestamp']));
+
+    return $actualSlots;
 }
 
 function usableWhToPercent(float $wh, float $usablePercentWh): float
