@@ -310,7 +310,7 @@
         setText('lookback-days', `${targetLookbackDays} day(s)`);
         setText('valid-lookback-days', `Valid days used: ${validLookbackDaysUsed}`);
         setText('effective-lookback', `Using ${validLookbackDaysUsed} valid day(s) from ${targetLookbackDays}`);
-        setText('solar-peak', Number.isFinite(Number(summary.solarPeak)) ? `${Number(summary.solarPeak).toFixed(0)} W/m�` : '--');
+        setText('solar-peak', Number.isFinite(Number(summary.solarPeak)) ? `${Number(summary.solarPeak).toFixed(0)} W/m2` : '--');
         setText('anchor-soc', formatPercent(Number(summary.anchorSoc)));
 
         const generatedAt = payload.generatedAt ? new Date(payload.generatedAt) : null;

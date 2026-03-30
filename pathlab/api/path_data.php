@@ -32,6 +32,11 @@ const SOLAR_REFERENCE_CHARGE_W = 450.0;
 const MIN_VALID_ELECTRIC_LEVEL_HOURS = 20;
 const MIN_PARTIAL_ELECTRIC_LEVEL_HOURS = 12;
 const MIN_VALID_ACTIVITY_HOURS = 3;
+const DEFAULT_SHORTWAVE_LATITUDE = 52.3;
+const DEFAULT_SHORTWAVE_LONGITUDE = 4.863;
+const DEFAULT_SHORTWAVE_TIMEZONE = 'Europe/Amsterdam';
+const SHORTWAVE_CACHE_TTL_SECONDS = 7200;
+const PATHLAB_FETCH_TIMEOUT_SECONDS = 6;
 
 try {
     $payload = buildPathPayload();
@@ -60,19 +65,18 @@ function buildPathPayload(): array
         $efficiency = POPUP_POWER_EFFICIENCY_FALLBACK;
     }
 
-    $rootPath = projectRootPath();
-    $localChargeStatusUrl = buildLocalUrl($rootPath . '/main/api/charge_status_all_proxy.php');
-    $localShortwaveUrl = buildLocalUrl($rootPath . '/main/api/shortwave_radiation_api.php');
+    $chargeStatusUrl = resolveChargeStatusUrl();
     $whPerHourUrl = appendDaysQueryParam(resolveConfiguredUrl('wh-per-hourApi'), $targetLookbackDays);
 
     $errors = [];
 
-    $chargeStatus = fetchJson($localChargeStatusUrl, 'charge status', $errors);
-    $shortwave = fetchJson($localShortwaveUrl, 'shortwave radiation', $errors);
+    $chargeStatus = fetchJson($chargeStatusUrl, 'charge status', $errors);
     $whPerHour = fetchJson($whPerHourUrl, 'wh_per_hour', $errors);
+    $shortwave = fetchShortwaveData($errors);
 
-    $currentSoc = extractCurrentSoc($chargeStatus);
     $todayDate = $now->format('Y-m-d');
+    $fallbackCurrentSoc = extractLatestActualSoc($whPerHour, $todayDate);
+    $currentSoc = extractCurrentSoc($chargeStatus, $fallbackCurrentSoc);
     $solarByDateHour = extractSolarByDateHour($shortwave, buildGraphDates($now, $graphDays), $tz);
     $solarPeak = maxSolarValue($solarByDateHour);
 
@@ -202,28 +206,26 @@ function requestPositiveInt(string $key, int $default, int $min, int $max): int
     return max($min, min($max, (int) $value));
 }
 
-function projectRootPath(): string
-{
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/pathlab/api/path_data.php';
-    $root = dirname(dirname(dirname($scriptName)));
-    if ($root === '\\' || $root === '.') {
-        return '';
-    }
-    return rtrim(str_replace('\\', '/', $root), '/');
-}
-
-function buildLocalUrl(string $path): string
-{
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    return $scheme . '://' . $host . $path;
-}
-
 function resolveConfiguredUrl(string $configKey): string
 {
     $rawUrl = ConfigLoader::get($configKey);
     if (!is_string($rawUrl) || trim($rawUrl) === '') {
         throw new RuntimeException('Missing config value for ' . $configKey);
+    }
+
+    $baseUrl = ConfigLoader::get('apiBaseUrlPiControl', '');
+    if (is_string($baseUrl) && $baseUrl !== '') {
+        $rawUrl = str_replace('${apiBaseUrlPiControl}', $baseUrl, $rawUrl);
+    }
+
+    return $rawUrl;
+}
+
+function resolveChargeStatusUrl(): string
+{
+    $rawUrl = ConfigLoader::get('chargeStatusApi', ConfigLoader::get('allApi'));
+    if (!is_string($rawUrl) || trim($rawUrl) === '') {
+        throw new RuntimeException('Missing config value for chargeStatusApi/allApi');
     }
 
     $baseUrl = ConfigLoader::get('apiBaseUrlPiControl', '');
@@ -256,7 +258,7 @@ function fetchJson(string $url, string $label, array &$errors): ?array
 {
     $context = stream_context_create([
         'http' => [
-            'timeout' => 12,
+            'timeout' => PATHLAB_FETCH_TIMEOUT_SECONDS,
             'ignore_errors' => true,
             'method' => 'GET',
             'header' => 'User-Agent: PathLab',
@@ -286,10 +288,114 @@ function fetchJson(string $url, string $label, array &$errors): ?array
     return $decoded;
 }
 
-function extractCurrentSoc(?array $chargeStatus): float
+function fetchShortwaveData(array &$errors): ?array
+{
+    $latitude = DEFAULT_SHORTWAVE_LATITUDE;
+    $longitude = DEFAULT_SHORTWAVE_LONGITUDE;
+    $timezone = DEFAULT_SHORTWAVE_TIMEZONE;
+    $cachePath = buildShortwaveCachePath($latitude, $longitude, $timezone);
+    $cached = readShortwaveCache($cachePath);
+
+    if ($cached !== null && !isCacheExpired($cached, SHORTWAVE_CACHE_TTL_SECONDS)) {
+        return formatShortwaveResponse($cached);
+    }
+
+    $apiUrl = sprintf(
+        'https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&hourly=shortwave_radiation&timezone=%s',
+        rawurlencode((string) $latitude),
+        rawurlencode((string) $longitude),
+        rawurlencode($timezone)
+    );
+
+    try {
+        $payload = fetchJsonBody($apiUrl, 'shortwave radiation');
+        $hourlySeries = extractShortwaveHourlySeries($payload);
+        $fresh = [
+            'success' => true,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'timezone' => isset($payload['timezone']) ? (string) $payload['timezone'] : $timezone,
+            'unit' => 'W/m2',
+            'days' => extractShortwaveDailyTotals($hourlySeries['time'], $hourlySeries['shortwave_radiation']),
+            'hourly' => $hourlySeries,
+            'hourly_units' => [
+                'shortwave_radiation' => extractShortwaveUnit($payload),
+            ],
+            'cachedAt' => time(),
+        ];
+        writeShortwaveCache($cachePath, $fresh);
+        return formatShortwaveResponse($fresh);
+    } catch (Throwable $e) {
+        if ($cached !== null) {
+            $errors[] = 'Using stale shortwave radiation cache.';
+            return formatShortwaveResponse($cached);
+        }
+        $errors[] = $e->getMessage() !== '' ? $e->getMessage() : 'Failed to fetch shortwave radiation.';
+        return null;
+    }
+}
+
+function fetchJsonBody(string $url, string $label): array
+{
+    $body = null;
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => PATHLAB_FETCH_TIMEOUT_SECONDS,
+            CURLOPT_TIMEOUT => PATHLAB_FETCH_TIMEOUT_SECONDS,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_USERAGENT => 'PathLab',
+        ]);
+        $body = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $statusCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+
+        if ($body === false || $statusCode >= 400) {
+            $message = $curlError !== '' ? $curlError : ('HTTP ' . $statusCode);
+            throw new RuntimeException('Failed to fetch ' . $label . ': ' . $message);
+        }
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => PATHLAB_FETCH_TIMEOUT_SECONDS,
+                'ignore_errors' => true,
+                'header' => "User-Agent: PathLab\r\n",
+            ],
+        ]);
+        $body = @file_get_contents($url, false, $context);
+        if ($body === false || $body === '') {
+            throw new RuntimeException('Failed to fetch ' . $label . '.');
+        }
+    }
+
+    try {
+        $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        throw new RuntimeException('Invalid JSON from ' . $label . '.', 0, $e);
+    }
+
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Invalid JSON from ' . $label . '.');
+    }
+
+    if (array_key_exists('success', $decoded) && $decoded['success'] === false) {
+        $message = isset($decoded['error']) && is_string($decoded['error']) && trim($decoded['error']) !== ''
+            ? trim($decoded['error'])
+            : ('Upstream ' . $label . ' returned success=false.');
+        throw new RuntimeException($message);
+    }
+
+    return $decoded;
+}
+
+function extractCurrentSoc(?array $chargeStatus, ?float $fallback = null): float
 {
     if (!is_array($chargeStatus)) {
-        return 0.0;
+        return $fallback !== null ? clampPercent($fallback) : 0.0;
     }
 
     $properties = null;
@@ -305,10 +411,30 @@ function extractCurrentSoc(?array $chargeStatus): float
     }
 
     if (!is_array($properties) || !isset($properties['electricLevel']) || !is_numeric($properties['electricLevel'])) {
-        return 0.0;
+        return $fallback !== null ? clampPercent($fallback) : 0.0;
     }
 
     return clampPercent((float) $properties['electricLevel']);
+}
+
+function extractLatestActualSoc(?array $whPerHour, string $todayDate): ?float
+{
+    if (!is_array($whPerHour) || !isset($whPerHour[$todayDate]) || !is_array($whPerHour[$todayDate])) {
+        return null;
+    }
+
+    $latestSoc = null;
+    foreach ($whPerHour[$todayDate] as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $electricLevel = $row['electric_level'] ?? null;
+        if ($electricLevel !== null && $electricLevel !== '' && is_numeric($electricLevel)) {
+            $latestSoc = (float) $electricLevel;
+        }
+    }
+
+    return $latestSoc !== null ? clampPercent($latestSoc) : null;
 }
 
 function extractDayStartSoc(array $rows, float $fallback): float
@@ -376,6 +502,142 @@ function maxSolarValue(array $solarByDateHour): float
         }
     }
     return $max;
+}
+
+function buildShortwaveCachePath(float $latitude, float $longitude, string $timezone): string
+{
+    $cacheKey = md5(json_encode([
+        'latitude' => $latitude,
+        'longitude' => $longitude,
+        'timezone' => $timezone,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
+    return __DIR__ . '/../../main/data/shortwave_radiation_cache_' . $cacheKey . '.json';
+}
+
+function readShortwaveCache(string $path): ?array
+{
+    if (!file_exists($path)) {
+        return null;
+    }
+
+    $raw = @file_get_contents($path);
+    if ($raw === false) {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (
+        !is_array($decoded) ||
+        !isset(
+            $decoded['cachedAt'],
+            $decoded['latitude'],
+            $decoded['longitude'],
+            $decoded['timezone'],
+            $decoded['unit'],
+            $decoded['days'],
+            $decoded['hourly'],
+            $decoded['hourly_units']
+        ) ||
+        !is_array($decoded['hourly']['time'] ?? null) ||
+        !is_array($decoded['hourly']['shortwave_radiation'] ?? null)
+    ) {
+        return null;
+    }
+
+    return $decoded;
+}
+
+function writeShortwaveCache(string $path, array $payload): bool
+{
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        return false;
+    }
+
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($encoded === false) {
+        return false;
+    }
+
+    return @file_put_contents($path, $encoded, LOCK_EX) !== false;
+}
+
+function isCacheExpired(array $payload, int $ttlSeconds): bool
+{
+    return !isset($payload['cachedAt']) || (time() - (int) $payload['cachedAt']) > $ttlSeconds;
+}
+
+function formatShortwaveResponse(array $payload): array
+{
+    return [
+        'success' => true,
+        'latitude' => $payload['latitude'],
+        'longitude' => $payload['longitude'],
+        'timezone' => $payload['timezone'],
+        'unit' => $payload['unit'],
+        'days' => $payload['days'],
+        'hourly' => $payload['hourly'],
+        'hourly_units' => $payload['hourly_units'],
+    ];
+}
+
+function extractShortwaveHourlySeries(array $payload): array
+{
+    $hourly = $payload['hourly'] ?? null;
+    $times = is_array($hourly['time'] ?? null) ? $hourly['time'] : [];
+    $values = is_array($hourly['shortwave_radiation'] ?? null) ? $hourly['shortwave_radiation'] : [];
+
+    if (count($times) === 0 || count($times) !== count($values)) {
+        throw new RuntimeException('The API returned invalid hourly shortwave radiation data.');
+    }
+
+    return [
+        'time' => array_map(static fn ($time): string => (string) $time, $times),
+        'shortwave_radiation' => array_map(static fn ($value): float => (float) $value, $values),
+    ];
+}
+
+function extractShortwaveDailyTotals(array $times, array $values): array
+{
+    if (count($times) === 0 || count($times) !== count($values)) {
+        throw new RuntimeException('The API returned invalid hourly shortwave radiation data.');
+    }
+
+    $groups = [];
+    foreach ($times as $index => $timestamp) {
+        try {
+            $dt = new DateTimeImmutable((string) $timestamp);
+        } catch (Exception $e) {
+            throw new RuntimeException('The API returned an invalid hourly timestamp.', 0, $e);
+        }
+
+        $dateKey = $dt->format('Y-m-d');
+        if (!isset($groups[$dateKey])) {
+            $groups[$dateKey] = 0.0;
+        }
+        $groups[$dateKey] += (float) $values[$index];
+    }
+
+    $days = [];
+    foreach ($groups as $date => $total) {
+        $days[] = [
+            'date' => $date,
+            'value' => (int) round($total),
+        ];
+    }
+
+    return $days;
+}
+
+function extractShortwaveUnit(array $payload): string
+{
+    $hourlyUnits = $payload['hourly_units'] ?? null;
+    $unit = is_array($hourlyUnits) && isset($hourlyUnits['shortwave_radiation'])
+        ? (string) $hourlyUnits['shortwave_radiation']
+        : 'W/m2';
+
+    return $unit !== '' ? $unit : 'W/m2';
 }
 
 function buildUsageMedianProfile(?array $whPerHour, string $todayDate, int $targetLookbackDays, int $baseWh, float $efficiency): array
