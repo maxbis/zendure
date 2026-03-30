@@ -252,8 +252,10 @@ if ($isApi) {
                 <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
             </div>
         </div>
-        <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>
-        <div id="status" class="status"></div>
+        <div class="file-row">
+            <div id="status" class="status"></div>
+            <p class="muted">File: <code>main/data/charge_schedule_conditions.json</code></p>
+        </div>
         <input id="import-json-input" type="file" accept=".json,application/json" hidden>
     </section>
 
@@ -282,13 +284,12 @@ if ($isApi) {
         <section class="card">
             <h2 id="editor-title">Rule Editor</h2>
             <form id="rule-form" novalidate>
-                <div class="row">
-                    <label for="inp-name">Name</label>
-                    <input id="inp-name" type="text" placeholder="Rule name" required>
-                </div>
-
-                <div class="row split">
-                    <div>
+                <div class="editor-top-grid">
+                    <div class="editor-grid-item editor-grid-name">
+                        <label for="inp-name">Name</label>
+                        <input id="inp-name" type="text" placeholder="Rule name" required>
+                    </div>
+                    <div class="editor-grid-item editor-grid-mode">
                         <label for="inp-value-mode">Value Mode</label>
                         <select id="inp-value-mode" class="value-mode-select">
                             <option value="fixed">Fixed</option>
@@ -296,60 +297,84 @@ if ($isApi) {
                             <option value="netzero+">netzero+</option>
                         </select>
                     </div>
-                    <div>
+                    <div class="editor-grid-item editor-grid-fixed">
                         <label for="inp-fixed-value">Fixed Value (W)</label>
                         <input id="inp-fixed-value" type="number" step="1" placeholder="500">
                     </div>
-                </div>
 
-                <div class="row split">
-                    <div>
-                        <label for="inp-month">Month (optional)</label>
+                    <div class="editor-grid-item editor-grid-month">
+                        <label for="inp-month">Month</label>
                         <input id="inp-month" type="text" placeholder="10,11,12,1,2,3">
                     </div>
-                    <div>
-                        <label for="inp-hour">Hour (optional)</label>
+                    <div class="editor-grid-item editor-grid-hour">
+                        <label for="inp-hour">Hour</label>
                         <input id="inp-hour" type="text" placeholder="1,2,17,18">
                     </div>
-                </div>
-
-                <div class="row split">
-                    <div>
-                        <label for="inp-min-time">Min Time (optional)</label>
+                    <div class="editor-grid-item editor-grid-min-time">
+                        <label for="inp-min-time">Min Time</label>
                         <input id="inp-min-time" type="text" placeholder="10">
                     </div>
-                    <div>
-                        <label for="inp-max-time">Max Time (optional)</label>
+                    <div class="editor-grid-item editor-grid-max-time">
+                        <label for="inp-max-time">Max Time</label>
                         <input id="inp-max-time" type="text" placeholder="11">
                     </div>
                 </div>
 
-                <div class="row split">
-                    <div>
-                        <label for="inp-min-value">Min Power (optional)</label>
-                        <input id="inp-min-value" type="number" step="100" placeholder="None">
+                <div id="limits-row" class="row" hidden>
+                    <div class="limits-heading-row">
+                        <label>Power Limits</label>
+                        <div class="limits-toggle" role="radiogroup" aria-label="Power limits enabled">
+                            <label class="limits-toggle-option">
+                                <input id="limits-off" type="radio" name="limits-enabled" value="off" checked>
+                                <span>Off</span>
+                            </label>
+                            <label class="limits-toggle-option">
+                                <input id="limits-on" type="radio" name="limits-enabled" value="on">
+                                <span>On</span>
+                            </label>
+                        </div>
                     </div>
-                    <div>
-                        <label for="inp-max-value">Max Power (optional)</label>
-                        <input id="inp-max-value" type="number" step="100" placeholder="None">
+                    <div id="limits-slider-panel" class="limits-slider-panel" hidden>
+                        <input id="inp-min-value" type="hidden">
+                        <input id="inp-max-value" type="hidden">
+                        <div class="limits-value-row">
+                            <div class="limits-value-chip limits-value-chip-min">
+                                <span class="limits-value-label">Min</span>
+                                <strong id="limits-min-display">-1200 W</strong>
+                            </div>
+                            <div class="limits-value-chip limits-value-chip-max">
+                                <span class="limits-value-label">Max</span>
+                                <strong id="limits-max-display">1200 W</strong>
+                            </div>
+                        </div>
+                        <div id="limits-slider" class="limits-slider">
+                            <div class="limits-slider-track"></div>
+                            <div id="limits-selected-range" class="limits-selected-range"></div>
+                            <input id="limits-min-range" class="limits-range limits-range-min" type="range" min="-1200" max="1200" step="100" value="-1200" aria-label="Minimum power limit">
+                            <input id="limits-max-range" class="limits-range limits-range-max" type="range" min="-1200" max="1200" step="100" value="1200" aria-label="Maximum power limit">
+                        </div>
+                        <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                     </div>
-                    <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                 </div>
 
-                <div id="fallback-row" class="row" hidden>
-                    <label for="inp-fallback-value">Fallback Value (optional)</label>
-                    <select id="inp-fallback-value" class="fallback-select">
-                        <option value="">Select fallback value</option>
-                        <option value="netzero">netzero</option>
-                        <option value="netzero+">netzero+</option>
-                        <option value="-800">-800</option>
-                        <option value="-400">-400</option>
-                        <option value="-200">-200</option>
-                        <option value="0">0</option>
-                        <option value="200">200</option>
-                        <option value="400">400</option>
-                        <option value="800">800</option>
-                    </select>
+                <div id="fallback-row" class="editor-top-grid editor-top-grid-fallback" hidden>
+                    <div class="editor-grid-item editor-grid-fallback-label">
+                        <label for="inp-fallback-value">Fallback Value (optional)</label>
+                    </div>
+                    <div class="editor-grid-item editor-grid-fallback-input">
+                        <select id="inp-fallback-value" class="fallback-select">
+                            <option value="">Select fallback value</option>
+                            <option value="netzero">netzero</option>
+                            <option value="netzero+">netzero+</option>
+                            <option value="-800">-800</option>
+                            <option value="-400">-400</option>
+                            <option value="-200">-200</option>
+                            <option value="0">0</option>
+                            <option value="200">200</option>
+                            <option value="400">400</option>
+                            <option value="800">800</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="row">

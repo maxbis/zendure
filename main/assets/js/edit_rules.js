@@ -35,6 +35,16 @@
         inpHour: document.getElementById('inp-hour'),
         inpMinTime: document.getElementById('inp-min-time'),
         inpMaxTime: document.getElementById('inp-max-time'),
+        limitsRow: document.getElementById('limits-row'),
+        limitsOff: document.getElementById('limits-off'),
+        limitsOn: document.getElementById('limits-on'),
+        limitsSliderPanel: document.getElementById('limits-slider-panel'),
+        limitsSlider: document.getElementById('limits-slider'),
+        limitsSelectedRange: document.getElementById('limits-selected-range'),
+        limitsMinRange: document.getElementById('limits-min-range'),
+        limitsMaxRange: document.getElementById('limits-max-range'),
+        limitsMinDisplay: document.getElementById('limits-min-display'),
+        limitsMaxDisplay: document.getElementById('limits-max-display'),
         inpMinValue: document.getElementById('inp-min-value'),
         inpMaxValue: document.getElementById('inp-max-value'),
         fallbackRow: document.getElementById('fallback-row'),
@@ -87,6 +97,9 @@
         'inp-fallback-value',
     ];
     const runtimeOnlyConditionFields = new Set(['electricity_level', 'electric_level', 'electricLevel']);
+    const LIMIT_MIN = -1200;
+    const LIMIT_MAX = 1200;
+    const LIMIT_STEP = 100;
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -197,13 +210,174 @@
         input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
     }
 
+    function snapLimitValue(rawValue) {
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue)) return 0;
+        const snapped = Math.round(numericValue / LIMIT_STEP) * LIMIT_STEP;
+        return Math.min(LIMIT_MAX, Math.max(LIMIT_MIN, snapped));
+    }
+
+    function parseStoredLimitValue(input, fallbackValue) {
+        if (!input) return fallbackValue;
+        const rawValue = String(input.value || '').trim();
+        if (rawValue === '') return fallbackValue;
+        return snapLimitValue(rawValue);
+    }
+
+    function formatLimitValue(value) {
+        const numericValue = snapLimitValue(value);
+        return numericValue > 0 ? ('+' + numericValue + ' W') : (numericValue + ' W');
+    }
+
+    function setLimitHiddenInput(input, value) {
+        if (!input) return;
+        if (value === null || value === undefined || value === '') {
+            input.value = '';
+        } else {
+            input.value = String(snapLimitValue(value));
+        }
+        updateFieldState(input.id);
+        updatePowerInputState(input);
+    }
+
+    function updateLimitsVisuals() {
+        if (!els.limitsSlider || !els.limitsSelectedRange || !els.limitsMinRange || !els.limitsMaxRange) return;
+        const minValue = snapLimitValue(els.limitsMinRange.value);
+        const maxValue = snapLimitValue(els.limitsMaxRange.value);
+        const startPercent = ((minValue - LIMIT_MIN) / (LIMIT_MAX - LIMIT_MIN)) * 100;
+        const endPercent = ((maxValue - LIMIT_MIN) / (LIMIT_MAX - LIMIT_MIN)) * 100;
+        els.limitsSelectedRange.style.left = startPercent + '%';
+        els.limitsSelectedRange.style.width = Math.max(0, endPercent - startPercent) + '%';
+        els.limitsSlider.style.setProperty('--limits-start', startPercent + '%');
+        els.limitsSlider.style.setProperty('--limits-end', endPercent + '%');
+        if (els.limitsMinDisplay) {
+            els.limitsMinDisplay.textContent = formatLimitValue(minValue);
+        }
+        if (els.limitsMaxDisplay) {
+            els.limitsMaxDisplay.textContent = formatLimitValue(maxValue);
+        }
+        updateLimitValueTone(els.limitsMinDisplay, minValue);
+        updateLimitValueTone(els.limitsMaxDisplay, maxValue);
+        updateLimitThumbTone(els.limitsMinRange, minValue);
+        updateLimitThumbTone(els.limitsMaxRange, maxValue);
+    }
+
+    function updateLimitValueTone(element, value) {
+        if (!element) return;
+        element.classList.remove('is-negative', 'is-positive', 'is-neutral');
+        if (value < 0) {
+            element.classList.add('is-negative');
+            return;
+        }
+        if (value > 0) {
+            element.classList.add('is-positive');
+            return;
+        }
+        element.classList.add('is-neutral');
+    }
+
+    function updateLimitThumbTone(input, value) {
+        if (!input) return;
+        input.classList.remove('is-negative', 'is-positive', 'is-neutral');
+        if (value < 0) {
+            input.classList.add('is-negative');
+            return;
+        }
+        if (value > 0) {
+            input.classList.add('is-positive');
+            return;
+        }
+        input.classList.add('is-neutral');
+    }
+
+    function syncLimitsState(options) {
+        const opts = options || {};
+        const modeAllowsLimits = els.inpValueMode.value === 'netzero' || els.inpValueMode.value === 'netzero+';
+        const limitsEnabled = modeAllowsLimits && !!els.limitsOn?.checked;
+
+        if (els.limitsRow) {
+            els.limitsRow.hidden = !modeAllowsLimits;
+        }
+        if (els.limitsSliderPanel) {
+            els.limitsSliderPanel.hidden = !limitsEnabled;
+        }
+        if (els.limitsOff) {
+            els.limitsOff.disabled = !modeAllowsLimits;
+        }
+        if (els.limitsOn) {
+            els.limitsOn.disabled = !modeAllowsLimits;
+        }
+        if (els.limitsMinRange) {
+            els.limitsMinRange.disabled = !limitsEnabled;
+        }
+        if (els.limitsMaxRange) {
+            els.limitsMaxRange.disabled = !limitsEnabled;
+        }
+
+        let minValue = els.limitsMinRange ? snapLimitValue(els.limitsMinRange.value) : parseStoredLimitValue(els.inpMinValue, LIMIT_MIN);
+        let maxValue = els.limitsMaxRange ? snapLimitValue(els.limitsMaxRange.value) : parseStoredLimitValue(els.inpMaxValue, LIMIT_MAX);
+
+        if (opts.resetToDefaults) {
+            minValue = LIMIT_MIN;
+            maxValue = LIMIT_MAX;
+        }
+
+        if (limitsEnabled) {
+            minValue = snapLimitValue(els.limitsMinRange ? els.limitsMinRange.value : minValue);
+            maxValue = snapLimitValue(els.limitsMaxRange ? els.limitsMaxRange.value : maxValue);
+            if (minValue > maxValue) {
+                if (opts.activeThumb === 'min') {
+                    maxValue = minValue;
+                } else {
+                    minValue = maxValue;
+                }
+            }
+            if (els.limitsMinRange) {
+                els.limitsMinRange.value = String(minValue);
+            }
+            if (els.limitsMaxRange) {
+                els.limitsMaxRange.value = String(maxValue);
+            }
+            setLimitHiddenInput(els.inpMinValue, minValue);
+            setLimitHiddenInput(els.inpMaxValue, maxValue);
+        } else {
+            if (opts.resetToDefaults) {
+                if (els.limitsMinRange) {
+                    els.limitsMinRange.value = String(LIMIT_MIN);
+                }
+                if (els.limitsMaxRange) {
+                    els.limitsMaxRange.value = String(LIMIT_MAX);
+                }
+            } else {
+                if (els.limitsMinRange) {
+                    els.limitsMinRange.value = String(minValue);
+                }
+                if (els.limitsMaxRange) {
+                    els.limitsMaxRange.value = String(maxValue);
+                }
+            }
+            setLimitHiddenInput(els.inpMinValue, null);
+            setLimitHiddenInput(els.inpMaxValue, null);
+        }
+
+        if (els.inpMinValue) {
+            els.inpMinValue.disabled = !limitsEnabled;
+        }
+        if (els.inpMaxValue) {
+            els.inpMaxValue.disabled = !limitsEnabled;
+        }
+
+        updateLimitsVisuals();
+        updatePowerRangeIndicator();
+    }
+
     function updatePowerRangeIndicator() {
         if (!els.powerRangeIndicator) return;
 
         const indicator = els.powerRangeIndicator;
         const minRaw = String(els.inpMinValue?.value || '').trim();
         const maxRaw = String(els.inpMaxValue?.value || '').trim();
-        const enabled = !els.inpMinValue.disabled && !els.inpMaxValue.disabled;
+        const enabled = !els.inpMinValue.disabled && !els.inpMaxValue.disabled && !!els.limitsOn?.checked;
 
         indicator.hidden = true;
         indicator.textContent = '';
@@ -530,15 +704,17 @@
         els.inpMaxTime.value = '';
         els.inpMinValue.value = '';
         els.inpMaxValue.value = '';
+        if (els.limitsOff) els.limitsOff.checked = true;
+        if (els.limitsOn) els.limitsOn.checked = false;
+        if (els.limitsMinRange) els.limitsMinRange.value = String(LIMIT_MIN);
+        if (els.limitsMaxRange) els.limitsMaxRange.value = String(LIMIT_MAX);
         els.inpFallbackValue.value = '';
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
-        els.inpMinValue.disabled = true;
-        els.inpMaxValue.disabled = true;
         els.conditionsList.innerHTML = '';
         updateFallbackVisibility();
+        syncLimitsState({ resetToDefaults: true });
         updateAllFieldStates();
-        updatePowerRangeIndicator();
         renderTable();
     }
 
@@ -550,19 +726,12 @@
 
     function updateValueModeFields() {
         const isFixed = els.inpValueMode.value === 'fixed';
-        const allowBounds = !isFixed;
         els.inpFixedValue.disabled = !isFixed;
         if (!isFixed) {
             els.inpFixedValue.value = '';
         }
-        els.inpMinValue.disabled = !allowBounds;
-        els.inpMaxValue.disabled = !allowBounds;
-        if (!allowBounds) {
-            els.inpMinValue.value = '';
-            els.inpMaxValue.value = '';
-        }
+        syncLimitsState();
         updateAllFieldStates();
-        updatePowerRangeIndicator();
     }
 
     function fillEditor(rule, idx) {
@@ -583,8 +752,17 @@
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
+        const hasLimits = (rule.min_power !== undefined && rule.min_power !== null) || (rule.max_power !== undefined && rule.max_power !== null);
         els.inpMinValue.value = rule.min_power !== undefined && rule.min_power !== null ? String(rule.min_power) : '';
         els.inpMaxValue.value = rule.max_power !== undefined && rule.max_power !== null ? String(rule.max_power) : '';
+        if (els.limitsOff) els.limitsOff.checked = !hasLimits;
+        if (els.limitsOn) els.limitsOn.checked = hasLimits;
+        if (els.limitsMinRange) {
+            els.limitsMinRange.value = String(rule.min_power !== undefined && rule.min_power !== null ? snapLimitValue(rule.min_power) : LIMIT_MIN);
+        }
+        if (els.limitsMaxRange) {
+            els.limitsMaxRange.value = String(rule.max_power !== undefined && rule.max_power !== null ? snapLimitValue(rule.max_power) : LIMIT_MAX);
+        }
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
         els.conditionsList.innerHTML = '';
@@ -593,7 +771,6 @@
         });
         updateFallbackVisibility();
         updateAllFieldStates();
-        updatePowerRangeIndicator();
         renderTable();
     }
 
@@ -679,20 +856,15 @@
         if (maxTime) rule.max_time = maxTime;
 
         if (mode === 'netzero' || mode === 'netzero+') {
-            const minValue = els.inpMinValue.value.trim();
-            const maxValue = els.inpMaxValue.value.trim();
             rule.min_power = null;
             rule.max_power = null;
-            if (minValue) {
-                if (!/^-?\d+$/.test(minValue)) {
-                    throw new Error('Min power must be an integer.');
+            if (els.limitsOn && els.limitsOn.checked) {
+                const minValue = els.inpMinValue.value.trim();
+                const maxValue = els.inpMaxValue.value.trim();
+                if (!/^-?\d+$/.test(minValue) || !/^-?\d+$/.test(maxValue)) {
+                    throw new Error('Power limits must be valid integers.');
                 }
                 rule.min_power = parseInt(minValue, 10);
-            }
-            if (maxValue) {
-                if (!/^-?\d+$/.test(maxValue)) {
-                    throw new Error('Max power must be an integer.');
-                }
                 rule.max_power = parseInt(maxValue, 10);
             }
             if (
@@ -970,6 +1142,34 @@
             updateValueModeTone();
         });
 
+        if (els.limitsOff) {
+            els.limitsOff.addEventListener('change', function () {
+                syncLimitsState();
+            });
+        }
+
+        if (els.limitsOn) {
+            els.limitsOn.addEventListener('change', function () {
+                syncLimitsState();
+            });
+        }
+
+        if (els.limitsMinRange) {
+            const syncMinRange = function () {
+                syncLimitsState({ activeThumb: 'min' });
+            };
+            els.limitsMinRange.addEventListener('input', syncMinRange);
+            els.limitsMinRange.addEventListener('change', syncMinRange);
+        }
+
+        if (els.limitsMaxRange) {
+            const syncMaxRange = function () {
+                syncLimitsState({ activeThumb: 'max' });
+            };
+            els.limitsMaxRange.addEventListener('input', syncMaxRange);
+            els.limitsMaxRange.addEventListener('change', syncMaxRange);
+        }
+
         els.inpFallbackValue.addEventListener('change', function () {
             updateFallbackTone();
         });
@@ -1142,6 +1342,7 @@
     updateValueModeFields();
     updateValueModeTone();
     updateFallbackTone();
+    syncLimitsState({ resetToDefaults: true });
     updateAllFieldStates();
     loadRules();
 })();

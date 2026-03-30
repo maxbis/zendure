@@ -186,6 +186,40 @@ button {
     background: rgba(153, 27, 27, 0.24);
 }
 
+.limits-slider-panel .power-range-indicator {
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.limits-slider-panel .power-range-indicator.is-charge {
+    border-color: rgba(127, 215, 127, 0.28);
+    background: rgba(127, 215, 127, 0.06);
+}
+
+.limits-slider-panel .power-range-indicator.is-discharge {
+    border-color: rgba(255, 139, 139, 0.28);
+    background: rgba(255, 139, 139, 0.06);
+}
+
+.limits-slider-panel .power-range-indicator.is-bidirectional {
+    border-color: rgba(142, 197, 255, 0.28);
+    background: rgba(142, 197, 255, 0.06);
+}
+
+.limits-slider-panel .power-range-indicator.is-partial {
+    border-color: rgba(244, 217, 139, 0.28);
+    background: rgba(244, 217, 139, 0.06);
+}
+
+.limits-slider-panel .power-range-indicator.is-invalid {
+    border-color: rgba(255, 139, 139, 0.34);
+    background: rgba(153, 27, 27, 0.18);
+}
+
 .btn-link {
     display: inline-flex;
     align-items: center;
@@ -224,9 +258,13 @@ button:hover {
 
 .file-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto 1fr;
     align-items: center;
     gap: 8px;
+}
+
+.file-row .muted {
+    margin: 0;
 }
 
 .file-label {
@@ -244,7 +282,7 @@ button:hover {
 
 .status {
     min-height: 0;
-    margin-top: 4px;
+    margin-top: 0;
     border-radius: 8px;
     padding: 6px 10px;
     width: fit-content;
@@ -529,9 +567,271 @@ form {
     grid-template-columns: 1fr 1fr;
 }
 
+.editor-top-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.editor-grid-item {
+    min-width: 0;
+}
+
+.editor-grid-name {
+    grid-column: 1 / span 2;
+}
+
+.editor-grid-mode {
+    grid-column: 3;
+}
+
+.editor-grid-fixed {
+    grid-column: 4;
+}
+
+.editor-grid-month {
+    grid-column: 1;
+}
+
+.editor-grid-hour {
+    grid-column: 2;
+}
+
+.editor-grid-min-time {
+    grid-column: 3;
+}
+
+.editor-grid-max-time {
+    grid-column: 4;
+}
+
+.editor-top-grid-fallback {
+    align-items: start;
+}
+
+.editor-grid-fallback-label {
+    grid-column: 1 / span 2;
+}
+
+.editor-grid-fallback-label > label {
+    margin-bottom: 0;
+}
+
+.editor-grid-fallback-input {
+    grid-column: 3;
+}
+
 .row.split .power-range-indicator {
     grid-column: 1 / -1;
     margin-top: 2px;
+}
+
+.limits-heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.limits-heading-row > label {
+    margin-bottom: 0;
+}
+
+.limits-toggle {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.limits-toggle-option {
+    margin: 0;
+}
+
+.limits-toggle-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.limits-toggle-option span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    min-height: 26px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.limits-toggle-option input:checked + span {
+    background: color-mix(in srgb, var(--primary) 30%, #0b1324);
+    color: #ffffff;
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24);
+}
+
+.limits-toggle-option input:disabled + span {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.limits-slider-panel {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.limits-value-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.limits-value-chip {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #0b1324;
+}
+
+.limits-value-chip strong.is-negative {
+    color: #ff8b8b;
+}
+
+.limits-value-chip strong.is-positive {
+    color: #86efac;
+}
+
+.limits-value-chip strong.is-neutral {
+    color: var(--text);
+}
+
+.limits-value-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.limits-value-chip strong {
+    white-space: nowrap;
+}
+
+.limits-slider {
+    position: relative;
+    height: 34px;
+}
+
+.limits-slider-track,
+.limits-selected-range {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 8px;
+    border-radius: 999px;
+}
+
+.limits-slider-track {
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.limits-selected-range {
+    background: linear-gradient(90deg, rgba(255, 139, 139, 0.95), rgba(142, 197, 255, 0.9) 50%, rgba(127, 215, 127, 0.95));
+    box-shadow: 0 0 0 1px rgba(142, 197, 255, 0.16);
+}
+
+.limits-range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.limits-range::-webkit-slider-runnable-track {
+    height: 34px;
+    background: transparent;
+}
+
+.limits-range::-moz-range-track {
+    height: 34px;
+    background: transparent;
+}
+
+.limits-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 7px;
+    border-radius: 50%;
+    border: 2px solid #e5e7eb;
+    background: #0b1324;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.65);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+
+.limits-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #e5e7eb;
+    background: #0b1324;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.65);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+
+.limits-range.is-negative::-webkit-slider-thumb {
+    border-color: #ff8b8b;
+}
+
+.limits-range.is-positive::-webkit-slider-thumb {
+    border-color: #86efac;
+}
+
+.limits-range.is-neutral::-webkit-slider-thumb {
+    border-color: #d1d5db;
+}
+
+.limits-range.is-negative::-moz-range-thumb {
+    border-color: #ff8b8b;
+}
+
+.limits-range.is-positive::-moz-range-thumb {
+    border-color: #86efac;
+}
+
+.limits-range.is-neutral::-moz-range-thumb {
+    border-color: #d1d5db;
+}
+
+.limits-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 0.82rem;
 }
 
 .conditions-header {
@@ -607,6 +907,42 @@ button.danger.condition-remove-btn:hover {
     .condition-row {
         grid-template-columns: 1fr;
     }
+    .editor-top-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .editor-top-grid-fallback {
+        grid-template-columns: 1fr 1fr;
+    }
+    .editor-grid-name,
+    .editor-grid-fallback-label {
+        grid-column: 1 / -1;
+    }
+    .editor-grid-mode {
+        grid-column: 1;
+    }
+    .editor-grid-fixed {
+        grid-column: 2;
+    }
+    .editor-grid-month {
+        grid-column: 1;
+    }
+    .editor-grid-hour {
+        grid-column: 2;
+    }
+    .editor-grid-min-time {
+        grid-column: 1;
+    }
+    .editor-grid-max-time {
+        grid-column: 2;
+    }
+    .editor-grid-fallback-input {
+        grid-column: 1 / -1;
+    }
+    .limits-heading-row,
+    .limits-value-row {
+        grid-template-columns: 1fr;
+        display: grid;
+    }
 }
 
 @media (max-width: 760px) {
@@ -642,6 +978,21 @@ button.danger.condition-remove-btn:hover {
         grid-column: 1 / -1;
     }
 
+    .editor-top-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .editor-grid-name,
+    .editor-grid-mode,
+    .editor-grid-fixed,
+    .editor-grid-month,
+    .editor-grid-hour,
+    .editor-grid-min-time,
+    .editor-grid-max-time,
+    .editor-grid-fallback-label,
+    .editor-grid-fallback-input {
+        grid-column: auto;
+    }
     h1 {
         font-size: 1.7rem;
     }
