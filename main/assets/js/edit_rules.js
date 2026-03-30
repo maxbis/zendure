@@ -730,6 +730,7 @@
         if (!isFixed) {
             els.inpFixedValue.value = '';
         }
+        updateValueModeTone();
         syncLimitsState();
         updateAllFieldStates();
     }

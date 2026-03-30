@@ -520,16 +520,19 @@ select.is-field-filled {
 
 .value-mode-select.value-mode-fixed {
     color: var(--fallback-neutral);
+    -webkit-text-fill-color: var(--fallback-neutral);
 }
 
 .value-mode-select.value-mode-netzero {
     color: var(--fallback-netzero);
+    -webkit-text-fill-color: var(--fallback-netzero);
     border-color: rgba(244, 217, 139, 0.45);
     box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
 }
 
 .value-mode-select.value-mode-netzero-plus {
     color: var(--fallback-positive);
+    -webkit-text-fill-color: var(--fallback-positive);
     border-color: rgba(127, 215, 127, 0.45);
     box-shadow: 0 0 0 1px rgba(127, 215, 127, 0.18);
 }
