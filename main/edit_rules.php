@@ -290,7 +290,7 @@ if ($isApi) {
                 <div class="row split">
                     <div>
                         <label for="inp-value-mode">Value Mode</label>
-                        <select id="inp-value-mode">
+                        <select id="inp-value-mode" class="value-mode-select">
                             <option value="fixed">Fixed</option>
                             <option value="netzero">netzero</option>
                             <option value="netzero+">netzero+</option>
@@ -336,9 +336,20 @@ if ($isApi) {
                     <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                 </div>
 
-                <div class="row">
+                <div id="fallback-row" class="row" hidden>
                     <label for="inp-fallback-value">Fallback Value (optional)</label>
-                    <input id="inp-fallback-value" type="text" placeholder="0, netzero, netzero+">
+                    <select id="inp-fallback-value" class="fallback-select">
+                        <option value="">Select fallback value</option>
+                        <option value="netzero">netzero</option>
+                        <option value="netzero+">netzero+</option>
+                        <option value="-800">-800</option>
+                        <option value="-400">-400</option>
+                        <option value="-200">-200</option>
+                        <option value="0">0</option>
+                        <option value="200">200</option>
+                        <option value="400">400</option>
+                        <option value="800">800</option>
+                    </select>
                 </div>
 
                 <div class="row">

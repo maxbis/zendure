@@ -7,10 +7,19 @@
     --primary: #2563eb;
     --ok: #166534;
     --error: #991b1b;
+    --fallback-netzero: #f4d98b;
+    --fallback-netzero-plus: #7fd77f;
+    --fallback-negative: #ff8b8b;
+    --fallback-positive: #86efac;
+    --fallback-neutral: #d1d5db;
 }
 
 * {
     box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
 }
 
 body {
@@ -116,20 +125,25 @@ button {
     cursor: pointer;
 }
 
+#inp-fixed-value,
 #inp-min-value,
 #inp-max-value {
     font-weight: 700;
 }
 
+#inp-fixed-value.is-charging,
 #inp-min-value.is-charging,
 #inp-max-value.is-charging {
     color: #7fd77f;
+    -webkit-text-fill-color: #7fd77f;
     font-weight: 700;
 }
 
+#inp-fixed-value.is-discharging,
 #inp-min-value.is-discharging,
 #inp-max-value.is-discharging {
     color: #ff8b8b;
+    -webkit-text-fill-color: #ff8b8b;
     font-weight: 700;
 }
 
@@ -416,6 +430,83 @@ select.is-field-filled {
     border-color: #60a5fa;
     box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.22);
     background: color-mix(in srgb, #0b1324 86%, #10203b);
+}
+
+.fallback-select.fallback-neutral {
+    color: var(--fallback-neutral);
+}
+
+.fallback-select.fallback-netzero {
+    color: var(--fallback-netzero);
+    border-color: rgba(244, 217, 139, 0.45);
+    box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
+}
+
+.fallback-select.fallback-netzero-plus,
+.fallback-select.fallback-positive {
+    color: var(--fallback-positive);
+    border-color: rgba(127, 215, 127, 0.45);
+    box-shadow: 0 0 0 1px rgba(127, 215, 127, 0.18);
+}
+
+.fallback-select.fallback-negative {
+    color: var(--fallback-negative);
+    border-color: rgba(255, 139, 139, 0.45);
+    box-shadow: 0 0 0 1px rgba(255, 139, 139, 0.18);
+}
+
+.fallback-select option {
+    background: #0b1324;
+    color: var(--fallback-neutral);
+}
+
+.fallback-select option[value="netzero"] {
+    color: var(--fallback-netzero);
+}
+
+.fallback-select option[value="netzero+"] {
+    color: var(--fallback-netzero-plus);
+}
+
+.fallback-select option[value="-800"],
+.fallback-select option[value="-400"],
+.fallback-select option[value="-200"] {
+    color: var(--fallback-negative);
+}
+
+.fallback-select option[value="200"],
+.fallback-select option[value="400"],
+.fallback-select option[value="800"] {
+    color: var(--fallback-positive);
+}
+
+.value-mode-select.value-mode-fixed {
+    color: var(--fallback-neutral);
+}
+
+.value-mode-select.value-mode-netzero {
+    color: var(--fallback-netzero);
+    border-color: rgba(244, 217, 139, 0.45);
+    box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
+}
+
+.value-mode-select.value-mode-netzero-plus {
+    color: var(--fallback-positive);
+    border-color: rgba(127, 215, 127, 0.45);
+    box-shadow: 0 0 0 1px rgba(127, 215, 127, 0.18);
+}
+
+.value-mode-select option {
+    background: #0b1324;
+    color: var(--fallback-neutral);
+}
+
+.value-mode-select option[value="netzero"] {
+    color: var(--fallback-netzero);
+}
+
+.value-mode-select option[value="netzero+"] {
+    color: var(--fallback-positive);
 }
 
 label.is-optional-filled {

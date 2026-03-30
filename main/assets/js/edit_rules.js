@@ -37,6 +37,7 @@
         inpMaxTime: document.getElementById('inp-max-time'),
         inpMinValue: document.getElementById('inp-min-value'),
         inpMaxValue: document.getElementById('inp-max-value'),
+        fallbackRow: document.getElementById('fallback-row'),
         inpFallbackValue: document.getElementById('inp-fallback-value'),
         powerRangeIndicator: document.getElementById('power-range-indicator'),
         conditionsList: document.getElementById('conditions-list'),
@@ -62,7 +63,7 @@
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
         'inp-min-value': 'Optional signed minimum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
         'inp-max-value': 'Optional signed maximum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
-        'inp-fallback-value': 'Optional value when runtime conditions fail: number, netzero, or netzero+.',
+        'inp-fallback-value': 'Optional value when runtime conditions fail.',
     };
     const trackedFieldIds = [
         'inp-name',
@@ -85,6 +86,7 @@
         'inp-max-value',
         'inp-fallback-value',
     ];
+    const runtimeOnlyConditionFields = new Set(['electricity_level', 'electric_level', 'electricLevel']);
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -175,6 +177,7 @@
 
     function updateAllFieldStates() {
         trackedFieldIds.forEach(updateFieldState);
+        updatePowerInputState(els.inpFixedValue);
         updatePowerInputState(els.inpMinValue);
         updatePowerInputState(els.inpMaxValue);
         updatePowerRangeIndicator();
@@ -298,6 +301,75 @@
 
         indicator.textContent = `Bidirectional range: ${minValue} to ${maxValue} W`;
         indicator.classList.add('is-bidirectional');
+    }
+
+    function hasRuntimeConditionRows() {
+        const rows = Array.from(els.conditionsList.querySelectorAll('.condition-row'));
+        return rows.some(function (row) {
+            const fieldSel = row.querySelector('select');
+            return fieldSel && runtimeOnlyConditionFields.has(fieldSel.value);
+        });
+    }
+
+    function updateFallbackVisibility() {
+        if (!els.fallbackRow || !els.inpFallbackValue) return;
+        const shouldShow = hasRuntimeConditionRows();
+        els.fallbackRow.hidden = !shouldShow;
+        els.inpFallbackValue.disabled = !shouldShow;
+        if (!shouldShow) {
+            els.inpFallbackValue.value = '';
+        }
+        updateFallbackTone();
+        updateFieldState('inp-fallback-value');
+    }
+
+    function updateFallbackTone() {
+        if (!els.inpFallbackValue) return;
+        const value = String(els.inpFallbackValue.value || '');
+        els.inpFallbackValue.classList.remove(
+            'fallback-neutral',
+            'fallback-netzero',
+            'fallback-netzero-plus',
+            'fallback-negative',
+            'fallback-positive'
+        );
+
+        if (value === '') {
+            els.inpFallbackValue.classList.add('fallback-neutral');
+            return;
+        }
+        if (value === 'netzero') {
+            els.inpFallbackValue.classList.add('fallback-netzero');
+            return;
+        }
+        if (value === 'netzero+') {
+            els.inpFallbackValue.classList.add('fallback-netzero-plus');
+            return;
+        }
+
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue) || numericValue === 0) {
+            els.inpFallbackValue.classList.add('fallback-neutral');
+            return;
+        }
+
+        els.inpFallbackValue.classList.add(numericValue < 0 ? 'fallback-negative' : 'fallback-positive');
+    }
+
+    function updateValueModeTone() {
+        if (!els.inpValueMode) return;
+        const value = String(els.inpValueMode.value || '');
+        els.inpValueMode.classList.remove('value-mode-fixed', 'value-mode-netzero', 'value-mode-netzero-plus');
+
+        if (value === 'netzero') {
+            els.inpValueMode.classList.add('value-mode-netzero');
+            return;
+        }
+        if (value === 'netzero+') {
+            els.inpValueMode.classList.add('value-mode-netzero-plus');
+            return;
+        }
+        els.inpValueMode.classList.add('value-mode-fixed');
     }
 
     function renderTable() {
@@ -432,6 +504,11 @@
         delBtn.title = 'Remove this condition row.';
         delBtn.addEventListener('click', function () {
             row.remove();
+            updateFallbackVisibility();
+        });
+
+        fieldSel.addEventListener('change', function () {
+            updateFallbackVisibility();
         });
 
         row.appendChild(fieldSel);
@@ -459,6 +536,7 @@
         els.inpMinValue.disabled = true;
         els.inpMaxValue.disabled = true;
         els.conditionsList.innerHTML = '';
+        updateFallbackVisibility();
         updateAllFieldStates();
         updatePowerRangeIndicator();
         renderTable();
@@ -509,13 +587,13 @@
         els.inpMaxValue.value = rule.max_power !== undefined && rule.max_power !== null ? String(rule.max_power) : '';
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
-        updateAllFieldStates();
-        updatePowerRangeIndicator();
-
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
             els.conditionsList.appendChild(createConditionRow(condition));
         });
+        updateFallbackVisibility();
+        updateAllFieldStates();
+        updatePowerRangeIndicator();
         renderTable();
     }
 
@@ -633,7 +711,7 @@
             } else {
                 const fallbackNumber = Number(fallbackRaw);
                 if (!Number.isFinite(fallbackNumber)) {
-                    throw new Error('Fallback value must be numeric, netzero, or netzero+.');
+                    throw new Error('Fallback value must be one of the allowed dropdown values.');
                 }
                 rule.fallback_value = Math.trunc(fallbackNumber);
             }
@@ -889,6 +967,11 @@
 
         els.inpValueMode.addEventListener('change', function () {
             updateValueModeFields();
+            updateValueModeTone();
+        });
+
+        els.inpFallbackValue.addEventListener('change', function () {
+            updateFallbackTone();
         });
 
         trackedFieldIds.forEach(function (inputId) {
@@ -896,14 +979,24 @@
             if (!input) return;
             input.addEventListener('input', function () {
                 updateFieldState(inputId);
-                if (inputId === 'inp-min-value' || inputId === 'inp-max-value' || inputId === 'inp-value-mode') {
+                if (
+                    inputId === 'inp-fixed-value' ||
+                    inputId === 'inp-min-value' ||
+                    inputId === 'inp-max-value' ||
+                    inputId === 'inp-value-mode'
+                ) {
                     updatePowerInputState(input);
                     updatePowerRangeIndicator();
                 }
             });
             input.addEventListener('change', function () {
                 updateFieldState(inputId);
-                if (inputId === 'inp-min-value' || inputId === 'inp-max-value' || inputId === 'inp-value-mode') {
+                if (
+                    inputId === 'inp-fixed-value' ||
+                    inputId === 'inp-min-value' ||
+                    inputId === 'inp-max-value' ||
+                    inputId === 'inp-value-mode'
+                ) {
                     updatePowerInputState(input);
                     updatePowerRangeIndicator();
                 }
@@ -912,6 +1005,7 @@
 
         els.btnAddCondition.addEventListener('click', function () {
             els.conditionsList.appendChild(createConditionRow());
+            updateFallbackVisibility();
         });
 
         els.btnCancel.addEventListener('click', function () {
@@ -1046,6 +1140,8 @@
 
     attachEvents();
     updateValueModeFields();
+    updateValueModeTone();
+    updateFallbackTone();
     updateAllFieldStates();
     loadRules();
 })();
