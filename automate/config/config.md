@@ -42,6 +42,8 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 |-----|------|-------------|------------|
 | **MIN_CHARGE_LEVEL** | number | Minimum state-of-charge (%), 0–100. Below this, discharge is prevented. | `device_controller.py`: `BaseDeviceController` (`min_charge_level`). Used in `automate_www.py` when deciding charge/discharge limits. |
 | **MAX_CHARGE_LEVEL** | number | Maximum state-of-charge (%), 0–100. Above this, charge is prevented. | Same as `MIN_CHARGE_LEVEL`. |
+| **SLOW_CHARGE_START_LEVEL** | number | Optional SoC threshold (%), 0–100, where dynamic charging starts being capped near full battery. Only applies to dynamic modes (`netzero`, `netzero+`). | `device_controller.py`: `BaseDeviceController` (`slow_charge_start_level`), applied in `_calculate_new_settings()`. |
+| **SLOW_CHARGE_MAX_POWER** | number | Optional maximum dynamic charge power (W) once `SLOW_CHARGE_START_LEVEL` is reached. Disabled unless both slow-charge keys are present and valid. Explicit fixed power commands are not affected. | `device_controller.py`: `BaseDeviceController` (`slow_charge_max_power`), applied in `_calculate_new_settings()`. |
 
 ---
 

@@ -145,22 +145,26 @@ For dynamic modes, the effective precedence is:
 3. Apply battery-level guards inside `_calculate_new_settings()`
    - block charging when the battery is too full
    - block discharging when the battery is too empty
-4. Clamp the dynamic desired feed to `MAX_CHARGE_POWER` / `MAX_DISCHARGE_POWER`
-5. Apply the minimum absolute threshold and minimum delta threshold
-6. Convert the result back into `new_input` / `new_output`
-7. Convert `new_input` / `new_output` into `raw_target_power` for `netzero` or `netzero+`
-8. Apply signed schedule bounds from `min_power` / `max_power`, producing `bounded_target`
-9. Compare `previous_power` against `bounded_target`
-10. If the bounded target crosses sign, `ReversalRampGuard` ramps toward zero, producing `final_target`
-11. Apply `power_feed_max_delta` step limiting against `previous_power`
-12. In `_send_power_feed()`, apply battery limit-state safety again
+4. Apply the near-full dynamic charge taper
+   - if `electricLevel >= SLOW_CHARGE_START_LEVEL`
+   - and the dynamic result implies charging
+   - cap charging to `SLOW_CHARGE_MAX_POWER`
+5. Clamp the dynamic desired feed to `MAX_CHARGE_POWER` / `MAX_DISCHARGE_POWER`
+6. Apply the minimum absolute threshold and minimum delta threshold
+7. Convert the result back into `new_input` / `new_output`
+8. Convert `new_input` / `new_output` into `raw_target_power` for `netzero` or `netzero+`
+9. Apply signed schedule bounds from `min_power` / `max_power`, producing `bounded_target`
+10. Compare `previous_power` against `bounded_target`
+11. If the bounded target crosses sign, `ReversalRampGuard` ramps toward zero, producing `final_target`
+12. Apply `power_feed_max_delta` step limiting against `previous_power`
+13. In `_send_power_feed()`, apply battery limit-state safety again
    - block charge if `limit_state == 1`
    - block discharge if `limit_state == -1`
-13. Apply hard config caps again
+14. Apply hard config caps again
    - clamp below `-MAX_DISCHARGE_POWER`
    - clamp above `+MAX_CHARGE_POWER`
-14. Skip sending if the final value equals `previous_power`
-15. Send to the device and only then update `previous_power`
+15. Skip sending if the final value equals `previous_power`
+16. Send to the device and only then update `previous_power`
 
 `MAX_DISCHARGE_POWER` and `MAX_CHARGE_POWER` are therefore checked twice:
 

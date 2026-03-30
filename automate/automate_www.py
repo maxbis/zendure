@@ -2379,6 +2379,17 @@ class AutomationApp:
             f"   Power caps: MAX_DISCHARGE_POWER={self.controller.max_discharge_power} W, "
             f"MAX_CHARGE_POWER={self.controller.max_charge_power} W"
         )
+        if (
+            getattr(self.controller, "slow_charge_start_level", None) is not None
+            and getattr(self.controller, "slow_charge_max_power", None) is not None
+        ):
+            self.logger.info(
+                "   Dynamic slow-charge taper: "
+                f"SLOW_CHARGE_START_LEVEL={self.controller.slow_charge_start_level}%, "
+                f"SLOW_CHARGE_MAX_POWER={self.controller.slow_charge_max_power} W"
+            )
+        else:
+            self.logger.info("   Dynamic slow-charge taper: disabled")
         # Show test mode prominently on startup (controlled via config.jsonc key: TEST_MODE).
         if getattr(self.controller, "test_mode", False):
             self.logger.warning(

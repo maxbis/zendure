@@ -438,6 +438,8 @@ def _make_minimal_automate_controller(device_controller_module, *, netzero_bi_di
     controller.max_charge_level = 96
     controller.max_discharge_power = 800
     controller.max_charge_power = 1200
+    controller.slow_charge_start_level = None
+    controller.slow_charge_max_power = None
     controller.device_ip = "127.0.0.1"
     controller.device_sn = "TEST-SN"
     controller.accumulator = SimpleNamespace(last_zendure_data=None)
@@ -457,6 +459,12 @@ def _make_minimal_automate_controller(device_controller_module, *, netzero_bi_di
         controller, device_controller_module.AutomateController
     )
     controller._get_dynamic_power_context = device_controller_module.AutomateController._get_dynamic_power_context.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._calculate_new_settings = device_controller_module.AutomateController._calculate_new_settings.__get__(
+        controller, device_controller_module.AutomateController
+    )
+    controller._apply_dynamic_slow_charge_limit = device_controller_module.AutomateController._apply_dynamic_slow_charge_limit.__get__(
         controller, device_controller_module.AutomateController
     )
     controller._normalize_schedule_bound = device_controller_module.AutomateController._normalize_schedule_bound
@@ -1045,6 +1053,73 @@ def test_controller_send_power_feed_limits_charge_to_configured_max():
     assert error is None
     assert actual_power == 1200
     assert controller.previous_power == 1200
+
+
+def test_dynamic_slow_charge_limit_caps_dynamic_charge_near_full():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.slow_charge_start_level = 80
+    controller.slow_charge_max_power = 200
+
+    new_input, new_output = device_controller.AutomateController._calculate_new_settings(
+        controller,
+        p1_power=-650,
+        current_input=0,
+        current_output=0,
+        electric_level=80,
+    )
+
+    assert new_input == 200
+    assert new_output == 0
+
+
+def test_dynamic_slow_charge_limit_does_not_apply_below_threshold():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.slow_charge_start_level = 80
+    controller.slow_charge_max_power = 200
+
+    new_input, new_output = device_controller.AutomateController._calculate_new_settings(
+        controller,
+        p1_power=-650,
+        current_input=0,
+        current_output=0,
+        electric_level=79,
+    )
+
+    assert new_input == 650
+    assert new_output == 0
+
+
+def test_dynamic_slow_charge_limit_does_not_override_max_charge_level_stop():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.slow_charge_start_level = 80
+    controller.slow_charge_max_power = 200
+    controller.max_charge_level = 80
+
+    new_input, new_output = device_controller.AutomateController._calculate_new_settings(
+        controller,
+        p1_power=-650,
+        current_input=0,
+        current_output=0,
+        electric_level=80,
+    )
+
+    assert new_input == 0
+    assert new_output == 0
+
+
+def test_fixed_power_command_bypasses_dynamic_slow_charge_limit():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.slow_charge_start_level = 80
+    controller.slow_charge_max_power = 200
+
+    result = device_controller.AutomateController.set_power(controller, 500)
+
+    assert result.success is True
+    assert result.power == 500
 
 
 def test_controller_set_power_reaches_target_in_300w_steps():

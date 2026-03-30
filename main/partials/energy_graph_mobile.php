@@ -25,9 +25,9 @@
     <div class="energy-graph-mobile-tab-panels">
         <div class="energy-graph-mobile-tab-panel active" data-tab="graph" role="tabpanel" aria-hidden="false">
             <div class="energy-graph-focus-nav" id="energy-graph-focus-nav" hidden>
-                <button type="button" class="energy-graph-focus-nav-btn" data-energy-graph-nav="prev" aria-label="Previous day">Prev</button>
+                <button type="button" class="energy-graph-focus-nav-btn energy-graph-focus-nav-btn-prev" data-energy-graph-nav="prev" aria-label="Previous day"></button>
                 <div class="energy-graph-focus-nav-label" data-energy-graph-focus-label aria-live="polite">Today</div>
-                <button type="button" class="energy-graph-focus-nav-btn" data-energy-graph-nav="next" aria-label="Next day">Next</button>
+                <button type="button" class="energy-graph-focus-nav-btn energy-graph-focus-nav-btn-next" data-energy-graph-nav="next" aria-label="Next day"></button>
             </div>
             <div class="energy-graph-canvas-mobile">
                 <canvas id="energyChartMobile"></canvas>

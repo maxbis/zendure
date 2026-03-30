@@ -189,6 +189,8 @@ class BaseDeviceController:
         max_soc = _parse_int_config("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
         max_discharge_power = _parse_int_config("MAX_DISCHARGE_POWER", MAX_DISCHARGE_POWER)
         max_charge_power = _parse_int_config("MAX_CHARGE_POWER", MAX_CHARGE_POWER)
+        slow_charge_start_level_raw = self.config.get("SLOW_CHARGE_START_LEVEL")
+        slow_charge_max_power_raw = self.config.get("SLOW_CHARGE_MAX_POWER")
 
         # Clamp to [0, 100]
         min_soc = max(0, min(100, min_soc))
@@ -202,6 +204,16 @@ class BaseDeviceController:
         self.max_charge_level = max_soc
         self.max_discharge_power = max(0, max_discharge_power)
         self.max_charge_power = max(0, max_charge_power)
+        self.slow_charge_start_level = None
+        self.slow_charge_max_power = None
+
+        try:
+            if slow_charge_start_level_raw is not None and slow_charge_max_power_raw is not None:
+                self.slow_charge_start_level = max(0, min(100, int(slow_charge_start_level_raw)))
+                self.slow_charge_max_power = max(0, int(slow_charge_max_power_raw))
+        except (TypeError, ValueError):
+            self.slow_charge_start_level = None
+            self.slow_charge_max_power = None
 
         # Track the last N emitted keyed log entries to suppress repeats.
         self._recent_log_messages = deque(maxlen=self._RECENT_LOG_WINDOW)
@@ -713,6 +725,11 @@ class AutomateController(BaseDeviceController):
                     message_key='battery_min_discharge_block',
                 )
 
+        effective_desired = self._apply_dynamic_slow_charge_limit(
+            effective_desired,
+            electric_level,
+        )
+
         # Clamp effective desired feed using the configured power caps.
         effective_desired = max(-self.max_charge_power, min(self.max_discharge_power, effective_desired))
 
@@ -740,6 +757,30 @@ class AutomateController(BaseDeviceController):
             new_output = 0
 
         return int(round(new_input)), int(round(new_output))
+
+    def _apply_dynamic_slow_charge_limit(
+        self,
+        effective_desired: int,
+        electric_level: Optional[int],
+    ) -> int:
+        """Cap dynamic charging near full SoC without affecting fixed commands."""
+        if electric_level is None:
+            return effective_desired
+        if self.slow_charge_start_level is None or self.slow_charge_max_power is None:
+            return effective_desired
+        if electric_level < self.slow_charge_start_level or effective_desired >= 0:
+            return effective_desired
+
+        limited_effective = max(effective_desired, -self.slow_charge_max_power)
+        if limited_effective != effective_desired:
+            self.log(
+                'info',
+                f"Dynamic slow-charge cap active at {electric_level}%: "
+                f"{effective_desired} W -> {limited_effective} W "
+                f"(threshold={self.slow_charge_start_level}%, cap={self.slow_charge_max_power} W)",
+                message_key='dynamic_slow_charge_limit',
+            )
+        return limited_effective
 
     def calculate_netzero_power(
         self,
