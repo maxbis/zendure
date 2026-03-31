@@ -61,6 +61,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
 | **NETZERO_BI_DIRECTIONAL** | boolean | Controls whether `netzero` may actively charge as well as discharge. `false` preserves discharge-only behavior; `true` allows bidirectional netzero control. | `device_controller.py`: `AutomateController.calculate_netzero_power()`. |
+| **NETZERO_TARGET_W** | number | Signed grid target in watts for dynamic modes. `0` preserves the current exact-netzero target, negative values prefer slight export, and positive values prefer slight import. Dynamic calculation uses `adjusted_p1_power = p1_power - NETZERO_TARGET_W`. | `device_controller.py`: `AutomateController.calculate_netzero_power()`. |
 | **POWER_FEED_MIN_THRESHOLD** | number | Minimum absolute power (W). If desired power is below this, it is treated as 0. | `device_controller.py`: `ZendureDeviceController`. |
 | **POWER_FEED_MIN_DELTA** | number | Minimum change (W) to apply a new power limit; smaller deltas are ignored. | `device_controller.py`: `ZendureDeviceController`. |
 | **POWER_FEED_MAX_DELTA** | number | Maximum allowed step (W) for a single power-feed change. | `automate_www.py`: main loop when applying power feed updates. |

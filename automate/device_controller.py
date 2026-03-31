@@ -813,7 +813,19 @@ class AutomateController(BaseDeviceController):
         if p1_power is None:
             raise ValueError("P1 meter data supplied by the caller is missing 'total_power'")
 
+        config = getattr(self, "config", {}) or {}
+        try:
+            netzero_target_w = int(config.get("NETZERO_TARGET_W", 0))
+        except (TypeError, ValueError):
+            netzero_target_w = 0
+        adjusted_p1_power = p1_power - netzero_target_w
+
         self.log('debug', f"P1 power (grid-status): {p1_power}")
+        if netzero_target_w != 0:
+            self.log(
+                'debug',
+                f"Adjusted P1 power for target {netzero_target_w} W: {adjusted_p1_power}",
+            )
 
         # Read Zendure state unless the caller already supplied this iteration's snapshot.
         if zendure_data is None:
@@ -834,7 +846,7 @@ class AutomateController(BaseDeviceController):
 
         # Calculate new settings new_output=discharge, new_input=charge
         new_input, new_output = self._calculate_new_settings(
-            p1_power=p1_power,
+            p1_power=adjusted_p1_power,
             current_input=current_input,
             current_output=current_output,
             electric_level=electric_level,
@@ -866,6 +878,8 @@ class AutomateController(BaseDeviceController):
         self._last_dynamic_power_context = {
             'mode': mode,
             'p1_power': p1_power,
+            'netzero_target_w': netzero_target_w,
+            'adjusted_p1_power': adjusted_p1_power,
             'current_input': current_input,
             'current_output': current_output,
             'electric_level': electric_level,

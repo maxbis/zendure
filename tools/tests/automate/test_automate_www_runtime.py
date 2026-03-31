@@ -1200,6 +1200,43 @@ def test_calculate_netzero_plus_power_never_discharges():
     assert result == 0
 
 
+@pytest.mark.parametrize(
+    ("target_w", "p1_power", "expected_adjusted"),
+    [
+        (-10, -250, -240),
+        (20, 250, 230),
+    ],
+)
+def test_calculate_netzero_power_applies_configured_target_offset(target_w, p1_power, expected_adjusted):
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.config = {"NETZERO_BI_DIRECTIONAL": True, "NETZERO_TARGET_W": target_w}
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+
+    captured = {}
+
+    def fake_calculate_new_settings(p1_power, current_input, current_output, electric_level):
+        captured["p1_power"] = p1_power
+        return (0, 0)
+
+    controller._calculate_new_settings = fake_calculate_new_settings
+
+    device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero",
+        p1_data={"total_power": p1_power},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert captured["p1_power"] == expected_adjusted
+    assert controller._last_dynamic_power_context["p1_power"] == p1_power
+    assert controller._last_dynamic_power_context["netzero_target_w"] == target_w
+    assert controller._last_dynamic_power_context["adjusted_p1_power"] == expected_adjusted
+
+
 def test_controller_set_power_applies_max_delta_to_fixed_values():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)

@@ -30,15 +30,16 @@ Relevant code:
 For a dynamic command (`netzero`, `netzero+`, or `None`), the controller resolves power in this order:
 
 1. Read P1 meter data from the app/runtime layer.
-2. Read Zendure state (`inputLimit`, `outputLimit`, `electricLevel`).
-3. `_calculate_new_settings()` computes `(new_input, new_output)` from current state and P1 power.
-4. `calculate_netzero_power()` converts that into a raw signed target:
+2. Shift the P1 reading toward the configured target with `adjusted_p1_power = p1_power - NETZERO_TARGET_W`.
+3. Read Zendure state (`inputLimit`, `outputLimit`, `electricLevel`).
+4. `_calculate_new_settings()` computes `(new_input, new_output)` from current state and adjusted P1 power.
+5. `calculate_netzero_power()` converts that into a raw signed target:
    - `netzero+`: positive charge or `0`
    - `netzero`: negative discharge or `0`, unless `NETZERO_BI_DIRECTIONAL=true`, in which case it may be positive or negative
-5. `_apply_schedule_power_bounds()` clamps the raw target into signed `min_power` / `max_power`.
-6. `ReversalRampGuard` compares `previous_power` to the bounded target and ramps only if the bounded target reverses sign.
-7. `_apply_power_feed_max_delta()` limits the step size.
-8. `_send_power_feed()` reapplies battery protection and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` before sending the final command to the device.
+6. `_apply_schedule_power_bounds()` clamps the raw target into signed `min_power` / `max_power`.
+7. `ReversalRampGuard` compares `previous_power` to the bounded target and ramps only if the bounded target reverses sign.
+8. `_apply_power_feed_max_delta()` limits the step size.
+9. `_send_power_feed()` reapplies battery protection and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` before sending the final command to the device.
 
 The important detail is that signed schedule bounds are now evaluated before reversal handling.
 
@@ -101,7 +102,7 @@ With the default divisor-based guard, that becomes `-100` for the next command.
 
 ### 6. Summary
 
-- `calculate_netzero_power()` produces the raw dynamic intent.
+- `calculate_netzero_power()` first shifts the P1 reading toward `NETZERO_TARGET_W`, then produces the raw dynamic intent.
 - Signed slot bounds (`min_power` / `max_power`) are hard constraints on that raw result.
 - `ReversalRampGuard` smooths only the bounded target.
 - `power_feed_max_delta` then limits the step size.

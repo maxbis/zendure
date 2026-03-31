@@ -14,8 +14,8 @@ This module provides object-oriented wrappers for interacting with the Zendure b
 
 - **`AutomateController`**: The main class for controlling the Zendure battery's power settings. It can:
     - Set specific charge or discharge power levels.
-    - Implement a `netzero` mode that only discharges to reduce grid import toward zero.
-    - Implement a `netzero+` mode that only charges to reduce grid export toward zero.
+    - Implement a `netzero` mode that reduces grid import/export toward the configured target.
+    - Implement a `netzero+` mode that only charges to reduce grid export toward the configured target.
     - Respect battery charge level limits (e.g., not charging above 90% or discharging below 20%).
     - Use `PowerAccumulator` to track and log power usage over time.
     - Put the device into standby mode when appropriate.
@@ -57,8 +57,8 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
 
 Dynamic mode summary:
 
-- `netzero` = dynamic import/export balancing mode; with `NETZERO_BI_DIRECTIONAL=false` it does not actively charge, with `true` it may charge and discharge
-- `netzero+` = charge-only, never actively discharges
+- `netzero` = dynamic import/export balancing mode that aims for `NETZERO_TARGET_W`; with `NETZERO_BI_DIRECTIONAL=false` it does not actively charge, with `true` it may charge and discharge
+- `netzero+` = charge-only mode that aims for `NETZERO_TARGET_W` and never actively discharges
 - signed `min_power` / `max_power` clamp the raw dynamic result before `ReversalRampGuard`
 - `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` are enforced inside dynamic calculation and again as final safety clamps before the device write
 
@@ -110,7 +110,7 @@ When a specific integer power value is set (e.g., via schedule or manual command
 
 ### 2. NetZero & NetZero+ Modes
 
-In **NetZero** modes, the system dynamically calculates the required power based on the P1 meter reading.
+In **NetZero** modes, the system dynamically calculates the required power based on the P1 meter reading shifted by `NETZERO_TARGET_W`.
 
 *   **`netzero`**
     *   Uses discharge only.

@@ -258,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="card">
       <h2 class="card-header">Edit Config</h2>
-      <p class="config-subtitle">Edit current config values and save as valid JSON.</p>
+      <p class="config-subtitle">Edit current config values and save as valid JSON. NETZERO_TARGET_W shifts the dynamic grid target: try -10 to prefer slight export, use positive values to prefer slight import, and 0 to keep exact netzero.</p>
       <p class="config-file"><?= htmlspecialchars($configPath, ENT_QUOTES, 'UTF-8') ?></p>
 
       <?php if ($statusMessage !== ''): ?>
