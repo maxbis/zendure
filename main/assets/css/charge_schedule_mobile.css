@@ -2144,9 +2144,7 @@ code {
 }
 #edit-modal #inp-date,
 #edit-modal #inp-time,
-#edit-modal #inp-watts,
-#edit-modal #inp-min-value,
-#edit-modal #inp-max-value {
+#edit-modal #inp-watts {
     width: 100%;
     max-width: 100%;
     min-height: 44px;
@@ -2158,14 +2156,10 @@ code {
     color: var(--text-primary);
     box-sizing: border-box;
 }
-#edit-modal #inp-watts,
-#edit-modal #inp-min-value,
-#edit-modal #inp-max-value {
+#edit-modal #inp-watts {
     font-weight: 600;
 }
-#edit-modal #inp-watts:disabled,
-#edit-modal #inp-min-value:disabled,
-#edit-modal #inp-max-value:disabled {
+#edit-modal #inp-watts:disabled {
     opacity: 0.7;
     cursor: not-allowed;
 }
@@ -2177,15 +2171,229 @@ code {
     color: #ff8b8b;
     font-weight: 700;
 }
-#edit-modal #inp-min-value.is-charging,
-#edit-modal #inp-max-value.is-charging {
-    color: #7fd77f;
-    font-weight: 700;
+
+#edit-modal .edit-modal-limits-panel {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
 }
-#edit-modal #inp-min-value.is-discharging,
-#edit-modal #inp-max-value.is-discharging {
+
+#edit-modal .edit-modal-limits-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    width: fit-content;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid rgba(124, 154, 205, 0.28);
+    background: rgba(11, 19, 36, 0.85);
+}
+
+#edit-modal .edit-modal-limits-toggle-option {
+    position: relative;
+}
+
+#edit-modal .edit-modal-limits-toggle-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#edit-modal .edit-modal-limits-toggle-option span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    color: #bcd0ee;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+#edit-modal .edit-modal-limits-toggle-option input:checked + span {
+    background: linear-gradient(180deg, rgba(45, 86, 162, 0.95), rgba(27, 59, 121, 0.95));
+    color: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(134, 176, 255, 0.28);
+}
+
+#edit-modal .edit-modal-limits-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+#edit-modal .edit-modal-limits-chip {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #4d4d4d;
+    background: rgba(17, 27, 46, 0.72);
+    min-width: 0;
+}
+
+#edit-modal .edit-modal-limits-chip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+#edit-modal .edit-modal-limits-chip-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+#edit-modal .edit-modal-limits-label {
+    font-size: 0.8rem;
+    color: #9dc6ff;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+#edit-modal .edit-modal-limits-chip strong {
+    font-size: 1rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#edit-modal .edit-modal-limits-chip strong.is-negative {
     color: #ff8b8b;
-    font-weight: 700;
+}
+
+#edit-modal .edit-modal-limits-chip strong.is-positive {
+    color: #86efac;
+}
+
+#edit-modal .edit-modal-limits-chip strong.is-neutral {
+    color: #d7dee9;
+}
+
+#edit-modal .edit-modal-limits-chip strong.is-unset {
+    color: rgba(215, 222, 233, 0.62);
+}
+
+#edit-modal .edit-modal-limits-slider {
+    position: relative;
+    height: 34px;
+}
+
+#edit-modal .edit-modal-limits-track,
+#edit-modal .edit-modal-limits-selected-range {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 10px;
+    border-radius: 999px;
+}
+
+#edit-modal .edit-modal-limits-track {
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+#edit-modal .edit-modal-limits-selected-range {
+    background: linear-gradient(90deg, rgba(255, 139, 139, 0.95), rgba(142, 197, 255, 0.92) 50%, rgba(134, 239, 172, 0.95));
+    box-shadow: 0 0 0 1px rgba(142, 197, 255, 0.16);
+}
+
+#edit-modal .edit-modal-limits-slider.is-disabled {
+    opacity: 0.45;
+}
+
+#edit-modal .edit-modal-limits-range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#edit-modal .edit-modal-limits-range::-webkit-slider-runnable-track {
+    height: 34px;
+    background: transparent;
+}
+
+#edit-modal .edit-modal-limits-range::-moz-range-track {
+    height: 34px;
+    background: transparent;
+}
+
+#edit-modal .edit-modal-limits-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin-top: 6px;
+    border-radius: 50%;
+    border: 2px solid #dbe4f0;
+    background: #0b1324;
+    box-shadow: 0 0 0 4px rgba(11, 19, 36, 0.68);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+
+#edit-modal .edit-modal-limits-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #dbe4f0;
+    background: #0b1324;
+    box-shadow: 0 0 0 4px rgba(11, 19, 36, 0.68);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+
+#edit-modal .edit-modal-limits-range.is-negative::-webkit-slider-thumb {
+    border-color: #ff8b8b;
+}
+
+#edit-modal .edit-modal-limits-range.is-positive::-webkit-slider-thumb {
+    border-color: #86efac;
+}
+
+#edit-modal .edit-modal-limits-range.is-neutral::-webkit-slider-thumb {
+    border-color: #d1d5db;
+}
+
+#edit-modal .edit-modal-limits-range.is-negative::-moz-range-thumb {
+    border-color: #ff8b8b;
+}
+
+#edit-modal .edit-modal-limits-range.is-positive::-moz-range-thumb {
+    border-color: #86efac;
+}
+
+#edit-modal .edit-modal-limits-range.is-neutral::-moz-range-thumb {
+    border-color: #d1d5db;
+}
+
+#edit-modal .edit-modal-limits-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.78rem;
+}
+
+#edit-modal .edit-modal-limits-help {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.92rem;
+    line-height: 1.45;
 }
 
 #edit-modal .power-range-indicator {
@@ -2227,4 +2435,10 @@ code {
     color: #ff8b8b;
     border-color: rgba(255, 139, 139, 0.6);
     background: rgba(153, 27, 27, 0.24);
+}
+
+@media (max-width: 640px) {
+    #edit-modal .edit-modal-limits-values {
+        grid-template-columns: 1fr;
+    }
 }

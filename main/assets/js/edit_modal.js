@@ -7,9 +7,20 @@ class EditModal {
         this.apiUrl = apiUrl;
         this.currentOriginalKey = null;
         this.scheduleEntriesByKey = {};
+        this.limitMin = -1200;
+        this.limitMax = 1200;
+        this.limitStep = 100;
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.powerRangeIndicator = document.getElementById('power-range-indicator');
+        this.limitsSlider = document.getElementById('limits-slider');
+        this.limitsSelectedRange = document.getElementById('limits-selected-range');
+        this.limitsMinRange = document.getElementById('limits-min-range');
+        this.limitsMaxRange = document.getElementById('limits-max-range');
+        this.limitsMinDisplay = document.getElementById('limits-min-display');
+        this.limitsMaxDisplay = document.getElementById('limits-max-display');
+        this.limitsOff = document.getElementById('limits-off');
+        this.limitsOn = document.getElementById('limits-on');
         this.confirmResolve = null;
         
         this.init();
@@ -101,6 +112,22 @@ class EditModal {
                 input.addEventListener('input', () => this.updateConstraintInputState(input));
             }
         });
+        if (this.limitsMinRange) {
+            const syncMinRange = () => this.handleLimitRangeInput('min');
+            this.limitsMinRange.addEventListener('input', syncMinRange);
+            this.limitsMinRange.addEventListener('change', syncMinRange);
+        }
+        if (this.limitsMaxRange) {
+            const syncMaxRange = () => this.handleLimitRangeInput('max');
+            this.limitsMaxRange.addEventListener('input', syncMaxRange);
+            this.limitsMaxRange.addEventListener('change', syncMaxRange);
+        }
+        if (this.limitsOff) {
+            this.limitsOff.addEventListener('change', () => this.handleLimitsToggle(false));
+        }
+        if (this.limitsOn) {
+            this.limitsOn.addEventListener('change', () => this.handleLimitsToggle(true));
+        }
         
         // Enter key to save
         this.modal.addEventListener('keydown', (e) => {
@@ -227,7 +254,196 @@ class EditModal {
             maxValueInput.value = '';
             maxValueInput.classList.remove('is-charging', 'is-discharging');
         }
+        this.syncConstraintSlider();
         this.updatePowerRangeIndicator();
+    }
+
+    snapLimitValue(rawValue) {
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue)) return 0;
+        const snapped = Math.round(numericValue / this.limitStep) * this.limitStep;
+        return Math.min(this.limitMax, Math.max(this.limitMin, snapped));
+    }
+
+    formatLimitValue(value) {
+        const numericValue = this.snapLimitValue(value);
+        return numericValue > 0 ? `+${numericValue} W` : `${numericValue} W`;
+    }
+
+    getConstraintInput(inputId) {
+        return document.getElementById(inputId);
+    }
+
+    getStoredLimitValue(inputId) {
+        const input = this.getConstraintInput(inputId);
+        if (!input) return null;
+        const rawValue = String(input.value || '').trim();
+        if (rawValue === '') return null;
+        return this.snapLimitValue(rawValue);
+    }
+
+    setConstraintValue(inputId, value) {
+        const input = this.getConstraintInput(inputId);
+        if (!input) return;
+        input.value = value === null || value === undefined || value === ''
+            ? ''
+            : String(this.snapLimitValue(value));
+        this.updateConstraintInputState(input);
+    }
+
+    areLimitsEnabled() {
+        return !!this.limitsOn?.checked;
+    }
+
+    setLimitsEnabled(enabled, options = {}) {
+        const shouldResetToDefaults = options.resetToDefaults === true;
+        if (this.limitsOn) {
+            this.limitsOn.checked = !!enabled;
+        }
+        if (this.limitsOff) {
+            this.limitsOff.checked = !enabled;
+        }
+
+        if (enabled) {
+            if (shouldResetToDefaults) {
+                this.setConstraintValue('inp-min-value', this.limitMin);
+                this.setConstraintValue('inp-max-value', this.limitMax);
+            } else {
+                const minStored = this.getStoredLimitValue('inp-min-value');
+                const maxStored = this.getStoredLimitValue('inp-max-value');
+                if (minStored === null) {
+                    this.setConstraintValue('inp-min-value', this.limitMin);
+                }
+                if (maxStored === null) {
+                    this.setConstraintValue('inp-max-value', this.limitMax);
+                }
+            }
+        } else {
+            this.setConstraintValue('inp-min-value', null);
+            this.setConstraintValue('inp-max-value', null);
+        }
+
+        this.syncConstraintSlider();
+        this.updatePowerRangeIndicator();
+    }
+
+    handleLimitsToggle(enabled) {
+        this.setLimitsEnabled(enabled, { resetToDefaults: enabled });
+    }
+
+    updateLimitValueTone(element, value, isUnset = false) {
+        if (!element) return;
+        element.classList.remove('is-negative', 'is-positive', 'is-neutral', 'is-unset');
+        if (isUnset) {
+            element.classList.add('is-unset');
+            return;
+        }
+        if (value < 0) {
+            element.classList.add('is-negative');
+            return;
+        }
+        if (value > 0) {
+            element.classList.add('is-positive');
+            return;
+        }
+        element.classList.add('is-neutral');
+    }
+
+    updateLimitThumbTone(input, value) {
+        if (!input) return;
+        input.classList.remove('is-negative', 'is-positive', 'is-neutral');
+        if (value < 0) {
+            input.classList.add('is-negative');
+            return;
+        }
+        if (value > 0) {
+            input.classList.add('is-positive');
+            return;
+        }
+        input.classList.add('is-neutral');
+    }
+
+    syncConstraintSlider(options = {}) {
+        if (!this.limitsMinRange || !this.limitsMaxRange || !this.limitsSelectedRange) {
+            return;
+        }
+
+        const minStored = this.getStoredLimitValue('inp-min-value');
+        const maxStored = this.getStoredLimitValue('inp-max-value');
+        const limitsEnabled = this.areLimitsEnabled();
+
+        let minSliderValue = minStored === null ? this.limitMin : minStored;
+        let maxSliderValue = maxStored === null ? this.limitMax : maxStored;
+
+        if (options.activeThumb === 'min') {
+            minSliderValue = this.snapLimitValue(this.limitsMinRange.value);
+        }
+        if (options.activeThumb === 'max') {
+            maxSliderValue = this.snapLimitValue(this.limitsMaxRange.value);
+        }
+
+        if (minSliderValue > maxSliderValue) {
+            if (options.activeThumb === 'min') {
+                maxSliderValue = minSliderValue;
+            } else {
+                minSliderValue = maxSliderValue;
+            }
+        }
+
+        this.limitsMinRange.value = String(minSliderValue);
+        this.limitsMaxRange.value = String(maxSliderValue);
+
+        const startPercent = ((minSliderValue - this.limitMin) / (this.limitMax - this.limitMin)) * 100;
+        const endPercent = ((maxSliderValue - this.limitMin) / (this.limitMax - this.limitMin)) * 100;
+        this.limitsSelectedRange.style.left = `${startPercent}%`;
+        this.limitsSelectedRange.style.width = `${Math.max(0, endPercent - startPercent)}%`;
+        if (this.limitsSlider) {
+            this.limitsSlider.style.setProperty('--limits-start', `${startPercent}%`);
+            this.limitsSlider.style.setProperty('--limits-end', `${endPercent}%`);
+        }
+
+        if (this.limitsMinDisplay) {
+            this.limitsMinDisplay.textContent = minStored === null ? 'Unset' : this.formatLimitValue(minStored);
+            this.updateLimitValueTone(this.limitsMinDisplay, minSliderValue, minStored === null);
+        }
+        if (this.limitsMaxDisplay) {
+            this.limitsMaxDisplay.textContent = maxStored === null ? 'Unset' : this.formatLimitValue(maxStored);
+            this.updateLimitValueTone(this.limitsMaxDisplay, maxSliderValue, maxStored === null);
+        }
+
+        this.updateLimitThumbTone(this.limitsMinRange, minSliderValue);
+        this.updateLimitThumbTone(this.limitsMaxRange, maxSliderValue);
+
+        this.limitsMinRange.disabled = !limitsEnabled;
+        this.limitsMaxRange.disabled = !limitsEnabled;
+        if (this.limitsSlider) {
+            this.limitsSlider.classList.toggle('is-disabled', !limitsEnabled);
+        }
+        if (this.limitsSelectedRange) {
+            this.limitsSelectedRange.hidden = !limitsEnabled;
+        }
+    }
+
+    handleLimitRangeInput(which) {
+        if (!this.areLimitsEnabled()) return;
+        if (which === 'min') {
+            const minValue = this.limitsMinRange ? this.snapLimitValue(this.limitsMinRange.value) : this.limitMin;
+            const maxStored = this.getStoredLimitValue('inp-max-value');
+            this.setConstraintValue('inp-min-value', minValue);
+            if (maxStored !== null && minValue > maxStored) {
+                this.setConstraintValue('inp-max-value', minValue);
+            }
+            this.syncConstraintSlider({ activeThumb: 'min' });
+            return;
+        }
+
+        const maxValue = this.limitsMaxRange ? this.snapLimitValue(this.limitsMaxRange.value) : this.limitMax;
+        const minStored = this.getStoredLimitValue('inp-min-value');
+        this.setConstraintValue('inp-max-value', maxValue);
+        if (minStored !== null && maxValue < minStored) {
+            this.setConstraintValue('inp-min-value', maxValue);
+        }
+        this.syncConstraintSlider({ activeThumb: 'max' });
     }
 
     syncModeInputs(mode, options = {}) {
@@ -253,6 +469,17 @@ class EditModal {
                 wattsInput.value = '';
                 wattsInput.setAttribute('value', '');
             }
+            if (!preserveConstraints) {
+                if (this.limitsOff) this.limitsOff.checked = true;
+                if (this.limitsOn) this.limitsOn.checked = false;
+                this.setLimitsEnabled(false);
+            } else if (this.getStoredLimitValue('inp-min-value') === null && this.getStoredLimitValue('inp-max-value') === null) {
+                if (this.limitsOff) this.limitsOff.checked = true;
+                if (this.limitsOn) this.limitsOn.checked = false;
+            } else {
+                if (this.limitsOn) this.limitsOn.checked = true;
+                if (this.limitsOff) this.limitsOff.checked = false;
+            }
         } else {
             if (wattsGroup) wattsGroup.style.display = 'block';
             if (constraintsGroup) constraintsGroup.style.display = 'none';
@@ -269,6 +496,7 @@ class EditModal {
         this.updateWattsInputState();
         this.updateConstraintInputState(document.getElementById('inp-min-value'));
         this.updateConstraintInputState(document.getElementById('inp-max-value'));
+        this.syncConstraintSlider();
         this.updatePowerRangeIndicator();
     }
 
@@ -311,8 +539,10 @@ class EditModal {
             document.getElementById('inp-time').value = timeStr;
             document.getElementById('inp-watts').value = '';
             this.clearConstraintInputs();
-            document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
-            this.syncModeInputs('fixed', { preserveConstraints: false });
+            if (this.limitsOn) this.limitsOn.checked = false;
+            if (this.limitsOff) this.limitsOff.checked = true;
+            document.querySelector('input[name="val-mode"][value="netzero"]').checked = true;
+            this.syncModeInputs('netzero', { preserveConstraints: false });
         } else {
             document.getElementById('inp-date').value = key.substring(0, 8);
             document.getElementById('inp-time').value = key.substring(8, 12);
@@ -325,20 +555,38 @@ class EditModal {
                 document.querySelector('input[name="val-mode"][value="netzero"]').checked = true;
                 document.getElementById('inp-min-value').value = minValue ?? '';
                 document.getElementById('inp-max-value').value = maxValue ?? '';
+                if (minValue === '' && maxValue === '') {
+                    if (this.limitsOff) this.limitsOff.checked = true;
+                    if (this.limitsOn) this.limitsOn.checked = false;
+                } else {
+                    if (this.limitsOn) this.limitsOn.checked = true;
+                    if (this.limitsOff) this.limitsOff.checked = false;
+                }
                 this.syncModeInputs('netzero', { preserveConstraints: true });
             } else if (value === 'netzero+') {
                 document.querySelector('input[name="val-mode"][value="netzero+"]').checked = true;
                 document.getElementById('inp-min-value').value = minValue ?? '';
                 document.getElementById('inp-max-value').value = maxValue ?? '';
+                if (minValue === '' && maxValue === '') {
+                    if (this.limitsOff) this.limitsOff.checked = true;
+                    if (this.limitsOn) this.limitsOn.checked = false;
+                } else {
+                    if (this.limitsOn) this.limitsOn.checked = true;
+                    if (this.limitsOff) this.limitsOff.checked = false;
+                }
                 this.syncModeInputs('netzero+', { preserveConstraints: true });
             } else if (value === 'auto') {
                 document.querySelector('input[name="val-mode"][value="auto"]').checked = true;
                 this.clearConstraintInputs();
+                if (this.limitsOn) this.limitsOn.checked = true;
+                if (this.limitsOff) this.limitsOff.checked = false;
                 this.syncModeInputs('auto', { preserveConstraints: false });
             } else {
                 document.querySelector('input[name="val-mode"][value="fixed"]').checked = true;
                 document.getElementById('inp-watts').value = value ?? '';
                 this.clearConstraintInputs();
+                if (this.limitsOn) this.limitsOn.checked = true;
+                if (this.limitsOff) this.limitsOff.checked = false;
                 this.syncModeInputs('fixed', { preserveConstraints: false });
             }
         }

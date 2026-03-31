@@ -25,11 +25,11 @@
                         <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">☀️</span><span>NetZero+</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="netzero" label="Net Zero">
+                        <input type="radio" name="val-mode" value="netzero" label="Net Zero" checked>
                         <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🔌</span><span>NetZero</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="fixed" checked>
+                        <input type="radio" name="val-mode" value="fixed">
                         <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">⚡</span><span>Watts&nbsp;(W)</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
@@ -45,15 +45,43 @@
                     <input type="number" id="inp-watts" placeholder="0" step="100">
                 </div>
                 <div class="edit-modal-grid" id="group-constraints" style="display:none;">
-                    <div class="form-group">
-                        <label>Min Power (W)</label>
-                        <input type="number" id="inp-min-value" placeholder="Optional" step="100">
-                        <small>Signed value: negative = discharge, positive = charge.</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Max Power (W)</label>
-                        <input type="number" id="inp-max-value" placeholder="Optional" step="100">
-                        <small>Signed value: negative = discharge, positive = charge.</small>
+                    <input type="hidden" id="inp-min-value" value="">
+                    <input type="hidden" id="inp-max-value" value="">
+                    <div class="edit-modal-limits-panel">
+                        <div class="edit-modal-limits-toggle" role="group" aria-label="Power limits enabled">
+                            <label class="edit-modal-limits-toggle-option">
+                                <input type="radio" name="limits-enabled" id="limits-off" value="off">
+                                <span>Off</span>
+                            </label>
+                            <label class="edit-modal-limits-toggle-option">
+                                <input type="radio" name="limits-enabled" id="limits-on" value="on">
+                                <span>On</span>
+                            </label>
+                        </div>
+                        <div class="edit-modal-limits-values">
+                            <div class="edit-modal-limits-chip">
+                                <div class="edit-modal-limits-chip-header">
+                                    <div class="edit-modal-limits-chip-value-row">
+                                        <span class="edit-modal-limits-label">Min</span>
+                                        <strong id="limits-min-display">Unset</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="edit-modal-limits-chip">
+                                <div class="edit-modal-limits-chip-header">
+                                    <div class="edit-modal-limits-chip-value-row">
+                                        <span class="edit-modal-limits-label">Max</span>
+                                        <strong id="limits-max-display">Unset</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="edit-modal-limits-slider" id="limits-slider">
+                            <div class="edit-modal-limits-track"></div>
+                            <div class="edit-modal-limits-selected-range" id="limits-selected-range"></div>
+                            <input type="range" class="edit-modal-limits-range" id="limits-min-range" min="-1200" max="1200" step="100" value="-1200" aria-label="Minimum power limit">
+                            <input type="range" class="edit-modal-limits-range" id="limits-max-range" min="-1200" max="1200" step="100" value="1200" aria-label="Maximum power limit">
+                        </div>
                     </div>
                     <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                 </div>
