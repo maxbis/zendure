@@ -13,6 +13,9 @@ import sqlite3
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -390,6 +393,185 @@ def _import_automate_www_module():
         sys.path.insert(0, str(automate_dir))
     import automate_www  # type: ignore
     return automate_www
+
+
+def _import_automate_api_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import automate_api  # type: ignore
+    return automate_api
+
+
+def _create_status_updates_db(db_path: Path, rows: list[tuple] | None = None) -> None:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        if rows:
+            conn.executemany(
+                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                rows,
+            )
+        conn.commit()
+
+
+def _start_test_api_server(
+    *,
+    with_db: bool = True,
+    db_rows: list[tuple] | None = None,
+    status_updates_delta_token: str | None = None,
+    compute_wh_result: dict | None = None,
+):
+    automate_api = _import_automate_api_module()
+    automate_www = _import_automate_www_module()
+    cleanup_callbacks: list[callable] = []
+    db_path = Path(__file__) if with_db else (REPO_ROOT / "__missing_status_updates__.db")
+    if with_db:
+        original_connect = automate_api.sqlite3.connect
+        shared_uri = f"file:api-tests-{time.time_ns()}?mode=memory&cache=shared"
+        keeper_conn = sqlite3.connect(shared_uri, uri=True, check_same_thread=False)
+        keeper_conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        if db_rows:
+            keeper_conn.executemany(
+                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                db_rows,
+            )
+            keeper_conn.commit()
+
+        def _connect_proxy(_path, *args, **kwargs):
+            return original_connect(shared_uri, uri=True, check_same_thread=False)
+
+        automate_api.sqlite3.connect = _connect_proxy
+        cleanup_callbacks.append(lambda: setattr(automate_api.sqlite3, "connect", original_connect))
+        cleanup_callbacks.append(keeper_conn.close)
+
+    api_state = automate_api.ApiState()
+    api_state.last_p1 = automate_www.P1Readings(readings={"total_power": -42}, timestamp=int(time.time()))
+    api_state.last_zendure = automate_www.ZendureReadings(
+        readings={"properties": {"electricLevel": 77}},
+        timestamp=int(time.time()),
+    )
+    api_state.last_status = automate_www.StatusChange(
+        event_type="change",
+        old_value=0,
+        new_value=-42,
+        timestamp=int(time.time()),
+    )
+    api_state.last_status_by_type = {
+        "start": automate_www.AutomationStatusEntry("start", None, None, None, int(time.time()) - 120),
+        "change": automate_www.AutomationStatusEntry("change", 0, -42, -42, int(time.time())),
+    }
+
+    events = {
+        "refresh_p1": 0,
+        "refresh_zendure": 0,
+        "restart": 0,
+        "refresh_schedule": 0,
+        "status_post_update": [],
+        "pause_set": [],
+        "compute_wh_calls": 0,
+        "controller_logs": [],
+    }
+    pause_state = {"active": False}
+    controller = SimpleNamespace(log_level="INFO", max_charge_power=1200, slow_charge_max_power=200)
+
+    def refresh_p1():
+        events["refresh_p1"] += 1
+        api_state.last_p1 = automate_www.P1Readings(readings={"total_power": 321}, timestamp=int(time.time()))
+
+    def refresh_zendure():
+        events["refresh_zendure"] += 1
+        api_state.last_zendure = automate_www.ZendureReadings(
+            readings={"properties": {"electricLevel": 88}},
+            timestamp=int(time.time()),
+        )
+
+    def request_restart():
+        events["restart"] += 1
+
+    def fetch_schedule():
+        events["refresh_schedule"] += 1
+
+    def post_update(*args):
+        events["status_post_update"].append(args)
+
+    def set_pause(value: bool):
+        pause_state["active"] = value
+        events["pause_set"].append(value)
+
+    def compute_wh_per_hour(_db_path: str, _now: int, _days: int) -> dict:
+        events["compute_wh_calls"] += 1
+        return compute_wh_result if compute_wh_result is not None else {"2025-01-01": []}
+
+    def controller_log(level, message, *args, **kwargs):
+        events["controller_logs"].append((level, message))
+
+    controller.log = controller_log
+
+    server = automate_api.create_http_server(
+        api_state=api_state,
+        db_path=str(db_path),
+        schedule_controller=SimpleNamespace(fetch_schedule=fetch_schedule),
+        status_api=SimpleNamespace(db_path=str(db_path), post_update=post_update),
+        refresh_p1_callback=refresh_p1,
+        refresh_zendure_callback=refresh_zendure,
+        restart_callback=request_restart,
+        pause_getter=lambda: pause_state["active"],
+        pause_setter=set_pause,
+        controller=controller,
+        status_updates_delta_token=status_updates_delta_token,
+        compute_wh_per_hour_callback=compute_wh_per_hour,
+        port=0,
+        log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def cleanup():
+        try:
+            server.shutdown()
+        finally:
+            server.server_close()
+            thread.join(timeout=2)
+            for callback in reversed(cleanup_callbacks):
+                callback()
+
+    return SimpleNamespace(
+        base_url=base_url,
+        server=server,
+        thread=thread,
+        events=events,
+        api_state=api_state,
+        controller=controller,
+        cleanup=cleanup,
+    )
 
 
 def _import_power_meter_module():
@@ -1954,6 +2136,356 @@ def test_load_loop_config_falls_back_to_global_interval():
     app._load_loop_config()
 
     assert app.loop_interval_seconds == 25
+
+
+def test_create_http_server_wires_shared_state_and_callbacks():
+    automate_api = _import_automate_api_module()
+
+    api_state = automate_api.ApiState()
+    schedule_controller = SimpleNamespace()
+    status_api = SimpleNamespace()
+    controller = SimpleNamespace(log_level="INFO")
+
+    def _noop():
+        return None
+
+    server = automate_api.create_http_server(
+        api_state=api_state,
+        db_path=":memory:",
+        schedule_controller=schedule_controller,
+        status_api=status_api,
+        refresh_p1_callback=_noop,
+        refresh_zendure_callback=_noop,
+        restart_callback=_noop,
+        pause_getter=lambda: False,
+        pause_setter=lambda _value: None,
+        controller=controller,
+        status_updates_delta_token="token123",
+        compute_wh_per_hour_callback=lambda db_path, now, days: {},
+        port=0,
+        log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
+    )
+    try:
+        assert server.api_state is api_state
+        assert server.schedule_controller is schedule_controller
+        assert server.status_api is status_api
+        assert server.controller is controller
+        assert server.status_updates_delta_token == "token123"
+        assert server.compute_wh_per_hour_callback is not None
+    finally:
+        server.server_close()
+
+
+def test_api_discovery_and_status_endpoints():
+    runtime = _start_test_api_server()
+    try:
+        test_response = requests.get(f"{runtime.base_url}/api/test", timeout=2)
+        assert test_response.status_code == 200
+        test_payload = test_response.json()
+        assert test_payload["path"] == "/api/test"
+        assert any(item["path"] == "/api/p1" for item in test_payload["endpoints"])
+
+        p1_response = requests.get(f"{runtime.base_url}/api/p1?max_age=0", timeout=2)
+        assert p1_response.status_code == 200
+        assert p1_response.json()["readings"]["total_power"] == 321
+        assert runtime.events["refresh_p1"] == 1
+
+        zendure_response = requests.get(f"{runtime.base_url}/api/zendure?max_age=0", timeout=2)
+        assert zendure_response.status_code == 200
+        assert zendure_response.json()["readings"]["properties"]["electricLevel"] == 88
+        assert runtime.events["refresh_zendure"] == 1
+
+        status_response = requests.get(f"{runtime.base_url}/api/status", timeout=2)
+        assert status_response.status_code == 200
+        assert status_response.json()["eventType"] == "change"
+
+        all_response = requests.get(f"{runtime.base_url}/api/all", timeout=2)
+        assert all_response.status_code == 200
+        all_payload = all_response.json()
+        assert all_payload["p1"]["readings"]["total_power"] == 321
+        assert all_payload["zendure"]["readings"]["properties"]["electricLevel"] == 88
+        assert all_payload["status"]["eventType"] == "change"
+
+        automation_status_response = requests.get(f"{runtime.base_url}/api/automation_status", timeout=2)
+        assert automation_status_response.status_code == 200
+        automation_payload = automation_status_response.json()
+        assert automation_payload["success"] is True
+        assert automation_payload["entryCount"] == 2
+        assert automation_payload["lastChanges"][0]["type"] == "change"
+    finally:
+        runtime.cleanup()
+
+
+def test_api_control_endpoints_and_unknown_path():
+    runtime = _start_test_api_server()
+    try:
+        refresh_response = requests.get(f"{runtime.base_url}/api/refresh", timeout=2)
+        assert refresh_response.status_code == 200
+        assert refresh_response.json()["ok"] is True
+        assert runtime.events["refresh_schedule"] == 1
+        assert runtime.events["status_post_update"][0][0] == "Rescan"
+
+        restart_response = requests.post(f"{runtime.base_url}/api/restart", timeout=2)
+        assert restart_response.status_code == 200
+        assert restart_response.json()["ok"] is True
+        assert runtime.events["restart"] == 1
+
+        pause_get_response = requests.get(f"{runtime.base_url}/api/pause", timeout=2)
+        assert pause_get_response.status_code == 200
+        assert pause_get_response.json()["pauseActive"] is False
+
+        pause_on_response = requests.post(f"{runtime.base_url}/api/pause?state=on", timeout=2)
+        assert pause_on_response.status_code == 200
+        assert pause_on_response.json()["pauseActive"] is True
+
+        pause_off_response = requests.post(f"{runtime.base_url}/api/pause?state=off", timeout=2)
+        assert pause_off_response.status_code == 200
+        assert pause_off_response.json()["pauseActive"] is False
+        assert runtime.events["pause_set"] == [True, False]
+
+        loglevel_get_response = requests.get(f"{runtime.base_url}/api/loglevel", timeout=2)
+        assert loglevel_get_response.status_code == 200
+        assert loglevel_get_response.json()["level"] == "INFO"
+
+        loglevel_post_response = requests.post(f"{runtime.base_url}/api/loglevel?level=debug", timeout=2)
+        assert loglevel_post_response.status_code == 200
+        assert loglevel_post_response.json()["level"] == "DEBUG"
+        assert runtime.controller.log_level == "DEBUG"
+
+        invalid_loglevel_response = requests.post(f"{runtime.base_url}/api/loglevel?level=wat", timeout=2)
+        assert invalid_loglevel_response.status_code == 400
+
+        missing_response = requests.get(f"{runtime.base_url}/api/does-not-exist", timeout=2)
+        assert missing_response.status_code == 404
+    finally:
+        runtime.cleanup()
+
+
+def test_api_wh_per_hour_endpoint_and_cache():
+    runtime = _start_test_api_server(compute_wh_result={"2025-01-01": [{"hour": "00", "charged_wh": 1.0, "discharged_wh": 0.0, "electric_level": 77}]})
+    try:
+        response_one = requests.get(f"{runtime.base_url}/api/wh_per_hour?days=0", timeout=2)
+        assert response_one.status_code == 200
+        assert response_one.json()["2025-01-01"][0]["charged_wh"] == 1.0
+        assert runtime.events["compute_wh_calls"] == 1
+
+        response_two = requests.get(f"{runtime.base_url}/api/wh_per_hour?days=0", timeout=2)
+        assert response_two.status_code == 200
+        assert runtime.events["compute_wh_calls"] == 1
+    finally:
+        runtime.cleanup()
+
+
+def test_api_wh_per_hour_returns_error_when_db_missing():
+    runtime = _start_test_api_server(with_db=False)
+    try:
+        response = requests.get(f"{runtime.base_url}/api/wh_per_hour?days=0", timeout=2)
+        assert response.status_code == 200
+        assert response.json()["error"] == "Status updates database not available"
+    finally:
+        runtime.cleanup()
+
+
+def test_api_status_updates_delta_endpoint_behaviors():
+    db_rows = [
+        ("change", "0", "-42", -42, 77, 1000),
+        ("change", "-42", "-84", -84, 76, 1010),
+    ]
+    runtime = _start_test_api_server(db_rows=db_rows, status_updates_delta_token="secret")
+    try:
+        unauthorized_response = requests.get(
+            f"{runtime.base_url}/api/status_updates_delta?after_id=0",
+            timeout=2,
+        )
+        assert unauthorized_response.status_code == 401
+
+        missing_after_id_response = requests.get(
+            f"{runtime.base_url}/api/status_updates_delta?token=secret",
+            timeout=2,
+        )
+        assert missing_after_id_response.status_code == 400
+
+        success_response = requests.get(
+            f"{runtime.base_url}/api/status_updates_delta?after_id=0&token=secret",
+            timeout=2,
+        )
+        assert success_response.status_code == 200
+        payload = success_response.json()
+        assert len(payload["rows"]) == 2
+        assert payload["rows"][0]["type"] == "change"
+        assert payload["max_id_returned"] == payload["rows"][-1]["id"]
+        assert payload["has_more"] is False
+    finally:
+        runtime.cleanup()
+
+
+def test_api_state_dependent_endpoint_returns_503_when_api_state_missing():
+    runtime = _start_test_api_server()
+    try:
+        runtime.server.api_state = None
+        response = requests.get(f"{runtime.base_url}/api/status", timeout=2)
+        assert response.status_code == 503
+        assert response.json()["error"] == "API state not initialized"
+    finally:
+        runtime.cleanup()
+
+
+def test_api_slow_charge_max_power_get_and_post():
+    runtime = _start_test_api_server()
+    try:
+        get_response = requests.get(f"{runtime.base_url}/api/slow_charge_max_power", timeout=2)
+        assert get_response.status_code == 200
+        assert get_response.json()["slowChargeMaxPower"] == 200
+        assert get_response.json()["maxChargePower"] == 1200
+
+        post_response = requests.post(f"{runtime.base_url}/api/slow_charge_max_power?value=300", timeout=2)
+        assert post_response.status_code == 200
+        assert post_response.json()["slowChargeMaxPower"] == 300
+        assert runtime.controller.slow_charge_max_power == 300
+        assert runtime.events["controller_logs"][-1][0] == "info"
+        assert "SLOW_CHARGE_MAX_POWER" in runtime.events["controller_logs"][-1][1]
+        assert "200 -> 300" in runtime.events["controller_logs"][-1][1]
+    finally:
+        runtime.cleanup()
+
+
+def test_api_slow_charge_max_power_validation_and_missing_controller():
+    runtime = _start_test_api_server()
+    try:
+        negative_response = requests.post(f"{runtime.base_url}/api/slow_charge_max_power?value=-1", timeout=2)
+        assert negative_response.status_code == 400
+
+        too_high_response = requests.post(f"{runtime.base_url}/api/slow_charge_max_power?value=1201", timeout=2)
+        assert too_high_response.status_code == 400
+
+        missing_value_response = requests.post(f"{runtime.base_url}/api/slow_charge_max_power", timeout=2)
+        assert missing_value_response.status_code == 400
+
+        invalid_value_response = requests.post(f"{runtime.base_url}/api/slow_charge_max_power?value=abc", timeout=2)
+        assert invalid_value_response.status_code == 400
+
+        runtime.server.controller = None
+        missing_controller_get = requests.get(f"{runtime.base_url}/api/slow_charge_max_power", timeout=2)
+        assert missing_controller_get.status_code == 503
+
+        missing_controller_post = requests.post(f"{runtime.base_url}/api/slow_charge_max_power?value=300", timeout=2)
+        assert missing_controller_post.status_code == 503
+    finally:
+        runtime.cleanup()
+
+
+def test_standby_check_sends_standby_only_once_per_zero_period(monkeypatch):
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.value = 0
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+
+    standby_calls: list[str] = []
+    app.controller = SimpleNamespace(
+        set_standby_mode=lambda: standby_calls.append("standby") or SimpleNamespace(success=True)
+    )
+
+    current_time = 1000.0
+    monkeypatch.setattr(automate_www.time, "time", lambda: current_time)
+
+    app._handle_standby_check()
+    assert app.zero_power_since == 1000.0
+    assert app.standby_sent is False
+    assert standby_calls == []
+
+    current_time = 1000.0 + automate_www.STANDBY_DELAY_SECONDS - 1
+    app._handle_standby_check()
+    assert standby_calls == []
+    assert app.standby_sent is False
+
+    current_time = 1000.0 + automate_www.STANDBY_DELAY_SECONDS
+    app._handle_standby_check()
+    assert standby_calls == ["standby"]
+    assert app.standby_sent is True
+    assert app.zero_power_since is None
+
+    current_time = 1000.0 + (2 * automate_www.STANDBY_DELAY_SECONDS)
+    app._handle_standby_check()
+    assert standby_calls == ["standby"]
+    assert app.standby_sent is True
+
+
+def test_standby_check_allows_new_standby_after_nonzero_period(monkeypatch):
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+
+    standby_calls: list[str] = []
+    app.controller = SimpleNamespace(
+        set_standby_mode=lambda: standby_calls.append("standby") or SimpleNamespace(success=True)
+    )
+
+    current_time = 2000.0
+    monkeypatch.setattr(automate_www.time, "time", lambda: current_time)
+
+    app.value = 0
+    app._handle_standby_check()
+    current_time = 2000.0 + automate_www.STANDBY_DELAY_SECONDS
+    app._handle_standby_check()
+    assert standby_calls == ["standby"]
+    assert app.standby_sent is True
+
+    app.value = 150
+    app._handle_standby_check()
+    assert app.zero_power_since is None
+    assert app.standby_sent is False
+
+    app.value = 0
+    current_time = 3000.0
+    app._handle_standby_check()
+    current_time = 3000.0 + automate_www.STANDBY_DELAY_SECONDS
+    app._handle_standby_check()
+    assert standby_calls == ["standby", "standby"]
+    assert app.standby_sent is True
+
+
+def test_standby_check_retries_after_failed_standby(monkeypatch):
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.value = 0
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+
+    results = deque([False, True])
+    standby_calls: list[str] = []
+    app.controller = SimpleNamespace(
+        set_standby_mode=lambda: standby_calls.append("standby") or SimpleNamespace(success=results.popleft())
+    )
+
+    current_time = 4000.0
+    monkeypatch.setattr(automate_www.time, "time", lambda: current_time)
+
+    app._handle_standby_check()
+    current_time = 4000.0 + automate_www.STANDBY_DELAY_SECONDS
+    app._handle_standby_check()
+    assert standby_calls == ["standby"]
+    assert app.standby_sent is False
+    assert app.zero_power_since == 4000.0
+
+    current_time = 4000.0 + automate_www.STANDBY_DELAY_SECONDS + 1
+    app._handle_standby_check()
+    assert standby_calls == ["standby", "standby"]
+    assert app.standby_sent is True
+    assert app.zero_power_since is None
 
 
 def test_runtime_condition_true_keeps_base_value():

@@ -849,12 +849,13 @@ form {
 }
 
 .raw-json-card {
-    min-width: 1200px;
+    min-width: 0;
 }
 
 .raw-json-card textarea {
     margin-top: 10px;
-    width: 80%;
+    width: 100%;
+    max-width: 100%;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: #5c5c5c;
@@ -959,6 +960,27 @@ button.danger.condition-remove-btn:hover {
         padding: 12px;
     }
 
+    .card-header-row {
+        display: grid;
+        justify-content: stretch;
+    }
+
+    .card-header-row > * {
+        min-width: 0;
+    }
+
+    .actions {
+        width: 100%;
+    }
+
+    .actions > button,
+    .actions > .btn-link {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 0;
+        white-space: normal;
+        text-align: center;
+    }
+
     .hero-top {
         display: grid;
         gap: 10px;
@@ -996,6 +1018,13 @@ button.danger.condition-remove-btn:hover {
     .editor-grid-fallback-input {
         grid-column: auto;
     }
+
+    h1,
+    h2 {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     h1 {
         font-size: 1.7rem;
     }
@@ -1033,5 +1062,142 @@ button.danger.condition-remove-btn:hover {
 
     .card-header-row {
         align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .rules-page {
+        padding: 0 10px;
+    }
+
+    .card {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 1.35rem;
+    }
+
+    .rules-list-header {
+        gap: 10px;
+    }
+
+    .rules-list-header #btn-new {
+        width: 100%;
+    }
+
+    .rules-table,
+    .rules-table tbody,
+    .rules-table tr,
+    .rules-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .rules-table {
+        margin-top: 12px;
+    }
+
+    .rules-table tr {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 0;
+    }
+
+    .rules-table td {
+        border-bottom: 0;
+        padding: 0;
+        min-width: 0;
+    }
+
+    .rules-table tbody > tr:not(:last-child) {
+        border-bottom: 1px solid var(--line);
+    }
+
+    .rules-table td:nth-child(2) {
+        color: var(--muted);
+        font-size: 0.9rem;
+    }
+
+    .rules-table td:nth-child(3) {
+        min-width: 0;
+    }
+
+    .rule-name-button {
+        width: 100%;
+        justify-content: flex-start;
+        min-width: 0;
+    }
+
+    .rule-name-button code {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+
+    .table-actions {
+        width: auto;
+    }
+
+    .rule-actions-popover {
+        right: 0;
+        left: auto;
+        max-width: min(220px, calc(100vw - 32px));
+    }
+
+    .limits-toggle {
+        width: 100%;
+    }
+
+    .limits-toggle-option span {
+        min-width: 0;
+        width: 100%;
+    }
+}
+
+@media (max-width: 360px) {
+    .rules-page {
+        padding: 0 8px;
+    }
+
+    .actions {
+        gap: 6px;
+    }
+
+    .actions > button,
+    .actions > .btn-link {
+        flex-basis: 100%;
+        font-size: 0.95rem;
+        padding: 8px 10px;
+    }
+
+    h1 {
+        font-size: 1.2rem;
+    }
+
+    .rules-table tr {
+        grid-template-columns: auto 1fr;
+    }
+
+    .rules-table td:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+
+    .rules-table td:nth-child(4) {
+        justify-self: end;
+    }
+
+    .limits-slider-panel {
+        padding: 12px 10px;
+    }
+
+    .limits-value-chip {
+        padding: 8px 10px;
+    }
+
+    .limits-scale {
+        font-size: 0.72rem;
     }
 }

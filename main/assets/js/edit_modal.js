@@ -381,10 +381,16 @@ class EditModal {
         input.classList.remove('is-charging', 'is-discharging');
 
         const rawValue = input.value.trim();
-        if (rawValue === '') return;
+        if (rawValue === '') {
+            this.updatePowerRangeIndicator();
+            return;
+        }
 
         const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue) || numericValue === 0) return;
+        if (!Number.isFinite(numericValue) || numericValue === 0) {
+            this.updatePowerRangeIndicator();
+            return;
+        }
 
         input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
         this.updatePowerRangeIndicator();

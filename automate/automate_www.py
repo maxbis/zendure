@@ -20,15 +20,13 @@ import select
 import platform
 import threading
 import queue
-import http.server
-import socketserver
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from warnings import simplefilter
 from zoneinfo import ZoneInfo
 from typing import Optional, Any, Callable
-from urllib.parse import urlparse, parse_qs
 
+from automate_api import ApiState, create_http_server
 from device_controller import AutomateController, ScheduleController, BaseDeviceController, get_reader
 from power_metere_loader import get_power_meter_reader
 
@@ -148,20 +146,6 @@ class AutomationStatusEntry:
             "p1TotalPower": self.p1_total_power,
         }
 
-
-class ApiState:
-    """Shared state for API endpoints: latest P1, Zendure, and status readings."""
-
-    def __init__(self):
-        self.last_p1: Optional[P1Readings] = None
-        self.last_zendure: Optional[ZendureReadings] = None
-        self.last_status: Optional[StatusChange] = None
-        self.last_status_by_type: dict[str, AutomationStatusEntry] = {}
-
-
-# ============================================================================
-# HTTP API HANDLER
-# ============================================================================
 
 def _allowed_wh_dates(now: int, days_back: int, tz: ZoneInfo) -> list[str]:
     dt = datetime.fromtimestamp(now, tz=tz)
@@ -420,669 +404,6 @@ def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAY
             tz=tz,
         )
     return _build_wh_result(wh_by_date_hour, electric_levels_by_date_hour, allowed_dates)
-
-
-def compute_automation_status_from_state(api_state: ApiState, type_filter: str, limit: int) -> dict:
-    """Build Automation Status response from in-memory state."""
-    if type_filter not in (EVENT_TYPE_CHANGE, "all"):
-        type_filter = EVENT_TYPE_CHANGE
-
-    limit = max(limit, 1) # minimum 1
-    limit = min(limit, 50) # maximum 50
-
-    all_entries = list(api_state.last_status_by_type.values())
-    filtered = (
-        all_entries
-        if type_filter == "all"
-        else [entry for entry in all_entries if entry.event_type == EVENT_TYPE_CHANGE]
-    )
-
-    filtered.sort(key=lambda e: (e.timestamp or 0), reverse=True)
-    last_changes = [entry.to_dict() for entry in filtered[:limit]]
-
-    timestamps = [e.timestamp for e in all_entries if e.timestamp is not None]
-    last_alive = max(timestamps) if timestamps else None
-    last_update = last_alive
-    entry_count = len(all_entries)
-
-    running_time = 0
-    start_entry = api_state.last_status_by_type.get("start")
-    stop_entry = api_state.last_status_by_type.get("stop")
-    if start_entry and start_entry.timestamp is not None:
-        if stop_entry and stop_entry.timestamp is not None and stop_entry.timestamp >= start_entry.timestamp:
-            running_time = stop_entry.timestamp - start_entry.timestamp
-        else:
-            running_time = int(time.time()) - start_entry.timestamp
-
-    return {
-        "success": True,
-        "method": "GET",
-        "lastChanges": last_changes,
-        "lastAlive": last_alive,
-        "runningTime": running_time,
-        "entryCount": entry_count,
-        "lastUpdate": last_update,
-    }
-
-
-class AutomationTCPServer(socketserver.ThreadingTCPServer):
-    """TCPServer that holds api_state for the request handler."""
-    allow_reuse_address = True  # avoid "Address already in use" when restarting quickly
-    daemon_threads = True  # don't wait for request threads during shutdown/restart
-    block_on_close = False  # avoid hanging on persistent client connections
-
-    def __init__(self, server_address, request_handler_class):
-        super().__init__(server_address, request_handler_class)
-        self.api_state: Optional[ApiState] = None
-        self.db_path: Optional[str] = None
-        self.schedule_controller: Optional[ScheduleController] = None
-        self.status_api: Optional["StatusApi"] = None
-        self.refresh_p1_callback: Optional[Callable[[], None]] = None
-        self.refresh_zendure_callback: Optional[Callable[[], None]] = None
-        self.restart_callback: Optional[Callable[[], None]] = None
-        self.pause_getter: Optional[Callable[[], bool]] = None
-        self.pause_setter: Optional[Callable[[bool], None]] = None
-        self.wh_per_hour_cache: Optional[dict[str, Any]] = None
-        self.wh_per_hour_cache_lock = threading.Lock()
-
-
-class ApiTestHandler(http.server.BaseHTTPRequestHandler):
-    """Handles GET /api/test, /api/p1, /api/zendure, /api/status, /api/all, /api/wh_per_hour, /api/refresh with JSON responses."""
-    protocol_version = "HTTP/1.0"  # close per-request to avoid keep-alive restart hangs
-
-    def _send_json(self, data, status=200, sort_keys=True):
-        """Send JSON response."""
-        body = json.dumps(data, sort_keys=sort_keys).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(body)
-        self.close_connection = True
-
-    def _parse_max_age(self, parsed) -> int:
-        """Parse max_age (or maxAge) from query string; default 60. Returns non-negative int."""
-        max_age = 60
-        query = parse_qs(parsed.query)
-        for key in ("max_age", "maxAge"):
-            if key in query and query[key]:
-                try:
-                    val = int(query[key][0])
-                    if val >= 0:
-                        max_age = val
-                    break
-                except (ValueError, TypeError):
-                    pass
-        return max_age
-
-    def _parse_non_negative_int_query(self, parsed, key: str, default: Optional[int] = None) -> Optional[int]:
-        """Parse a non-negative integer query param; returns default when absent/invalid."""
-        query = parse_qs(parsed.query)
-        if key not in query or not query[key]:
-            return default
-        try:
-            value = int(query[key][0])
-        except (ValueError, TypeError):
-            return default
-        if value < 0:
-            return default
-        return value
-
-    def _resolve_wh_per_hour_days(self, parsed) -> int:
-        """Resolve optional days parameter with default fallback and max clamp."""
-        requested = self._parse_non_negative_int_query(parsed, "days", WH_PER_HOUR_DAYS_DEFAULT)
-        if requested is None:
-            return WH_PER_HOUR_DAYS_DEFAULT
-        return min(requested, WH_PER_HOUR_DAYS_MAX)
-
-    def _is_status_updates_delta_authorized(self, parsed) -> bool:
-        """Optional token auth for status_updates_delta endpoint."""
-        required_token = getattr(self.server, "status_updates_delta_token", None)
-        if not required_token:
-            return True
-
-        header_token = self.headers.get("X-API-Token")
-        if header_token and header_token == required_token:
-            return True
-
-        query = parse_qs(parsed.query)
-        query_token = query.get("token", [None])[0]
-        if query_token and query_token == required_token:
-            return True
-        return False
-
-    def _maybe_refresh_reading(self, reading, max_age: int, refresh_cb) -> None:
-        """If reading is missing or older than max_age seconds, call refresh_cb (0 = always refresh)."""
-        now = int(time.time())
-        need_refresh = (
-            max_age == 0
-            or reading is None
-            or (now - (reading.timestamp or 0)) > max_age
-        )
-        if need_refresh and refresh_cb is not None:
-            refresh_cb()
-
-    def _test_payload(self) -> dict:
-        return {
-            "path": API_PATH_TEST,
-            "status": "ok",
-            "message": "API is up and running",
-            "endpoints": [
-                {"path": API_PATH_TEST, "optional_params": []},
-                {
-                    "path": API_PATH_P1,
-                    "optional_params": [
-                        {
-                            "name": "max_age",
-                            "alt": "maxAge",
-                            "type": "int",
-                            "default": 60,
-                            "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)",
-                        },
-                    ],
-                },
-                {
-                    "path": API_PATH_ZENDURE,
-                    "optional_params": [
-                        {
-                            "name": "max_age",
-                            "alt": "maxAge",
-                            "type": "int",
-                            "default": 60,
-                            "description": "0 = always refresh; N = refresh if data older than N seconds (default 60)",
-                        },
-                    ],
-                },
-                {"path": API_PATH_STATUS, "optional_params": []},
-                {"path": API_PATH_ALL, "optional_params": []},
-                {"path": API_PATH_AUTOMATION_STATUS, "optional_params": []},
-                {
-                    "path": API_PATH_WH_PER_HOUR,
-                    "optional_params": [
-                        {
-                            "name": "days",
-                            "type": "int",
-                            "default": WH_PER_HOUR_DAYS_DEFAULT,
-                            "max": WH_PER_HOUR_DAYS_MAX,
-                            "description": "Optional history window in days including today; values above max are clamped",
-                        },
-                    ],
-                },
-                {
-                    "path": API_PATH_STATUS_UPDATES_DELTA,
-                    "optional_params": [
-                        {
-                            "name": "after_id",
-                            "type": "int",
-                            "required": True,
-                            "description": "Return rows where id > after_id",
-                        },
-                        {
-                            "name": "limit",
-                            "type": "int",
-                            "default": 500,
-                            "max": 2000,
-                            "description": "Maximum rows per page",
-                        },
-                        {
-                            "name": "token",
-                            "type": "string",
-                            "required": False,
-                            "description": "Optional auth token when server token protection is enabled",
-                        },
-                    ],
-                },
-                {"path": API_PATH_REFRESH, "optional_params": []},
-                {"path": API_PATH_RESTART, "optional_params": []},
-                {
-                    "path": API_PATH_PAUSE,
-                    "optional_params": [
-                        {
-                            "name": "state",
-                            "type": "string",
-                            "allowed": ["on", "off", "true", "false", "1", "0"],
-                            "description": "POST only: set pause override state",
-                        },
-                    ],
-                },
-                {
-                    "path": API_PATH_LOG_LEVEL,
-                    "optional_params": [
-                        {
-                            "name": "level",
-                            "alt": "loglevel|log_level",
-                            "type": "string",
-                            "allowed": ["DEBUG", "INFO", "WARNING", "ERROR"],
-                            "description": "POST only: set runtime log level",
-                        },
-                    ],
-                },
-            ],
-        }
-
-    def _control_help_payload(self) -> dict:
-        return {
-            "ok": True,
-            "message": "Automation control API help",
-            "commands": [
-                {
-                    "path": API_PATH_PAUSE,
-                    "name": "status",
-                    "method": "GET",
-                    "description": "Get current pause override state",
-                    "example": f"{API_PATH_PAUSE}",
-                },
-                {
-                    "path": API_PATH_PAUSE,
-                    "name": "pause_on",
-                    "method": "POST",
-                    "description": "Enable pause override (forces desired power to 0)",
-                    "example": f"{API_PATH_PAUSE}?state=on",
-                },
-                {
-                    "path": API_PATH_PAUSE,
-                    "name": "pause_off",
-                    "method": "POST",
-                    "description": "Disable pause override (resume schedule control)",
-                    "example": f"{API_PATH_PAUSE}?state=off",
-                },
-                {
-                    "path": API_PATH_RESTART,
-                    "name": "restart",
-                    "method": "POST",
-                    "description": "Request graceful restart of automation process",
-                    "example": f"{API_PATH_RESTART}",
-                },
-                {
-                    "path": API_PATH_REFRESH,
-                    "name": "refresh_schedule",
-                    "method": "GET",
-                    "description": "Force schedule refresh from API",
-                    "example": f"{API_PATH_REFRESH}",
-                },
-                {
-                    "path": API_PATH_LOG_LEVEL,
-                    "name": "log_level_status",
-                    "method": "GET",
-                    "description": "Get current runtime log level",
-                    "example": f"{API_PATH_LOG_LEVEL}",
-                },
-                {
-                    "path": API_PATH_LOG_LEVEL,
-                    "name": "log_level_set",
-                    "method": "POST",
-                    "description": "Set runtime log level (DEBUG|INFO|WARNING|ERROR)",
-                    "example": f"{API_PATH_LOG_LEVEL}?level=info",
-                },
-            ],
-            "note": "Use /api/test for full endpoint inventory.",
-        }
-
-    def _handle_api_help(self, parsed) -> bool:
-        if parsed.path not in ("/", "/api"):
-            return False
-        self._send_json({
-            "path": parsed.path,
-            "ok": True,
-            "message": "Automation API help",
-            "endpoints": self._test_payload().get("endpoints", []),
-            "control": self._control_help_payload().get("commands", []),
-        }, sort_keys=False)
-        return True
-
-    def _handle_test(self, path: str) -> bool:
-        if path != API_PATH_TEST:
-            return False
-        self._send_json(self._test_payload(), sort_keys=False)
-        return True
-
-    def _handle_wh_per_hour(self, parsed) -> bool:
-        if parsed.path != API_PATH_WH_PER_HOUR:
-            return False
-        db_path = getattr(self.server, "db_path", None)
-        if not db_path or not os.path.exists(db_path):
-            self._send_json({"error": "Status updates database not available"})
-            return True
-        now = int(time.time())
-        resolved_days = self._resolve_wh_per_hour_days(parsed)
-        cached = None
-        with self.server.wh_per_hour_cache_lock:
-            cache_entry = self.server.wh_per_hour_cache
-            if (
-                cache_entry
-                and cache_entry.get("db_path") == db_path
-                and cache_entry.get("days") == resolved_days
-                and (now - int(cache_entry.get("computed_at", 0))) < WH_PER_HOUR_CACHE_SECONDS
-            ):
-                cached = cache_entry.get("data")
-        if cached is not None:
-            self._send_json(cached, sort_keys=True)
-            return True
-
-        data = compute_wh_per_hour(db_path, now, resolved_days)
-        with self.server.wh_per_hour_cache_lock:
-            self.server.wh_per_hour_cache = {
-                "db_path": db_path,
-                "days": resolved_days,
-                "computed_at": now,
-                "data": data,
-            }
-        self._send_json(data, sort_keys=True)
-        return True
-
-    def _handle_status_updates_delta(self, parsed) -> bool:
-        if parsed.path != API_PATH_STATUS_UPDATES_DELTA:
-            return False
-
-        if not self._is_status_updates_delta_authorized(parsed):
-            self._send_json({"error": "Unauthorized"}, 401)
-            return True
-
-        query = parse_qs(parsed.query)
-        if "after_id" not in query or not query["after_id"]:
-            self._send_json({"error": "Missing required query parameter: after_id"}, 400)
-            return True
-
-        try:
-            after_id = int(query["after_id"][0])
-            if after_id < 0:
-                raise ValueError("after_id must be non-negative")
-        except (ValueError, TypeError):
-            self._send_json({"error": "Invalid after_id; expected non-negative integer"}, 400)
-            return True
-
-        limit = self._parse_non_negative_int_query(parsed, "limit", 500)
-        if limit is None or limit <= 0:
-            self._send_json({"error": "Invalid limit; expected positive integer"}, 400)
-            return True
-        limit = min(limit, 2000)
-
-        db_path = getattr(self.server, "db_path", None)
-        if not db_path or not os.path.exists(db_path):
-            self._send_json({"error": "Status updates database not available"}, 503)
-            return True
-
-        rows = []
-        try:
-            with sqlite3.connect(db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cur = conn.execute(
-                    "SELECT id, type, old_value, new_value, p1_total_power, electric_level, timestamp "
-                    "FROM status_updates WHERE id > ? ORDER BY id ASC LIMIT ?",
-                    (after_id, limit + 1),
-                )
-                fetched = cur.fetchall()
-
-            has_more = len(fetched) > limit
-            selected = fetched[:limit]
-            rows = [dict(r) for r in selected]
-        except Exception as e:
-            self._send_json({"error": f"Failed to query status updates: {e}"}, 500)
-            return True
-
-        max_id_returned = after_id
-        if rows:
-            max_id_returned = int(rows[-1]["id"])
-
-        self._send_json(
-            {
-                "rows": rows,
-                "max_id_returned": max_id_returned,
-                "has_more": has_more,
-            },
-            sort_keys=False,
-        )
-        return True
-
-    def _handle_refresh(self, path: str) -> bool:
-        if path != API_PATH_REFRESH:
-            return False
-        schedule_controller = getattr(self.server, "schedule_controller", None)
-        status_api = getattr(self.server, "status_api", None)
-        if not schedule_controller or not status_api:
-            self._send_json({"error": "Refresh not available"}, 503)
-            return True
-        try:
-            schedule_controller.fetch_schedule()
-            status_api.post_update(EVENT_TYPE_RESCAN, None, None)
-            self._send_json({"ok": True, "message": "Schedule refreshed"})
-        except Exception as e:
-            self._send_json({"ok": False, "error": str(e)}, 500)
-        return True
-
-    def _handle_restart(self, path: str) -> bool:
-        if path != API_PATH_RESTART:
-            return False
-        restart_cb = getattr(self.server, "restart_callback", None)
-        if restart_cb is None:
-            self._send_json({"ok": False, "error": "Restart not available"}, 503)
-            return True
-        try:
-            restart_cb()
-            self._send_json({"ok": True, "message": "Restart requested"})
-        except Exception as e:
-            self._send_json({"ok": False, "error": str(e)}, 500)
-        return True
-
-    def _parse_pause_state(self, parsed) -> Optional[bool]:
-        query = parse_qs(parsed.query)
-        raw = None
-        for key in ("state", "pause", "mode", "action"):
-            if key in query and query[key]:
-                raw = str(query[key][0]).strip().lower()
-                break
-        if raw is None:
-            return None
-        if raw in ("on", "pause", "true", "1", "start"):
-            return True
-        if raw in ("off", "resume", "false", "0", "stop"):
-            return False
-        return None
-
-    def _handle_pause_get(self, parsed) -> bool:
-        if parsed.path != API_PATH_PAUSE:
-            return False
-        pause_getter = getattr(self.server, "pause_getter", None)
-        if pause_getter is None:
-            self._send_json({"ok": False, "error": "Pause override not available"}, 503)
-            return True
-        try:
-            active = bool(pause_getter())
-            self._send_json({"ok": True, "pauseActive": active})
-        except Exception as e:
-            self._send_json({"ok": False, "error": str(e)}, 500)
-        return True
-
-    def _handle_pause_post(self, parsed) -> bool:
-        if parsed.path != API_PATH_PAUSE:
-            return False
-        pause_setter = getattr(self.server, "pause_setter", None)
-        pause_getter = getattr(self.server, "pause_getter", None)
-        if pause_setter is None or pause_getter is None:
-            self._send_json({"ok": False, "error": "Pause override not available"}, 503)
-            return True
-        desired = self._parse_pause_state(parsed)
-        if desired is None:
-            self._send_json(self._control_help_payload())
-            return True
-        try:
-            pause_setter(desired)
-            active = bool(pause_getter())
-            self._send_json({"ok": True, "pauseActive": active})
-        except Exception as e:
-            active = bool(pause_getter())
-            self._send_json({"ok": False, "error": str(e), "pauseActive": active}, 500)
-        return True
-
-    def _allowed_runtime_log_levels(self) -> list[str]:
-        allowed = [
-            level
-            for level in BaseDeviceController._LOG_LEVEL_PRIORITY.keys()
-            if level in ("DEBUG", "INFO", "WARNING", "ERROR")
-        ]
-        return allowed if allowed else ["DEBUG", "INFO", "WARNING", "ERROR"]
-
-    def _parse_log_level(self, parsed) -> Optional[str]:
-        query = parse_qs(parsed.query)
-        raw = None
-        for key in ("level", "loglevel", "log_level"):
-            if key in query and query[key]:
-                raw = str(query[key][0]).strip().upper()
-                break
-        if not raw:
-            return None
-        return raw if raw in self._allowed_runtime_log_levels() else None
-
-    def _handle_loglevel_get(self, parsed) -> bool:
-        if parsed.path != API_PATH_LOG_LEVEL:
-            return False
-        controller = getattr(self.server, "controller", None)
-        if controller is None:
-            self._send_json({"ok": False, "error": "Log level control not available"}, 503)
-            return True
-        current_level = str(getattr(controller, "log_level", "INFO")).upper()
-        allowed = self._allowed_runtime_log_levels()
-        if current_level not in allowed:
-            current_level = "INFO"
-        self._send_json({
-            "ok": True,
-            "level": current_level,
-            "allowedLevels": allowed,
-        })
-        return True
-
-    def _handle_loglevel_post(self, parsed) -> bool:
-        if parsed.path != API_PATH_LOG_LEVEL:
-            return False
-        controller = getattr(self.server, "controller", None)
-        if controller is None:
-            self._send_json({"ok": False, "error": "Log level control not available"}, 503)
-            return True
-        desired = self._parse_log_level(parsed)
-        if desired is None:
-            self._send_json({
-                "ok": False,
-                "error": "Invalid log level. Use DEBUG|INFO|WARNING|ERROR.",
-            }, 400)
-            return True
-        controller.log_level = desired
-        # Always print log level changes (independent of current log level)
-        print(f"[loglevel] Log level changed via API to: {desired}")
-        self._send_json({
-            "ok": True,
-            "level": desired,
-            "message": f"Log level set to {desired}",
-        })
-        return True
-
-    def _handle_automation_status(self, path: str, api_state: ApiState) -> bool:
-        if path != API_PATH_AUTOMATION_STATUS:
-            return False
-        data = compute_automation_status_from_state(api_state, "all", 50)
-        self._send_json(data)
-        return True
-
-    def _handle_p1(self, parsed, api_state: ApiState) -> bool:
-        if parsed.path != API_PATH_P1:
-            return False
-        max_age = self._parse_max_age(parsed)
-        self._maybe_refresh_reading(
-            api_state.last_p1, max_age, getattr(self.server, "refresh_p1_callback", None)
-        )
-        data = api_state.last_p1.to_dict() if api_state.last_p1 else None
-        self._send_json(data)
-        return True
-
-    def _handle_zendure(self, parsed, api_state: ApiState) -> bool:
-        if parsed.path != API_PATH_ZENDURE:
-            return False
-        max_age = self._parse_max_age(parsed)
-        self._maybe_refresh_reading(
-            api_state.last_zendure,
-            max_age,
-            getattr(self.server, "refresh_zendure_callback", None),
-        )
-        data = api_state.last_zendure.to_dict() if api_state.last_zendure else None
-        self._send_json(data)
-        return True
-
-    def _handle_status(self, path: str, api_state: ApiState) -> bool:
-        if path != API_PATH_STATUS:
-            return False
-        data = api_state.last_status.to_dict() if api_state.last_status else None
-        self._send_json(data)
-        return True
-
-    def _handle_all(self, path: str, api_state: ApiState) -> bool:
-        if path != API_PATH_ALL:
-            return False
-        response = {
-            "p1": api_state.last_p1.to_dict() if api_state.last_p1 else None,
-            "zendure": api_state.last_zendure.to_dict() if api_state.last_zendure else None,
-            "status": api_state.last_status.to_dict() if api_state.last_status else None,
-        }
-        self._send_json(response)
-        return True
-
-    def do_GET(self):
-        """
-        Handle HTTP GET requests for the automation API server.
-
-        Routes recognized API paths (such as /api/test, /api/wh_per_hour, /api/refresh, /api/automation_status, 
-        /api/p1, /api/zendure, /api/status, and /api/all) to their respective handlers. 
-        Returns JSON responses for successful API calls. If the API state is not initialized, 
-        returns a 503 error with an explanation. Unrecognized paths result in a 404 error response.
-        """
-        parsed = urlparse(self.path)
-        if self._handle_api_help(parsed):
-            return
-        if self._handle_test(parsed.path):
-            return
-        if self._handle_wh_per_hour(parsed):
-            return
-        if self._handle_status_updates_delta(parsed):
-            return
-        if self._handle_refresh(parsed.path):
-            return
-        if self._handle_restart(parsed.path):
-            return
-        if self._handle_pause_get(parsed):
-            return
-        if self._handle_loglevel_get(parsed):
-            return
-        api_state = getattr(self.server, "api_state", None)
-        if api_state is None:
-            self._send_json({"error": "API state not initialized"}, 503)
-            return
-        if self._handle_automation_status(parsed.path, api_state):
-            return
-        if self._handle_p1(parsed, api_state):
-            return
-        if self._handle_zendure(parsed, api_state):
-            return
-        if self._handle_status(parsed.path, api_state):
-            return
-        if self._handle_all(parsed.path, api_state):
-            return
-        self.send_error(404, "Not Found")
-
-    def do_POST(self):
-        """Handle HTTP POST requests for the automation API server."""
-        parsed = urlparse(self.path)
-        if self._handle_api_help(parsed):
-            return
-        if self._handle_restart(parsed.path):
-            return
-        if self._handle_pause_post(parsed):
-            return
-        if self._handle_loglevel_post(parsed):
-            return
-        self.send_error(404, "Not Found")
-
-    def log_message(self, msg_format, *args):
-        """Suppress default request logging to avoid cluttering automation output."""
-        pass
 
 
 # ============================================================================
@@ -1721,6 +1042,7 @@ class AutomationApp:
         self.old_value = None
         self.value = 0
         self.zero_power_since: Optional[float] = None
+        self.standby_sent = False
         self.pause_override_active = False
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
         self.stop_posted = False
@@ -1874,24 +1196,28 @@ class AutomationApp:
     def _start_http_server(self):
         """Start HTTP API server in a daemon thread."""
         try:
-            self.http_server = AutomationTCPServer(("", HTTP_API_PORT), ApiTestHandler)
-            self.http_server.api_state = self.api_state
-            self.http_server.db_path = self.status_api.db_path
-            self.http_server.schedule_controller = self.schedule_controller
-            self.http_server.status_api = self.status_api
-            self.status_api.http_server = self.http_server
-            self.http_server.refresh_p1_callback = self._refresh_p1_for_api
-            self.http_server.refresh_zendure_callback = self._refresh_zendure_for_api
-            self.http_server.restart_callback = self.request_restart
-            self.http_server.pause_getter = lambda: self.pause_override_active
-            self.http_server.pause_setter = self._set_pause_override
-            self.http_server.controller = self.controller
             token_cfg = self.schedule_controller.config.get("statusUpdatesDeltaApiToken", "")
             env_token = os.getenv("STATUS_UPDATES_DELTA_API_TOKEN", "")
             token = str(token_cfg).strip() if token_cfg is not None else ""
             if not token and env_token is not None:
                 token = str(env_token).strip()
-            self.http_server.status_updates_delta_token = token or None
+            self.http_server = create_http_server(
+                api_state=self.api_state,
+                db_path=self.status_api.db_path,
+                schedule_controller=self.schedule_controller,
+                status_api=self.status_api,
+                refresh_p1_callback=self._refresh_p1_for_api,
+                refresh_zendure_callback=self._refresh_zendure_for_api,
+                restart_callback=self.request_restart,
+                pause_getter=lambda: self.pause_override_active,
+                pause_setter=self._set_pause_override,
+                controller=self.controller,
+                status_updates_delta_token=token or None,
+                compute_wh_per_hour_callback=compute_wh_per_hour,
+                port=HTTP_API_PORT,
+                log_level_priorities=BaseDeviceController._LOG_LEVEL_PRIORITY,
+            )
+            self.status_api.http_server = self.http_server
             self.http_server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.http_server_thread.start()
             self.logger.info(f"HTTP API listening on port {HTTP_API_PORT}")
@@ -2277,15 +1603,21 @@ class AutomationApp:
                 self.zero_power_since = time.time()
                 return
 
+            if self.standby_sent:
+                return
+
             zero_duration = time.time() - self.zero_power_since
             if zero_duration >= STANDBY_DELAY_SECONDS:
                 self.logger.info(
                     f"0 power for {int(zero_duration)} seconds, setting device in standby mode"
                 )
-                self.controller.set_standby_mode()
-                self.zero_power_since = None
+                result = self.controller.set_standby_mode()
+                if getattr(result, "success", False):
+                    self.standby_sent = True
+                    self.zero_power_since = None
         else:
             self.zero_power_since = None
+            self.standby_sent = False
 
     def _handle_user_input(self) -> bool:
         """Process any pending user input. Returns False if quit requested."""

@@ -19,6 +19,10 @@ $commandGroups = [
         'title' => 'Automation',
         'description' => 'Temporarily pause or resume schedule-driven control.',
     ],
+    'slow_charge' => [
+        'title' => 'Slow Charge',
+        'description' => 'Preset runtime override buttons for SLOW_CHARGE_MAX_POWER.',
+    ],
     'logging' => [
         'title' => 'Logging',
         'description' => 'Change runtime log verbosity for troubleshooting.',
