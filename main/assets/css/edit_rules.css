@@ -1004,19 +1004,40 @@ button.danger.condition-remove-btn:hover {
     }
 
     .editor-top-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .editor-grid-name,
-    .editor-grid-mode,
-    .editor-grid-fixed,
-    .editor-grid-month,
-    .editor-grid-hour,
-    .editor-grid-min-time,
-    .editor-grid-max-time,
+    .editor-grid-name {
+        grid-column: 1 / -1;
+    }
+
+    .editor-grid-mode {
+        grid-column: 1;
+    }
+
+    .editor-grid-fixed {
+        grid-column: 2;
+    }
+
+    .editor-grid-month {
+        grid-column: 1;
+    }
+
+    .editor-grid-hour {
+        grid-column: 2;
+    }
+
+    .editor-grid-min-time {
+        grid-column: 1;
+    }
+
+    .editor-grid-max-time {
+        grid-column: 2;
+    }
+
     .editor-grid-fallback-label,
     .editor-grid-fallback-input {
-        grid-column: auto;
+        grid-column: 1 / -1;
     }
 
     h1,
@@ -1086,6 +1107,19 @@ button.danger.condition-remove-btn:hover {
         width: 100%;
     }
 
+    .limits-heading-row {
+        display: flex;
+        grid-template-columns: none;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .limits-heading-row > label {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
     .rules-table,
     .rules-table tbody,
     .rules-table tr,
@@ -1146,14 +1180,8 @@ button.danger.condition-remove-btn:hover {
         left: auto;
         max-width: min(220px, calc(100vw - 32px));
     }
-
-    .limits-toggle {
-        width: 100%;
-    }
-
     .limits-toggle-option span {
         min-width: 0;
-        width: 100%;
     }
 }
 
@@ -1177,6 +1205,39 @@ button.danger.condition-remove-btn:hover {
         font-size: 1.2rem;
     }
 
+    .editor-top-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .editor-grid-name {
+        grid-column: 1 / -1;
+    }
+
+    .editor-grid-mode {
+        grid-column: 1;
+    }
+
+    .editor-grid-fixed {
+        grid-column: 2;
+    }
+
+    .editor-grid-month {
+        grid-column: 1;
+    }
+
+    .editor-grid-hour {
+        grid-column: 2;
+    }
+
+    .editor-grid-min-time {
+        grid-column: 1;
+    }
+
+    .editor-grid-max-time {
+        grid-column: 2;
+    }
+
     .rules-table tr {
         grid-template-columns: auto 1fr;
     }
@@ -1191,6 +1252,14 @@ button.danger.condition-remove-btn:hover {
 
     .limits-slider-panel {
         padding: 12px 10px;
+    }
+
+    .limits-heading-row {
+        gap: 8px;
+    }
+
+    .limits-toggle {
+        flex: 0 0 auto;
     }
 
     .limits-value-chip {
