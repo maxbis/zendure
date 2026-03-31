@@ -49,6 +49,40 @@
     margin-bottom: 0;
 }
 
+.automation-status-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.automation-status-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.automation-control-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    color: #7d7d7d;
+    text-decoration: none;
+    font-size: 0.95rem;
+    line-height: 1;
+    opacity: 0.8;
+    transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.automation-control-link:hover,
+.automation-control-link:focus-visible {
+    color: #64b5f6;
+    background: rgba(100, 181, 246, 0.1);
+    opacity: 1;
+}
+
 /* Refresh Button */
 .automation-refresh-btn {
     display: inline-flex;
@@ -354,6 +388,18 @@ body.mobile-dark .automation-refresh-btn {
     color: var(--text-primary);
     padding: 4px 10px;
     font-size: 0.75rem;
+}
+
+body.mobile-dark .automation-control-link {
+    color: var(--text-tertiary);
+    opacity: 0.72;
+}
+
+body.mobile-dark .automation-control-link:hover,
+body.mobile-dark .automation-control-link:focus-visible {
+    color: #64b5f6;
+    background: rgba(100, 181, 246, 0.14);
+    opacity: 1;
 }
 
 body.mobile-dark .automation-refresh-btn:hover:not(:disabled) {

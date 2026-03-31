@@ -14,12 +14,20 @@
 <!-- Automation Status Section -->
 <div class="card" data-component="automation-status">
     <div class="metric-section">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="automation-status-header-row">
             <h3 class="card-header">Automation Status</h3>
-            <button class="automation-refresh-btn no-select" id="automation-refresh-btn" title="Refresh (hold for full reload)">
-                <span class="refresh-icon">↻</span>
-                <span class="refresh-text">Refresh</span>
-            </button>
+            <div class="automation-status-header-actions">
+                <button class="automation-refresh-btn no-select" id="automation-refresh-btn" title="Refresh (hold for full reload)">
+                    <span class="refresh-icon">↻</span>
+                    <span class="refresh-text">Refresh</span>
+                </button>
+                <a
+                    class="automation-control-link"
+                    href="../automate/control/index.php"
+                    title="Automation control"
+                    aria-label="Open automation control"
+                >⚙</a>
+            </div>
         </div>
         <?php
         // Ensure ConfigLoader is available
