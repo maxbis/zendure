@@ -1,4 +1,9 @@
 <?php
+
+// Validate user access
+$validateFile = __DIR__ . '/../login/validate.php';
+require_once $validateFile;
+
 // main/edit_rules_help.php
 date_default_timezone_set('Europe/Amsterdam');
 ?>

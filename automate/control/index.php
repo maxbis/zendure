@@ -1,6 +1,9 @@
 <?php
 
-require_once __DIR__ . '/../../login/validate.php';
+// Validate user access
+$validateFile = __DIR__ . '/../../login/validate.php';
+require_once $validateFile;
+
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/commands.php';
 
