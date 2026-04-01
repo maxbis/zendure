@@ -1607,12 +1607,14 @@ code {
     background: var(--bg-secondary);
     border-radius: 14px;
     width: 360px;
-    height: 580px;
+    max-height: calc(100vh - 32px);
     padding: 0;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.56);
     transform: scale(0.9) translateY(-80px);
     opacity: 0;
     transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
 }
 
 .price-graph-mobile-popup.active .price-graph-mobile-popup-dialog {
@@ -1705,7 +1707,7 @@ code {
     position: relative;
     padding: 18px 18px 10px;
     flex: 1 1 auto;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .price-graph-mobile-popup-body .price-graph-popup-price {
