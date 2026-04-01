@@ -69,7 +69,20 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-danger',
+            'buttonClass' => 'btn-info',
+            'expect_disconnect' => false,
+        ],
+        'slow_charge_100' => [
+            'method' => 'POST',
+            'path' => '/api/slow_charge_max_power?value=100',
+            'label' => '100 W',
+            'description' => 'Set runtime slow-charge max power to 100 W.',
+            'group' => 'slow_charge',
+            'order' => 15,
+            'confirmTitle' => '',
+            'confirmBody' => '',
+            'confirmAction' => '',
+            'buttonClass' => 'btn-refresh',
             'expect_disconnect' => false,
         ],
         'slow_charge_240' => [
@@ -82,7 +95,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-warning',
+            'buttonClass' => 'btn-resume',
             'expect_disconnect' => false,
         ],
         'slow_charge_500' => [
@@ -95,7 +108,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-info',
+            'buttonClass' => 'btn-warning',
             'expect_disconnect' => false,
         ],
         'slow_charge_800' => [
@@ -108,7 +121,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-refresh',
+            'buttonClass' => 'btn-process',
             'expect_disconnect' => false,
         ],
         'slow_charge_1200' => [
@@ -121,7 +134,7 @@ function restartCommandDefinitions(): array {
             'confirmTitle' => '',
             'confirmBody' => '',
             'confirmAction' => '',
-            'buttonClass' => 'btn-resume',
+            'buttonClass' => 'btn-danger',
             'expect_disconnect' => false,
         ],
         'log_debug' => [
