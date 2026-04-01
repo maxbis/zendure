@@ -7,7 +7,7 @@
 // Helper functions for rendering
 function getTimeClass($h)
 {
-    return ($h >= 22 || $h < 6) ? 'time-night' : (($h < 12) ? 'time-morning' : (($h < 18) ? 'time-afternoon' : 'time-evening'));
+    return ($h < 6) ? 'time-night' : (($h < 12) ? 'time-morning' : (($h < 18) ? 'time-afternoon' : 'time-evening'));
 }
 
 function getValueLabel($val)
@@ -23,6 +23,65 @@ function getValueLabel($val)
     if (is_numeric($val))
         return ($val > 0 ? '+' : '') . intval($val) . ' W';
     return $val . ' W';
+}
+
+function getRuleDisplayLabel($slot)
+{
+    $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+    if ($ruleName === '') {
+        return '';
+    }
+
+    $ruleIndex = (isset($slot['rule_index']) && is_numeric($slot['rule_index']))
+        ? intval($slot['rule_index'])
+        : null;
+
+    return $ruleIndex !== null && $ruleIndex > 0
+        ? ('#' . $ruleIndex . ' ' . $ruleName)
+        : $ruleName;
+}
+
+function buildHourlyDisplaySlots($slots)
+{
+    if (!is_array($slots)) {
+        $slots = [];
+    }
+
+    $sortedSlots = array_values($slots);
+    usort($sortedSlots, function ($a, $b) {
+        $timeA = isset($a['time']) ? (string) $a['time'] : '';
+        $timeB = isset($b['time']) ? (string) $b['time'] : '';
+        return strcmp($timeA, $timeB);
+    });
+
+    $displayedSlots = [];
+    $lastKnownSlot = null;
+    $slotIndex = 0;
+    $slotCount = count($sortedSlots);
+
+    for ($hour = 0; $hour < 24; $hour++) {
+        $hourTime = str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . '00';
+
+        while ($slotIndex < $slotCount) {
+            $candidate = $sortedSlots[$slotIndex];
+            $candidateTime = isset($candidate['time']) ? (string) $candidate['time'] : '';
+            if ($candidateTime !== '' && strcmp($candidateTime, $hourTime) <= 0) {
+                $lastKnownSlot = $candidate;
+                $slotIndex++;
+                continue;
+            }
+            break;
+        }
+
+        $slot = is_array($lastKnownSlot) ? $lastKnownSlot : [];
+        $slot['time'] = $hourTime;
+        if (!array_key_exists('value', $slot)) {
+            $slot['value'] = null;
+        }
+        $displayedSlots[] = $slot;
+    }
+
+    return $displayedSlots;
 }
 ?>
 <div class="layout">
@@ -48,21 +107,7 @@ function getValueLabel($val)
                     </div>
                     <div class="schedule-list" id="today-schedule-grid">
                         <?php
-                        $prevVal = null;
-                        $prevRuleName = null;
-                        // First pass: collect displayed slots to find the active one
-                        $displayedSlots = [];
-                        foreach ($resolvedToday as $slot) {
-                            $val = $slot['value'];
-                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
-                            // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
-                                continue;
-                            }
-                            $prevVal = $val;
-                            $prevRuleName = $ruleName;
-                            $displayedSlots[] = $slot;
-                        }
+                        $displayedSlots = buildHourlyDisplaySlots($resolvedToday);
 
                         // Find the current active entry from displayed slots (closest to current time but not larger)
                         $currentActiveTime = null;
@@ -83,6 +128,7 @@ function getValueLabel($val)
                             $isCurrent = ($time === $currentActiveTime);
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $ruleLabel = getRuleDisplayLabel($slot);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -104,9 +150,9 @@ function getValueLabel($val)
                                     </div>
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
                                         <span class="schedule-rule-badge">Rule</span>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -121,21 +167,7 @@ function getValueLabel($val)
                     </div>
                     <div class="schedule-list" id="tomorrow-schedule-grid">
                         <?php
-                        $prevVal = null;
-                        $prevRuleName = null;
-                        // First pass: collect displayed slots
-                        $displayedSlots = [];
-                        foreach ($resolvedTomorrow as $slot) {
-                            $val = $slot['value'];
-                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
-                            // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
-                                continue;
-                            }
-                            $prevVal = $val;
-                            $prevRuleName = $ruleName;
-                            $displayedSlots[] = $slot;
-                        }
+                        $displayedSlots = buildHourlyDisplaySlots($resolvedTomorrow);
 
                         // Second pass: render the displayed slots (no current time for tomorrow)
                         foreach ($displayedSlots as $slot):
@@ -144,6 +176,7 @@ function getValueLabel($val)
                             $h = intval(substr($time, 0, 2));
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $ruleLabel = getRuleDisplayLabel($slot);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -165,9 +198,9 @@ function getValueLabel($val)
                                     </div>
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
                                         <span class="schedule-rule-badge">Rule</span>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>

@@ -132,14 +132,14 @@ body.mobile-dark {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    max-height: 300px;
+    max-height: 380px;
     overflow-y: auto;
     flex: 1 1 auto;
     scrollbar-width: thin;
 }
 
 .schedule-list::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
 }
 
 .schedule-list::-webkit-scrollbar-track {
@@ -158,7 +158,7 @@ body.mobile-dark {
 
 .schedule-item {
     display: grid;
-    grid-template-columns: 44px 200px 160px;
+    grid-template-columns: 44px 160px 240px;
     column-gap: 10px;
     row-gap: 0;
     align-items: center;
@@ -228,6 +228,7 @@ body.mobile-dark {
     width: 100%;
     min-width: 0;
     justify-self: start;
+    transform: translateX(-40px);
 }
 
 .schedule-rule-badge {
@@ -347,7 +348,7 @@ body.mobile-dark {
 }
 
 .schedule-day .schedule-list {
-    max-height: 400px;
+    max-height: 490px;
     overflow-y: auto;
     scrollbar-width: thin;
     padding-right: 2px;
@@ -753,6 +754,10 @@ body.mobile-dark {
 
 .price-graph-row-mobile .price-graph-bar.has-schedule.has-runtime-condition::after {
     background: #cbe100;
+}
+
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-rule-color]::after {
+    background: var(--rule-dot-color);
 }
 
 .price-graph-row-mobile .price-graph-bar.price-current {

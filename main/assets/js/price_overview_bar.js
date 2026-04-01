@@ -367,6 +367,27 @@ async function getPriceGraphRules() {
     return data.rules;
 }
 
+function normalizeRuleOverrideColor(value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) return '';
+    return /^#([0-9a-fA-F]{6})$/.test(rawValue) ? rawValue.toUpperCase() : '';
+}
+
+function buildRuleColorMap(rules) {
+    const colorMap = {};
+    if (!Array.isArray(rules)) {
+        return colorMap;
+    }
+
+    rules.forEach((rule, index) => {
+        const color = normalizeRuleOverrideColor(rule?.color);
+        if (!color) return;
+        colorMap[String(index + 1)] = color;
+    });
+
+    return colorMap;
+}
+
 async function showPriceGraphRuleDetail(ruleIndex, ruleName) {
     const modal = ensurePriceGraphRuleDetailModal();
     const titleEl = modal.querySelector('.price-graph-rule-detail-title');
@@ -1362,7 +1383,7 @@ function showPriceGraphPopup(bar, container) {
  * @param {Array|Object} scheduleEntries - Array of schedule entries or schedule context
  * @param {Object} editModal - Edit modal instance for click handlers
  */
-function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
+function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ruleColorMap = {}) {
     const todayContainer = document.getElementById('price-graph-today');
     const tomorrowContainer = document.getElementById('price-graph-tomorrow');
     const tomorrowContainerMobile = document.getElementById('price-graph-tomorrow-mobile');
@@ -1827,7 +1848,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             
             // Get color for price (grey when no real data)
-            const barColor = getPriceColor(price, minPrice, maxPrice);
+            const defaultBarColor = getPriceColor(price, minPrice, maxPrice);
             
             // Format display text
             const priceDisplay = formatPrice(price);
@@ -1890,10 +1911,18 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal) {
             }
             barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             
+            const overrideRuleColor = ruleIndex !== undefined && ruleIndex !== null
+                ? normalizeRuleOverrideColor(ruleColorMap[String(ruleIndex)])
+                : '';
+
             const barInner = document.createElement('div');
             barInner.className = `price-graph-bar-inner ${!hasRealPrice ? 'price-null' : ''}`;
             barInner.style.height = barHeight;
-            barInner.style.backgroundColor = barColor;
+            barInner.style.backgroundColor = defaultBarColor;
+            if (overrideRuleColor) {
+                barDiv.dataset.ruleColor = overrideRuleColor;
+                barDiv.style.setProperty('--rule-dot-color', overrideRuleColor);
+            }
             
             const barLabel = document.createElement('div');
             barLabel.className = 'price-graph-bar-label';
@@ -2105,18 +2134,26 @@ async function fetchAndRenderPrices(priceApiUrl, scheduleEntries, editModal) {
             throw (lastError || new Error('All price API URLs failed'));
         }
         
+        let ruleColorMap = {};
+        try {
+            const rules = await getPriceGraphRules();
+            ruleColorMap = buildRuleColorMap(rules);
+        } catch (ruleError) {
+            console.warn('Failed to load rule colors for price graph:', ruleError);
+        }
+
         // Get current hour
         const now = new Date();
         const currentHour = now.getHours();
         
         // Render the price graph
-        renderPriceGraph(priceData, currentHour, scheduleEntries, editModal);
+        renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ruleColorMap);
     } catch (e) {
         console.error('Failed to fetch prices:', e);
         const errorMessage = e && (e.message || String(e));
         const now = new Date();
         const currentHour = now.getHours();
-        renderPriceGraph({ today: {}, tomorrow: {}, error: errorMessage }, currentHour, scheduleEntries, editModal);
+        renderPriceGraph({ today: {}, tomorrow: {}, error: errorMessage }, currentHour, scheduleEntries, editModal, {});
     }
 }
 

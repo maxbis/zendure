@@ -1,0 +1,56 @@
+.rule-color-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rule-color-field > #inp-color {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.rule-color-picker-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.rule-color-picker-input {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #1f2937;
+    cursor: pointer;
+}
+
+.rule-color-picker-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.rule-color-picker-input::-webkit-color-swatch {
+    border: 0;
+    border-radius: 6px;
+}
+
+.rule-color-picker-input::-moz-color-swatch {
+    border: 0;
+    border-radius: 6px;
+}
+
+.rule-color-picker-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.rule-color-picker-dot.is-active {
+    border-color: rgba(255, 255, 255, 0.5);
+}

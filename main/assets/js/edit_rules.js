@@ -31,6 +31,7 @@
         inpName: document.getElementById('inp-name'),
         inpValueMode: document.getElementById('inp-value-mode'),
         inpFixedValue: document.getElementById('inp-fixed-value'),
+        inpColor: document.getElementById('inp-color'),
         inpMonth: document.getElementById('inp-month'),
         inpHour: document.getElementById('inp-hour'),
         inpMinTime: document.getElementById('inp-min-time'),
@@ -67,6 +68,7 @@
         'inp-name': 'Rule name shown in the rules list and source labels.',
         'inp-value-mode': 'Select output mode: fixed watts, netzero, or netzero+.',
         'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
+        'inp-color': 'Optional hex color override for graph bars when this rule is active, for example #FF7043.',
         'inp-month': 'Optional month filter. Comma-separated values 1-12 (e.g. 10,11,12,1,2,3).',
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
@@ -79,6 +81,7 @@
         'inp-name',
         'inp-value-mode',
         'inp-fixed-value',
+        'inp-color',
         'inp-month',
         'inp-hour',
         'inp-min-time',
@@ -89,6 +92,7 @@
     ];
     const optionalFieldIds = [
         'inp-month',
+        'inp-color',
         'inp-hour',
         'inp-min-time',
         'inp-max-time',
@@ -140,6 +144,8 @@
         out.name = String(rule.name || '').trim();
         out.value = rule.value;
         out.enabled = rule.enabled !== false;
+        const normalizedColor = normalizeRuleColor(rule.color);
+        if (normalizedColor) out.color = normalizedColor;
         if (rule.key) out.key = String(rule.key);
         if (rule.month) out.month = String(rule.month);
         if (rule.hour) out.hour = String(rule.hour);
@@ -562,12 +568,15 @@
             const limitLabel = hasMinLimit && hasMaxLimit
                 ? ('Limits: ' + rule.min_power + ' to ' + rule.max_power + ' W')
                 : (hasMinLimit ? ('Limit: min ' + rule.min_power + ' W') : (hasMaxLimit ? ('Limit: max ' + rule.max_power + ' W') : ''));
-            const indicatorHtml = hasLimits
+            const limitIndicatorHtml = hasLimits
                 ? '<span class="rule-limit-indicator" aria-hidden="true"></span>'
+                : '<span class="rule-limit-indicator rule-limit-indicator-placeholder" aria-hidden="true"></span>';
+            const colorSwatchHtml = rule.color
+                ? '<span class="rule-color-indicator" style="background:' + escapeHtml(rule.color) + ';" aria-hidden="true"></span>'
                 : '';
             const nameTitle = hasLimits
-                ? ' title="' + escapeHtml(limitLabel) + '"'
-                : '';
+                ? ' title="' + escapeHtml(limitLabel + (rule.color ? (' | Color: ' + rule.color) : '')) + '"'
+                : (rule.color ? ' title="Color: ' + escapeHtml(rule.color) + '"' : '');
             const enabledAttr = rule.enabled === false ? '' : ' checked';
             const isFirst = idx === 0;
             const isLast = idx === state.rules.length - 1;
@@ -581,7 +590,7 @@
             tr.innerHTML = [
                 '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
-                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + indicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
+                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + colorSwatchHtml + limitIndicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
                 '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
@@ -698,6 +707,7 @@
         els.editorTitle.textContent = 'Rule Editor';
         els.form.reset();
         els.inpName.value = '';
+        els.inpColor.value = '';
         els.inpMonth.value = '';
         els.inpHour.value = '';
         els.inpMinTime.value = '';
@@ -714,6 +724,8 @@
         els.conditionsList.innerHTML = '';
         updateFallbackVisibility();
         syncLimitsState({ resetToDefaults: true });
+        els.inpColor.dispatchEvent(new Event('input', { bubbles: true }));
+        els.inpColor.dispatchEvent(new Event('change', { bubbles: true }));
         updateAllFieldStates();
         renderTable();
     }
@@ -749,6 +761,7 @@
             els.inpValueMode.value = 'fixed';
             els.inpFixedValue.value = String(rule.value);
         }
+        els.inpColor.value = rule.color || '';
         els.inpMonth.value = rule.month || '';
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
@@ -771,6 +784,8 @@
             els.conditionsList.appendChild(createConditionRow(condition));
         });
         updateFallbackVisibility();
+        els.inpColor.dispatchEvent(new Event('input', { bubbles: true }));
+        els.inpColor.dispatchEvent(new Event('change', { bubbles: true }));
         updateAllFieldStates();
         renderTable();
     }
@@ -843,6 +858,13 @@
         }
 
         const rule = { name: name, value: value };
+        const color = normalizeRuleColor(els.inpColor.value);
+        if (String(els.inpColor.value || '').trim() !== '' && !color) {
+            throw new Error('Rule color must be a hex color like #FF7043.');
+        }
+        if (color) {
+            rule.color = color;
+        }
 
         const month = els.inpMonth.value.trim();
         if (month) rule.month = month;
@@ -896,6 +918,12 @@
         }
 
         return normalizeRule(rule);
+    }
+
+    function normalizeRuleColor(value) {
+        const rawValue = String(value || '').trim();
+        if (!rawValue) return '';
+        return /^#([0-9a-fA-F]{6})$/.test(rawValue) ? rawValue.toUpperCase() : '';
     }
 
     function moveRule(idx, delta) {
