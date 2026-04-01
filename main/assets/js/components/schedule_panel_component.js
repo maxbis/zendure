@@ -127,6 +127,7 @@ class SchedulePanelComponent extends Component {
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
             const ruleLabel = formatRuleDisplayLabel(slot);
+            const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
@@ -137,7 +138,7 @@ class SchedulePanelComponent extends Component {
                     <div class="schedule-item-time">${formatTime(time)}</div>
                     <div class="schedule-item-value ${valClass}">${valDisplay}</div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
                 ${!isMobile && slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
             `;
             container.appendChild(div);
@@ -169,6 +170,7 @@ class SchedulePanelComponent extends Component {
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
             const ruleLabel = formatRuleDisplayLabel(slot);
+            const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass}`;
@@ -179,7 +181,7 @@ class SchedulePanelComponent extends Component {
                     <div class="schedule-item-time">${formatTime(time)}</div>
                     <div class="schedule-item-value ${valClass}">${valDisplay}</div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
             `;
             container.appendChild(div);
         });
@@ -308,6 +310,23 @@ function formatRuleDisplayLabel(slot) {
     return Number.isInteger(parsedRuleIndex) && parsedRuleIndex > 0
         ? `#${parsedRuleIndex} ${ruleName}`
         : ruleName;
+}
+
+function getScheduleRuleColor(slot) {
+    if (!slot || slot.rule_index === undefined || slot.rule_index === null) {
+        return '';
+    }
+
+    const normalizedRuleIndex = String(parseInt(slot.rule_index, 10));
+    if (!normalizedRuleIndex || normalizedRuleIndex === 'NaN') {
+        return '';
+    }
+
+    const colorMap = (window && window.SCHEDULE_RULE_COLOR_MAP && typeof window.SCHEDULE_RULE_COLOR_MAP === 'object')
+        ? window.SCHEDULE_RULE_COLOR_MAP
+        : {};
+    const rawColor = colorMap[normalizedRuleIndex];
+    return /^#([0-9a-fA-F]{6})$/.test(String(rawColor || '').trim()) ? String(rawColor).trim().toUpperCase() : '';
 }
 
 function buildHourlyDisplaySlots(slots) {

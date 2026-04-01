@@ -231,6 +231,15 @@ body.mobile-dark {
     transform: translateX(-40px);
 }
 
+.schedule-rule-color-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
 .schedule-rule-badge {
     flex: 0 0 auto;
     font-size: 0.6rem;

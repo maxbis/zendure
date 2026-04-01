@@ -41,6 +41,61 @@ function getRuleDisplayLabel($slot)
         : $ruleName;
 }
 
+function normalizeScheduleRuleColor($value)
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $trimmed = trim($value);
+    return preg_match('/^#([0-9a-fA-F]{6})$/', $trimmed) ? strtoupper($trimmed) : '';
+}
+
+function loadScheduleRuleColorMap()
+{
+    $rulesFile = __DIR__ . '/../data/charge_schedule_conditions.json';
+    if (!is_file($rulesFile) || !is_readable($rulesFile)) {
+        return [];
+    }
+
+    $raw = file_get_contents($rulesFile);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $colorMap = [];
+    foreach (array_values($decoded) as $idx => $rule) {
+        if (!is_array($rule)) {
+            continue;
+        }
+        $normalizedColor = normalizeScheduleRuleColor($rule['color'] ?? null);
+        if ($normalizedColor === '') {
+            continue;
+        }
+        $colorMap[(string) ($idx + 1)] = $normalizedColor;
+    }
+
+    return $colorMap;
+}
+
+function getRuleColorForSlot($slot, $colorMap)
+{
+    $ruleIndex = (isset($slot['rule_index']) && is_numeric($slot['rule_index']))
+        ? (string) intval($slot['rule_index'])
+        : '';
+
+    if ($ruleIndex === '' || !is_array($colorMap) || !isset($colorMap[$ruleIndex])) {
+        return '';
+    }
+
+    return normalizeScheduleRuleColor($colorMap[$ruleIndex]);
+}
+
 function buildHourlyDisplaySlots($slots)
 {
     if (!is_array($slots)) {
@@ -83,6 +138,8 @@ function buildHourlyDisplaySlots($slots)
 
     return $displayedSlots;
 }
+
+$scheduleRuleColorMap = loadScheduleRuleColorMap();
 ?>
 <div class="layout">
 <div class="card schedule-mobile-card">
@@ -129,6 +186,7 @@ function buildHourlyDisplaySlots($slots)
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
                             $ruleLabel = getRuleDisplayLabel($slot);
+                            $ruleColor = getRuleColorForSlot($slot, $scheduleRuleColorMap);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -151,7 +209,9 @@ function buildHourlyDisplaySlots($slots)
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
                                     <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
-                                        <span class="schedule-rule-badge">Rule</span>
+                                        <?php if ($ruleColor !== ''): ?>
+                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                        <?php endif; ?>
                                         <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
@@ -177,6 +237,7 @@ function buildHourlyDisplaySlots($slots)
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
                             $ruleLabel = getRuleDisplayLabel($slot);
+                            $ruleColor = getRuleColorForSlot($slot, $scheduleRuleColorMap);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -199,7 +260,9 @@ function buildHourlyDisplaySlots($slots)
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
                                     <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
-                                        <span class="schedule-rule-badge">Rule</span>
+                                        <?php if ($ruleColor !== ''): ?>
+                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                        <?php endif; ?>
                                         <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
@@ -282,6 +345,8 @@ function buildHourlyDisplaySlots($slots)
     </div>
 </div>
 <script>
+window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
 (function() {
     var tabs = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab');
     var panels = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab-panel');
