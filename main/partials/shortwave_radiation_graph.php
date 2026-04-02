@@ -90,6 +90,7 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
 </style>
 <script>
     (function() {
+        var MAX_DISPLAY_AGE_MS = 4 * 60 * 60 * 1000;
         var root = document.getElementById(<?php echo json_encode($shortwaveGraphId, JSON_UNESCAPED_SLASHES); ?>);
         if (!root) return;
 
@@ -100,6 +101,8 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
         var daysEl = root.querySelector('[data-role="days"]');
         var apiUrl = <?php echo json_encode($shortwaveApiUrl, JSON_UNESCAPED_SLASHES); ?>;
         var latestPayload = null;
+        var activeRequest = null;
+        var hasRenderError = false;
         var resizeRaf = 0;
 
         function escapeHtml(value) {
@@ -119,6 +122,40 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
             if (viewportEl) viewportEl.hidden = true;
             if (chartEl) chartEl.hidden = true;
             if (daysEl) daysEl.hidden = true;
+        }
+
+        function getCachedAtMs(payload) {
+            if (!payload || payload.cachedAt == null) return null;
+            var cachedAtSeconds = Number(payload.cachedAt);
+            if (!Number.isFinite(cachedAtSeconds) || cachedAtSeconds <= 0) return null;
+            return cachedAtSeconds * 1000;
+        }
+
+        function shouldRefresh() {
+            if (!latestPayload || hasRenderError) {
+                return true;
+            }
+
+            var cachedAtMs = getCachedAtMs(latestPayload);
+            if (cachedAtMs === null) {
+                return true;
+            }
+
+            return (Date.now() - cachedAtMs) >= MAX_DISPLAY_AGE_MS;
+        }
+
+        function fetchPayload() {
+            return fetch(apiUrl, { method: 'GET' })
+                .then(function(response) {
+                    return response.json().catch(function() {
+                        throw new Error('Shortwave radiation response is not valid JSON.');
+                    }).then(function(payload) {
+                        if (!response.ok || !payload.success) {
+                            throw new Error(payload && payload.error ? payload.error : 'Failed to load shortwave radiation.');
+                        }
+                        return payload;
+                    });
+                });
         }
 
         function formatDate(timestamp) {
@@ -257,6 +294,7 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
 
         function render(payload) {
             latestPayload = payload;
+            hasRenderError = false;
             var viewportWidth = viewportEl ? viewportEl.clientWidth : root.clientWidth;
             var chart = buildChartData(payload, viewportWidth);
             var bottomY = chart.height - chart.paddingBottom;
@@ -303,6 +341,33 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
             if (viewportEl) viewportEl.hidden = false;
         }
 
+        function refreshShortwaveRadiationGraph(options) {
+            options = options || {};
+
+            if (activeRequest) {
+                return activeRequest;
+            }
+
+            if (!options.force && !shouldRefresh()) {
+                return Promise.resolve();
+            }
+
+            activeRequest = fetchPayload()
+                .then(function(payload) {
+                    render(payload);
+                })
+                .catch(function(error) {
+                    hasRenderError = true;
+                    setStatus(error && error.message ? error.message : 'Failed to load shortwave radiation.', true);
+                    throw error;
+                })
+                .finally(function() {
+                    activeRequest = null;
+                });
+
+            return activeRequest;
+        }
+
         function queueResizeRender() {
             if (!latestPayload) return;
             if (resizeRaf) cancelAnimationFrame(resizeRaf);
@@ -312,21 +377,11 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
             });
         }
 
-        fetch(apiUrl, { method: 'GET' })
-            .then(function(response) {
-                return response.json().catch(function() {
-                    throw new Error('Shortwave radiation response is not valid JSON.');
-                }).then(function(payload) {
-                    if (!response.ok || !payload.success) {
-                        throw new Error(payload && payload.error ? payload.error : 'Failed to load shortwave radiation.');
-                    }
-                    return payload;
-                });
-            })
-            .then(render)
-            .catch(function(error) {
-                setStatus(error && error.message ? error.message : 'Failed to load shortwave radiation.', true);
-            });
+        window.refreshShortwaveRadiationGraph = refreshShortwaveRadiationGraph;
+
+        refreshShortwaveRadiationGraph({ force: true }).catch(function() {
+            return null;
+        });
 
         window.addEventListener('resize', queueResizeRender);
     })();

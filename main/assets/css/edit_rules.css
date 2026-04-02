@@ -267,6 +267,10 @@ button:hover {
     margin: 0;
 }
 
+.file-row code {
+    overflow-wrap: anywhere;
+}
+
 .file-label {
     font-size: 0.96rem;
     font-weight: 600;
@@ -1083,30 +1087,14 @@ button.danger.condition-remove-btn:hover {
     }
 
     .file-row {
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-            "label label"
-            "path copy";
-        gap: 6px 8px;
+        grid-template-columns: 1fr;
+        align-items: start;
+        gap: 8px;
     }
 
-    .file-label {
-        grid-area: label;
-        font-size: 1rem;
-    }
-
-    .file-path {
-        grid-area: path;
-        font-size: 1.05rem;
-    }
-
-    #btn-copy-file-path {
-        grid-area: copy;
-        min-height: 42px;
-    }
-
-    .status {
-        font-size: 1rem;
+    .file-row .muted {
+        font-size: 0.95rem;
+        line-height: 1.45;
     }
 
     .card-header-row {
@@ -1162,10 +1150,11 @@ button.danger.condition-remove-btn:hover {
 
     .rules-table tr {
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        grid-template-areas: "enabled index name actions";
         align-items: center;
-        gap: 8px;
-        padding: 10px 0;
+        gap: 10px;
+        padding: 12px 0;
     }
 
     .rules-table td {
@@ -1174,33 +1163,52 @@ button.danger.condition-remove-btn:hover {
         min-width: 0;
     }
 
+    .rules-table td:nth-child(1) {
+        grid-area: enabled;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     .rules-table tbody > tr:not(:last-child) {
         border-bottom: 1px solid var(--line);
     }
 
     .rules-table td:nth-child(2) {
+        grid-area: index;
         color: var(--muted);
-        font-size: 0.9rem;
+        font-size: 0.95rem;
+        line-height: 1;
     }
 
     .rules-table td:nth-child(3) {
+        grid-area: name;
         min-width: 0;
     }
 
-.rule-name-button {
+    .rules-table td:nth-child(4) {
+        grid-area: actions;
+    }
+
+    .rule-name-button {
         width: 100%;
         justify-content: flex-start;
         min-width: 0;
+        align-items: center;
+        padding: 2px 0;
     }
 
     .rule-name-button code {
         min-width: 0;
         overflow-wrap: anywhere;
         white-space: normal;
+        font-size: 0.96rem;
+        line-height: 1.35;
     }
 
     .table-actions {
         width: auto;
+        justify-self: end;
     }
 
     .rule-actions-popover {
@@ -1208,6 +1216,12 @@ button.danger.condition-remove-btn:hover {
         left: auto;
         max-width: min(220px, calc(100vw - 32px));
     }
+
+    .enabled-cell input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
     .limits-toggle-option span {
         min-width: 0;
     }
@@ -1281,15 +1295,27 @@ button.danger.condition-remove-btn:hover {
     }
 
     .rules-table tr {
-        grid-template-columns: auto 1fr;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "enabled name actions"
+            "index name actions";
+        align-items: start;
+        gap: 8px 10px;
     }
 
-    .rules-table td:nth-child(3) {
-        grid-column: 1 / -1;
+    .rules-table td:nth-child(2) {
+        align-self: start;
+        padding-top: 2px;
     }
 
-    .rules-table td:nth-child(4) {
-        justify-self: end;
+    .rule-name-button {
+        align-items: flex-start;
+    }
+
+    .rule-actions-toggle {
+        width: 36px;
+        min-width: 36px;
+        height: 36px;
     }
 
     .limits-slider-panel {

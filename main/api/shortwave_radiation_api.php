@@ -70,6 +70,7 @@ try {
         'days' => $responsePayload['days'],
         'hourly' => $responsePayload['hourly'],
         'hourly_units' => $responsePayload['hourly_units'],
+        'cachedAt' => $responsePayload['cachedAt'],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(resolveStatusCode($e->getMessage()));
