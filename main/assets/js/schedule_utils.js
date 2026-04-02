@@ -32,7 +32,7 @@ function getValueLabel(value) {
  * @returns {string} - CSS class name
  */
 function getTimeClass(hour) {
-    if (hour >= 22 || hour < 6) return 'time-night';
+    if (hour < 6) return 'time-night';
     if (hour < 12) return 'time-morning';
     if (hour < 18) return 'time-afternoon';
     return 'time-evening';

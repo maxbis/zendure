@@ -113,6 +113,24 @@ function validateCondition(array $condition): bool
     return true;
 }
 
+function normalizeRuleColor($value): ?string
+{
+    if (!is_string($value)) {
+        return null;
+    }
+
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return null;
+    }
+
+    if (!preg_match('/^#([0-9a-fA-F]{6})$/', $trimmed)) {
+        return null;
+    }
+
+    return strtoupper($trimmed);
+}
+
 function normalizeRules(array $rules): array
 {
     $out = [];
@@ -132,6 +150,10 @@ function normalizeRules(array $rules): array
         $normalized['name'] = $name;
         $normalized['value'] = is_numeric($rule['value']) ? (int) $rule['value'] : (string) $rule['value'];
         $normalized['enabled'] = !array_key_exists('enabled', $rule) ? true : (bool) $rule['enabled'];
+        $color = array_key_exists('color', $rule) ? normalizeRuleColor($rule['color']) : null;
+        if ($color !== null) {
+            $normalized['color'] = $color;
+        }
 
         if (isset($rule['key']) && is_string($rule['key']) && $rule['key'] !== '') {
             $normalized['key'] = $rule['key'];
@@ -236,6 +258,7 @@ if ($isApi) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit Rules</title>
     <link rel="stylesheet" href="assets/css/edit_rules.css">
+    <link rel="stylesheet" href="assets/css/edit_rules_color_picker.css">
 </head>
 <body>
 <main class="rules-page">
@@ -300,6 +323,12 @@ if ($isApi) {
                     <div class="editor-grid-item editor-grid-fixed">
                         <label for="inp-fixed-value">Fixed Value (W)</label>
                         <input id="inp-fixed-value" type="number" step="1" placeholder="500">
+                    </div>
+                    <div class="editor-grid-item editor-grid-color">
+                        <label for="inp-color">Rule Color</label>
+                        <div class="rule-color-field" data-rule-color-field>
+                            <input id="inp-color" type="text" placeholder="#FF7043" inputmode="text" autocomplete="off">
+                        </div>
                     </div>
 
                     <div class="editor-grid-item editor-grid-month">
@@ -398,5 +427,6 @@ window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT
 window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>
+<script src="assets/js/edit_rules_color_picker.js"></script>
 </body>
 </html>

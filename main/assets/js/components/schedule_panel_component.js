@@ -102,21 +102,7 @@ class SchedulePanelComponent extends Component {
             return;
         }
         
-        let prevVal = null;
-        let prevRuleName = null;
-        const displayedSlots = [];
-        
-        // First pass: collect displayed slots
-        resolved.forEach(slot => {
-            const val = slot.value;
-            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
-            if (prevVal !== null && val === prevVal && ruleName === prevRuleName) {
-                return;
-            }
-            prevVal = val;
-            prevRuleName = ruleName;
-            displayedSlots.push(slot);
-        });
+        const displayedSlots = buildHourlyDisplaySlots(resolved);
         
         // Find current active entry
         let currentActiveTime = null;
@@ -140,6 +126,8 @@ class SchedulePanelComponent extends Component {
             const valClass = getValueClass(slot.value);
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+            const ruleLabel = formatRuleDisplayLabel(slot);
+            const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
@@ -150,7 +138,7 @@ class SchedulePanelComponent extends Component {
                     <div class="schedule-item-time">${formatTime(time)}</div>
                     <div class="schedule-item-value ${valClass}">${valDisplay}</div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
                 ${!isMobile && slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
             `;
             container.appendChild(div);
@@ -169,21 +157,7 @@ class SchedulePanelComponent extends Component {
             return;
         }
         
-        let prevVal = null;
-        let prevRuleName = null;
-        const displayedSlots = [];
-        
-        // First pass: collect displayed slots
-        resolvedTomorrow.forEach(slot => {
-            const val = slot.value;
-            const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
-            if (prevVal !== null && val === prevVal && ruleName === prevRuleName) {
-                return;
-            }
-            prevVal = val;
-            prevRuleName = ruleName;
-            displayedSlots.push(slot);
-        });
+        const displayedSlots = buildHourlyDisplaySlots(resolvedTomorrow);
         
         // Render slots (no current time highlighting for tomorrow)
         displayedSlots.forEach(slot => {
@@ -195,6 +169,8 @@ class SchedulePanelComponent extends Component {
             const valClass = getValueClass(slot.value);
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+            const ruleLabel = formatRuleDisplayLabel(slot);
+            const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
             div.className = `schedule-item ${bgClass}`;
@@ -205,7 +181,7 @@ class SchedulePanelComponent extends Component {
                     <div class="schedule-item-time">${formatTime(time)}</div>
                     <div class="schedule-item-value ${valClass}">${valDisplay}</div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
+                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
             `;
             container.appendChild(div);
         });
@@ -318,6 +294,74 @@ class SchedulePanelComponent extends Component {
         const now = new Date();
         return String(now.getHours()).padStart(2, '0') + '00';
     }
+}
+
+function formatRuleDisplayLabel(slot) {
+    if (!slot || slot.rule_name === undefined || slot.rule_name === null) {
+        return '';
+    }
+
+    const ruleName = String(slot.rule_name).trim();
+    if (!ruleName) {
+        return '';
+    }
+
+    const parsedRuleIndex = parseInt(slot.rule_index, 10);
+    return Number.isInteger(parsedRuleIndex) && parsedRuleIndex > 0
+        ? `#${parsedRuleIndex} ${ruleName}`
+        : ruleName;
+}
+
+function getScheduleRuleColor(slot) {
+    if (!slot || slot.rule_index === undefined || slot.rule_index === null) {
+        return '';
+    }
+
+    const normalizedRuleIndex = String(parseInt(slot.rule_index, 10));
+    if (!normalizedRuleIndex || normalizedRuleIndex === 'NaN') {
+        return '';
+    }
+
+    const colorMap = (window && window.SCHEDULE_RULE_COLOR_MAP && typeof window.SCHEDULE_RULE_COLOR_MAP === 'object')
+        ? window.SCHEDULE_RULE_COLOR_MAP
+        : {};
+    const rawColor = colorMap[normalizedRuleIndex];
+    return /^#([0-9a-fA-F]{6})$/.test(String(rawColor || '').trim()) ? String(rawColor).trim().toUpperCase() : '';
+}
+
+function buildHourlyDisplaySlots(slots) {
+    const sortedSlots = Array.isArray(slots)
+        ? [...slots].sort((a, b) => String(a?.time || '').localeCompare(String(b?.time || '')))
+        : [];
+
+    const displayedSlots = [];
+    let lastKnownSlot = null;
+    let slotIndex = 0;
+
+    for (let hour = 0; hour < 24; hour++) {
+        const hourTime = `${String(hour).padStart(2, '0')}00`;
+
+        while (slotIndex < sortedSlots.length) {
+            const candidate = sortedSlots[slotIndex];
+            const candidateTime = String(candidate?.time || '');
+            if (candidateTime && candidateTime <= hourTime) {
+                lastKnownSlot = candidate;
+                slotIndex += 1;
+                continue;
+            }
+            break;
+        }
+
+        displayedSlots.push({
+            ...(lastKnownSlot && typeof lastKnownSlot === 'object' ? lastKnownSlot : {}),
+            time: hourTime,
+            value: lastKnownSlot && Object.prototype.hasOwnProperty.call(lastKnownSlot, 'value')
+                ? lastKnownSlot.value
+                : null
+        });
+    }
+
+    return displayedSlots;
 }
 
 // Export for use in modules

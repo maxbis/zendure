@@ -7,7 +7,7 @@
 // Helper functions for rendering
 function getTimeClass($h)
 {
-    return ($h >= 22 || $h < 6) ? 'time-night' : (($h < 12) ? 'time-morning' : (($h < 18) ? 'time-afternoon' : 'time-evening'));
+    return ($h < 6) ? 'time-night' : (($h < 12) ? 'time-morning' : (($h < 18) ? 'time-afternoon' : 'time-evening'));
 }
 
 function getValueLabel($val)
@@ -24,6 +24,122 @@ function getValueLabel($val)
         return ($val > 0 ? '+' : '') . intval($val) . ' W';
     return $val . ' W';
 }
+
+function getRuleDisplayLabel($slot)
+{
+    $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+    if ($ruleName === '') {
+        return '';
+    }
+
+    $ruleIndex = (isset($slot['rule_index']) && is_numeric($slot['rule_index']))
+        ? intval($slot['rule_index'])
+        : null;
+
+    return $ruleIndex !== null && $ruleIndex > 0
+        ? ('#' . $ruleIndex . ' ' . $ruleName)
+        : $ruleName;
+}
+
+function normalizeScheduleRuleColor($value)
+{
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $trimmed = trim($value);
+    return preg_match('/^#([0-9a-fA-F]{6})$/', $trimmed) ? strtoupper($trimmed) : '';
+}
+
+function loadScheduleRuleColorMap()
+{
+    $rulesFile = __DIR__ . '/../data/charge_schedule_conditions.json';
+    if (!is_file($rulesFile) || !is_readable($rulesFile)) {
+        return [];
+    }
+
+    $raw = file_get_contents($rulesFile);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $colorMap = [];
+    foreach (array_values($decoded) as $idx => $rule) {
+        if (!is_array($rule)) {
+            continue;
+        }
+        $normalizedColor = normalizeScheduleRuleColor($rule['color'] ?? null);
+        if ($normalizedColor === '') {
+            continue;
+        }
+        $colorMap[(string) ($idx + 1)] = $normalizedColor;
+    }
+
+    return $colorMap;
+}
+
+function getRuleColorForSlot($slot, $colorMap)
+{
+    $ruleIndex = (isset($slot['rule_index']) && is_numeric($slot['rule_index']))
+        ? (string) intval($slot['rule_index'])
+        : '';
+
+    if ($ruleIndex === '' || !is_array($colorMap) || !isset($colorMap[$ruleIndex])) {
+        return '';
+    }
+
+    return normalizeScheduleRuleColor($colorMap[$ruleIndex]);
+}
+
+function buildHourlyDisplaySlots($slots)
+{
+    if (!is_array($slots)) {
+        $slots = [];
+    }
+
+    $sortedSlots = array_values($slots);
+    usort($sortedSlots, function ($a, $b) {
+        $timeA = isset($a['time']) ? (string) $a['time'] : '';
+        $timeB = isset($b['time']) ? (string) $b['time'] : '';
+        return strcmp($timeA, $timeB);
+    });
+
+    $displayedSlots = [];
+    $lastKnownSlot = null;
+    $slotIndex = 0;
+    $slotCount = count($sortedSlots);
+
+    for ($hour = 0; $hour < 24; $hour++) {
+        $hourTime = str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . '00';
+
+        while ($slotIndex < $slotCount) {
+            $candidate = $sortedSlots[$slotIndex];
+            $candidateTime = isset($candidate['time']) ? (string) $candidate['time'] : '';
+            if ($candidateTime !== '' && strcmp($candidateTime, $hourTime) <= 0) {
+                $lastKnownSlot = $candidate;
+                $slotIndex++;
+                continue;
+            }
+            break;
+        }
+
+        $slot = is_array($lastKnownSlot) ? $lastKnownSlot : [];
+        $slot['time'] = $hourTime;
+        if (!array_key_exists('value', $slot)) {
+            $slot['value'] = null;
+        }
+        $displayedSlots[] = $slot;
+    }
+
+    return $displayedSlots;
+}
+
+$scheduleRuleColorMap = loadScheduleRuleColorMap();
 ?>
 <div class="layout">
 <div class="card schedule-mobile-card">
@@ -48,21 +164,7 @@ function getValueLabel($val)
                     </div>
                     <div class="schedule-list" id="today-schedule-grid">
                         <?php
-                        $prevVal = null;
-                        $prevRuleName = null;
-                        // First pass: collect displayed slots to find the active one
-                        $displayedSlots = [];
-                        foreach ($resolvedToday as $slot) {
-                            $val = $slot['value'];
-                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
-                            // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
-                                continue;
-                            }
-                            $prevVal = $val;
-                            $prevRuleName = $ruleName;
-                            $displayedSlots[] = $slot;
-                        }
+                        $displayedSlots = buildHourlyDisplaySlots($resolvedToday);
 
                         // Find the current active entry from displayed slots (closest to current time but not larger)
                         $currentActiveTime = null;
@@ -83,6 +185,8 @@ function getValueLabel($val)
                             $isCurrent = ($time === $currentActiveTime);
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $ruleLabel = getRuleDisplayLabel($slot);
+                            $ruleColor = getRuleColorForSlot($slot, $scheduleRuleColorMap);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -104,9 +208,11 @@ function getValueLabel($val)
                                     </div>
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
-                                        <span class="schedule-rule-badge">Rule</span>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
+                                        <?php if ($ruleColor !== ''): ?>
+                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                        <?php endif; ?>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -121,21 +227,7 @@ function getValueLabel($val)
                     </div>
                     <div class="schedule-list" id="tomorrow-schedule-grid">
                         <?php
-                        $prevVal = null;
-                        $prevRuleName = null;
-                        // First pass: collect displayed slots
-                        $displayedSlots = [];
-                        foreach ($resolvedTomorrow as $slot) {
-                            $val = $slot['value'];
-                            $ruleName = isset($slot['rule_name']) ? (string) $slot['rule_name'] : '';
-                            // Filter logic: Only show changes or first item
-                            if ($prevVal !== null && $val === $prevVal && $ruleName === $prevRuleName) {
-                                continue;
-                            }
-                            $prevVal = $val;
-                            $prevRuleName = $ruleName;
-                            $displayedSlots[] = $slot;
-                        }
+                        $displayedSlots = buildHourlyDisplaySlots($resolvedTomorrow);
 
                         // Second pass: render the displayed slots (no current time for tomorrow)
                         foreach ($displayedSlots as $slot):
@@ -144,6 +236,8 @@ function getValueLabel($val)
                             $h = intval(substr($time, 0, 2));
                             $bgClass = getTimeClass($h);
                             $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
+                            $ruleLabel = getRuleDisplayLabel($slot);
+                            $ruleColor = getRuleColorForSlot($slot, $scheduleRuleColorMap);
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
@@ -165,9 +259,11 @@ function getValueLabel($val)
                                     </div>
                                 </div>
                                 <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleName); ?>">
-                                        <span class="schedule-rule-badge">Rule</span>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleName); ?></span>
+                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
+                                        <?php if ($ruleColor !== ''): ?>
+                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                        <?php endif; ?>
+                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -249,6 +345,8 @@ function getValueLabel($val)
     </div>
 </div>
 <script>
+window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
 (function() {
     var tabs = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab');
     var panels = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab-panel');

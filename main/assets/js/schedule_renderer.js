@@ -16,25 +16,7 @@ function renderToday(resolved, currentHour, currentTime) {
 
     container.innerHTML = '';
 
-    let prevVal = null;
-    let prevRuleName = null;
-
-    // First pass: collect displayed slots to find the active one
-    const displayedSlots = [];
-    resolved.forEach(slot => {
-        const val = slot.value;
-        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
-        // Filter logic: Only show changes or first item
-        if (prevVal !== null &&
-            ((val === prevVal && ruleName === prevRuleName) ||
-                (val === 'netzero' && prevVal === 'netzero' && ruleName === prevRuleName) ||
-                (val === 'netzero+' && prevVal === 'netzero+' && ruleName === prevRuleName))) {
-            return;
-        }
-        prevVal = val;
-        prevRuleName = ruleName;
-        displayedSlots.push(slot);
-    });
+    const displayedSlots = buildHourlyDisplaySlots(resolved);
 
     // Find the current active entry from displayed slots (closest to current time but not larger)
     let currentActiveTime = null;
@@ -47,22 +29,9 @@ function renderToday(resolved, currentHour, currentTime) {
         }
     });
 
-    // Second pass: render the displayed slots
-    prevVal = null;
-    prevRuleName = null;
-    resolved.forEach(slot => {
+    displayedSlots.forEach(slot => {
         const val = slot.value;
         const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
-        // Filter logic: Only show changes or first item
-        if (prevVal !== null &&
-            ((val === prevVal && ruleName === prevRuleName) ||
-                (val === 'netzero' && prevVal === 'netzero' && ruleName === prevRuleName) ||
-                (val === 'netzero+' && prevVal === 'netzero+' && ruleName === prevRuleName))) {
-            return;
-        }
-        prevVal = val;
-        prevRuleName = ruleName;
-
         const time = String(slot.time);
         const h = parseInt(time.substring(0, 2));
         const isCurrent = (time === currentActiveTime);
@@ -71,6 +40,8 @@ function renderToday(resolved, currentHour, currentTime) {
         const valDisplay = getValueLabel(val);
         const valClass = getValueClass(val);
         const isConditionSlot = slot && slot.source === 'condition';
+        const ruleLabel = formatRuleDisplayLabel(slot);
+        const ruleColor = getScheduleRuleColor(slot);
 
         const div = document.createElement('div');
         div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
@@ -79,7 +50,7 @@ function renderToday(resolved, currentHour, currentTime) {
                 <div class="schedule-item-time">${formatTime(time)}</div>
                 <div class="schedule-item-value ${valClass}">${valDisplay}</div>
             </div>
-            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
+            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
             ${slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
         `;
         container.appendChild(div);
@@ -101,18 +72,7 @@ function renderTomorrow(resolved) {
         return;
     }
 
-    let prevVal = null;
-    let prevRuleName = null;
-    const displayedSlots = [];
-
-    resolved.forEach(slot => {
-        const val = slot.value;
-        const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
-        if (prevVal !== null && val === prevVal && ruleName === prevRuleName) return;
-        prevVal = val;
-        prevRuleName = ruleName;
-        displayedSlots.push(slot);
-    });
+    const displayedSlots = buildHourlyDisplaySlots(resolved);
 
     displayedSlots.forEach(slot => {
         const time = String(slot.time);
@@ -122,6 +82,8 @@ function renderTomorrow(resolved) {
         const valClass = getValueClass(slot.value);
         const isConditionSlot = slot && slot.source === 'condition';
         const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
+        const ruleLabel = formatRuleDisplayLabel(slot);
+        const ruleColor = getScheduleRuleColor(slot);
 
         const div = document.createElement('div');
         div.className = `schedule-item ${bgClass}`;
@@ -130,10 +92,78 @@ function renderTomorrow(resolved) {
                 <div class="schedule-item-time">${formatTime(time)}</div>
                 <div class="schedule-item-value ${valClass}">${valDisplay}</div>
             </div>
-            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleName)}"><span class="schedule-rule-badge">Rule</span><span class="schedule-item-rule-name">${escapeHtml(ruleName)}</span></div>` : ''}
+            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
         `;
         container.appendChild(div);
     });
+}
+
+function formatRuleDisplayLabel(slot) {
+    if (!slot || slot.rule_name === undefined || slot.rule_name === null) {
+        return '';
+    }
+
+    const ruleName = String(slot.rule_name).trim();
+    if (!ruleName) {
+        return '';
+    }
+
+    const parsedRuleIndex = parseInt(slot.rule_index, 10);
+    return Number.isInteger(parsedRuleIndex) && parsedRuleIndex > 0
+        ? `#${parsedRuleIndex} ${ruleName}`
+        : ruleName;
+}
+
+function getScheduleRuleColor(slot) {
+    if (!slot || slot.rule_index === undefined || slot.rule_index === null) {
+        return '';
+    }
+
+    const normalizedRuleIndex = String(parseInt(slot.rule_index, 10));
+    if (!normalizedRuleIndex || normalizedRuleIndex === 'NaN') {
+        return '';
+    }
+
+    const colorMap = (window && window.SCHEDULE_RULE_COLOR_MAP && typeof window.SCHEDULE_RULE_COLOR_MAP === 'object')
+        ? window.SCHEDULE_RULE_COLOR_MAP
+        : {};
+    const rawColor = colorMap[normalizedRuleIndex];
+    return /^#([0-9a-fA-F]{6})$/.test(String(rawColor || '').trim()) ? String(rawColor).trim().toUpperCase() : '';
+}
+
+function buildHourlyDisplaySlots(slots) {
+    const sortedSlots = Array.isArray(slots)
+        ? [...slots].sort((a, b) => String(a?.time || '').localeCompare(String(b?.time || '')))
+        : [];
+
+    const displayedSlots = [];
+    let lastKnownSlot = null;
+    let slotIndex = 0;
+
+    for (let hour = 0; hour < 24; hour++) {
+        const hourTime = `${String(hour).padStart(2, '0')}00`;
+
+        while (slotIndex < sortedSlots.length) {
+            const candidate = sortedSlots[slotIndex];
+            const candidateTime = String(candidate?.time || '');
+            if (candidateTime && candidateTime <= hourTime) {
+                lastKnownSlot = candidate;
+                slotIndex += 1;
+                continue;
+            }
+            break;
+        }
+
+        displayedSlots.push({
+            ...(lastKnownSlot && typeof lastKnownSlot === 'object' ? lastKnownSlot : {}),
+            time: hourTime,
+            value: lastKnownSlot && Object.prototype.hasOwnProperty.call(lastKnownSlot, 'value')
+                ? lastKnownSlot.value
+                : null
+        });
+    }
+
+    return displayedSlots;
 }
 
 /**

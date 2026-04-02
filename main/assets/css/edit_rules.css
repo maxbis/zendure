@@ -417,9 +417,14 @@ button:hover {
     width: 9px;
     height: 9px;
     border-radius: 999px;
-    background: #f59e0b;
-    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.28);
+    background: transparent;
+    border: 1.5px solid rgba(203, 213, 225, 0.9);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
     flex: 0 0 auto;
+}
+
+.rule-limit-indicator-placeholder {
+    opacity: 0;
 }
 
 .rule-name-button:hover code {
@@ -592,20 +597,34 @@ form {
     grid-column: 4;
 }
 
+.editor-grid-color {
+    grid-column: 1 / span 2;
+    grid-row: 3;
+}
+
 .editor-grid-month {
     grid-column: 1;
+    grid-row: 2;
 }
 
 .editor-grid-hour {
     grid-column: 2;
+    grid-row: 2;
 }
 
 .editor-grid-min-time {
     grid-column: 3;
+    grid-row: 2;
 }
 
 .editor-grid-max-time {
     grid-column: 4;
+    grid-row: 2;
+}
+
+#inp-color {
+    font-family: Consolas, "Courier New", monospace;
+    text-transform: uppercase;
 }
 
 .editor-top-grid-fallback {
@@ -939,6 +958,10 @@ button.danger.condition-remove-btn:hover {
     .editor-grid-max-time {
         grid-column: 2;
     }
+    .editor-grid-color {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
     .editor-grid-fallback-input {
         grid-column: 1 / -1;
     }
@@ -1033,6 +1056,11 @@ button.danger.condition-remove-btn:hover {
 
     .editor-grid-max-time {
         grid-column: 2;
+    }
+
+    .editor-grid-color {
+        grid-column: 1 / -1;
+        grid-row: auto;
     }
 
     .editor-grid-fallback-label,
@@ -1159,7 +1187,7 @@ button.danger.condition-remove-btn:hover {
         min-width: 0;
     }
 
-    .rule-name-button {
+.rule-name-button {
         width: 100%;
         justify-content: flex-start;
         min-width: 0;
@@ -1183,6 +1211,15 @@ button.danger.condition-remove-btn:hover {
     .limits-toggle-option span {
         min-width: 0;
     }
+}
+
+.rule-color-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
 @media (max-width: 360px) {
@@ -1236,6 +1273,11 @@ button.danger.condition-remove-btn:hover {
 
     .editor-grid-max-time {
         grid-column: 2;
+    }
+
+    .editor-grid-color {
+        grid-column: 1 / -1;
+        grid-row: auto;
     }
 
     .rules-table tr {
