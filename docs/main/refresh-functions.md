@@ -31,6 +31,7 @@ Overview of refresh-related JavaScript in the schedule app: the two main APIs, w
 - Price graph (via `fetchAndRenderPrices`)
 - Schedule calculator
 - Watt-hours per hour partial (chart + daily table), via `refreshEnergyGraph()` when this refresh runs (including on the 20×20 interval)
+- Shortwave radiation graph, via `refreshShortwaveRadiationGraph()` when this refresh runs; the graph fetches only when its displayed payload is missing, errored, or older than 4 hours
 
 Does **not** touch automation status or charge status.
 
@@ -103,7 +104,19 @@ Handles the Automation "Refresh" button: disables button, shows "refreshing" UX,
 
 ---
 
-## 7. DataService (legacy note)
+## 7. Shortwave radiation refresh
+
+**File:** `main/partials/shortwave_radiation_graph.php`
+
+**API:** **`refreshShortwaveRadiationGraph()`** (exposed as `window.refreshShortwaveRadiationGraph`)
+
+**When triggered:** Initial partial load and from `_refreshScheduleAndPricesInternal()` in `charge_schedule.js`.
+
+**Updates:** Shortwave radiation chart from `api/shortwave_radiation_api.php`, but only if the displayed payload is missing, in an error state, or older than 4 hours based on the API response `cachedAt` timestamp.
+
+---
+
+## 8. DataService (legacy note)
 
 `main/assets/js/data_service.js` is not part of the current mobile page load order.  
 The active refresh path is driven by `main/assets/js/charge_schedule.js` and `main/assets/js/charge_status.js`.
@@ -127,6 +140,7 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Price graph
 - Schedule calculator
 - Watt-hours per hour partial (chart + daily totals table)
+- Shortwave radiation graph check (fetch only if displayed data is missing, errored, or older than 4 hours)
 
 ---
 
@@ -137,6 +151,7 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Bar graph: yes
 - Price graph: yes
 - Wh per hour: yes
+- Shortwave radiation: conditional
 - Automation: no
 - Charge status: no
 
@@ -145,6 +160,7 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Bar graph: indicators only
 - Price graph: indicators only
 - Wh per hour: no
+- Shortwave radiation: no
 - Automation: yes
 - Charge status: yes
 
@@ -153,6 +169,7 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Bar graph: no
 - Price graph: no
 - Wh per hour: no
+- Shortwave radiation: no
 - Automation: yes (calls `refreshStatus`)
 - Charge status: yes
 
@@ -161,6 +178,7 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Bar graph: no
 - Price graph: no
 - Wh per hour: no
+- Shortwave radiation: no
 - Automation: no
 - Charge status: no
 
@@ -169,7 +187,8 @@ The active refresh path is driven by `main/assets/js/charge_schedule.js` and `ma
 - Bar graph: indicators only
 - Price graph: indicators only
 - Wh per hour: no
+- Shortwave radiation: no
 - Automation: no
 - Charge status: no
 
-Two main refresh flows: **schedule and prices** (debounced + immediate + on visibility, including Wh per hour) and **status** (20 s interval + visibility + manual button).
+Two main refresh flows: **schedule and prices** (debounced + immediate + on visibility, including Wh per hour and conditional shortwave refresh) and **status** (20 s interval + visibility + manual button).

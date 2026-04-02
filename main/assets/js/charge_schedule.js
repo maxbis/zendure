@@ -143,6 +143,9 @@ async function _refreshScheduleAndPricesInternal() {
             if (typeof window.refreshEnergyGraph === 'function') {
                 await window.refreshEnergyGraph();
             }
+            if (typeof window.refreshShortwaveRadiationGraph === 'function') {
+                await window.refreshShortwaveRadiationGraph();
+            }
             console.log('Schedule data refresh completed successfully');
         } else {
             throw new Error(todayData.error || 'Failed to fetch schedule data');

@@ -52,6 +52,7 @@
         colorPicker.type = 'color';
         colorPicker.className = 'rule-color-picker-input';
         colorPicker.value = DEFAULT_PICKER_COLOR;
+        colorPicker.defaultValue = DEFAULT_PICKER_COLOR;
         colorPicker.setAttribute('aria-label', 'Pick rule color');
 
         const colorDot = document.createElement('span');
@@ -67,6 +68,8 @@
             const normalizedColor = normalizeHexColor(textField.value);
             if (normalizedColor) {
                 colorPicker.value = normalizedColor;
+            } else {
+                colorPicker.value = DEFAULT_PICKER_COLOR;
             }
             updateSelectedDot(colorDot, normalizedColor);
         };
@@ -80,6 +83,10 @@
 
         textField.addEventListener('input', syncFromTextField);
         textField.addEventListener('change', syncFromTextField);
+        fieldRoot.form?.addEventListener('reset', function () {
+            colorPicker.value = DEFAULT_PICKER_COLOR;
+            updateSelectedDot(colorDot, '');
+        });
 
         syncFromTextField();
         fieldRoot.dataset.colorPickerEnhanced = 'true';
