@@ -1341,7 +1341,6 @@ class AutomationApp:
             f"last_power={power_display} "
             f"messages={snapshot.get('message_count')} "
             f"topic={snapshot.get('topic')}",
-            message_key="mqtt_status_summary",
         )
 
     def _refresh_p1_for_api(self) -> None:
