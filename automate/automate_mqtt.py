@@ -1722,6 +1722,7 @@ class AutomationApp:
 
     def _sleep_interrupted(self):
         """Sleep with interrupt for input/shutdown."""
+        print(f"Sleeping for {self.loop_interval_seconds} seconds")
         sleep_remaining = self.loop_interval_seconds
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
