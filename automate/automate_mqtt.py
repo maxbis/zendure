@@ -1300,6 +1300,25 @@ class AutomationApp:
             self._last_p1_read_source = "mqtt"
         return reading
 
+    def _format_mqtt_status_line(self, snapshot: dict[str, Any]) -> str:
+        """Render a compact periodic MQTT health line for operators."""
+        connected = bool(snapshot.get("connected"))
+        stale = bool(snapshot.get("stale"))
+        if not connected:
+            state = "down"
+        elif stale:
+            state = "stale"
+        else:
+            state = "ok"
+
+        age_seconds = snapshot.get("age_seconds")
+        age_text = "never" if age_seconds is None else f"{age_seconds:.1f}s"
+        power_text = snapshot.get("total_power")
+        power_display = "?" if power_text is None else f"{power_text}W"
+        message_count = snapshot.get("message_count")
+        message_display = 0 if message_count is None else message_count
+        return f"MQTT: {state} age={age_text} p={power_display} n={message_display}"
+
     def _log_mqtt_diagnostics_if_needed(self) -> None:
         """Log MQTT receive activity and a periodic health summary."""
         if self.mqtt_helper is None or not self.mqtt_helper.is_enabled() or self.logger is None:
@@ -1328,20 +1347,12 @@ class AutomationApp:
             return
         self._last_mqtt_status_log_ts = now
 
-        age_seconds = snapshot.get("age_seconds")
-        age_text = "never" if age_seconds is None else f"{age_seconds:.1f}s"
-        power_text = snapshot.get("total_power")
-        power_display = "unknown" if power_text is None else f"{power_text}W"
-        status_level = self.logger.warning if snapshot.get("stale") else self.logger.info
-        status_level(
-            "MQTT status: "
-            f"connected={snapshot.get('connected')} "
-            f"stale={snapshot.get('stale')} "
-            f"age={age_text} "
-            f"last_power={power_display} "
-            f"messages={snapshot.get('message_count')} "
-            f"topic={snapshot.get('topic')}",
+        status_level = (
+            self.logger.warning
+            if (not snapshot.get("connected") or snapshot.get("stale"))
+            else self.logger.info
         )
+        status_level(self._format_mqtt_status_line(snapshot))
 
     def _refresh_p1_for_api(self) -> None:
         """Read P1 meter and update api_state.last_p1 (for on-demand refresh from /api/p1)."""
