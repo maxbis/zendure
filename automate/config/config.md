@@ -107,6 +107,24 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 | **powerMeter.p1_hw.loopIntervalSeconds** | number | Optional loop interval override used when `powerMeter.type` is `"p1_hw"`. | `automate_www.py`: `_load_loop_config()`. |
 | **powerMeter.shelly** | object | Shelly meter connection and JSON path. | `power_metere_shelly.py`: `ShellyPowerMeterReader`. |
 | **powerMeter.shelly.ip** | string | IP (or host) of the Shelly meter. | Used to build the Shelly API URL. |
-| **powerMeter.shelly.endpoint** | string | HTTP path for the Shelly data (for example `"/rpc/EM.GetStatus?id=0"`). Defaults to `"/properties/report"` when omitted. | Appended to `http://<ip><endpoint>` for reading. |
+to check if we are rec| **powerMeter.shelly.endpoint** | string | HTTP path for the Shelly data (for example `"/rpc/EM.GetStatus?id=0"`). Defaults to `"/properties/report"` when omitted. | Appended to `http://<ip><endpoint>` for reading. |
 | **powerMeter.shelly.totalPowerPath** | string | Dot-notation path to total power in the Shelly JSON (for example `"total_act_power"`). Defaults to `"total_power"` when omitted. | Used to read the power value from the Shelly response. |
 | **powerMeter.shelly.loopIntervalSeconds** | number | Optional loop interval override used when `powerMeter.type` is `"shelly"`. | `automate_www.py`: `_load_loop_config()`. |
+
+### Optional MQTT overlay for `automate_mqtt.py`
+
+`automate_www.py` continues using the normal configured `powerMeter` reader. The copied `automate_mqtt.py` can optionally subscribe to Shelly MQTT messages and only fall back to the existing HTTP reader when MQTT is stale or disabled.
+
+| Key | Type | Description | Where used |
+|-----|------|-------------|------------|
+| **mqttPowerMeter** | object | Optional MQTT settings block used only by `automate_mqtt.py`. If omitted or disabled, `automate_mqtt.py` behaves like HTTP-only power meter reading. | `automate_mqtt.py`, `power_meter_mqtt_subscriber.py` |
+| **mqttPowerMeter.enabled** | boolean | Enable the MQTT subscriber/cache. Default `false`. | `automate_mqtt.py`: start/skip MQTT helper. |
+| **mqttPowerMeter.brokerHost** | string | MQTT broker host or IP. Required when MQTT is enabled. | `power_meter_mqtt_subscriber.py`: broker connection. |
+| **mqttPowerMeter.brokerPort** | number | MQTT broker TCP port. Default `1883`. | `power_meter_mqtt_subscriber.py`: broker connection. |
+| **mqttPowerMeter.username** | string | Optional broker username. | `power_meter_mqtt_subscriber.py`: MQTT authentication. |
+| **mqttPowerMeter.password** | string | Optional broker password. | `power_meter_mqtt_subscriber.py`: MQTT authentication. |
+| **mqttPowerMeter.topic** | string | Topic carrying the Shelly status payload to consume (for example `"shellypro3em-841fe890decc/status/em:0"`). Required when MQTT is enabled. | `power_meter_mqtt_subscriber.py`: subscription topic. |
+| **mqttPowerMeter.totalPowerPath** | string | Dot-notation path to total power within the MQTT JSON payload. Default `"total_act_power"`. | `power_meter_mqtt_subscriber.py`: payload parsing. |
+| **mqttPowerMeter.staleAfterSeconds** | number | Max allowed age for the latest MQTT message before `automate_mqtt.py` falls back to the normal HTTP read. Default `55`. | `automate_mqtt.py`: stale detection / HTTP fallback. |
+| **mqttPowerMeter.periodicControlIntervalSeconds** | number | Run the full control pipeline at least this often even when MQTT is fresh and unchanged. Default `60`. | `automate_mqtt.py`: periodic housekeeping control. |
+| **mqttPowerMeter.changeThresholdWatts** | number | Minimum absolute change in MQTT power before a power-change event is raised. Default `0`. | `power_meter_mqtt_subscriber.py`: event generation. |
