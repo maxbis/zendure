@@ -42,6 +42,7 @@ LOOP_INTERVAL_SECONDS = 20
 API_REFRESH_INTERVAL_SECONDS = 300
 MQTT_STALE_AFTER_SECONDS = 55
 MQTT_PERIODIC_CONTROL_INTERVAL_SECONDS = 60
+FAST_LOOP_INTERVAL_SECONDS = 2
 
 # Time at 0 power before setting device to standby (seconds)
 STANDBY_DELAY_SECONDS = 300
@@ -1057,6 +1058,8 @@ class AutomationApp:
         self.mqtt_helper: Optional[MqttPowerMeterSubscriber] = None
         self.mqtt_stale_after_seconds = MQTT_STALE_AFTER_SECONDS
         self.periodic_control_interval_seconds = MQTT_PERIODIC_CONTROL_INTERVAL_SECONDS
+        self.fast_loop_interval_seconds = FAST_LOOP_INTERVAL_SECONDS
+        self.fast_loop_active = False
         self.last_full_control_run_ts = 0.0
         self._last_p1_read_source = "http"
         self._last_mqtt_status_log_ts = 0.0
@@ -1165,6 +1168,14 @@ class AutomationApp:
         except (TypeError, ValueError):
             api_refresh = API_REFRESH_INTERVAL_SECONDS
         self.api_refresh_interval_seconds = max(60, min(api_refresh, 3600))  # clamp 1–60 minutes
+
+        try:
+            fast_loop_interval = int(
+                self.controller.config.get("FAST_LOOP_INTERVAL_SECONDS", FAST_LOOP_INTERVAL_SECONDS)
+            )
+        except (TypeError, ValueError):
+            fast_loop_interval = FAST_LOOP_INTERVAL_SECONDS
+        self.fast_loop_interval_seconds = max(1, min(fast_loop_interval, 10))
 
         mqtt_config = self.controller.config.get("mqttPowerMeter")
         if isinstance(mqtt_config, dict):
@@ -1588,7 +1599,7 @@ class AutomationApp:
             if self._last_runtime_decision_signature != signature:
                 self._warn_runtime_condition_once(
                     f"runtime-missing-fallback:{slot_time}",
-                    f"Runtime conditions failed for slot {slot_time}, but fallback_value is missing/invalid; using default fallback 0"
+                    f"Runtime conditions false for slot {slot_time}, but fallback_value is missing/invalid; using default fallback 0"
                 )
                 self._last_runtime_decision_signature = signature
             return fallback_value
@@ -1596,7 +1607,7 @@ class AutomationApp:
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
             self.logger.info(
-                f"Runtime conditions failed for slot {slot_time} (electricity_level={electricity_level}); "
+                f"Runtime conditions false for slot {slot_time} (electricity_level={electricity_level}); "
                 f"using fallback_value {fallback_value} instead of base value {desired_power}"
             )
             self._last_runtime_decision_signature = signature
@@ -1652,6 +1663,23 @@ class AutomationApp:
             schedule_entry=schedule_entry,
             zendure_data=zendure_data,
         )
+
+        previous_fast_loop_active = self.fast_loop_active
+        self.fast_loop_active = bool(
+            result.max_delta_limited or result.reversal_ramp_active
+        )
+        if self.fast_loop_active and not previous_fast_loop_active:
+            self.logger.debug(
+                "Adaptive fast loop enabled: "
+                f"max_delta_limited={result.max_delta_limited}, "
+                f"reversal_ramp_active={result.reversal_ramp_active}",
+                message_key="adaptive_fast_loop_enabled",
+            )
+        elif not self.fast_loop_active and previous_fast_loop_active:
+            self.logger.debug(
+                "Adaptive fast loop cleared; restoring normal loop interval",
+                message_key="adaptive_fast_loop_cleared",
+            )
 
         if not result.success:
             self.logger.error(f"Failed to set power: {result.error}")
@@ -1722,11 +1750,20 @@ class AutomationApp:
 
     def _sleep_interrupted(self):
         """Sleep with interrupt for input/shutdown."""
-        sleep_remaining = self.loop_interval_seconds
+        active_sleep_seconds = (
+            self.fast_loop_interval_seconds if self.fast_loop_active else self.loop_interval_seconds
+        )
+        if self.fast_loop_active:
+            self.logger.debug(
+                "Fast loop mode active: "
+                f"sleeping {self.fast_loop_interval_seconds} seconds instead of {self.loop_interval_seconds} seconds",
+                message_key="fast_loop_mode_active",
+            )
+        sleep_remaining = active_sleep_seconds
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
             now = time.localtime().tm_sec
-            if now in (self.steps) and sleep_remaining < self.loop_interval_seconds:
+            if now in (self.steps) and sleep_remaining < active_sleep_seconds:
                 return
 
             # Check input
@@ -1834,6 +1871,10 @@ class AutomationApp:
         else:
             self.logger.info("TEST MODE: OFF")
         self.logger.info(f"   Loop interval: {self.loop_interval_seconds} seconds")
+        self.logger.info(
+            "   Fast loop interval when power_feed_max_delta or reversal ramp is active: "
+            f"{self.fast_loop_interval_seconds} seconds"
+        )
         self.logger.info(
             "   API refresh interval: "
             f"{self.api_refresh_interval_seconds} seconds "

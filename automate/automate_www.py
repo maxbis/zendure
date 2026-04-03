@@ -1497,7 +1497,7 @@ class AutomationApp:
             if self._last_runtime_decision_signature != signature:
                 self._warn_runtime_condition_once(
                     f"runtime-missing-fallback:{slot_time}",
-                    f"Runtime conditions failed for slot {slot_time}, but fallback_value is missing/invalid; using default fallback 0"
+                    f"Runtime conditions false for slot {slot_time}, but fallback_value is missing/invalid; using default fallback 0"
                 )
                 self._last_runtime_decision_signature = signature
             return fallback_value
@@ -1505,8 +1505,7 @@ class AutomationApp:
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
             self.logger.info(
-                f"Runtime conditions failed for slot {slot_time} (electricity_level={electricity_level}); "
-                f"using fallback_value {fallback_value} instead of base value {desired_power}"
+false                f"using fallback_value {fallback_value} instead of base value {desired_power}"
             )
             self._last_runtime_decision_signature = signature
         return fallback_value

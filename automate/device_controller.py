@@ -78,6 +78,10 @@ class PowerResult:
     success: bool
     power: int
     error: Optional[str] = None
+    requested_power: Optional[int] = None
+    target_power: Optional[int] = None
+    max_delta_limited: bool = False
+    reversal_ramp_active: bool = False
 
 
 class ReversalRampGuard:
@@ -1165,7 +1169,11 @@ class AutomateController(BaseDeviceController):
                 error=f"Zero feed-in calculation failed: {str(exc)}"
             )
 
+        requested_power = target_power
+        runtime_context = self._get_dynamic_power_context()
+        reversal_ramp_active = bool(runtime_context.get('guard_active', False))
         target_power = self._apply_power_feed_max_delta(target_power)
+        max_delta_limited = target_power != requested_power
 
         success, error_msg, actual_power = self._send_power_feed(target_power)
 
@@ -1195,10 +1203,21 @@ class AutomateController(BaseDeviceController):
             return PowerResult(
                 success=False,
                 power=actual_power,
-                error=f"Failed to set power feed: {error_msg}"
+                error=f"Failed to set power feed: {error_msg}",
+                requested_power=requested_power,
+                target_power=target_power,
+                max_delta_limited=max_delta_limited,
+                reversal_ramp_active=reversal_ramp_active,
             )
 
-        return PowerResult(success=True, power=actual_power)
+        return PowerResult(
+            success=True,
+            power=actual_power,
+            requested_power=requested_power,
+            target_power=target_power,
+            max_delta_limited=max_delta_limited,
+            reversal_ramp_active=reversal_ramp_active,
+        )
 
     def set_standby_mode(self) -> PowerResult:
         """
