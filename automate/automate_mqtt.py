@@ -1722,7 +1722,6 @@ class AutomationApp:
 
     def _sleep_interrupted(self):
         """Sleep with interrupt for input/shutdown."""
-        print(f"Sleeping for {self.loop_interval_seconds} seconds")
         sleep_remaining = self.loop_interval_seconds
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
@@ -1735,7 +1734,17 @@ class AutomationApp:
                 break
 
             if not self.shutdown_requested:
-                time.sleep(min(1, sleep_remaining))
+                wait_seconds = min(1, sleep_remaining)
+                mqtt_enabled = self.mqtt_helper is not None and self.mqtt_helper.is_enabled()
+                if mqtt_enabled and self.mqtt_helper.wait_for_wake(wait_seconds):
+                    if self.mqtt_helper.consume_wake_event():
+                        self.logger.debug(
+                            "MQTT wake event received; interrupting sleep early",
+                            message_key="mqtt_wake_event",
+                        )
+                        return
+                else:
+                    time.sleep(wait_seconds) if not mqtt_enabled else None
             sleep_remaining -= 1
 
     def _shutdown(self):

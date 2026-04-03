@@ -88,6 +88,7 @@ class MqttPowerMeterSubscriber:
         self._connected = False
         self._running = False
         self._power_change_event = False
+        self._wake_event = threading.Event()
         self._last_raw_payload: Optional[str] = None
         self._last_payload: Optional[dict[str, Any]] = None
         self._last_total_power: Optional[int] = None
@@ -150,6 +151,7 @@ class MqttPowerMeterSubscriber:
             self._running = False
             self._connected = False
             self._client = None
+            self._wake_event.clear()
         if client is None:
             return
         try:
@@ -229,6 +231,21 @@ class MqttPowerMeterSubscriber:
             self._power_change_event = False
             return True
 
+    def wait_for_wake(self, timeout_seconds: float) -> bool:
+        """Wait until a thresholded MQTT change requests an early wake."""
+        return self._wake_event.wait(timeout=max(0.0, float(timeout_seconds)))
+
+    def consume_wake_event(self) -> bool:
+        """Return whether a wake event was pending and clear only the wake signal."""
+        if not self._wake_event.is_set():
+            return False
+        self._wake_event.clear()
+        return True
+
+    def clear_wake_event(self) -> None:
+        """Clear any pending wake signal without touching the control event."""
+        self._wake_event.clear()
+
     def _normalize_payload(self, payload: dict[str, Any]) -> tuple[dict[str, Any], Optional[int]]:
         normalized = dict(payload)
         total_power_raw = _get_json_value(normalized, self.total_power_path)
@@ -279,3 +296,4 @@ class MqttPowerMeterSubscriber:
             )
             if self._last_triggered_change:
                 self._power_change_event = True
+                self._wake_event.set()
