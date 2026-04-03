@@ -1368,7 +1368,11 @@ class AutomationApp:
             return False, None, "Failed to read P1 meter data"
 
         self._update_p1_state(p1_data)
-        result = self.controller.set_power(mode, p1_data=p1_data)
+        result = self.controller.set_power(
+            mode,
+            p1_data=p1_data,
+            p1_source=self._last_p1_read_source,
+        )
         if not result.success:
             return False, None, result.error
         return True, result.power, None
@@ -1662,6 +1666,7 @@ class AutomationApp:
             p1_data=p1_data,
             schedule_entry=schedule_entry,
             zendure_data=zendure_data,
+            p1_source=self._last_p1_read_source,
         )
 
         previous_fast_loop_active = self.fast_loop_active
@@ -1970,7 +1975,8 @@ class AutomationApp:
         if mqtt_enabled and mqtt_fresh and not mqtt_changed and not periodic_due:
             snapshot = self.mqtt_helper.get_status_snapshot(self.mqtt_stale_after_seconds)
             delta_watts = snapshot.get("last_delta_watts")
-            if delta_watts is not None:
+            last_triggered_change = bool(snapshot.get("last_triggered_change"))
+            if delta_watts is not None and not last_triggered_change:
                 self.logger.debug(
                     "MQTT power delta below threshold; skipping control run: "
                     f"delta={delta_watts}W threshold={snapshot.get('change_threshold_watts')}W "

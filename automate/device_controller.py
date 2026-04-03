@@ -792,6 +792,7 @@ class AutomateController(BaseDeviceController):
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
         zendure_data: Optional[Dict[str, Any]] = None,
+        p1_source: Optional[str] = None,
         ) -> int:
         """
         Calculate the actual power value needed to achieve netzero/netzero+ mode.
@@ -824,7 +825,10 @@ class AutomateController(BaseDeviceController):
             netzero_target_w = 0
         adjusted_p1_power = p1_power - netzero_target_w
 
-        self.log('debug', f"P1 power (grid-status): {p1_power}")
+        source_label = str(p1_source).strip() if p1_source is not None else ""
+        if not source_label:
+            source_label = "unknown"
+        self.log('debug', f"P1 power (grid-status, source={source_label}): {p1_power}")
         if netzero_target_w != 0:
             self.log(
                 'debug',
@@ -940,6 +944,7 @@ class AutomateController(BaseDeviceController):
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
         zendure_data: Optional[Dict[str, Any]] = None,
+        p1_source: Optional[str] = None,
     ) -> int:
         if isinstance(value, int):
             return value
@@ -954,6 +959,7 @@ class AutomateController(BaseDeviceController):
                 p1_data=p1_data,
                 schedule_entry=schedule_entry,
                 zendure_data=zendure_data,
+                p1_source=p1_source,
             )
             runtime_context = self._get_dynamic_power_context()
             bounded_power = self._apply_schedule_power_bounds(
@@ -1127,6 +1133,7 @@ class AutomateController(BaseDeviceController):
             p1_data: Optional[Dict[str, Any]] = None,
             schedule_entry: Optional[Dict[str, Any]] = None,
             zendure_data: Optional[Dict[str, Any]] = None,
+            p1_source: Optional[str] = None,
         ) -> PowerResult:
         """
         Set power feed to the Zendure battery.
@@ -1155,6 +1162,7 @@ class AutomateController(BaseDeviceController):
                 p1_data=p1_data,
                 schedule_entry=schedule_entry,
                 zendure_data=zendure_data,
+                p1_source=p1_source,
             )
         except ValueError as exc:
             error_message = str(exc)
@@ -1174,6 +1182,22 @@ class AutomateController(BaseDeviceController):
         reversal_ramp_active = bool(runtime_context.get('guard_active', False))
         target_power = self._apply_power_feed_max_delta(target_power)
         max_delta_limited = target_power != requested_power
+
+        if value in ('netzero', 'netzero+') or value is None:
+            raw_target = runtime_context.get('raw_power', requested_power)
+            if max_delta_limited:
+                reason = 'max_delta'
+            elif reversal_ramp_active:
+                reason = 'reversal_ramp'
+            elif requested_power != raw_target:
+                reason = 'schedule_bounds'
+            else:
+                reason = 'direct'
+            self.log(
+                'debug',
+                f"Netzero target: raw={raw_target} final={target_power} reason={reason}",
+                message_key='netzero_target_summary',
+            )
 
         success, error_msg, actual_power = self._send_power_feed(target_power)
 
