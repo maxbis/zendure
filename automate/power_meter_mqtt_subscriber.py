@@ -249,12 +249,15 @@ class MqttPowerMeterSubscriber:
     def _normalize_payload(self, payload: dict[str, Any]) -> tuple[dict[str, Any], Optional[int]]:
         normalized = dict(payload)
         total_power_raw = _get_json_value(normalized, self.total_power_path)
+        if total_power_raw is None:
+            normalized["total_power"] = None
+            return normalized, None
+
         total_power = None
-        if total_power_raw is not None:
-            try:
-                total_power = int(round(float(total_power_raw)))
-            except (TypeError, ValueError):
-                total_power = None
+        try:
+            total_power = int(round(float(total_power_raw)))
+        except (TypeError, ValueError):
+            total_power = None
         normalized["total_power"] = total_power
         return normalized, total_power
 
@@ -274,6 +277,10 @@ class MqttPowerMeterSubscriber:
             payload = json.loads(raw_payload)
             if not isinstance(payload, dict):
                 return
+
+            if _get_json_value(payload, self.total_power_path) is None:
+                return
+
             normalized_payload, total_power = self._normalize_payload(payload)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             return

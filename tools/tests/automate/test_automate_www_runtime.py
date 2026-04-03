@@ -976,7 +976,7 @@ def test_apply_dynamic_power_command_reads_meter_once_and_passes_same_data():
     )
     app.controller = SimpleNamespace(
         config_path=Path("/tmp/config.jsonc"),
-        set_power=lambda mode, p1_data=None: device_controller.PowerResult(
+        set_power=lambda mode, p1_data=None, p1_source=None: device_controller.PowerResult(
             success=True,
             power=123 if p1_data == {"total_power": -55} and mode == automate_www.POWER_MODE_NETZERO else 0,
         ),
@@ -991,6 +991,42 @@ def test_apply_dynamic_power_command_reads_meter_once_and_passes_same_data():
     assert error is None
     assert app.api_state.last_p1 is not None
     assert app.api_state.last_p1.readings == {"total_power": -55}
+
+
+def test_apply_dynamic_power_command_passes_http_p1_source():
+    automate_www = _import_automate_www_module()
+    device_controller = _import_device_controller_module()
+    app = automate_www.AutomationApp()
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+
+    captured = {}
+
+    def _set_power(mode, p1_data=None, p1_source=None):
+        captured["mode"] = mode
+        captured["p1_data"] = p1_data
+        captured["p1_source"] = p1_source
+        return device_controller.PowerResult(success=True, power=123)
+
+    app.controller = SimpleNamespace(
+        config_path=Path("/tmp/config.jsonc"),
+        set_power=_set_power,
+    )
+
+    app._accumulate_p1_data = lambda: {"total_power": -55}
+    app._last_p1_read_source = "http"
+
+    success, power, error = app._apply_dynamic_power_command(automate_www.POWER_MODE_NETZERO)
+
+    assert success is True
+    assert power == 123
+    assert error is None
+    assert captured["p1_source"] == "http"
+    assert captured["p1_data"] == {"total_power": -55}
 
 
 def test_command_handler_uses_dynamic_power_setter_for_netzero():
@@ -1062,7 +1098,7 @@ def test_controller_find_current_schedule_value_keeps_min_max_metadata():
 def test_controller_set_power_clamps_netzero_to_schedule_bounds():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1080,7 +1116,7 @@ def test_controller_set_power_clamps_netzero_to_schedule_bounds():
 def test_controller_set_power_clamps_netzero_plus_without_discharge():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: 50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: 50
     controller._last_dynamic_power_context = {"raw_power": 50, "guarded_power": 50, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1101,7 +1137,7 @@ def test_controller_set_power_applies_bounds_before_reversal_for_negative_only_s
     logs = []
     controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
     controller.previous_power = -200
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: 327
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: 327
     controller._last_dynamic_power_context = {"raw_power": 327}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1124,7 +1160,7 @@ def test_controller_set_power_reversal_guard_uses_bounded_target_sign():
     logs = []
     controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
     controller.previous_power = -200
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: 50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: 50
     controller._last_dynamic_power_context = {"raw_power": 50}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1420,7 +1456,7 @@ def test_controller_set_power_applies_max_delta_to_netzero_values():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
     controller.previous_power = -179
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -1000
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: -1000
     controller._last_dynamic_power_context = {"raw_power": -1000, "guarded_power": -1000, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1459,7 +1495,7 @@ def test_controller_test_mode_updates_previous_power_for_simulated_send():
 def test_controller_test_mode_uses_simulated_previous_power_for_next_max_delta_step():
     device_controller = _import_device_controller_module()
     controller = _make_minimal_automate_controller(device_controller)
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -800
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: -800
     controller._last_dynamic_power_context = {"raw_power": -800, "guarded_power": -800, "guard_active": False}
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
 
@@ -1782,7 +1818,7 @@ def test_controller_set_power_logs_when_device_limits_override_bounded_result():
     controller.test_mode = False
     controller.previous_power = None
     controller.power_feed_max_delta = 300
-    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None: -50
+    controller.calculate_netzero_power = lambda mode, p1_data, schedule_entry=None, zendure_data=None, p1_source=None: -50
     controller._last_dynamic_power_context = {"raw_power": -50, "guarded_power": -50, "guard_active": False}
     controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=True)
     controller._apply_schedule_power_bounds = device_controller.AutomateController._apply_schedule_power_bounds.__get__(controller, device_controller.AutomateController)
@@ -2175,6 +2211,145 @@ def test_load_loop_config_falls_back_to_global_interval():
     assert app.loop_interval_seconds == 25
 
 
+def test_load_loop_config_reads_fast_loop_interval():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.controller = SimpleNamespace(
+        config={
+            "LOOP_INTERVAL_SECONDS": 20,
+            "FAST_LOOP_INTERVAL_SECONDS": 2,
+            "powerMeter": {
+                "type": "shelly",
+                "shelly": {"loopIntervalSeconds": 6},
+            },
+            "API_REFRESH_INTERVAL_SECONDS": 60,
+        }
+    )
+
+    app._load_loop_config()
+
+    assert app.loop_interval_seconds == 6
+    assert app.fast_loop_interval_seconds == 2
+
+
+def test_apply_power_settings_enables_and_clears_fast_loop():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.old_value = -200
+    app.value = -200
+    app.fast_loop_active = False
+    app.schedule_controller = SimpleNamespace(last_schedule_entry=None)
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    posted_updates: list[tuple] = []
+    app.status_api = SimpleNamespace(post_update=lambda *args, **kwargs: posted_updates.append((args, kwargs)))
+
+    responses = deque(
+        [
+            SimpleNamespace(
+                success=True,
+                power=-600,
+                error=None,
+                max_delta_limited=True,
+                reversal_ramp_active=False,
+            ),
+            SimpleNamespace(
+                success=True,
+                power=-600,
+                error=None,
+                max_delta_limited=False,
+                reversal_ramp_active=False,
+            ),
+        ]
+    )
+    app.controller = SimpleNamespace(
+        set_power=lambda *_args, **_kwargs: responses.popleft()
+    )
+
+    app._apply_power_settings(automate_www.POWER_MODE_NETZERO, {"total_power": 500})
+    assert app.fast_loop_active is True
+    assert app.value == -600
+
+    app.old_value = app.value
+    app._apply_power_settings(automate_www.POWER_MODE_NETZERO, {"total_power": 450})
+    assert app.fast_loop_active is False
+    assert app.value == -600
+
+
+def test_apply_power_settings_passes_http_p1_source():
+    automate_www = _import_automate_www_module()
+    device_controller = _import_device_controller_module()
+    app = automate_www.AutomationApp()
+    app.old_value = -200
+    app.value = -200
+    app.fast_loop_active = False
+    app._last_p1_read_source = "http"
+    app.schedule_controller = SimpleNamespace(last_schedule_entry=None)
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    app.status_api = SimpleNamespace(post_update=lambda *args, **kwargs: None)
+
+    captured = {}
+
+    def _set_power(desired_power, p1_data=None, schedule_entry=None, zendure_data=None, p1_source=None):
+        captured["desired_power"] = desired_power
+        captured["p1_data"] = p1_data
+        captured["schedule_entry"] = schedule_entry
+        captured["zendure_data"] = zendure_data
+        captured["p1_source"] = p1_source
+        return device_controller.PowerResult(
+            success=True,
+            power=-300,
+            max_delta_limited=False,
+            reversal_ramp_active=False,
+        )
+
+    app.controller = SimpleNamespace(set_power=_set_power)
+
+    app._apply_power_settings(automate_www.POWER_MODE_NETZERO, {"total_power": 320})
+
+    assert captured["p1_source"] == "http"
+    assert captured["p1_data"] == {"total_power": 320}
+
+
+def test_sleep_interrupted_uses_fast_loop_interval(monkeypatch):
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.loop_interval_seconds = 6
+    app.fast_loop_interval_seconds = 2
+    app.fast_loop_active = True
+    app.shutdown_requested = False
+    app.steps = []
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda *_args, **_kwargs: None,
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    app._handle_user_input = lambda: True
+
+    sleep_calls: list[float] = []
+
+    monkeypatch.setattr(automate_www.time, "sleep", lambda seconds: sleep_calls.append(seconds))
+    monkeypatch.setattr(
+        automate_www.time,
+        "localtime",
+        lambda: SimpleNamespace(tm_sec=1),
+    )
+
+    app._sleep_interrupted()
+
+    assert sleep_calls == [1, 1]
+
+
 def test_create_http_server_wires_shared_state_and_callbacks():
     automate_api = _import_automate_api_module()
 
@@ -2545,6 +2720,29 @@ def test_runtime_condition_false_uses_fallback():
     }
     app, _logs = _build_app_with_slot(slot, electric_level=88)
     assert app._apply_runtime_conditions("netzero") == 0
+
+
+def test_runtime_condition_false_logs_slot_level_and_bounds():
+    slot = {
+        "time": "2000",
+        "value": "netzero",
+        "runtime_conditions": [{"field": "electricity_level", "op": ">=", "value": 90}],
+        "fallback_value": 0,
+        "min_power": -300,
+        "max_power": 100,
+    }
+    app, logs = _build_app_with_slot(slot, electric_level=88)
+
+    assert app._apply_runtime_conditions("netzero") == 0
+    assert any(
+        level == "info"
+        and "Runtime conditions false for slot 2000" in msg
+        and "electricity_level=88" in msg
+        and "min_power=-300" in msg
+        and "max_power=100" in msg
+        and "using fallback_value 0 instead of base value netzero" in msg
+        for level, msg in logs
+    )
 
 
 def test_runtime_invalid_condition_is_skipped_and_does_not_break():

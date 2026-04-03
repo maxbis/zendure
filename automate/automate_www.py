@@ -1045,8 +1045,11 @@ class AutomationApp:
         self.standby_sent = False
         self.pause_override_active = False
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
+        self._last_p1_read_source: Optional[str] = None
         self.stop_posted = False
         self.loop_interval_seconds = LOOP_INTERVAL_SECONDS
+        self.fast_loop_interval_seconds = 2
+        self.fast_loop_active = False
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self._runtime_condition_warning_cache: set[str] = set()
@@ -1146,6 +1149,13 @@ class AutomationApp:
             loop_interval = LOOP_INTERVAL_SECONDS
         self.loop_interval_seconds = max(5, min(loop_interval, 300))  # clamp 5–300 seconds
         self.steps = self._generate_steps(self.loop_interval_seconds, 59)
+        try:
+            fast_loop_interval = int(
+                self.controller.config.get("FAST_LOOP_INTERVAL_SECONDS", 2)
+            )
+        except (TypeError, ValueError):
+            fast_loop_interval = 2
+        self.fast_loop_interval_seconds = max(1, min(fast_loop_interval, 10))
 
         try:
             api_refresh = int(self.controller.config.get("API_REFRESH_INTERVAL_SECONDS", API_REFRESH_INTERVAL_SECONDS))
@@ -1241,7 +1251,10 @@ class AutomationApp:
         """Read the configured power meter."""
         try:
             power_meter_reader = get_power_meter_reader(self.controller.config_path)
-            return power_meter_reader.read()
+            reading = power_meter_reader.read()
+            if reading is not None:
+                self._last_p1_read_source = "http"
+            return reading
         except Exception as e:
             self.logger.warning(f"Failed to read power meter: {e}")
             return None
@@ -1266,7 +1279,11 @@ class AutomationApp:
             return False, None, "Failed to read P1 meter data"
 
         self._update_p1_state(p1_data)
-        result = self.controller.set_power(mode, p1_data=p1_data)
+        result = self.controller.set_power(
+            mode,
+            p1_data=p1_data,
+            p1_source=self._last_p1_read_source,
+        )
         if not result.success:
             return False, None, result.error
         return True, result.power, None
@@ -1502,10 +1519,20 @@ class AutomationApp:
                 self._last_runtime_decision_signature = signature
             return fallback_value
 
+        min_power = schedule_entry.get("min_power")
+        max_power = schedule_entry.get("max_power")
+        limit_parts = []
+        if min_power is not None:
+            limit_parts.append(f"min_power={min_power}")
+        if max_power is not None:
+            limit_parts.append(f"max_power={max_power}")
+        limits_suffix = f", {', '.join(limit_parts)}" if limit_parts else ""
+
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
             self.logger.info(
-false                f"using fallback_value {fallback_value} instead of base value {desired_power}"
+                f"Runtime conditions false for slot {slot_time} (electricity_level={electricity_level}{limits_suffix}); "
+                f"using fallback_value {fallback_value} instead of base value {desired_power}"
             )
             self._last_runtime_decision_signature = signature
         return fallback_value
@@ -1559,11 +1586,33 @@ false                f"using fallback_value {fallback_value} instead of base val
             p1_data=p1_data,
             schedule_entry=schedule_entry,
             zendure_data=zendure_data,
+            p1_source=self._last_p1_read_source,
         )
 
         if not result.success:
             self.logger.error(f"Failed to set power: {result.error}")
             return
+
+        should_enable_fast_loop = bool(
+            getattr(result, "max_delta_limited", False)
+            or getattr(result, "reversal_ramp_active", False)
+        )
+        if should_enable_fast_loop and not self.fast_loop_active:
+            self.fast_loop_active = True
+            self.logger.debug(
+                "Adaptive fast loop enabled: "
+                f"max_delta_limited={getattr(result, 'max_delta_limited', False)}, "
+                f"reversal_ramp_active={getattr(result, 'reversal_ramp_active', False)}",
+                message_key="adaptive_fast_loop_enabled",
+            )
+        elif not should_enable_fast_loop and self.fast_loop_active:
+            self.fast_loop_active = False
+            self.logger.debug(
+                "Adaptive fast loop cleared; restoring normal loop interval",
+                message_key="adaptive_fast_loop_cleared",
+            )
+        else:
+            self.fast_loop_active = should_enable_fast_loop
 
         power_log_message = f"Power: {result.power} (desired: {desired_power})"
         if result.power != self.old_value:
@@ -1630,11 +1679,21 @@ false                f"using fallback_value {fallback_value} instead of base val
 
     def _sleep_interrupted(self):
         """Sleep with interrupt for input/shutdown."""
-        sleep_remaining = self.loop_interval_seconds
+        active_sleep_interval = (
+            self.fast_loop_interval_seconds if self.fast_loop_active else self.loop_interval_seconds
+        )
+        if self.fast_loop_active:
+            self.logger.debug(
+                "Fast loop mode active: "
+                f"sleeping {self.fast_loop_interval_seconds} seconds instead of "
+                f"{self.loop_interval_seconds} seconds",
+                message_key="fast_loop_mode_active",
+            )
+        sleep_remaining = active_sleep_interval
         while sleep_remaining > 0 and not self.shutdown_requested:
             # Skip sleep if it's the first second of the minute
             now = time.localtime().tm_sec
-            if now in (self.steps) and sleep_remaining < self.loop_interval_seconds:
+            if now in (self.steps) and sleep_remaining < active_sleep_interval:
                 return
 
             # Check input
@@ -1729,6 +1788,10 @@ false                f"using fallback_value {fallback_value} instead of base val
         else:
             self.logger.info("TEST MODE: OFF")
         self.logger.info(f"   Loop interval: {self.loop_interval_seconds} seconds")
+        self.logger.info(
+            "   Fast loop interval when power_feed_max_delta or reversal ramp is active: "
+            f"{self.fast_loop_interval_seconds} seconds"
+        )
         self.logger.info(
             "   API refresh interval: "
             f"{self.api_refresh_interval_seconds} seconds "
