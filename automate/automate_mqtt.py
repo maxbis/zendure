@@ -7,7 +7,6 @@ using the OOP device controller classes. Exposes an HTTP API on port 1611 with
 /api/test, /api/p1, /api/zendure, /api/status, and /api/all endpoints.
 /api/p1 and /api/zendure accept optional query param max_age (or maxAge), default 60: 0 = always refresh;
 N = refresh if cached data is older than N seconds.
-Supports interactive keyboard commands.
 """
 
 import json
@@ -16,10 +15,7 @@ import signal
 import sqlite3
 import time
 import sys
-import select
-import platform
 import threading
-import queue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from warnings import simplefilter
@@ -667,346 +663,6 @@ class StatusApi:
 
 
 # ============================================================================
-# INPUT HANDLER CLASS
-# ============================================================================
-
-class InputHandler:
-    """
-    Cross-platform input handling for keyboard commands.
-    Handles both Unix (select) and Windows (threading) input methods.
-    """
-
-    def __init__(self):
-        """Initialize input handler with platform-specific setup."""
-        self.input_queue = queue.Queue()
-        self.input_thread = None
-        self.input_thread_running = False
-
-    def start_input_thread(self):
-        """Start input thread for Windows compatibility."""
-        if self.input_thread is None or not self.input_thread.is_alive():
-            self.input_thread_running = True
-            self.input_thread = threading.Thread(target=self._input_thread_worker, daemon=True)
-            self.input_thread.start()
-
-    def _input_thread_worker(self):
-        """Worker to read stdin."""
-        try:
-            while self.input_thread_running:
-                try:
-                    line = sys.stdin.readline()
-                    if line:
-                        self.input_queue.put(line.strip())
-                    else:
-                        break  # EOF
-                except (EOFError, OSError):
-                    break
-        except Exception:
-            pass
-
-    def check_for_input(self, timeout: float = 0.1) -> Optional[str]:
-        """
-        Check for user input.
-
-        Args:
-            timeout: Timeout in seconds for non-blocking input check
-
-        Returns:
-            User input string if available, None otherwise
-        """
-        if platform.system() == 'Windows':
-            self.start_input_thread()
-            try:
-                return self.input_queue.get_nowait()
-            except queue.Empty:
-                return None
-        else:
-            if select.select([sys.stdin], [], [], timeout)[0]:
-                try:
-                    return sys.stdin.readline().strip()
-                except (EOFError, OSError):
-                    return None
-            return None
-
-    def stop(self):
-        """Stop input thread (for Windows)."""
-        if platform.system() == 'Windows' and self.input_thread_running:
-            self.input_thread_running = False
-
-
-# ============================================================================
-# COMMAND HANDLER CLASS
-# ============================================================================
-
-class CommandHandler:
-    """
-    Handles keyboard commands for interactive control.
-    Processes commands like status, power settings, refresh, etc.
-    """
-
-    def __init__(self, controller: AutomateController, schedule_controller: ScheduleController,
-                 status_api: StatusApi, logger: Logger,
-                 on_pause_change: Optional[Callable[[bool], None]] = None,
-                 is_pause_active: Optional[Callable[[], bool]] = None,
-                 dynamic_power_setter: Optional[Callable[[str], tuple[bool, Optional[int], Optional[str]]]] = None):
-        """
-        Initialize command handler.
-
-        Args:
-            controller: Device controller for power operations
-            schedule_controller: Schedule controller for schedule operations
-            status_api: Status API client for posting updates
-            logger: Logger instance for messages
-        """
-        self.controller = controller
-        self.schedule_controller = schedule_controller
-        self.status_api = status_api
-        self.logger = logger
-        self.on_pause_change = on_pause_change
-        self.is_pause_active = is_pause_active
-        self.dynamic_power_setter = dynamic_power_setter
-        self._command_handlers = {
-            "h": self._cmd_help,
-            "help": self._cmd_help,
-            "s": self._cmd_status,
-            "status": self._cmd_status,
-            "a": self._cmd_accumulators,
-            "accumulators": self._cmd_accumulators,
-            "r": self._cmd_refresh,
-            "refresh": self._cmd_refresh,
-            "p": self._cmd_power,
-            "z": self._cmd_zero,
-            "zero": self._cmd_zero,
-            "nz": self._cmd_netzero,
-            "netzero": self._cmd_netzero,
-            "nzp": self._cmd_netzero_plus,
-            "netzero+": self._cmd_netzero_plus,
-            "pause": self._cmd_pause,
-            "pauze": self._cmd_pause,
-            "resume": self._cmd_resume,
-            "unpause": self._cmd_resume,
-            "q": self._cmd_quit,
-            "quit": self._cmd_quit,
-        }
-
-    def print_help(self):
-        """Print available keyboard commands."""
-        print("\n" + "="*60)
-        print("Available Commands:")
-        print("="*60)
-        print("  h, help          - Show this help message")
-        print("  s, status        - Show current status (power, battery, schedule)")
-        print("  a, accumulators  - Print accumulator status")
-        print("  r, refresh       - Force refresh schedule from API")
-        print("  p <value>        - Set power manually (e.g., 'p 500' or 'p netzero')")
-        print("  z, zero          - Set power to 0")
-        print("  nz, netzero      - Set power to netzero mode")
-        print("  nzp, netzero+    - Set power to netzero+ mode")
-        print("  pause on|off     - Pause automation (force 0) or resume schedule")
-        print("  pause status     - Show pause override status")
-        print("  resume, unpause  - Resume schedule control")
-        print("  q, quit          - Quit gracefully")
-        print("="*60 + "\n")
-
-    def handle(self, command: str) -> bool:
-        """
-        Handle a keyboard command.
-
-        Args:
-            command: Command string from user input
-
-        Returns:
-            True to continue, False to quit
-        """
-        command = command.strip().lower()
-        if not command:
-            return True
-
-        parts = command.split()
-        cmd = parts[0]
-        args = parts[1:] if len(parts) > 1 else []
-
-        try:
-            handler = self._command_handlers.get(cmd)
-            if handler is not None:
-                return handler(args)
-            self.logger.info(f"Unknown command: {cmd}. Type 'h' or 'help' for available commands.")
-            return True
-        except Exception as e:
-            self.logger.error(f"Error executing command: {e}")
-            return True
-
-    def _cmd_help(self, args: list) -> bool:
-        self.print_help()
-        return True
-
-    def _cmd_status(self, args: list) -> bool:
-        self.logger.info("=== Current Status ===")
-        try:
-            desired_power = self.schedule_controller.get_desired_power(refresh=False)
-            self.logger.info(f"Schedule desired power: {desired_power}")
-        except Exception as e:
-            self.logger.error(f"Error getting desired power: {e}")
-        self.controller.check_battery_limits()
-        self.logger.info(f"Battery limit state: {self.controller.limit_state} (1=max, -1=min, 0=ok)")
-        try:
-            reader = get_reader(self.controller.config_path)
-            zendure_data = reader.read_zendure(update_json=False)
-            if zendure_data:
-                props = zendure_data.get("properties", {})
-                battery_level = props.get("electricLevel", "N/A")
-                self.logger.info(f"Battery level: {battery_level}%")
-        except Exception as e:
-            self.logger.warning(f"Could not read Zendure data: {e}")
-        return True
-
-    def _cmd_accumulators(self, args: list) -> bool:
-        self.logger.debug("Accumulator debug output has been removed.")
-        return True
-
-    def _cmd_refresh(self, args: list) -> bool:
-        self.logger.info("Forcing schedule refresh...")
-        try:
-            api_url = self.schedule_controller.config.get("apiUrl")
-            if api_url:
-                print("\n" + "="*60)
-                print("API URL:")
-                print("="*60)
-                print(api_url)
-                print("="*60 + "\n")
-            else:
-                self.logger.warning("API URL not found in config")
-            self.schedule_controller.fetch_schedule()
-            self.logger.info("Schedule refreshed successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to refresh schedule: {e}")
-        return True
-
-    def _cmd_power(self, args: list) -> bool:
-        if not args:
-            self.logger.warning("Power command requires a value (e.g., 'p 500' or 'p netzero')")
-            return True
-        power_arg = args[0]
-        try:
-            if power_arg.lstrip("-").isdigit():
-                power_value = int(power_arg)
-            elif power_arg in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS]:
-                power_value = power_arg
-            else:
-                self.logger.warning(f"Invalid power value: {power_arg}")
-                self.logger.info("Use an integer (e.g., 500) or 'netzero' or 'netzero+'")
-                return True
-            self.logger.info(f"Manually setting power to: {power_value}")
-            if power_value in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS]:
-                success, actual_power, error = self._apply_dynamic_power(power_value)
-                if success:
-                    self.logger.info(f"Power set to: {actual_power}")
-                    self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
-                else:
-                    self.logger.error(f"Failed to set power: {error}")
-            else:
-                result = self.controller.set_power(power_value)
-                if result.success:
-                    self.logger.info(f"Power set to: {result.power}")
-                    self.status_api.post_update(EVENT_TYPE_CHANGE, None, result.power)
-                else:
-                    self.logger.error(f"Failed to set power: {result.error}")
-        except ValueError:
-            self.logger.warning(f"Invalid power value: {power_arg}")
-        return True
-
-    def _cmd_zero(self, args: list) -> bool:
-        self.logger.info("Setting power to 0")
-        result = self.controller.set_power(0)
-        if result.success:
-            self.logger.info("Power set to 0")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0)
-        else:
-            self.logger.error(f"Failed to set power: {result.error}")
-        return True
-
-    def _cmd_netzero(self, args: list) -> bool:
-        self.logger.info("Setting power to netzero")
-        success, actual_power, error = self._apply_dynamic_power(POWER_MODE_NETZERO)
-        if success:
-            self.logger.info("Power set to netzero")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
-        else:
-            self.logger.error(f"Failed to set power: {error}")
-        return True
-
-    def _cmd_netzero_plus(self, args: list) -> bool:
-        self.logger.info("Setting power to netzero+")
-        success, actual_power, error = self._apply_dynamic_power(POWER_MODE_NETZERO_PLUS)
-        if success:
-            self.logger.info("Power set to netzero+")
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
-        else:
-            self.logger.error(f"Failed to set power: {error}")
-        return True
-
-    def _cmd_quit(self, args: list) -> bool:
-        self.logger.info("Quit command received")
-        return False
-
-    def _set_pause(self, active: bool) -> bool:
-        if self.on_pause_change is None:
-            self.logger.error("Pause override is not available in this runtime.")
-            return False
-        try:
-            self.on_pause_change(active)
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to change pause override: {e}")
-            return False
-
-    def _pause_status(self) -> Optional[bool]:
-        if self.is_pause_active is None:
-            return None
-        try:
-            return bool(self.is_pause_active())
-        except Exception:
-            return None
-
-    def _cmd_pause(self, args: list) -> bool:
-        if not args:
-            status = self._pause_status()
-            if status is None:
-                self.logger.warning("Pause override status unavailable.")
-            else:
-                self.logger.info(f"Pause override is {'ON' if status else 'OFF'}.")
-            self.logger.info("Usage: pause on|off|status")
-            return True
-
-        action = str(args[0]).strip().lower()
-        if action in ("on", "1", "true", "start"):
-            self._set_pause(True)
-            return True
-        if action in ("off", "0", "false", "stop"):
-            self._set_pause(False)
-            return True
-        if action == "status":
-            status = self._pause_status()
-            if status is None:
-                self.logger.warning("Pause override status unavailable.")
-            else:
-                self.logger.info(f"Pause override is {'ON' if status else 'OFF'}.")
-            return True
-
-        self.logger.warning("Invalid pause command. Use: pause on|off|status")
-        return True
-
-    def _cmd_resume(self, args: list) -> bool:
-        self._set_pause(False)
-        return True
-
-    def _apply_dynamic_power(self, mode: str) -> tuple[bool, Optional[int], Optional[str]]:
-        if self.dynamic_power_setter is None:
-            return False, None, "Dynamic power setter is not configured"
-        return self.dynamic_power_setter(mode)
-
-
-# ============================================================================
 # AUTOMATION APP CLASS
 # ============================================================================
 
@@ -1014,7 +670,7 @@ class AutomationApp:
     """
     Main application class for the charge schedule automation.
     Encapsulates state, configuration, and the main execution loop.
-    Orchestrates all components: logger, status API, input handler, command handler.
+    Orchestrates all components: logger, status API, MQTT subscriber, and HTTP API.
     Includes HTTP API server for /api/test endpoint.
     """
 
@@ -1032,7 +688,6 @@ class AutomationApp:
         self.logger = None
         self.status_api = None
         self.input_handler = None
-        self.command_handler = None
 
         # HTTP API server
         self.http_server = None
@@ -1106,16 +761,6 @@ class AutomationApp:
                 db_path=db_path,
                 get_electric_level=get_electric_level,
                 retention_days=retention_days
-            )
-            self.input_handler = InputHandler()
-            self.command_handler = CommandHandler(
-                self.controller,
-                self.schedule_controller,
-                self.status_api,
-                self.logger,
-                on_pause_change=self._set_pause_override,
-                is_pause_active=lambda: self.pause_override_active,
-                dynamic_power_setter=self._apply_dynamic_power_command,
             )
 
             # Set up signal handlers
@@ -1782,18 +1427,8 @@ class AutomationApp:
             self.zero_power_since = None
             self.standby_sent = False
 
-    def _handle_user_input(self) -> bool:
-        """Process any pending user input. Returns False if quit requested."""
-        user_input = self.input_handler.check_for_input(timeout=0.1)
-        if user_input:
-            should_continue = self.command_handler.handle(user_input)
-            if not should_continue:
-                self.shutdown_requested = True
-                return False
-        return True
-
     def _sleep_interrupted(self):
-        """Sleep with interrupt for input/shutdown."""
+        """Sleep with interrupt for shutdown/MQTT wake events."""
         active_sleep_seconds = (
             self.fast_loop_interval_seconds if self.fast_loop_active else self.loop_interval_seconds
         )
@@ -1809,10 +1444,6 @@ class AutomationApp:
             now = time.localtime().tm_sec
             if now in (self.steps) and sleep_remaining < active_sleep_seconds:
                 return
-
-            # Check input
-            if not self._handle_user_input():
-                break
 
             if not self.shutdown_requested:
                 wait_seconds = min(1, sleep_remaining)
@@ -1932,7 +1563,7 @@ class AutomationApp:
             )
         else:
             self.logger.info("   MQTT power meter: disabled; using HTTP-only power meter reads")
-        self.logger.info("   Type 'h' or 'help' for available keyboard commands")
+        self.logger.info("   Runtime controls are available via the HTTP API/control page")
         print()
 
     def _update_p1_state(self, p1_data: Optional[dict]) -> None:
@@ -1998,10 +1629,6 @@ class AutomationApp:
         # 0. Sleep
         self._sleep_interrupted()
         if self.shutdown_requested:
-            return False
-
-        # 1. Check input
-        if not self._handle_user_input() or self.shutdown_requested:
             return False
 
         self._log_mqtt_diagnostics_if_needed()
