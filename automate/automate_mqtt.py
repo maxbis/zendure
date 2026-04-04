@@ -1300,6 +1300,25 @@ class AutomationApp:
             self._last_p1_read_source = "mqtt"
         return reading
 
+    def _format_mqtt_status_line(self, snapshot: dict[str, Any]) -> str:
+        """Render a compact periodic MQTT health line for operators."""
+        connected = bool(snapshot.get("connected"))
+        stale = bool(snapshot.get("stale"))
+        if not connected:
+            state = "down"
+        elif stale:
+            state = "stale"
+        else:
+            state = "ok"
+
+        age_seconds = snapshot.get("age_seconds")
+        age_text = "never" if age_seconds is None else f"{age_seconds:.1f}s"
+        power_text = snapshot.get("total_power")
+        power_display = "?" if power_text is None else f"{power_text}W"
+        message_count = snapshot.get("message_count")
+        message_display = 0 if message_count is None else message_count
+        return f"MQTT: {state} age={age_text} p={power_display} n={message_display}"
+
     def _log_mqtt_diagnostics_if_needed(self) -> None:
         """Log MQTT receive activity and a periodic health summary."""
         if self.mqtt_helper is None or not self.mqtt_helper.is_enabled() or self.logger is None:
@@ -1328,20 +1347,12 @@ class AutomationApp:
             return
         self._last_mqtt_status_log_ts = now
 
-        age_seconds = snapshot.get("age_seconds")
-        age_text = "never" if age_seconds is None else f"{age_seconds:.1f}s"
-        power_text = snapshot.get("total_power")
-        power_display = "unknown" if power_text is None else f"{power_text}W"
-        status_level = self.logger.warning if snapshot.get("stale") else self.logger.info
-        status_level(
-            "MQTT status: "
-            f"connected={snapshot.get('connected')} "
-            f"stale={snapshot.get('stale')} "
-            f"age={age_text} "
-            f"last_power={power_display} "
-            f"messages={snapshot.get('message_count')} "
-            f"topic={snapshot.get('topic')}",
+        status_level = (
+            self.logger.warning
+            if (not snapshot.get("connected") or snapshot.get("stale"))
+            else self.logger.info
         )
+        status_level(self._format_mqtt_status_line(snapshot))
 
     def _refresh_p1_for_api(self) -> None:
         """Read P1 meter and update api_state.last_p1 (for on-demand refresh from /api/p1)."""
@@ -1509,6 +1520,26 @@ class AutomationApp:
             return int(fallback_value)
         return None
 
+    def _format_runtime_fallback_log(
+        self,
+        slot_time: Any,
+        electricity_level: Any,
+        desired_power: Any,
+        fallback_value: Any,
+        min_power: Any = None,
+        max_power: Any = None,
+    ) -> str:
+        parts = [
+            f"Runtime: slot={slot_time} fallback",
+            f"lvl={electricity_level}",
+        ]
+        if min_power is not None:
+            parts.append(f"min={min_power}")
+        if max_power is not None:
+            parts.append(f"max={max_power}")
+        parts.append(f"base={desired_power} -> fb={fallback_value}")
+        return " ".join(parts)
+
     def _apply_runtime_conditions(self, desired_power: Any) -> Any:
         schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
         if not isinstance(schedule_entry, dict):
@@ -1609,18 +1640,18 @@ class AutomationApp:
 
         min_power = schedule_entry.get("min_power")
         max_power = schedule_entry.get("max_power")
-        limit_parts = []
-        if min_power is not None:
-            limit_parts.append(f"min_power={min_power}")
-        if max_power is not None:
-            limit_parts.append(f"max_power={max_power}")
-        limits_suffix = f", {', '.join(limit_parts)}" if limit_parts else ""
 
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
             self.logger.info(
-                f"Runtime conditions false for slot {slot_time} (electricity_level={electricity_level}{limits_suffix}); "
-                f"using fallback_value {fallback_value} instead of base value {desired_power}"
+                self._format_runtime_fallback_log(
+                    slot_time=slot_time,
+                    electricity_level=electricity_level,
+                    desired_power=desired_power,
+                    fallback_value=fallback_value,
+                    min_power=min_power,
+                    max_power=max_power,
+                )
             )
             self._last_runtime_decision_signature = signature
         return fallback_value
