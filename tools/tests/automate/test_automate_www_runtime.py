@@ -2736,13 +2736,63 @@ def test_runtime_condition_false_logs_slot_level_and_bounds():
     assert app._apply_runtime_conditions("netzero") == 0
     assert any(
         level == "info"
-        and "Runtime conditions false for slot 2000" in msg
-        and "electricity_level=88" in msg
-        and "min_power=-300" in msg
-        and "max_power=100" in msg
-        and "using fallback_value 0 instead of base value netzero" in msg
+        and msg == "Runtime: slot=2000 fallback lvl=88 min=-300 max=100 base=netzero -> fb=0"
         for level, msg in logs
     )
+
+
+def test_runtime_condition_false_logs_only_present_bound():
+    slot = {
+        "time": "2000",
+        "value": "netzero",
+        "runtime_conditions": [{"field": "electricity_level", "op": ">=", "value": 90}],
+        "fallback_value": 0,
+        "min_power": -300,
+    }
+    app, logs = _build_app_with_slot(slot, electric_level=88)
+
+    assert app._apply_runtime_conditions("netzero") == 0
+    assert any(
+        level == "info"
+        and msg == "Runtime: slot=2000 fallback lvl=88 min=-300 base=netzero -> fb=0"
+        for level, msg in logs
+    )
+
+
+def test_runtime_condition_false_logs_without_bounds():
+    slot = {
+        "time": "2000",
+        "value": "netzero",
+        "runtime_conditions": [{"field": "electricity_level", "op": ">=", "value": 90}],
+        "fallback_value": 0,
+    }
+    app, logs = _build_app_with_slot(slot, electric_level=88)
+
+    assert app._apply_runtime_conditions("netzero") == 0
+    assert any(
+        level == "info"
+        and msg == "Runtime: slot=2000 fallback lvl=88 base=netzero -> fb=0"
+        for level, msg in logs
+    )
+
+
+def test_runtime_condition_false_logs_once_per_decision_signature():
+    slot = {
+        "time": "2000",
+        "value": "netzero",
+        "runtime_conditions": [{"field": "electricity_level", "op": ">=", "value": 90}],
+        "fallback_value": 0,
+        "min_power": -300,
+        "max_power": 100,
+    }
+    app, logs = _build_app_with_slot(slot, electric_level=88)
+
+    assert app._apply_runtime_conditions("netzero") == 0
+    assert app._apply_runtime_conditions("netzero") == 0
+    info_logs = [msg for level, msg in logs if level == "info"]
+    assert info_logs == [
+        "Runtime: slot=2000 fallback lvl=88 min=-300 max=100 base=netzero -> fb=0"
+    ]
 
 
 def test_runtime_invalid_condition_is_skipped_and_does_not_break():

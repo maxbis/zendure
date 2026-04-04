@@ -1421,6 +1421,26 @@ class AutomationApp:
             return int(fallback_value)
         return None
 
+    def _format_runtime_fallback_log(
+        self,
+        slot_time: Any,
+        electricity_level: Any,
+        desired_power: Any,
+        fallback_value: Any,
+        min_power: Any = None,
+        max_power: Any = None,
+    ) -> str:
+        parts = [
+            f"Runtime: slot={slot_time} fallback",
+            f"lvl={electricity_level}",
+        ]
+        if min_power is not None:
+            parts.append(f"min={min_power}")
+        if max_power is not None:
+            parts.append(f"max={max_power}")
+        parts.append(f"base={desired_power} -> fb={fallback_value}")
+        return " ".join(parts)
+
     def _apply_runtime_conditions(self, desired_power: Any) -> Any:
         schedule_entry = getattr(self.schedule_controller, "last_schedule_entry", None)
         if not isinstance(schedule_entry, dict):
@@ -1521,18 +1541,18 @@ class AutomationApp:
 
         min_power = schedule_entry.get("min_power")
         max_power = schedule_entry.get("max_power")
-        limit_parts = []
-        if min_power is not None:
-            limit_parts.append(f"min_power={min_power}")
-        if max_power is not None:
-            limit_parts.append(f"max_power={max_power}")
-        limits_suffix = f", {', '.join(limit_parts)}" if limit_parts else ""
 
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
             self.logger.info(
-                f"Runtime conditions false for slot {slot_time} (electricity_level={electricity_level}{limits_suffix}); "
-                f"using fallback_value {fallback_value} instead of base value {desired_power}"
+                self._format_runtime_fallback_log(
+                    slot_time=slot_time,
+                    electricity_level=electricity_level,
+                    desired_power=desired_power,
+                    fallback_value=fallback_value,
+                    min_power=min_power,
+                    max_power=max_power,
+                )
             )
             self._last_runtime_decision_signature = signature
         return fallback_value
