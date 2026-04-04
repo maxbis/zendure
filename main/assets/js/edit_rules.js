@@ -6,6 +6,8 @@
         editIndex: null,
         initialRuleIndex: Number.isInteger(window.EDIT_RULES_INITIAL_RULE) ? window.EDIT_RULES_INITIAL_RULE - 1 : null,
         hasPendingImportedRules: false,
+        pageWasHidden: false,
+        isRefreshingForFreshData: false,
     };
 
     const els = {
@@ -1104,6 +1106,18 @@
     function attachEvents() {
         applyEditorHelpTooltips();
         updatePendingImportState();
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+                state.pageWasHidden = true;
+                return;
+            }
+
+            if (state.pageWasHidden && !state.isRefreshingForFreshData) {
+                state.isRefreshingForFreshData = true;
+                window.location.reload();
+            }
+        });
 
         if (els.btnExportJson) {
             els.btnExportJson.addEventListener('click', function () {
