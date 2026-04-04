@@ -33,6 +33,9 @@ $commandGroups = [
 ];
 $groupedCommands = [];
 foreach ($commandUi as $key => $cfg) {
+    if (array_key_exists('ui', $cfg) && $cfg['ui'] === false) {
+        continue;
+    }
     $groupKey = isset($cfg['group']) && is_string($cfg['group']) ? $cfg['group'] : 'other';
     if (!isset($groupedCommands[$groupKey])) {
         $groupedCommands[$groupKey] = [];
@@ -106,6 +109,55 @@ foreach ($groupedCommands as $groupKey => $commands) {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+    }
+    .control-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .control-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 0 0 120px;
+    }
+    .control-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .control-input {
+      width: 120px;
+      min-height: 38px;
+      padding: 8px 10px;
+      font-size: 15px;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    .control-help {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-tertiary);
+      line-height: 1.4;
+    }
+    .netzero-submit {
+      align-self: flex-end;
+      min-height: 38px;
+      white-space: nowrap;
+    }
+    @media (max-width: 640px) {
+      .control-input-wrap {
+        flex-basis: 100%;
+      }
+      .control-input {
+        width: 100%;
+      }
+      .netzero-submit {
+        width: 100%;
+      }
     }
     .command-btn {
       padding: 6px 12px;
@@ -289,6 +341,19 @@ foreach ($groupedCommands as $groupKey => $commands) {
               </div>
             </div>
           <?php endforeach; ?>
+
+          <div class="command-group">
+            <div class="command-group-title">Netzero Target</div>
+            <div class="command-group-desc">Set the runtime <code>NETZERO_TARGET_W</code> override as a signed watt value.</div>
+            <div class="control-form">
+              <div class="control-input-wrap">
+                <label class="control-label" for="netzeroTargetInput">Target Watts</label>
+                <input id="netzeroTargetInput" class="control-input" type="number" step="1" inputmode="numeric" placeholder="0">
+              </div>
+              <button id="netzeroTargetSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Target</button>
+            </div>
+            <div class="control-help">Use negative values to prefer export, positive values to prefer import, and <code>0</code> for exact netzero.</div>
+          </div>
         </div>
 
         <p id="status" class="command-status">Waiting for command...</p>
@@ -317,6 +382,8 @@ foreach ($groupedCommands as $groupKey => $commands) {
     (function () {
       var statusEl = document.getElementById('status');
       var buttons = Array.prototype.slice.call(document.querySelectorAll('.command-btn'));
+      var netzeroInput = document.getElementById('netzeroTargetInput');
+      var netzeroSubmit = document.getElementById('netzeroTargetSubmit');
       var proxyUrl = <?= json_encode($commandProxyUrl, JSON_UNESCAPED_SLASHES) ?>;
       var commands = <?= json_encode($commandUi, JSON_UNESCAPED_SLASHES) ?>;
 
@@ -339,6 +406,18 @@ foreach ($groupedCommands as $groupKey => $commands) {
         });
       }
 
+      function parseJsonResponse(res) {
+        return res.json()
+          .catch(function () { return {}; })
+          .then(function (payload) {
+            if (!res.ok || payload.ok === false) {
+              var msg = payload.error || ('HTTP ' + res.status);
+              throw new Error(msg);
+            }
+            return payload;
+          });
+      }
+
       function runCommand(commandKey) {
         var cfg = commands[commandKey];
         if (!cfg) {
@@ -357,17 +436,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
           },
           body: JSON.stringify({ command: commandKey })
         })
-          .then(function (res) {
-            return res.json()
-              .catch(function () { return {}; })
-              .then(function (payload) {
-                if (!res.ok || payload.ok === false) {
-                  var msg = payload.error || ('HTTP ' + res.status);
-                  throw new Error(msg);
-                }
-                return payload;
-              });
-          })
+          .then(parseJsonResponse)
           .then(function (payload) {
             var msg = payload.message || (cfg.label + ' command completed.');
             setStatus(msg, 'ok');
@@ -379,6 +448,67 @@ foreach ($groupedCommands as $groupKey => $commands) {
               return;
             }
             setStatus(cfg.label + ' failed: ' + msg, 'err');
+          })
+          .finally(function () {
+            setButtonsDisabled(false);
+          });
+      }
+
+      function loadNetzeroTarget() {
+        if (!netzeroInput) {
+          return;
+        }
+        fetch(proxyUrl + '?command=get_netzero_target_w', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+          .then(parseJsonResponse)
+          .then(function (payload) {
+            if (typeof payload.upstreamBody === 'object' && payload.upstreamBody !== null && typeof payload.upstreamBody.netzeroTargetW !== 'undefined') {
+              netzeroInput.value = String(payload.upstreamBody.netzeroTargetW);
+            } else if (typeof payload.netzeroTargetW !== 'undefined') {
+              netzeroInput.value = String(payload.netzeroTargetW);
+            }
+          })
+          .catch(function () {
+            // Keep page usable if the initial value fetch fails.
+          });
+      }
+
+      function submitNetzeroTarget() {
+        if (!netzeroInput || !netzeroSubmit) {
+          return;
+        }
+        var rawValue = String(netzeroInput.value || '').trim();
+        if (!/^-?\d+$/.test(rawValue)) {
+          setStatus('Netzero Target failed: enter a whole number in watts.', 'err');
+          return;
+        }
+
+        var value = Number(rawValue);
+        setButtonsDisabled(true);
+        setStatus('Sending command: Set Netzero Target ...');
+
+        fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ command: 'set_netzero_target_w', value: value })
+        })
+          .then(parseJsonResponse)
+          .then(function (payload) {
+            if (typeof payload.upstreamBody === 'object' && payload.upstreamBody !== null && typeof payload.upstreamBody.netzeroTargetW !== 'undefined') {
+              netzeroInput.value = String(payload.upstreamBody.netzeroTargetW);
+            }
+            setStatus(payload.message || ('NETZERO_TARGET_W set to ' + value + ' W'), 'ok');
+          })
+          .catch(function (err) {
+            var msg = (err && err.message) ? String(err.message) : 'Unknown error';
+            setStatus('Set Netzero Target failed: ' + msg, 'err');
           })
           .finally(function () {
             setButtonsDisabled(false);
@@ -409,6 +539,18 @@ foreach ($groupedCommands as $groupKey => $commands) {
         });
       });
 
+      if (netzeroSubmit) {
+        netzeroSubmit.addEventListener('click', submitNetzeroTarget);
+      }
+      if (netzeroInput) {
+        netzeroInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submitNetzeroTarget();
+          }
+        });
+      }
+
       cancelBtn.addEventListener('click', function () {
         pendingCommand = null;
         backdrop.classList.remove('open');
@@ -425,6 +567,8 @@ foreach ($groupedCommands as $groupKey => $commands) {
         backdrop.classList.remove('open');
         runCommand(cmd);
       });
+
+      loadNetzeroTarget();
     })();
   </script>
   <?php endif; ?>

@@ -15,6 +15,40 @@ require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include centralized configuration loader
 require_once __DIR__ . '/includes/config_loader.php';
 
+$configLoadError = ConfigLoader::getLoadError();
+if ($configLoadError !== null) {
+    http_response_code(500);
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Zendure Energy Manager - Config Error</title>
+        <link rel="stylesheet" href="assets/css/general_mobile.css">
+        <link rel="stylesheet" href="assets/css/charge_schedule_mobile.css">
+    </head>
+    <body class="mobile-dark">
+        <div class="container">
+            <div class="card" style="margin-top: 24px;">
+                <h1 class="card-header">Configuration Error</h1>
+                <p style="color: var(--text-secondary); line-height: 1.5;">
+                    The app could not start because the configuration file is invalid.
+                </p>
+                <p style="color: #ff8a80; line-height: 1.5;">
+                    <?= htmlspecialchars($configLoadError, ENT_QUOTES, 'UTF-8'); ?>
+                </p>
+                <p style="color: var(--text-tertiary); line-height: 1.5;">
+                    Fix the JSON in the config file and reload this page.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 $dataFile = __DIR__ . '/data/charge_schedule.json';
 
 // Load API URLs from centralized config loader

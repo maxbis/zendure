@@ -193,6 +193,7 @@ class BaseDeviceController:
         max_soc = _parse_int_config("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
         max_discharge_power = _parse_int_config("MAX_DISCHARGE_POWER", MAX_DISCHARGE_POWER)
         max_charge_power = _parse_int_config("MAX_CHARGE_POWER", MAX_CHARGE_POWER)
+        netzero_target_w = _parse_int_config("NETZERO_TARGET_W", 0)
         slow_charge_start_level_raw = self.config.get("SLOW_CHARGE_START_LEVEL")
         slow_charge_max_power_raw = self.config.get("SLOW_CHARGE_MAX_POWER")
 
@@ -208,6 +209,7 @@ class BaseDeviceController:
         self.max_charge_level = max_soc
         self.max_discharge_power = max(0, max_discharge_power)
         self.max_charge_power = max(0, max_charge_power)
+        self.netzero_target_w = netzero_target_w
         self.slow_charge_start_level = None
         self.slow_charge_max_power = None
 
@@ -818,9 +820,8 @@ class AutomateController(BaseDeviceController):
         if p1_power is None:
             raise ValueError("P1 meter data supplied by the caller is missing 'total_power'")
 
-        config = getattr(self, "config", {}) or {}
         try:
-            netzero_target_w = int(config.get("NETZERO_TARGET_W", 0))
+            netzero_target_w = int(getattr(self, "netzero_target_w", 0))
         except (TypeError, ValueError):
             netzero_target_w = 0
         adjusted_p1_power = p1_power - netzero_target_w

@@ -36,6 +36,7 @@ API_PATH_RESTART = "/api/restart"
 API_PATH_PAUSE = "/api/pause"
 API_PATH_LOG_LEVEL = "/api/loglevel"
 API_PATH_SLOW_CHARGE_MAX_POWER = "/api/slow_charge_max_power"
+API_PATH_NETZERO_TARGET_W = "/api/netzero_target_w"
 
 TEST_ENDPOINTS = [
     {"path": API_PATH_TEST, "optional_params": []},
@@ -51,6 +52,7 @@ TEST_ENDPOINTS = [
     {"path": API_PATH_PAUSE, "optional_params": [{"name": "state", "type": "string", "allowed": ["on", "off", "true", "false", "1", "0"], "description": "POST only: set pause override state"}]},
     {"path": API_PATH_LOG_LEVEL, "optional_params": [{"name": "level", "alt": "loglevel|log_level", "type": "string", "allowed": ["DEBUG", "INFO", "WARNING", "ERROR"], "description": "POST only: set runtime log level"}]},
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "optional_params": [{"name": "value", "type": "int", "min": 0, "description": "POST only: set runtime slow-charge max power; must be between 0 and MAX_CHARGE_POWER"}]},
+    {"path": API_PATH_NETZERO_TARGET_W, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime NETZERO_TARGET_W override as a signed integer"}]},
 ]
 
 CONTROL_COMMANDS = [
@@ -63,6 +65,8 @@ CONTROL_COMMANDS = [
     {"path": API_PATH_LOG_LEVEL, "name": "log_level_set", "method": "POST", "description": "Set runtime log level (DEBUG|INFO|WARNING|ERROR)", "example": f"{API_PATH_LOG_LEVEL}?level=info"},
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "name": "slow_charge_max_power_status", "method": "GET", "description": "Get current runtime slow-charge max power override", "example": f"{API_PATH_SLOW_CHARGE_MAX_POWER}"},
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "name": "slow_charge_max_power_set", "method": "POST", "description": "Set runtime slow-charge max power override", "example": f"{API_PATH_SLOW_CHARGE_MAX_POWER}?value=300"},
+    {"path": API_PATH_NETZERO_TARGET_W, "name": "netzero_target_w_status", "method": "GET", "description": "Get current runtime NETZERO_TARGET_W override", "example": f"{API_PATH_NETZERO_TARGET_W}"},
+    {"path": API_PATH_NETZERO_TARGET_W, "name": "netzero_target_w_set", "method": "POST", "description": "Set runtime NETZERO_TARGET_W override", "example": f"{API_PATH_NETZERO_TARGET_W}?value=-50"},
 ]
 
 
@@ -159,6 +163,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_pause_get",
         "_handle_loglevel_get",
         "_handle_slow_charge_max_power_get",
+        "_handle_netzero_target_w_get",
     )
     STATEFUL_GET_ROUTES = (
         "_handle_automation_status",
@@ -173,6 +178,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_pause_post",
         "_handle_loglevel_post",
         "_handle_slow_charge_max_power_post",
+        "_handle_netzero_target_w_post",
     )
 
     def _send_json(self, data, status=200, sort_keys=True):
@@ -228,6 +234,15 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if value < 0:
             return default
         return value
+
+    def _parse_int_query(self, parsed, key: str) -> Optional[int]:
+        query = parse_qs(parsed.query)
+        if key not in query or not query[key]:
+            return None
+        try:
+            return int(query[key][0])
+        except (ValueError, TypeError):
+            return None
 
     def _resolve_wh_per_hour_days(self, parsed) -> int:
         requested = self._parse_non_negative_int_query(parsed, "days", WH_PER_HOUR_DAYS_DEFAULT)
@@ -449,13 +464,10 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         return raw if raw in self._allowed_runtime_log_levels() else None
 
     def _parse_slow_charge_max_power(self, parsed) -> Optional[int]:
-        query = parse_qs(parsed.query)
-        if "value" not in query or not query["value"]:
-            return None
-        try:
-            return int(query["value"][0])
-        except (TypeError, ValueError):
-            return None
+        return self._parse_non_negative_int_query(parsed, "value")
+
+    def _parse_netzero_target_w(self, parsed) -> Optional[int]:
+        return self._parse_int_query(parsed, "value")
 
     def _handle_loglevel_get(self, parsed) -> bool:
         if parsed.path != API_PATH_LOG_LEVEL:
@@ -533,6 +545,46 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             "message": f"SLOW_CHARGE_MAX_POWER set to {controller.slow_charge_max_power} W",
             "slowChargeMaxPower": controller.slow_charge_max_power,
             "maxChargePower": max_charge_power,
+        })
+        return True
+
+    def _handle_netzero_target_w_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_NETZERO_TARGET_W:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "NETZERO_TARGET_W control not available"}, 503)
+            return True
+        current_value = getattr(controller, "netzero_target_w", 0)
+        if not isinstance(current_value, int):
+            try:
+                current_value = int(current_value)
+            except (TypeError, ValueError):
+                current_value = 0
+        self._send_json({"ok": True, "netzeroTargetW": current_value})
+        return True
+
+    def _handle_netzero_target_w_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_NETZERO_TARGET_W:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "NETZERO_TARGET_W control not available"}, 503)
+            return True
+        desired = self._parse_netzero_target_w(parsed)
+        if desired is None:
+            self._send_json({"ok": False, "error": "Invalid NETZERO_TARGET_W. Use signed integer value query parameter."}, 400)
+            return True
+        old_value = getattr(controller, "netzero_target_w", 0)
+        controller.netzero_target_w = desired
+        controller.log(
+            "info",
+            f"Runtime API override changed NETZERO_TARGET_W: {old_value} -> {desired} W",
+        )
+        self._send_json({
+            "ok": True,
+            "message": f"NETZERO_TARGET_W set to {controller.netzero_target_w} W",
+            "netzeroTargetW": controller.netzero_target_w,
         })
         return True
 

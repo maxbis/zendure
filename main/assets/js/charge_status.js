@@ -224,12 +224,18 @@ async function refreshStatus(isAutoRefresh = false) {
     }
 
     const apisCalled = [];
+    const backendReachability = {
+        configuredCount: 0,
+        successCount: 0,
+        backendUnavailableCount: 0
+    };
 
     // Fetch both automation status and charge status in parallel
 
     // Fetch automation status
     let automationPromise = Promise.resolve(null);
     if (typeof AUTOMATION_STATUS_API_URL !== 'undefined' && AUTOMATION_STATUS_API_URL) {
+        backendReachability.configuredCount++;
         // Detect config key based on URL pattern (localhost = local, otherwise remote)
         const isLocalUrl = AUTOMATION_STATUS_API_URL.includes('localhost') || AUTOMATION_STATUS_API_URL.includes('127.0.0.1');
         const statusConfigKey = 'statusApiUrl' + (isLocalUrl ? '-local' : '');
@@ -242,13 +248,14 @@ async function refreshStatus(isAutoRefresh = false) {
 
         automationPromise = fetchAutomationStatus(AUTOMATION_STATUS_API_URL)
             .then(data => {
+                backendReachability.successCount++;
                 renderAutomationStatus(data);
                 return data;
             })
             .catch(error => {
                 console.error('Failed to refresh automation status:', error);
                 if (isBackendUnavailableError(error)) {
-                    showNoBackendDialog();
+                    backendReachability.backendUnavailableCount++;
                 }
                 renderAutomationStatus({
                     success: false,
@@ -261,6 +268,7 @@ async function refreshStatus(isAutoRefresh = false) {
     // Fetch charge status
     let chargePromise = Promise.resolve(null);
     if (typeof CHARGE_STATUS_ALL_API_URL !== 'undefined' && CHARGE_STATUS_ALL_API_URL) {
+        backendReachability.configuredCount++;
         // Unified API (P1 + Zendure + status)
         const isLocalUrl = CHARGE_STATUS_ALL_API_URL.includes('localhost') || CHARGE_STATUS_ALL_API_URL.includes('127.0.0.1');
         const dataConfigKey = 'dataApiUrl' + (isLocalUrl ? '-local' : '');
@@ -274,6 +282,7 @@ async function refreshStatus(isAutoRefresh = false) {
         chargePromise = (async () => {
             try {
                 const allData = await fetchChargeStatusAll(CHARGE_STATUS_ALL_API_URL);
+                backendReachability.successCount++;
                 const { zendureData, p1Data } = normalizeChargeStatusAll(allData);
                 renderChargeStatus(zendureData, p1Data);
 
@@ -285,7 +294,7 @@ async function refreshStatus(isAutoRefresh = false) {
             } catch (error) {
                 console.error('Failed to refresh charge status (unified):', error);
                 if (isBackendUnavailableError(error)) {
-                    showNoBackendDialog();
+                    backendReachability.backendUnavailableCount++;
                 }
                 renderChargeStatus({
                     success: false,
@@ -308,6 +317,16 @@ async function refreshStatus(isAutoRefresh = false) {
     // Wait for both to complete (they run in parallel), then cross-check for pending state
     const [automationData] = await Promise.all([automationPromise, chargePromise]);
     applyPendingPowerState(automationData);
+
+    const shouldShowNoBackendDialog =
+        backendReachability.configuredCount > 0 &&
+        backendReachability.successCount === 0 &&
+        backendReachability.backendUnavailableCount === backendReachability.configuredCount;
+
+    if (shouldShowNoBackendDialog) {
+        console.warn('All configured status endpoints reported backend unavailable during this refresh cycle.');
+        showNoBackendDialog();
+    }
 
     // Update current time indicators in graphs during auto-refresh
     if (isAutoRefresh) {

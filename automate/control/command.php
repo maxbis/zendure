@@ -50,23 +50,47 @@ function parseJsonBody(): array {
     return is_array($decoded) ? $decoded : [];
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    responseJson(200, [
-        'ok' => true,
-        'message' => 'Command endpoint help',
-        'usage' => [
-            'method' => 'POST',
-            'body' => ['command' => 'pause_on'],
-            'or_query' => '?command=pause_on',
-        ],
-        'commands' => availableCommands($commands),
-    ]);
+function extractCommand(array $body): string {
+    if (isset($body['command']) && is_string($body['command'])) {
+        return trim($body['command']);
+    }
+    if (isset($_POST['command']) && is_string($_POST['command'])) {
+        return trim($_POST['command']);
+    }
+    if (isset($_GET['command']) && is_string($_GET['command'])) {
+        return trim($_GET['command']);
+    }
+    return '';
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+function extractIntegerValue(array $body): ?int {
+    $raw = null;
+    if (array_key_exists('value', $body)) {
+        $raw = $body['value'];
+    } elseif (array_key_exists('value', $_POST)) {
+        $raw = $_POST['value'];
+    } elseif (array_key_exists('value', $_GET)) {
+        $raw = $_GET['value'];
+    }
+    if ($raw === null) {
+        return null;
+    }
+    if (is_int($raw)) {
+        return $raw;
+    }
+    if (is_string($raw) && preg_match('/^-?\d+$/', trim($raw))) {
+        return (int) trim($raw);
+    }
+    return null;
+}
+
+$body = parseJsonBody();
+$command = extractCommand($body);
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     responseJson(405, [
         'ok' => false,
-        'error' => 'Method not allowed. Use POST.',
+        'error' => 'Method not allowed. Use GET or POST.',
         'commands' => availableCommands($commands),
     ]);
 }
@@ -80,14 +104,17 @@ if ($baseUrl === '') {
     ]);
 }
 
-$body = parseJsonBody();
-$command = '';
-if (isset($body['command']) && is_string($body['command'])) {
-    $command = trim($body['command']);
-} elseif (isset($_POST['command']) && is_string($_POST['command'])) {
-    $command = trim($_POST['command']);
-} elseif (isset($_GET['command']) && is_string($_GET['command'])) {
-    $command = trim($_GET['command']);
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $command === '') {
+    responseJson(200, [
+        'ok' => true,
+        'message' => 'Command endpoint help',
+        'usage' => [
+            'method' => 'POST',
+            'body' => ['command' => 'pause_on'],
+            'or_query' => '?command=pause_on',
+        ],
+        'commands' => availableCommands($commands),
+    ]);
 }
 
 if ($command === '' || !isset($commands[$command])) {
@@ -101,6 +128,17 @@ if ($command === '' || !isset($commands[$command])) {
 $cfg = $commands[$command];
 $method = strtoupper((string) ($cfg['method'] ?? 'POST'));
 $path = (string) ($cfg['path'] ?? '');
+if (!empty($cfg['parameterized'])) {
+    $value = extractIntegerValue($body);
+    if ($value === null) {
+        responseJson(400, [
+            'ok' => false,
+            'command' => $command,
+            'error' => 'Missing or invalid integer value.',
+        ]);
+    }
+    $path .= '?value=' . rawurlencode((string) $value);
+}
 $upstreamUrl = rtrim($baseUrl, '/') . $path;
 
 $context = stream_context_create([
