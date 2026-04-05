@@ -1076,6 +1076,80 @@ body.mobile-dark {
     background: #555;
 }
 
+/* Hourly totals (zoom / single-day mode): more rows + compact width like Daily totals */
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly {
+    max-height: 22em;
+}
+
+/* Shrink-wrapped table — avoids full-width column stretch and right-edge clipping */
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly table {
+    width: auto;
+    max-width: 100%;
+    table-layout: auto;
+    margin-left: 10px;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly th,
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly td {
+    padding: 4px 0 4px 0;
+    min-width: 90px;
+    white-space: nowrap;
+}
+
+/* Nest hourly times under section bands (section row stays flush left) */
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly thead th:first-child {
+    padding-left: 14px;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly tr.hourly-data td:first-child {
+    padding-left: 14px;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly th:nth-child(2),
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly td:nth-child(2) {
+    text-align: right;
+    padding-left: 10px;
+    padding-right: 0;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly th:nth-child(3),
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly td:nth-child(3) {
+    text-align: right;
+    padding-left: 10px;
+    padding-right: 0;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly th:nth-child(4),
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly td:nth-child(4) {
+    text-align: right;
+    padding-left: 10px;
+    padding-right: 0;
+}
+
+.energy-graph-mobile-daily-table .hourly-bat {
+    color: #64b5f6;
+}
+
+/* Hourly table: 6-hour bands + zebra stripes on data rows */
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly tr.hourly-section-label td {
+    padding: 6px 0 4px 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    border-top: 1px solid var(--border-color, #404040);
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly tr.hourly-section-label:first-child td {
+    border-top: none;
+    padding-top: 2px;
+}
+
+.energy-graph-mobile-daily-table.energy-graph-mobile-totals-table--hourly tr.hourly-data.hourly-zebra-alt td {
+    background: rgba(255, 255, 255, 0.045);
+}
+
 .energy-graph-mobile-daily-table table {
     width: 100%;
     table-layout: fixed;

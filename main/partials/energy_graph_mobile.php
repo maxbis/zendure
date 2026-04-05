@@ -34,7 +34,7 @@
             </div>
         </div>
         <div class="energy-graph-mobile-tab-panel" data-tab="daily" role="tabpanel" aria-hidden="true">
-            <h3 class="card-header">Daily totals</h3>
+            <h3 class="card-header" data-energy-graph-totals-title>Daily totals</h3>
             <div class="energy-graph-mobile-daily-table">
                 <p class="energy-graph-mobile-no-data">Loading…</p>
             </div>

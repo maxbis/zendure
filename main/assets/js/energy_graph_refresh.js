@@ -8,6 +8,8 @@
     var API_URL = typeof ENERGY_GRAPH_API_URL !== 'undefined' ? ENERGY_GRAPH_API_URL : 'api/energy_graph_api.php';
     var selectedMobileDay = null;
     var latestWhPerHour = [];
+    var latestWhPerDay = {};
+    var latestBaseWh = 5760;
     var energyGraphControlsBound = false;
     // In focused-day mode, show labels every N hours on the X axis.
     var FOCUSED_TICK_INTERVAL_HOURS = 2;
@@ -121,6 +123,12 @@
         if (label) label.textContent = formatFocusedDayLabel(selectedMobileDay);
         if (prevBtn) prevBtn.disabled = !isFocused || dayIndex <= 0;
         if (nextBtn) nextBtn.disabled = !isFocused || dayIndex === -1 || dayIndex >= days.length - 1;
+
+        var totalsTab = card.querySelector('.energy-graph-mobile-tab[data-tab="daily"]');
+        var totalsTitle = card.querySelector('[data-energy-graph-totals-title]');
+        var totalsLabel = isFocused ? 'Hourly totals' : 'Daily totals';
+        if (totalsTab) totalsTab.textContent = totalsLabel;
+        if (totalsTitle) totalsTitle.textContent = totalsLabel;
     }
 
     function setSelectedMobileDay(day, options) {
@@ -141,6 +149,7 @@
                 }
             }
             rerenderMobileChartFromSelection();
+            renderMobileTotalsTable();
         }
     }
 
@@ -532,6 +541,122 @@
         statusEl.hidden = false;
     }
 
+    function sortHourRowsForTable(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.slice().sort(function(a, b) {
+            return ((a && a.hourLabel) || '').localeCompare((b && b.hourLabel) || '');
+        });
+    }
+
+    function extractTimeFromHourLabel(hourLabel) {
+        if (!hourLabel || typeof hourLabel !== 'string') return '00:00';
+        var parts = hourLabel.split(' ');
+        return parts[1] || '00:00';
+    }
+
+    function hourQuarterFromTimeStr(timeStr) {
+        var h = parseInt((String(timeStr).split(':')[0] || '0'), 10);
+        if (!isFinite(h)) h = 0;
+        h = Math.max(0, Math.min(23, h));
+        if (h >= 18) return 3;
+        if (h >= 12) return 2;
+        if (h >= 6) return 1;
+        return 0;
+    }
+
+    function entryElectricLevel(entry) {
+        if (!entry || entry.electricLevel == null || entry.electricLevel === '') return null;
+        var parsed = Number(entry.electricLevel);
+        if (!isFinite(parsed)) return null;
+        return Math.max(0, Math.min(100, parsed));
+    }
+
+    function renderMobileTotalsTable() {
+        var container = document.querySelector('.energy-graph-mobile-daily-table');
+        if (!container) return;
+        if (selectedMobileDay) {
+            container.classList.add('energy-graph-mobile-totals-table--hourly');
+            var rows = sortHourRowsForTable(filterWhPerHourByDay(latestWhPerHour, selectedMobileDay));
+            renderMobileHourlyTable(container, rows);
+        } else {
+            container.classList.remove('energy-graph-mobile-totals-table--hourly');
+            renderMobileDailyTable(latestWhPerDay, latestBaseWh);
+        }
+    }
+
+    function renderMobileHourlyTable(container, rows) {
+        if (!rows || rows.length === 0) {
+            container.innerHTML = '<p class="energy-graph-mobile-no-data">No data</p>';
+            return;
+        }
+        var electricLevels = rows.map(function(d) {
+            return entryElectricLevel(d);
+        });
+        var sectionLabels = ['00:00 – 06:00', '06:00 – 12:00', '12:00 – 18:00', '18:00 – 00:00'];
+        var html = '<table><thead><tr><th>Time</th><th>W</th><th>Battery</th>' +
+            '<th title="Change vs previous hour">Δ%</th></tr></thead><tbody>';
+        var prevQuarter = -1;
+        var dataRowIndex = 0;
+        for (var i = 0; i < rows.length; i++) {
+            var d = rows[i];
+            var timeStr = extractTimeFromHourLabel(d && d.hourLabel);
+            var quarter = hourQuarterFromTimeStr(timeStr);
+            if (quarter !== prevQuarter) {
+                html += '<tr class="hourly-section-label"><td colspan="4">' +
+                    escapeHtml(sectionLabels[quarter]) + '</td></tr>';
+                prevQuarter = quarter;
+            }
+            var wh = d && d.wh != null ? Number(d.wh) : 0;
+            var wCellClass = '';
+            var wText;
+            if (wh > 0) {
+                wCellClass = 'wh-pos';
+                wText = '+' + Math.round(wh).toLocaleString() + ' W';
+            } else if (wh < 0) {
+                wCellClass = 'wh-neg';
+                wText = Math.round(wh).toLocaleString() + ' W';
+            } else {
+                wText = '0 W';
+            }
+            var pct = electricLevels[i];
+            var prevPct = i > 0 ? electricLevels[i - 1] : null;
+            var batText;
+            if (pct == null) {
+                batText = 'n/a';
+            } else {
+                if (prevPct == null) {
+                    batText = pct.toFixed(0) + '%';
+                } else {
+                    batText = prevPct.toFixed(0) + '%-' + pct.toFixed(0) + '%';
+                }
+            }
+            var deltaText;
+            var deltaClass = '';
+            if (pct == null || prevPct == null) {
+                deltaText = pct == null ? 'n/a' : '—';
+            } else {
+                var deltaInt = Math.round(pct - prevPct);
+                if (deltaInt > 0) {
+                    deltaClass = 'wh-pos';
+                    deltaText = '+' + deltaInt + '%';
+                } else if (deltaInt < 0) {
+                    deltaClass = 'wh-neg';
+                    deltaText = deltaInt + '%';
+                } else {
+                    deltaText = '0%';
+                }
+            }
+            var zebraClass = (dataRowIndex % 2 === 1) ? ' hourly-zebra-alt' : '';
+            dataRowIndex++;
+            html += '<tr class="hourly-data' + zebraClass + '"><td>' + escapeHtml(timeStr) + '</td><td' +
+                (wCellClass ? ' class="' + wCellClass + '"' : '') + '>' + escapeHtml(wText) + '</td>' +
+                '<td class="hourly-bat">' + escapeHtml(batText) + '</td><td' +
+                (deltaClass ? ' class="' + deltaClass + '"' : '') + '>' + escapeHtml(deltaText) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
     function renderMobileDailyTable(whPerDay, baseWh) {
         var container = document.querySelector('.energy-graph-mobile-daily-table');
         if (!container) return;
@@ -579,6 +704,8 @@
             var cacheInfo = json.cacheInfo || null;
 
             latestWhPerHour = Array.isArray(whPerHour) ? whPerHour : [];
+            latestWhPerDay = whPerDay && typeof whPerDay === 'object' ? whPerDay : {};
+            latestBaseWh = baseWh;
             ensureMobileControlsBound();
             if (selectedMobileDay) {
                 var hasSelectedDay = latestWhPerHour.some(function(d) {
@@ -593,7 +720,7 @@
             ensureMobileChartExists();
             updateMobileChart(cdMobile);
             syncMobileZoomUi();
-            renderMobileDailyTable(whPerDay, baseWh);
+            renderMobileTotalsTable();
             renderCacheStatus(cacheInfo);
         } catch (e) {
             console.warn('Energy graph refresh failed:', e);
