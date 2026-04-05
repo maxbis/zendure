@@ -53,6 +53,10 @@ WH_PER_HOUR_CACHE_SECONDS = 60
 # Shared timezone for status timestamps
 STATUS_TIMEZONE = "Europe/Amsterdam"
 
+# Retention cleanup scheduling
+RETENTION_CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60
+RETENTION_CLEANUP_LOOP_INTERVAL = 500
+
 # Power mode strings and validation defaults
 POWER_MODE_NETZERO = "netzero"
 POWER_MODE_NETZERO_PLUS = "netzero+"
@@ -597,7 +601,7 @@ class StatusApi:
 
     def _insert_status(self, event_type: str, old_value: Any, new_value: Any,
                        p1_total_power: Optional[int], timestamp: int) -> None:
-        """Insert status update into SQLite and optionally run retention cleanup."""
+        """Insert status update into SQLite."""
         if not self.db_path:
             return
         self._ensure_db()
@@ -624,10 +628,6 @@ class StatusApi:
                     )
                     if event_type == EVENT_TYPE_CHANGE:
                         self._remember_stored_change_row(new_value, electric_level, timestamp)
-                conn.execute(
-                    "DELETE FROM status_updates WHERE timestamp < ?",
-                    (int(timestamp) - (self.retention_days * 24 * 60 * 60),)
-                )
                 conn.commit()
             http_server = getattr(self, "http_server", None)
             if should_insert and http_server is not None and hasattr(http_server, "wh_per_hour_cache_lock"):
@@ -635,6 +635,24 @@ class StatusApi:
                     http_server.wh_per_hour_cache = None
         except Exception as e:
             self.logger.warning(f"Failed to write status update to SQLite: {e}")
+
+    def cleanup_old_rows(self, now_ts: int) -> bool:
+        """Delete rows older than the configured retention window."""
+        if not self.db_path:
+            return False
+        self._ensure_db()
+        try:
+            cutoff_ts = int(now_ts) - (self.retention_days * 24 * 60 * 60)
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "DELETE FROM status_updates WHERE timestamp < ?",
+                    (cutoff_ts,),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            self.logger.warning(f"Failed to clean up old SQLite status rows: {e}")
+            return False
 
     def post_update(self, event_type: str, old_value: Any = None, new_value: Any = None,
                     p1_total_power: Optional[int] = None) -> bool:
@@ -708,6 +726,8 @@ class AutomationApp:
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self._runtime_condition_warning_cache: set[str] = set()
         self._last_runtime_decision_signature: Optional[str] = None
+        self.loop_counter = 0
+        self.last_retention_cleanup_ts: Optional[int] = None
 
 
     def initialize(self) -> bool:
@@ -1496,6 +1516,22 @@ class AutomationApp:
         self._handle_standby_check()
         return True
 
+    def _maybe_run_retention_cleanup(self, now_ts: Optional[int] = None) -> None:
+        if self.status_api is None:
+            return
+        if self.loop_counter <= 0 or (self.loop_counter % RETENTION_CLEANUP_LOOP_INTERVAL) != 0:
+            return
+
+        current_ts = int(time.time()) if now_ts is None else int(now_ts)
+        if (
+            self.last_retention_cleanup_ts is not None
+            and (current_ts - self.last_retention_cleanup_ts) < RETENTION_CLEANUP_INTERVAL_SECONDS
+        ):
+            return
+
+        if self.status_api.cleanup_old_rows(current_ts):
+            self.last_retention_cleanup_ts = current_ts
+
     def run(self) -> int:
         """Main execution method."""
         if not self.initialize():
@@ -1509,8 +1545,10 @@ class AutomationApp:
 
         try:
             while not self.shutdown_requested:
+                self.loop_counter += 1
                 if not self._run_cycle():
                     break
+                self._maybe_run_retention_cleanup()
         except KeyboardInterrupt:
             self.shutdown_requested = True
         except Exception as e:

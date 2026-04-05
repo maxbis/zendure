@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,7 @@ CONDITIONS_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_conditions_bak.json"
 RESOLVER_FILE = MAIN_DATA_DIR / "resolve_schedule_conditions.php"
 DATA_API_FILE = MAIN_DATA_DIR / "api" / "data_api.php"
 MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
+AUTOMATE_DATA_DIR = REPO_ROOT / "automate" / "data"
 
 TEST_DESCRIPTIONS = [
     ("test_base_schedule_resolution_reads_object_entries", "Checks raw schedule object entries resolve into standard slot values."),
@@ -83,6 +85,11 @@ def _run_php_json(cmd: list[str]) -> dict:
     if not raw:
         raise RuntimeError("PHP command returned empty output")
     return json.loads(raw)
+
+
+def _unique_status_db_path() -> Path:
+    AUTOMATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return AUTOMATE_DATA_DIR / f"test_status_updates_{uuid.uuid4().hex}.db"
 
 
 def _load_lat_lon_from_main_config() -> tuple[float, float]:
@@ -2087,6 +2094,115 @@ def test_status_api_initializes_change_insert_state_from_existing_db(tmp_path):
         ("change", "600", 70, first_ts),
         ("change", "600", 70, first_ts + 3600),
     ]
+
+
+def test_status_api_insert_does_not_run_retention_cleanup():
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = _unique_status_db_path()
+    try:
+        status_api = automate_www.StatusApi(
+            logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+            db_path=str(db_path),
+            retention_days=1,
+        )
+        old_ts = int(datetime(2025, 1, 1, 10, 0, 0, tzinfo=tz).timestamp())
+        new_ts = old_ts + (2 * 24 * 60 * 60)
+
+        status_api._insert_status("start", None, None, None, old_ts)
+        status_api._insert_status("start", None, None, None, new_ts)
+
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute(
+                "SELECT timestamp FROM status_updates ORDER BY timestamp ASC"
+            ).fetchall()
+    finally:
+        if db_path.exists():
+            try:
+                db_path.unlink()
+            except PermissionError:
+                pass
+
+    assert rows == [(old_ts,), (new_ts,)]
+
+
+def test_status_api_cleanup_old_rows_deletes_only_expired_rows():
+    automate_www = _import_automate_www_module()
+    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    db_path = _unique_status_db_path()
+    try:
+        status_api = automate_www.StatusApi(
+            logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+            db_path=str(db_path),
+            retention_days=1,
+        )
+        now_ts = int(datetime(2025, 1, 3, 12, 0, 0, tzinfo=tz).timestamp())
+        old_ts = now_ts - (2 * 24 * 60 * 60)
+        fresh_ts = now_ts - (12 * 60 * 60)
+
+        status_api._insert_status("start", None, None, None, old_ts)
+        status_api._insert_status("start", None, None, None, fresh_ts)
+
+        assert status_api.cleanup_old_rows(now_ts) is True
+
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute(
+                "SELECT timestamp FROM status_updates ORDER BY timestamp ASC"
+            ).fetchall()
+    finally:
+        if db_path.exists():
+            try:
+                db_path.unlink()
+            except PermissionError:
+                pass
+
+    assert rows == [(fresh_ts,)]
+
+
+def test_automation_app_retention_cleanup_requires_loop_gate():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    cleanup_calls: list[int] = []
+    app.status_api = SimpleNamespace(cleanup_old_rows=lambda now_ts: cleanup_calls.append(now_ts) or True)
+
+    app.loop_counter = automate_www.RETENTION_CLEANUP_LOOP_INTERVAL - 1
+    app._maybe_run_retention_cleanup(now_ts=1000)
+
+    assert cleanup_calls == []
+    assert app.last_retention_cleanup_ts is None
+
+
+def test_automation_app_retention_cleanup_checks_elapsed_time():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    cleanup_calls: list[int] = []
+    app.status_api = SimpleNamespace(cleanup_old_rows=lambda now_ts: cleanup_calls.append(now_ts) or True)
+    app.loop_counter = automate_www.RETENTION_CLEANUP_LOOP_INTERVAL
+
+    app._maybe_run_retention_cleanup(now_ts=1000)
+    app._maybe_run_retention_cleanup(
+        now_ts=1000 + automate_www.RETENTION_CLEANUP_INTERVAL_SECONDS - 1
+    )
+    app._maybe_run_retention_cleanup(
+        now_ts=1000 + automate_www.RETENTION_CLEANUP_INTERVAL_SECONDS
+    )
+
+    assert cleanup_calls == [
+        1000,
+        1000 + automate_www.RETENTION_CLEANUP_INTERVAL_SECONDS,
+    ]
+    assert app.last_retention_cleanup_ts == 1000 + automate_www.RETENTION_CLEANUP_INTERVAL_SECONDS
+
+
+def test_automation_app_retention_cleanup_failure_does_not_update_timestamp():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    app.status_api = SimpleNamespace(cleanup_old_rows=lambda _now_ts: False)
+    app.loop_counter = automate_www.RETENTION_CLEANUP_LOOP_INTERVAL
+
+    app._maybe_run_retention_cleanup(now_ts=2000)
+
+    assert app.last_retention_cleanup_ts is None
 
 
 def test_load_change_points_preserves_electric_level_transitions(tmp_path):
