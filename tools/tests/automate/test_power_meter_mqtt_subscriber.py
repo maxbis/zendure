@@ -37,6 +37,8 @@ def _build_subscriber():
     subscriber._last_raw_payload = None
     subscriber._last_payload = None
     subscriber._last_total_power = None
+    subscriber._last_total_act = None
+    subscriber._last_total_act_ret = None
     subscriber._last_message_timestamp = None
     subscriber._message_count = 0
     subscriber._last_delta_watts = None
@@ -77,6 +79,7 @@ def test_on_message_ignores_missing_total_power_path():
 
     assert subscriber._message_count == 0
     assert subscriber._last_total_power is None
+    assert subscriber._last_total_act == 123.0
     assert subscriber._power_change_event is False
 
 
@@ -92,3 +95,20 @@ def test_on_message_ignores_null_total_power():
     assert subscriber._message_count == 0
     assert subscriber._last_total_power is None
     assert subscriber._power_change_event is False
+
+
+def test_on_message_caches_energy_counters_with_power_message():
+    subscriber = _build_subscriber()
+    payload = {
+        "method": "NotifyStatus",
+        "params": {
+            "em:0": {"total_act_power": 12.7},
+            "emdata:0": {"total_act": 52587.88, "total_act_ret": 45734.94},
+        },
+    }
+
+    subscriber._on_message(None, None, _message(payload))
+
+    assert subscriber._last_total_power == 13
+    assert subscriber._last_total_act == 52587.88
+    assert subscriber._last_total_act_ret == 45734.94

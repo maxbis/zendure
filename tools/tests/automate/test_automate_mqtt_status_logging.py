@@ -10,6 +10,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +26,14 @@ def _import_automate_mqtt_module():
         sys.path.insert(0, str(automate_dir))
     import automate_mqtt  # type: ignore
     return automate_mqtt
+
+
+def _import_status_updates_store():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import status_updates_store  # type: ignore
+    return status_updates_store
 
 
 def _build_app():
@@ -90,11 +99,11 @@ def test_format_mqtt_status_line_down_before_data():
 
 
 def test_status_api_insert_does_not_run_retention_cleanup():
-    automate_mqtt = _import_automate_mqtt_module()
-    tz = automate_mqtt.ZoneInfo(automate_mqtt.STATUS_TIMEZONE)
+    sus = _import_status_updates_store()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = _unique_db_path()
     try:
-        status_api = automate_mqtt.StatusApi(
+        status_api = sus.StatusApi(
             logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
             db_path=str(db_path),
             retention_days=1,
@@ -102,8 +111,8 @@ def test_status_api_insert_does_not_run_retention_cleanup():
         old_ts = int(datetime(2025, 1, 1, 10, 0, 0, tzinfo=tz).timestamp())
         new_ts = old_ts + (2 * 24 * 60 * 60)
 
-        status_api._insert_status("start", None, None, None, old_ts)
-        status_api._insert_status("start", None, None, None, new_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, old_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, new_ts)
 
         with sqlite3.connect(db_path) as conn:
             rows = conn.execute(
@@ -120,11 +129,11 @@ def test_status_api_insert_does_not_run_retention_cleanup():
 
 
 def test_status_api_cleanup_old_rows_deletes_only_expired_rows():
-    automate_mqtt = _import_automate_mqtt_module()
-    tz = automate_mqtt.ZoneInfo(automate_mqtt.STATUS_TIMEZONE)
+    sus = _import_status_updates_store()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = _unique_db_path()
     try:
-        status_api = automate_mqtt.StatusApi(
+        status_api = sus.StatusApi(
             logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
             db_path=str(db_path),
             retention_days=1,
@@ -133,8 +142,8 @@ def test_status_api_cleanup_old_rows_deletes_only_expired_rows():
         old_ts = now_ts - (2 * 24 * 60 * 60)
         fresh_ts = now_ts - (12 * 60 * 60)
 
-        status_api._insert_status("start", None, None, None, old_ts)
-        status_api._insert_status("start", None, None, None, fresh_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, old_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, fresh_ts)
 
         assert status_api.cleanup_old_rows(now_ts) is True
 
@@ -196,3 +205,22 @@ def test_maybe_run_retention_cleanup_does_not_update_timestamp_on_failure():
     app._maybe_run_retention_cleanup(now_ts=2000)
 
     assert app.last_retention_cleanup_ts is None
+
+
+def test_post_status_update_uses_latest_cached_energy_counters():
+    app = _build_app()
+    captured = {}
+    app.mqtt_helper = SimpleNamespace(
+        get_latest_total_act=lambda: 52587.88,
+        get_latest_total_act_ret=lambda: 45734.94,
+    )
+    app.status_api = SimpleNamespace(
+        post_update=lambda *args, **kwargs: captured.update({"args": args, "kwargs": kwargs}) or True
+    )
+
+    app._post_status_update("start", None, None, p1_total_power=12)
+
+    assert captured["args"] == ("start", None, None)
+    assert captured["kwargs"]["p1_total_power"] == 12
+    assert captured["kwargs"]["total_act"] == 52587.88
+    assert captured["kwargs"]["total_act_ret"] == 45734.94

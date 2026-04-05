@@ -1,0 +1,1 @@
+pytest tools\tests\automate -v --basetemp d:\tmp\

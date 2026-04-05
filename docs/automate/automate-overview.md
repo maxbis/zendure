@@ -36,6 +36,7 @@ This is the active automation script with a built-in HTTP API:
 
 - Exposes an HTTP API on port 1611 for monitoring (P1, Zendure, status, Wh-per-hour) and remote refresh.
 - Stores status updates in SQLite (`data/status_updates.db`) instead of POSTing to an external status API.
+- Uses a shared `status_updates_store` layer for SQLite schema management, Wh-per-hour reads, delta reads, and retention cleanup.
 - Uses a slightly different loop interval default (20 seconds) and supports power step delta limiting.
 
 For full documentation, see [automate-www.md](automate-www.md).
@@ -172,6 +173,7 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 - Used by: `StatusApi.post_update()` in `automate_www.py`
 - Purpose: persist automation lifecycle and power-change events so the built-in API can expose current and historical status.
 - When: on start (`type: 'start'`), stop (`type: 'stop'`), power change (`type: 'change'`), and schedule rescan (`type: 'Rescan'`).
+- Stored fields include event values plus optional meter context such as `p1_total_power`, `electric_level`, and cumulative Shelly counters (`total_act_x100`, `total_act_ret_x100`).
 - Exposed via: `/api/status`, `/api/automation_status`, `/api/wh_per_hour`, `/api/status_updates_delta`
 
 ### 3. Zendure device – read (GET)

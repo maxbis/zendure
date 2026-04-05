@@ -820,8 +820,15 @@ class AutomateController(BaseDeviceController):
         if p1_power is None:
             raise ValueError("P1 meter data supplied by the caller is missing 'total_power'")
 
+        raw_netzero_target_w = getattr(self, "netzero_target_w", None)
+        if raw_netzero_target_w is None:
+            config = getattr(self, "config", {})
+            if isinstance(config, dict):
+                raw_netzero_target_w = config.get("NETZERO_TARGET_W", 0)
+            else:
+                raw_netzero_target_w = 0
         try:
-            netzero_target_w = int(getattr(self, "netzero_target_w", 0))
+            netzero_target_w = int(raw_netzero_target_w)
         except (TypeError, ValueError):
             netzero_target_w = 0
         adjusted_p1_power = p1_power - netzero_target_w

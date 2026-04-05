@@ -32,10 +32,10 @@ The current repository only contains `automate_www.py`. Compared with legacy `au
 
 `automate_www.py` defines:
 
-- **Data classes**: `P1Readings`, `ZendureReadings`, `StatusChange`, `ApiState` — shared state for HTTP API responses.
-- **HTTP API**: `compute_wh_per_hour()`, `AutomationTCPServer`, `ApiTestHandler` — serve JSON endpoints.
+- **Data classes**: `P1Readings`, `ZendureReadings`, `StatusChange`, `ApiState` - shared state for HTTP API responses.
+- **HTTP API**: `AutomationTCPServer`, `ApiTestHandler` - serve JSON endpoints backed by `StatusApi` and the shared `status_updates_store`.
 - **Logger**: Wrapper around device controller logging.
-- **StatusApi**: Stores status updates in SQLite and invokes an `on_update` callback (updates `api_state.last_status`); does **not** POST to an external API.
+- **StatusApi**: Thin runtime-facing wrapper around the shared SQLite store; writes status updates, invokes an `on_update` callback, and exposes shared read helpers such as `compute_wh_per_hour()`.
 - **InputHandler**: Cross-platform keyboard input.
 - **CommandHandler**: Command dispatch dict with `_cmd_*` handlers.
 - **AutomationApp**: Main orchestrator; runs the loop, starts the HTTP server, and coordinates all components.
@@ -101,7 +101,7 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 
 7. `GET /api/wh_per_hour`
 - Watt-hours charged/discharged per calendar hour for the last N days.
-- Uses SQLite `status_updates` table.
+- Uses SQLite `status_updates` table through the shared store abstraction.
 - Optional query param: `days`
   - default: `3`
   - max: `30`
@@ -118,7 +118,8 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 - Optional query params: `limit` (default `500`, max `2000`).
 - Optional auth: `token` query param or `X-API-Token` header (if configured).
 - Returns `{"rows": [...], "max_id_returned": int, "has_more": bool}`.
-- Each row contains: `id`, `type`, `old_value`, `new_value`, `p1_total_power`, `electric_level`, `timestamp`.
+- Each row contains: `id`, `type`, `old_value`, `new_value`, `p1_total_power`, `electric_level`, `total_act`, `total_act_ret`, `timestamp`.
+- `total_act` and `total_act_ret` are returned as decimal Shelly counters; they are stored internally in SQLite as scaled integers (`total_act_x100`, `total_act_ret_x100`).
 - Returns 401 if authentication is required but not provided; 400 if `after_id` is missing or invalid; 503 if database is unavailable.
 
 11. `GET /api/pause`
@@ -143,7 +144,7 @@ Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_
 
 1. **Configuration**: Reads `automate/config/config.jsonc`.
 
-2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (SQLite + callback), `InputHandler`, `CommandHandler`, initializes the shared power-meter reader, sets up signal handlers, and loads loop config via `_load_loop_config()`.
+2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (shared SQLite store + callback), `InputHandler`, `CommandHandler`, initializes the shared power-meter reader, sets up signal handlers, and loads loop config via `_load_loop_config()`.
 
 3. **HTTP server**: Starts `AutomationTCPServer` in a daemon thread; shares `api_state`, `db_path`, `schedule_controller`, and `status_api` with the request handler.
 
@@ -156,11 +157,11 @@ Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_
    - Apply battery limits
    - Apply power step delta limiting (max change per iteration)
    - Apply power settings via `AutomateController`
-   - Post status updates to `StatusApi` (SQLite + callback)
+   - Post status updates to `StatusApi` (shared SQLite store + callback)
    - Check standby delay (time at 0 power)
    - Update `api_state.last_zendure` and `api_state.last_status` as applicable
 
-5. **Status storage**: `StatusApi` writes to `{dataDir}/status_updates.db` and invokes `on_update`, which updates `api_state.last_status` for HTTP consumers. Data is retained for `statusUpdatesRetentionDays` (default 7).
+5. **Status storage**: `StatusApi` writes to `{dataDir}/status_updates.db` through the shared `status_updates_store` module and invokes `on_update`, which updates `api_state.last_status` for HTTP consumers. The SQLite table also stores optional cumulative Shelly energy counters as `total_act_x100` and `total_act_ret_x100`, while `/api/status_updates_delta` exposes them as `total_act` and `total_act_ret`. Data is retained for `statusUpdatesRetentionDays` (default 7), with cleanup performed periodically inside the runtime instead of on every insert.
 
 ## Usage
 
@@ -233,6 +234,12 @@ curl -X POST "http://localhost:1611/api/loglevel?level=DEBUG"
 `automate_www.py` uses the same external APIs for the Zendure device, P1 meter, schedule, and optional data storage as described in the overview, except for the **automation status API**. Status updates are stored locally in SQLite; there is no external status POST for start/stop/change/Rescan events.
 
 See [automate-overview.md](automate-overview.md#api-calls-used-by-automate_wwwpy) for the full list of schedule, Zendure, P1, and data API calls. The status API (item 2 in that list) does **not** apply to `automate_www.py`.
+
+## Operational Notes
+
+- Existing SQLite databases are upgraded automatically on startup if `total_act_x100` and `total_act_ret_x100` are missing.
+- For manual production upgrades, use [`migrate_status_updates_add_energy_columns.py`](/D:/www/zendure/automate/tools/migrate_status_updates_add_energy_columns.py).
+- The generic replication stack under `db-replication/` can carry the new columns when the target schema also has them. Any separate hard-coded MariaDB sync scripts need their own schema and insert-list updates.
 
 ## Power Control Logic
 

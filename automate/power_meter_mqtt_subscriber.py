@@ -24,6 +24,8 @@ DEFAULT_BROKER_PORT = 1883
 DEFAULT_STALE_AFTER_SECONDS = 55
 DEFAULT_CHANGE_THRESHOLD_WATTS = 0
 DEFAULT_KEEPALIVE_SECONDS = 60
+TOTAL_ACT_PATHS = ("params.emdata:0.total_act", "total_act")
+TOTAL_ACT_RET_PATHS = ("params.emdata:0.total_act_ret", "total_act_ret")
 
 
 def _find_config_file() -> Path:
@@ -92,6 +94,8 @@ class MqttPowerMeterSubscriber:
         self._last_raw_payload: Optional[str] = None
         self._last_payload: Optional[dict[str, Any]] = None
         self._last_total_power: Optional[int] = None
+        self._last_total_act: Optional[float] = None
+        self._last_total_act_ret: Optional[float] = None
         self._last_message_timestamp: Optional[float] = None
         self._message_count = 0
         self._last_delta_watts: Optional[int] = None
@@ -180,6 +184,14 @@ class MqttPowerMeterSubscriber:
         with self._lock:
             return self._last_total_power
 
+    def get_latest_total_act(self) -> Optional[float]:
+        with self._lock:
+            return self._last_total_act
+
+    def get_latest_total_act_ret(self) -> Optional[float]:
+        with self._lock:
+            return self._last_total_act_ret
+
     def get_last_message_timestamp(self) -> Optional[float]:
         with self._lock:
             return self._last_message_timestamp
@@ -246,12 +258,34 @@ class MqttPowerMeterSubscriber:
         """Clear any pending wake signal without touching the control event."""
         self._wake_event.clear()
 
-    def _normalize_payload(self, payload: dict[str, Any]) -> tuple[dict[str, Any], Optional[int]]:
+    @staticmethod
+    def _parse_optional_float(raw: Any) -> Optional[float]:
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    def _extract_first_float(self, payload: dict[str, Any], paths: tuple[str, ...]) -> Optional[float]:
+        for path in paths:
+            parsed = self._parse_optional_float(_get_json_value(payload, path))
+            if parsed is not None:
+                return parsed
+        return None
+
+    def _normalize_payload(
+        self, payload: dict[str, Any]
+    ) -> tuple[dict[str, Any], Optional[int], Optional[float], Optional[float]]:
         normalized = dict(payload)
+        total_act = self._extract_first_float(normalized, TOTAL_ACT_PATHS)
+        total_act_ret = self._extract_first_float(normalized, TOTAL_ACT_RET_PATHS)
+        normalized["total_act"] = total_act
+        normalized["total_act_ret"] = total_act_ret
         total_power_raw = _get_json_value(normalized, self.total_power_path)
         if total_power_raw is None:
             normalized["total_power"] = None
-            return normalized, None
+            return normalized, None, total_act, total_act_ret
 
         total_power = None
         try:
@@ -259,7 +293,7 @@ class MqttPowerMeterSubscriber:
         except (TypeError, ValueError):
             total_power = None
         normalized["total_power"] = total_power
-        return normalized, total_power
+        return normalized, total_power, total_act, total_act_ret
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         with self._lock:
@@ -277,16 +311,16 @@ class MqttPowerMeterSubscriber:
             payload = json.loads(raw_payload)
             if not isinstance(payload, dict):
                 return
-
-            if _get_json_value(payload, self.total_power_path) is None:
-                return
-
-            normalized_payload, total_power = self._normalize_payload(payload)
+            normalized_payload, total_power, total_act, total_act_ret = self._normalize_payload(payload)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             return
 
         received_at = time.time()
         with self._lock:
+            if total_act is not None:
+                self._last_total_act = total_act
+            if total_act_ret is not None:
+                self._last_total_act_ret = total_act_ret
             if total_power is None:
                 return
             previous_power = self._last_total_power

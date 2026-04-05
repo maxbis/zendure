@@ -576,6 +576,7 @@ These endpoints are mainly consumed by the web app:
   - default is `3`, maximum is `30`
 - `GET /api/status_updates_delta?after_id=...`
   - incremental status rows from SQLite
+  - rows may also include cumulative Shelly counters: `total_act` and `total_act_ret`
 
 For `/api/p1` and `/api/zendure`, optional query parameters are supported:
 

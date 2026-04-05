@@ -9,7 +9,6 @@ import http.server
 import json
 import os
 import socketserver
-import sqlite3
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -143,7 +142,6 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         self.pause_setter: Optional[Callable[[bool], None]] = None
         self.wh_per_hour_cache: Optional[dict[str, Any]] = None
         self.wh_per_hour_cache_lock = threading.Lock()
-        self.compute_wh_per_hour_callback: Optional[Callable[[str, int, int], dict]] = None
         self.log_level_priorities: Optional[dict[str, Any]] = None
         self.controller: Optional[Any] = None
         self.status_updates_delta_token: Optional[str] = None
@@ -302,9 +300,12 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def _handle_wh_per_hour(self, parsed) -> bool:
         if parsed.path != API_PATH_WH_PER_HOUR:
             return False
-        db_path = getattr(self.server, "db_path", None)
-        compute_wh_per_hour = getattr(self.server, "compute_wh_per_hour_callback", None)
-        if not db_path or not os.path.exists(db_path) or compute_wh_per_hour is None:
+        status_api = getattr(self.server, "status_api", None)
+        store = getattr(status_api, "store", None) if status_api is not None else None
+        db_identity = getattr(status_api, "db_path", None)
+        if db_identity is None and store is not None:
+            db_identity = getattr(store, "db_path", None)
+        if status_api is None or store is None or not hasattr(status_api, "compute_wh_per_hour"):
             self._send_error_json("Status updates database not available", 200)
             return True
         now = int(time.time())
@@ -312,14 +313,14 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         cached = None
         with self.server.wh_per_hour_cache_lock:
             cache_entry = self.server.wh_per_hour_cache
-            if cache_entry and cache_entry.get("db_path") == db_path and cache_entry.get("days") == resolved_days and (now - int(cache_entry.get("computed_at", 0))) < WH_PER_HOUR_CACHE_SECONDS:
+            if cache_entry and cache_entry.get("db_path") == db_identity and cache_entry.get("days") == resolved_days and (now - int(cache_entry.get("computed_at", 0))) < WH_PER_HOUR_CACHE_SECONDS:
                 cached = cache_entry.get("data")
         if cached is not None:
             self._send_json(cached, sort_keys=True)
             return True
-        data = compute_wh_per_hour(db_path, now, resolved_days)
+        data = status_api.compute_wh_per_hour(now, resolved_days)
         with self.server.wh_per_hour_cache_lock:
-            self.server.wh_per_hour_cache = {"db_path": db_path, "days": resolved_days, "computed_at": now, "data": data}
+            self.server.wh_per_hour_cache = {"db_path": db_identity, "days": resolved_days, "computed_at": now, "data": data}
         self._send_json(data, sort_keys=True)
         return True
 
@@ -346,26 +347,21 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return True
         limit = min(limit, 2000)
         db_path = getattr(self.server, "db_path", None)
-        if not db_path or not os.path.exists(db_path):
+        status_api = getattr(self.server, "status_api", None)
+        if (
+            not db_path
+            or not os.path.exists(db_path)
+            or status_api is None
+            or getattr(status_api, "store", None) is None
+        ):
             self._send_error_json("Status updates database not available", 503)
             return True
         try:
-            with sqlite3.connect(db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cur = conn.execute(
-                    "SELECT id, type, old_value, new_value, p1_total_power, electric_level, timestamp "
-                    "FROM status_updates WHERE id > ? ORDER BY id ASC LIMIT ?",
-                    (after_id, limit + 1),
-                )
-                fetched = cur.fetchall()
-            has_more = len(fetched) > limit
-            selected = fetched[:limit]
-            rows = [dict(r) for r in selected]
+            payload = status_api.store.fetch_status_updates_delta(after_id, limit)
         except Exception as exc:
             self._send_error_json(f"Failed to query status updates: {exc}", 500)
             return True
-        max_id_returned = after_id if not rows else int(rows[-1]["id"])
-        self._send_json({"rows": rows, "max_id_returned": max_id_returned, "has_more": has_more}, sort_keys=False)
+        self._send_json(payload, sort_keys=False)
         return True
 
     def _handle_refresh(self, parsed) -> bool:
@@ -672,7 +668,6 @@ def create_http_server(
     pause_setter: Callable[[bool], None],
     controller: Any,
     status_updates_delta_token: Optional[str],
-    compute_wh_per_hour_callback: Callable[[str, int, int], dict],
     port: int = HTTP_API_PORT,
     log_level_priorities: Optional[dict[str, Any]] = None,
     ) -> AutomationTCPServer:
@@ -688,6 +683,5 @@ def create_http_server(
     server.pause_setter = pause_setter
     server.controller = controller
     server.status_updates_delta_token = status_updates_delta_token
-    server.compute_wh_per_hour_callback = compute_wh_per_hour_callback
     server.log_level_priorities = log_level_priorities
     return server

@@ -20,6 +20,7 @@ import uuid
 from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 
 import pytest
@@ -410,6 +411,18 @@ def _import_automate_api_module():
     return automate_api
 
 
+def _import_status_updates_store_module():
+    automate_dir = REPO_ROOT / "automate"
+    if str(automate_dir) not in sys.path:
+        sys.path.insert(0, str(automate_dir))
+    import status_updates_store  # type: ignore
+    return status_updates_store
+
+
+def _sus():
+    return _import_status_updates_store_module()
+
+
 def _create_status_updates_db(db_path: Path, rows: list[tuple] | None = None) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(str(db_path)) as conn:
@@ -422,15 +435,21 @@ def _create_status_updates_db(db_path: Path, rows: list[tuple] | None = None) ->
                 new_value TEXT,
                 p1_total_power INTEGER,
                 electric_level INTEGER,
+                total_act_x100 INTEGER,
+                total_act_ret_x100 INTEGER,
                 timestamp INTEGER NOT NULL
             );
             """
         )
         if rows:
+            normalized_rows = [
+                row if len(row) == 8 else (*row[:-1], None, None, row[-1])
+                for row in rows
+            ]
             conn.executemany(
-                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                rows,
+                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, total_act_x100, total_act_ret_x100, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                normalized_rows,
             )
         conn.commit()
 
@@ -444,10 +463,11 @@ def _start_test_api_server(
 ):
     automate_api = _import_automate_api_module()
     automate_www = _import_automate_www_module()
+    sus = _import_status_updates_store_module()
     cleanup_callbacks: list[callable] = []
     db_path = Path(__file__) if with_db else (REPO_ROOT / "__missing_status_updates__.db")
     if with_db:
-        original_connect = automate_api.sqlite3.connect
+        original_connect = sus.sqlite3.connect
         shared_uri = f"file:api-tests-{time.time_ns()}?mode=memory&cache=shared"
         keeper_conn = sqlite3.connect(shared_uri, uri=True, check_same_thread=False)
         keeper_conn.executescript(
@@ -459,23 +479,29 @@ def _start_test_api_server(
                 new_value TEXT,
                 p1_total_power INTEGER,
                 electric_level INTEGER,
+                total_act_x100 INTEGER,
+                total_act_ret_x100 INTEGER,
                 timestamp INTEGER NOT NULL
             );
             """
         )
         if db_rows:
+            normalized_rows = [
+                row if len(row) == 8 else (*row[:-1], None, None, row[-1])
+                for row in db_rows
+            ]
             keeper_conn.executemany(
-                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, timestamp) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                db_rows,
+                "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, total_act_x100, total_act_ret_x100, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                normalized_rows,
             )
             keeper_conn.commit()
 
         def _connect_proxy(_path, *args, **kwargs):
             return original_connect(shared_uri, uri=True, check_same_thread=False)
 
-        automate_api.sqlite3.connect = _connect_proxy
-        cleanup_callbacks.append(lambda: setattr(automate_api.sqlite3, "connect", original_connect))
+        sus.sqlite3.connect = _connect_proxy
+        cleanup_callbacks.append(lambda: setattr(sus.sqlite3, "connect", original_connect))
         cleanup_callbacks.append(keeper_conn.close)
 
     api_state = automate_api.ApiState()
@@ -532,7 +558,7 @@ def _start_test_api_server(
         pause_state["active"] = value
         events["pause_set"].append(value)
 
-    def compute_wh_per_hour(_db_path: str, _now: int, _days: int) -> dict:
+    def compute_wh_per_hour(_now: int, _days: int) -> dict:
         events["compute_wh_calls"] += 1
         return compute_wh_result if compute_wh_result is not None else {"2025-01-01": []}
 
@@ -541,11 +567,25 @@ def _start_test_api_server(
 
     controller.log = controller_log
 
+    status_api_wrapper = None
+    if with_db:
+        status_store = sus.StatusUpdatesStore(
+            db_path=str(db_path),
+            retention_days=7,
+            log_warning=lambda _m: None,
+        )
+        status_api_wrapper = SimpleNamespace(
+            db_path=str(db_path),
+            post_update=post_update,
+            store=status_store,
+            compute_wh_per_hour=compute_wh_per_hour,
+        )
+
     server = automate_api.create_http_server(
         api_state=api_state,
         db_path=str(db_path),
         schedule_controller=SimpleNamespace(fetch_schedule=fetch_schedule),
-        status_api=SimpleNamespace(db_path=str(db_path), post_update=post_update),
+        status_api=status_api_wrapper,
         refresh_p1_callback=refresh_p1,
         refresh_zendure_callback=refresh_zendure,
         restart_callback=request_restart,
@@ -553,7 +593,6 @@ def _start_test_api_server(
         pause_setter=set_pause,
         controller=controller,
         status_updates_delta_token=status_updates_delta_token,
-        compute_wh_per_hour_callback=compute_wh_per_hour,
         port=0,
         log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
     )
@@ -1849,7 +1888,7 @@ def test_controller_set_power_logs_when_device_limits_override_bounded_result():
 
 
 def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):
-    automate_www = _import_automate_www_module()
+    sus = _sus()
     db_path = tmp_path / "status_updates.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -1876,8 +1915,8 @@ def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):
         )
         conn.commit()
 
-    result = automate_www.compute_wh_per_hour(str(db_path), now=1735734600, days_back=0)
-    end_dt = datetime.fromtimestamp(1735734600, tz=automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE))
+    result = sus.compute_wh_per_hour(str(db_path), now=1735734600, days_back=0)
+    end_dt = datetime.fromtimestamp(1735734600, tz=ZoneInfo(sus.WH_PER_HOUR_TIMEZONE))
     today = end_dt.strftime("%Y-%m-%d")
     hour_bucket = next(item for item in result[today] if item["hour"] == end_dt.strftime("%H"))
 
@@ -1887,8 +1926,8 @@ def test_compute_wh_per_hour_uses_status_updates_sqlite(tmp_path):
 
 
 def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.WH_PER_HOUR_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -1915,7 +1954,7 @@ def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
         )
         conn.commit()
 
-    result = automate_www.compute_wh_per_hour(
+    result = sus.compute_wh_per_hour(
         str(db_path),
         now=int(datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz).timestamp()),
         days_back=0,
@@ -1928,18 +1967,18 @@ def test_compute_wh_per_hour_keeps_seed_point_before_visible_window(tmp_path):
 
 
 def test_status_api_skips_redundant_change_rows_in_same_hour(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
         get_electric_level=lambda: 70,
     )
     base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
 
-    status_api._insert_status("change", None, 600, None, base_ts)
-    status_api._insert_status("change", None, 600, None, base_ts + 300)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts + 300)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -1950,19 +1989,19 @@ def test_status_api_skips_redundant_change_rows_in_same_hour(tmp_path):
 
 
 def test_status_api_keeps_first_change_row_in_new_hour(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
         get_electric_level=lambda: 70,
     )
     base_ts = int(datetime(2025, 1, 1, 10, 55, 0, tzinfo=tz).timestamp())
 
-    status_api._insert_status("change", None, 600, None, base_ts)
-    status_api._insert_status("change", None, 600, None, base_ts + 600)
-    status_api._insert_status("change", None, 600, None, base_ts + 900)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts + 600)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts + 900)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -1976,19 +2015,18 @@ def test_status_api_keeps_first_change_row_in_new_hour(tmp_path):
 
 
 def test_status_api_keeps_change_when_electric_level_changes(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
-    levels = iter([70, 71])
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
-        get_electric_level=lambda: next(levels),
+        get_electric_level=lambda: 70,
     )
     base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
 
-    status_api._insert_status("change", None, 600, None, base_ts)
-    status_api._insert_status("change", None, 600, None, base_ts + 300)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts)
+    status_api.store.insert_status("change", None, 600, None, 71, None, None, base_ts + 300)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -2002,18 +2040,18 @@ def test_status_api_keeps_change_when_electric_level_changes(tmp_path):
 
 
 def test_status_api_keeps_change_when_power_changes(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
         get_electric_level=lambda: 70,
     )
     base_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
 
-    status_api._insert_status("change", None, 600, None, base_ts)
-    status_api._insert_status("change", None, 400, None, base_ts + 300)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, base_ts)
+    status_api.store.insert_status("change", None, 400, None, 70, None, None, base_ts + 300)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -2027,18 +2065,18 @@ def test_status_api_keeps_change_when_power_changes(tmp_path):
 
 
 def test_status_api_keeps_non_change_events_unchanged(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
         get_electric_level=lambda: 70,
     )
     ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
 
-    status_api._insert_status("start", None, None, None, ts)
-    status_api._insert_status("start", None, None, None, ts + 60)
+    status_api.store.insert_status("start", None, None, None, 70, None, None, ts)
+    status_api.store.insert_status("start", None, None, None, 70, None, None, ts + 60)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -2052,8 +2090,8 @@ def test_status_api_keeps_non_change_events_unchanged(tmp_path):
 
 
 def test_status_api_initializes_change_insert_state_from_existing_db(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
     first_ts = int(datetime(2025, 1, 1, 10, 5, 0, tzinfo=tz).timestamp())
     with sqlite3.connect(db_path) as conn:
@@ -2076,14 +2114,14 @@ def test_status_api_initializes_change_insert_state_from_existing_db(tmp_path):
         )
         conn.commit()
 
-    status_api = automate_www.StatusApi(
+    status_api = sus.StatusApi(
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         db_path=str(db_path),
         get_electric_level=lambda: 70,
     )
-    status_api._ensure_db()
-    status_api._insert_status("change", None, 600, None, first_ts + 300)
-    status_api._insert_status("change", None, 600, None, first_ts + 3600)
+    status_api.store.ensure_db()
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, first_ts + 300)
+    status_api.store.insert_status("change", None, 600, None, 70, None, None, first_ts + 3600)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
@@ -2097,11 +2135,11 @@ def test_status_api_initializes_change_insert_state_from_existing_db(tmp_path):
 
 
 def test_status_api_insert_does_not_run_retention_cleanup():
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = _unique_status_db_path()
     try:
-        status_api = automate_www.StatusApi(
+        status_api = sus.StatusApi(
             logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
             db_path=str(db_path),
             retention_days=1,
@@ -2109,8 +2147,8 @@ def test_status_api_insert_does_not_run_retention_cleanup():
         old_ts = int(datetime(2025, 1, 1, 10, 0, 0, tzinfo=tz).timestamp())
         new_ts = old_ts + (2 * 24 * 60 * 60)
 
-        status_api._insert_status("start", None, None, None, old_ts)
-        status_api._insert_status("start", None, None, None, new_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, old_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, new_ts)
 
         with sqlite3.connect(db_path) as conn:
             rows = conn.execute(
@@ -2127,11 +2165,11 @@ def test_status_api_insert_does_not_run_retention_cleanup():
 
 
 def test_status_api_cleanup_old_rows_deletes_only_expired_rows():
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.STATUS_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.STATUS_TIMEZONE)
     db_path = _unique_status_db_path()
     try:
-        status_api = automate_www.StatusApi(
+        status_api = sus.StatusApi(
             logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
             db_path=str(db_path),
             retention_days=1,
@@ -2140,8 +2178,8 @@ def test_status_api_cleanup_old_rows_deletes_only_expired_rows():
         old_ts = now_ts - (2 * 24 * 60 * 60)
         fresh_ts = now_ts - (12 * 60 * 60)
 
-        status_api._insert_status("start", None, None, None, old_ts)
-        status_api._insert_status("start", None, None, None, fresh_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, old_ts)
+        status_api.store.insert_status("start", None, None, None, None, None, None, fresh_ts)
 
         assert status_api.cleanup_old_rows(now_ts) is True
 
@@ -2206,8 +2244,8 @@ def test_automation_app_retention_cleanup_failure_does_not_update_timestamp():
 
 
 def test_load_change_points_preserves_electric_level_transitions(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.WH_PER_HOUR_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -2236,7 +2274,7 @@ def test_load_change_points_preserves_electric_level_transitions(tmp_path):
         )
         conn.commit()
 
-    points = automate_www._load_change_points(str(db_path), window_start_ts=base_ts, tz=tz)
+    points = sus._load_change_points(str(db_path), window_start_ts=base_ts, tz=tz)
 
     assert points == [
         (base_ts, 600.0),
@@ -2246,8 +2284,8 @@ def test_load_change_points_preserves_electric_level_transitions(tmp_path):
 
 
 def test_load_change_points_preserves_hour_anchor_rows(tmp_path):
-    automate_www = _import_automate_www_module()
-    tz = automate_www.ZoneInfo(automate_www.WH_PER_HOUR_TIMEZONE)
+    sus = _sus()
+    tz = ZoneInfo(sus.WH_PER_HOUR_TIMEZONE)
     db_path = tmp_path / "status_updates.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -2275,7 +2313,7 @@ def test_load_change_points_preserves_hour_anchor_rows(tmp_path):
         )
         conn.commit()
 
-    points = automate_www._load_change_points(str(db_path), window_start_ts=base_ts, tz=tz)
+    points = sus._load_change_points(str(db_path), window_start_ts=base_ts, tz=tz)
 
     assert points == [
         (base_ts, 600.0),
@@ -2468,10 +2506,17 @@ def test_sleep_interrupted_uses_fast_loop_interval(monkeypatch):
 
 def test_create_http_server_wires_shared_state_and_callbacks():
     automate_api = _import_automate_api_module()
+    sus = _import_status_updates_store_module()
 
     api_state = automate_api.ApiState()
     schedule_controller = SimpleNamespace()
-    status_api = SimpleNamespace()
+    status_api = SimpleNamespace(
+        store=sus.StatusUpdatesStore(
+            db_path=":memory:",
+            retention_days=7,
+            log_warning=lambda _m: None,
+        ),
+    )
     controller = SimpleNamespace(log_level="INFO")
 
     def _noop():
@@ -2489,7 +2534,6 @@ def test_create_http_server_wires_shared_state_and_callbacks():
         pause_setter=lambda _value: None,
         controller=controller,
         status_updates_delta_token="token123",
-        compute_wh_per_hour_callback=lambda db_path, now, days: {},
         port=0,
         log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
     )
@@ -2499,7 +2543,6 @@ def test_create_http_server_wires_shared_state_and_callbacks():
         assert server.status_api is status_api
         assert server.controller is controller
         assert server.status_updates_delta_token == "token123"
-        assert server.compute_wh_per_hour_callback is not None
     finally:
         server.server_close()
 
@@ -2616,8 +2659,8 @@ def test_api_wh_per_hour_returns_error_when_db_missing():
 
 def test_api_status_updates_delta_endpoint_behaviors():
     db_rows = [
-        ("change", "0", "-42", -42, 77, 1000),
-        ("change", "-42", "-84", -84, 76, 1010),
+        ("change", "0", "-42", -42, 77, 5258788, 4573494, 1000),
+        ("change", "-42", "-84", -84, 76, 5258792, 4573499, 1010),
     ]
     runtime = _start_test_api_server(db_rows=db_rows, status_updates_delta_token="secret")
     try:
@@ -2641,6 +2684,8 @@ def test_api_status_updates_delta_endpoint_behaviors():
         payload = success_response.json()
         assert len(payload["rows"]) == 2
         assert payload["rows"][0]["type"] == "change"
+        assert payload["rows"][0]["total_act"] == 52587.88
+        assert payload["rows"][0]["total_act_ret"] == 45734.94
         assert payload["max_id_returned"] == payload["rows"][-1]["id"]
         assert payload["has_more"] is False
     finally:
