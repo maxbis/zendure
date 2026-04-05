@@ -98,11 +98,11 @@ function restartCommandDefinitions(): array {
             'buttonClass' => 'btn-resume',
             'expect_disconnect' => false,
         ],
-        'slow_charge_500' => [
+        'slow_charge_400' => [
             'method' => 'POST',
-            'path' => '/api/slow_charge_max_power?value=500',
-            'label' => '500 W',
-            'description' => 'Set runtime slow-charge max power to 500 W.',
+            'path' => '/api/slow_charge_max_power?value=400',
+            'label' => '400 W',
+            'description' => 'Set runtime slow-charge max power to 400 W.',
             'group' => 'slow_charge',
             'order' => 30,
             'confirmTitle' => '',
