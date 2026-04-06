@@ -772,11 +772,19 @@ body.mobile-dark {
 }
 
 .price-graph-row-mobile .price-graph-bar-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-size: var(--price-graph-label-size);
     color: var(--text-secondary);
     margin-top: 4px;
+    padding: 0 3px;
     font-weight: 500;
     white-space: nowrap;
+}
+
+.price-graph-row-mobile .price-graph-bar-label[data-block-start="true"] {
+    border-left: 1px dashed rgb(134, 134, 134);
 }
 
 .price-graph-row-mobile .price-graph-bar.price-current .price-graph-bar-label {
