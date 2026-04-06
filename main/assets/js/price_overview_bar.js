@@ -1759,6 +1759,35 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
         };
     };
 
+    const getRuleGroupIdentity = (dateStr, hourKey) => {
+        const hourIndex = parseInt(hourKey, 10);
+        if (Number.isNaN(hourIndex)) {
+            return 'no-rule';
+        }
+
+        const ruleMetaMap = scheduleRuleMetaMapByDate[dateStr];
+        if (!ruleMetaMap || !Object.prototype.hasOwnProperty.call(ruleMetaMap, hourIndex) || !ruleMetaMap[hourIndex]) {
+            return 'no-rule';
+        }
+
+        const ruleMeta = ruleMetaMap[hourIndex];
+        const normalizedRuleIndex = ruleMeta.ruleIndex !== undefined && ruleMeta.ruleIndex !== null
+            ? String(ruleMeta.ruleIndex).trim()
+            : '';
+        if (normalizedRuleIndex !== '') {
+            return `rule-index:${normalizedRuleIndex}`;
+        }
+
+        const normalizedRuleName = ruleMeta.ruleName !== undefined && ruleMeta.ruleName !== null
+            ? String(ruleMeta.ruleName).trim()
+            : '';
+        if (normalizedRuleName !== '') {
+            return `rule-name:${normalizedRuleName}`;
+        }
+
+        return 'no-rule';
+    };
+
     // Extract price data
     const todayPrices = priceData?.today || {};
     // Always treat tomorrow prices as an object; when empty we will render proxy (grey) bars
@@ -1827,7 +1856,7 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
     const renderPriceRow = (prices, dateStr, container, isToday) => {
         container.innerHTML = '';
         bindPopupContainer(container);
-        
+
         for (let h = 0; h < 24; h++) {
             const hourKey = String(h).padStart(2, '0');
             const price = prices[hourKey] !== undefined ? prices[hourKey] : null;
@@ -1926,6 +1955,13 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
             
             const barLabel = document.createElement('div');
             barLabel.className = 'price-graph-bar-label';
+            const ruleGroupIdentity = getRuleGroupIdentity(dateStr, hourKey);
+            const previousRuleGroupIdentity = h > 0
+                ? getRuleGroupIdentity(dateStr, String(h - 1).padStart(2, '0'))
+                : null;
+            if (h === 0 || ruleGroupIdentity !== previousRuleGroupIdentity) {
+                barLabel.dataset.blockStart = 'true';
+            }
             barLabel.textContent = hourKey;
             
             // Create price label element
