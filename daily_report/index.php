@@ -32,10 +32,10 @@ if ($requestedDate === '') {
                     <label class="meta-label" for="report-date">Report date</label>
                     <div class="nav-row">
                         <button type="button" class="nav-button" data-role="prev-day" aria-label="Previous day">&larr;</button>
-                        <input id="report-date" name="date" class="date-input" type="date" value="<?php echo htmlspecialchars($requestedDate, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input id="report-date" name="date" class="date-input" type="date" value="<?php echo htmlspecialchars($requestedDate, ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
                         <button type="button" class="nav-button" data-role="next-day" aria-label="Next day">&rarr;</button>
+                        <button type="submit" class="refresh-button">Load report</button>
                     </div>
-                    <button type="submit" class="refresh-button">Load report</button>
                 </form>
                 <div class="meta-pill">
                     <span class="meta-label">Saved JSON</span>

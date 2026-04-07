@@ -281,6 +281,18 @@
         }
     }
 
+    if (dateInputEl) {
+        dateInputEl.addEventListener('click', function openDatePicker() {
+            if (typeof this.showPicker === 'function') {
+                try {
+                    this.showPicker();
+                } catch {
+                    /* ignore: already open or unsupported */
+                }
+            }
+        });
+    }
+
     if (dateFormEl) {
         dateFormEl.addEventListener('submit', (event) => {
             event.preventDefault();
