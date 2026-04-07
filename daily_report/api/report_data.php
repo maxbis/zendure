@@ -160,14 +160,15 @@ function generateAndSaveReport(string $date, string $outputPath): void
 
     $pythonBin = getenv('PYTHON_BIN');
     if (!is_string($pythonBin) || trim($pythonBin) === '') {
-        $pythonBin = 'python3';
+        // Linux: python3. Windows: "python3" is often missing or a Store stub; use python.
+        $pythonBin = PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3';
     }
 
     $command = escapeshellarg($pythonBin)
         . ' ' . escapeshellarg($scriptPath)
         . ' --date ' . escapeshellarg($date)
         . ' --output ' . escapeshellarg($outputPath)
-        . ' 2>&1';
+        . (PHP_OS_FAMILY === 'Windows' ? '' : ' 2>&1');
 
     $outputLines = [];
     $exitCode = 0;
@@ -178,8 +179,22 @@ function generateAndSaveReport(string $date, string $outputPath): void
         if ($message === '') {
             $message = 'Report generator exited with code ' . $exitCode . ' and no output.';
         }
-        if ($exitCode === 127 || stripos($message, 'No such file') !== false || stripos($message, 'not found') !== false) {
-            $message .= ' Hint: set PYTHON_BIN in daily_report/.env to the full path (e.g. /usr/bin/python3).';
+        $lower = strtolower($message);
+        $looksLikeMissingInterpreter =
+            $exitCode === 127
+            || str_contains($lower, 'no such file')
+            || str_contains($lower, 'not found')
+            || str_contains($lower, 'cannot execute')
+            || str_contains($lower, 'is not recognized')
+            || str_contains($lower, 'specified program');
+        if ($looksLikeMissingInterpreter) {
+            $hint = 'Set PYTHON_BIN in daily_report/.env to your Python executable';
+            if (PHP_OS_FAMILY === 'Windows') {
+                $hint .= ' (e.g. py, python, or the full path to python.exe where pymysql is installed).';
+            } else {
+                $hint .= ' (e.g. /usr/bin/python3).';
+            }
+            $message .= ' ' . $hint;
         }
         throw new RuntimeException($message);
     }
