@@ -19,7 +19,8 @@
 // - Supports static conditions: price, ranking, min_time, max_time, month, hour
 // - Runtime-only conditions (e.g. electricity_level) are passed through as metadata
 // - Supports dynamic references via condition.value_ref:
-//   min_price, max_price, min_price_hour, max_price_hour, spread_price
+//   min_price, max_price, min_price_hour, max_price_hour,
+//   max_price_hour_am, max_price_hour_pm, spread_price
 // - Supports sun context for static conditions:
 //   sunrise_hour (floor), sunset_hour (ceil), and dynamic offset fields
 
@@ -319,7 +320,7 @@ function compareNumeric(float $left, string $op, float $right): bool
  * for condition evaluation to match existing "price >= 25" usage.
  *
  * @param array $priceByHour
- * @return array{min_price:?float,max_price:?float,min_price_hour:?int,max_price_hour:?int,spread_price:?float,ranking_by_hour:array<int,int>,rank_to_hour:array<int,int>}
+ * @return array{min_price:?float,max_price:?float,min_price_hour:?int,max_price_hour:?int,max_price_hour_am:?int,max_price_hour_pm:?int,spread_price:?float,ranking_by_hour:array<int,int>,rank_to_hour:array<int,int>}
  */
 function buildPriceContext(array $priceByHour): array
 {
@@ -327,6 +328,10 @@ function buildPriceContext(array $priceByHour): array
     $maxPrice = null;
     $minHour = null;
     $maxHour = null;
+    $maxPriceAm = null;
+    $maxHourAm = null;
+    $maxPricePm = null;
+    $maxHourPm = null;
     $pairs = [];
 
     for ($hour = 0; $hour < 24; $hour++) {
@@ -344,6 +349,17 @@ function buildPriceContext(array $priceByHour): array
         if ($maxPrice === null || $priceCents > $maxPrice) {
             $maxPrice = $priceCents;
             $maxHour = $hour;
+        }
+        if ($hour < 12) {
+            if ($maxPriceAm === null || $priceCents > $maxPriceAm) {
+                $maxPriceAm = $priceCents;
+                $maxHourAm = $hour;
+            }
+        } else {
+            if ($maxPricePm === null || $priceCents > $maxPricePm) {
+                $maxPricePm = $priceCents;
+                $maxHourPm = $hour;
+            }
         }
     }
 
@@ -372,6 +388,8 @@ function buildPriceContext(array $priceByHour): array
         'max_price' => $maxPrice,
         'min_price_hour' => $minHour,
         'max_price_hour' => $maxHour,
+        'max_price_hour_am' => $maxHourAm,
+        'max_price_hour_pm' => $maxHourPm,
         'spread_price' => ($minPrice !== null && $maxPrice !== null) ? ($maxPrice - $minPrice) : null,
         'ranking_by_hour' => $rankingByHour,
         'rank_to_hour' => $rankToHour,
@@ -583,6 +601,7 @@ function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string 
         } elseif (
             $field === 'min_price' || $field === 'max_price' ||
             $field === 'min_price_hour' || $field === 'max_price_hour' ||
+            $field === 'max_price_hour_am' || $field === 'max_price_hour_pm' ||
             $field === 'spread_price' ||
             $field === 'sunrise_hour' || $field === 'sunset_hour'
         ) {
@@ -806,6 +825,8 @@ function runResolve(): array
             'max_price' => $ctx['max_price'],
             'min_price_hour' => $ctx['min_price_hour'],
             'max_price_hour' => $ctx['max_price_hour'],
+            'max_price_hour_am' => $ctx['max_price_hour_am'],
+            'max_price_hour_pm' => $ctx['max_price_hour_pm'],
             'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
             // ranking: key = rank (1 = cheapest), value = hour (0-23)
             'ranking' => $ctx['rank_to_hour'],
