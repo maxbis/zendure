@@ -359,7 +359,7 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
                 .catch(function(error) {
                     hasRenderError = true;
                     setStatus(error && error.message ? error.message : 'Failed to load shortwave radiation.', true);
-                    throw error;
+                    console.warn('Shortwave radiation refresh failed:', error);
                 })
                 .finally(function() {
                     activeRequest = null;

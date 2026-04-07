@@ -34,6 +34,7 @@ desktop.ini
 # Environment variables
 .env
 .env.local
+daily_report/.env
 
 # Project-specific
 automate/data/status_updates.db

@@ -75,6 +75,7 @@ try {
 } catch (Throwable $e) {
     http_response_code(resolveStatusCode($e->getMessage()));
     echo json_encode([
+        'url' => $apiUrl,
         'success' => false,
         'error' => $e->getMessage(),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

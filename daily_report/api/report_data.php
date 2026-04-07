@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__) . '/load_env.php';
+daily_report_bootstrap_env();
+
+/** Absolute path to daily_report/tools/hourly_daily_grid_battery_report.py */
+define('DAILY_REPORT_GENERATOR_SCRIPT', dirname(__DIR__) . '/tools/hourly_daily_grid_battery_report.py');
+
 date_default_timezone_set('Europe/Amsterdam');
 
 header('Content-Type: application/json');
@@ -82,8 +88,7 @@ function buildReportPath(string $date): string
 
 function generateAndSaveReport(string $date, string $outputPath): void
 {
-    $repoRoot = dirname(__DIR__, 2);
-    $scriptPath = $repoRoot . '/tools/hourly_daily_grid_battery_report.py';
+    $scriptPath = DAILY_REPORT_GENERATOR_SCRIPT;
     if (!file_exists($scriptPath)) {
         throw new RuntimeException('Report generator script not found.');
     }

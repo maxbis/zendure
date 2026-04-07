@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for tools/hourly_daily_grid_battery_report.py."""
+"""Tests for daily_report/tools/hourly_daily_grid_battery_report.py."""
 
 from __future__ import annotations
 
@@ -17,10 +17,12 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_DIR = REPO_ROOT / "tools"
+DAILY_REPORT_TOOLS_DIR = REPO_ROOT / "daily_report" / "tools"
+LEGACY_TOOLS_DIR = REPO_ROOT / "tools"
 
-if str(TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(TOOLS_DIR))
+for _tools_path in (DAILY_REPORT_TOOLS_DIR, LEGACY_TOOLS_DIR):
+    if str(_tools_path) not in sys.path:
+        sys.path.insert(0, str(_tools_path))
 
 import hourly_daily_grid_battery_report as report  # type: ignore
 import wh_per_hour_queries as whq  # type: ignore
