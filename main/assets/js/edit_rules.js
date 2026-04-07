@@ -3,7 +3,13 @@
 
     const state = {
         rules: [],
+        ruleProfiles: {
+            active_profile_id: 'show_all',
+            profiles: [],
+        },
         editIndex: null,
+        selectedProfileId: 'show_all',
+        editingProfileId: null,
         initialRuleIndex: Number.isInteger(window.EDIT_RULES_INITIAL_RULE) ? window.EDIT_RULES_INITIAL_RULE - 1 : null,
         hasPendingImportedRules: false,
         pageWasHidden: false,
@@ -54,6 +60,12 @@
         inpFallbackValue: document.getElementById('inp-fallback-value'),
         powerRangeIndicator: document.getElementById('power-range-indicator'),
         conditionsList: document.getElementById('conditions-list'),
+        profileButtonBar: document.getElementById('profile-button-bar'),
+        profileEditor: document.getElementById('profile-editor'),
+        inpProfileShortName: document.getElementById('inp-profile-short-name'),
+        inpProfileDescription: document.getElementById('inp-profile-description'),
+        profileRuleMembership: document.getElementById('profile-rule-membership'),
+        btnSaveProfile: document.getElementById('btn-save-profile'),
     };
 
     const conditionFields = [
@@ -107,6 +119,7 @@
     const LIMIT_MIN = -1200;
     const LIMIT_MAX = 1200;
     const LIMIT_STEP = 100;
+    const SHOW_ALL_PROFILE_ID = 'show_all';
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -125,7 +138,112 @@
 
     function renderRawJson() {
         if (!els.rawJsonTextarea) return;
-        els.rawJsonTextarea.value = JSON.stringify(state.rules, null, 2);
+        els.rawJsonTextarea.value = JSON.stringify({
+            rules: state.rules,
+            rule_profiles: state.ruleProfiles,
+        }, null, 2);
+    }
+
+    function generateRuleId() {
+        return 'rule_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+    }
+
+    function normalizeRuleProfiles(config, rules) {
+        const validRuleIds = new Set((rules || []).map(function (rule) {
+            return rule && rule.rule_id ? String(rule.rule_id) : '';
+        }).filter(Boolean));
+        const defaultProfiles = [
+            { id: 'profile_a', short_name: 'A', description: '', rule_ids: [] },
+            { id: 'profile_b', short_name: 'B', description: '', rule_ids: [] },
+            { id: 'profile_c', short_name: 'C', description: '', rule_ids: [] },
+            { id: 'profile_d', short_name: 'D', description: '', rule_ids: [] },
+            { id: 'profile_e', short_name: 'E', description: '', rule_ids: [] },
+        ];
+        const incoming = config && Array.isArray(config.profiles) ? config.profiles : [];
+        const profilesById = {};
+
+        incoming.forEach(function (profile) {
+            if (!profile || typeof profile !== 'object') return;
+            const id = String(profile.id || '').trim();
+            if (!id || id === SHOW_ALL_PROFILE_ID) return;
+            const seen = new Set();
+            const ruleIds = Array.isArray(profile.rule_ids) ? profile.rule_ids.filter(function (ruleId) {
+                const normalizedId = String(ruleId || '').trim();
+                if (!normalizedId || !validRuleIds.has(normalizedId) || seen.has(normalizedId)) {
+                    return false;
+                }
+                seen.add(normalizedId);
+                return true;
+            }).map(function (ruleId) {
+                return String(ruleId).trim();
+            }) : [];
+            profilesById[id] = {
+                id: id,
+                short_name: String(profile.short_name || '').trim() || id,
+                description: String(profile.description || '').trim(),
+                rule_ids: ruleIds,
+            };
+        });
+
+        defaultProfiles.forEach(function (profile) {
+            if (!profilesById[profile.id]) {
+                profilesById[profile.id] = cloneDeep(profile);
+            } else if (!profilesById[profile.id].short_name) {
+                profilesById[profile.id].short_name = profile.short_name;
+            }
+        });
+
+        const orderedProfiles = defaultProfiles.map(function (profile) {
+            return profilesById[profile.id];
+        });
+
+        Object.keys(profilesById).forEach(function (id) {
+            if (!orderedProfiles.some(function (profile) { return profile.id === id; })) {
+                orderedProfiles.push(profilesById[id]);
+            }
+        });
+
+        const activeProfileId = config && typeof config.active_profile_id === 'string'
+            ? String(config.active_profile_id).trim()
+            : SHOW_ALL_PROFILE_ID;
+        const normalizedActiveId = activeProfileId === SHOW_ALL_PROFILE_ID ||
+            orderedProfiles.some(function (profile) { return profile.id === activeProfileId; })
+            ? activeProfileId
+            : SHOW_ALL_PROFILE_ID;
+
+        return {
+            active_profile_id: normalizedActiveId,
+            profiles: orderedProfiles,
+        };
+    }
+
+    function getActiveProfileId() {
+        return state.selectedProfileId || state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
+    }
+
+    function getProfileById(profileId) {
+        return state.ruleProfiles.profiles.find(function (profile) {
+            return profile.id === profileId;
+        }) || null;
+    }
+
+    function ruleMatchesSelectedProfile(rule) {
+        const activeProfileId = getActiveProfileId();
+        if (activeProfileId === SHOW_ALL_PROFILE_ID) {
+            return true;
+        }
+        const profile = getProfileById(activeProfileId);
+        return !!(profile && Array.isArray(profile.rule_ids) && profile.rule_ids.includes(rule.rule_id));
+    }
+
+    function getVisibleRules() {
+        return state.rules
+            .map(function (rule, idx) {
+                return { rule: rule, idx: idx };
+            })
+            .filter(function (entry) {
+                return ruleMatchesSelectedProfile(entry.rule);
+            });
     }
 
     function applyEditorHelpTooltips() {
@@ -144,6 +262,7 @@
 
     function normalizeRule(rule) {
         const out = {};
+        out.rule_id = String(rule.rule_id || '').trim() || generateRuleId();
         out.name = String(rule.name || '').trim();
         out.value = rule.value;
         out.enabled = rule.enabled !== false;
@@ -557,14 +676,24 @@
 
     function renderTable() {
         els.rulesTbody.innerHTML = '';
+        const visibleRules = getVisibleRules();
         if (state.rules.length === 0) {
             const tr = document.createElement('tr');
             tr.innerHTML = '<td colspan="4" class="muted">No rules yet.</td>';
             els.rulesTbody.appendChild(tr);
             return;
         }
+        if (visibleRules.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="4" class="muted">No rules in the selected profile.</td>';
+            els.rulesTbody.appendChild(tr);
+            renderRawJson();
+            return;
+        }
 
-        state.rules.forEach((rule, idx) => {
+        visibleRules.forEach(function (entry) {
+            const rule = entry.rule;
+            const idx = entry.idx;
             const hasMinLimit = rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== '';
             const hasMaxLimit = rule.max_power !== undefined && rule.max_power !== null && rule.max_power !== '';
             const hasLimits = hasMinLimit || hasMaxLimit;
@@ -622,6 +751,94 @@
                 toggle.setAttribute('aria-expanded', 'false');
             }
         });
+    }
+
+    function renderProfileButtons() {
+        if (!els.profileButtonBar) return;
+        els.profileButtonBar.innerHTML = '';
+
+        const profiles = [{
+            id: SHOW_ALL_PROFILE_ID,
+            short_name: 'Show All',
+            description: 'Show all rules. Individually disabled rules remain off.',
+        }].concat(state.ruleProfiles.profiles || []);
+
+        profiles.forEach(function (profile) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'profile-filter-button';
+            if (getActiveProfileId() === profile.id) {
+                button.classList.add('is-active');
+            }
+            button.setAttribute('data-profile-id', profile.id);
+            button.title = profile.description || profile.short_name || profile.id;
+            button.textContent = profile.short_name || profile.id;
+            els.profileButtonBar.appendChild(button);
+        });
+    }
+
+    function renderProfileEditor() {
+        if (!els.profileEditor || !els.profileRuleMembership || !els.inpProfileShortName || !els.inpProfileDescription) {
+            return;
+        }
+        const profileId = getActiveProfileId();
+        state.editingProfileId = profileId;
+
+        if (profileId === SHOW_ALL_PROFILE_ID) {
+            els.profileEditor.hidden = true;
+            els.inpProfileShortName.value = '';
+            els.inpProfileDescription.value = '';
+            els.profileRuleMembership.innerHTML = '';
+            return;
+        }
+
+        const profile = getProfileById(profileId);
+        if (!profile) {
+            els.profileEditor.hidden = true;
+            return;
+        }
+
+        els.profileEditor.hidden = false;
+        els.inpProfileShortName.value = profile.short_name || '';
+        els.inpProfileDescription.value = profile.description || '';
+        els.profileRuleMembership.innerHTML = '';
+
+        state.rules.forEach(function (rule, idx) {
+            const label = document.createElement('label');
+            label.className = 'profile-rule-chip';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = rule.rule_id;
+            checkbox.checked = Array.isArray(profile.rule_ids) && profile.rule_ids.includes(rule.rule_id);
+            checkbox.setAttribute('data-profile-rule-id', rule.rule_id);
+
+            const text = document.createElement('span');
+            text.textContent = (rule.name || ('Rule #' + (idx + 1))) + (rule.enabled === false ? ' (disabled)' : '');
+            text.title = rule.rule_id;
+
+            label.appendChild(checkbox);
+            label.appendChild(text);
+            els.profileRuleMembership.appendChild(label);
+        });
+    }
+
+    function renderProfiles() {
+        renderProfileButtons();
+        renderProfileEditor();
+    }
+
+    function persistProfileEditorChanges() {
+        const profileId = state.editingProfileId;
+        if (!profileId || profileId === SHOW_ALL_PROFILE_ID) return;
+        const profile = getProfileById(profileId);
+        if (!profile) return;
+
+        profile.short_name = String(els.inpProfileShortName?.value || '').trim() || profile.short_name || profile.id;
+        profile.description = String(els.inpProfileDescription?.value || '').trim();
+        profile.rule_ids = Array.from(els.profileRuleMembership?.querySelectorAll('input[data-profile-rule-id]:checked') || [])
+            .map(function (input) { return String(input.value || '').trim(); })
+            .filter(Boolean);
     }
 
     function escapeHtml(s) {
@@ -731,6 +948,7 @@
         els.inpColor.dispatchEvent(new Event('change', { bubbles: true }));
         updateAllFieldStates();
         renderTable();
+        renderProfiles();
     }
 
     function resetImportedFileInput() {
@@ -791,6 +1009,7 @@
         els.inpColor.dispatchEvent(new Event('change', { bubbles: true }));
         updateAllFieldStates();
         renderTable();
+        renderProfiles();
     }
 
     function applyInitialRuleSelection() {
@@ -944,14 +1163,17 @@
         if (!res.ok || !data.success) {
             throw new Error(data.error || 'Failed to load rules.');
         }
-        return data.rules || [];
+        return data;
     }
 
     async function apiSave() {
         const res = await fetch(window.EDIT_RULES_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rules: state.rules }),
+            body: JSON.stringify({
+                rules: state.rules,
+                rule_profiles: state.ruleProfiles,
+            }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) {
@@ -963,8 +1185,15 @@
     async function saveRulesToFile(successMessage) {
         try {
             const result = await apiSave();
+            if (Array.isArray(result.rules)) {
+                state.rules = result.rules.map(normalizeRule);
+            }
+            state.ruleProfiles = normalizeRuleProfiles(result.rule_profiles || state.ruleProfiles, state.rules);
+            state.selectedProfileId = state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
             state.hasPendingImportedRules = false;
             updatePendingImportState();
+            renderTable();
+            renderProfiles();
             setStatus(successMessage || (result.message + ' (' + result.count + ' rules)'), 'ok');
             return true;
         } catch (e) {
@@ -988,12 +1217,16 @@
     async function loadRules() {
         setStatus('Loading rules...', '');
         try {
-            const rules = await apiGet();
+            const data = await apiGet();
+            const rules = Array.isArray(data.rules) ? data.rules : [];
             state.rules = rules.map(normalizeRule);
+            state.ruleProfiles = normalizeRuleProfiles(data.rule_profiles || {}, state.rules);
+            state.selectedProfileId = state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
             state.hasPendingImportedRules = false;
             updatePendingImportState();
             resetImportedFileInput();
             renderTable();
+            renderProfiles();
             clearEditor();
             if (!applyInitialRuleSelection()) {
                 setStatus('Loaded ' + state.rules.length + ' rules.', 'ok');
@@ -1052,6 +1285,7 @@
 
     function applyImportedRules(normalizedRules, originalCount) {
         state.rules = normalizedRules;
+        state.ruleProfiles = normalizeRuleProfiles(state.ruleProfiles, state.rules);
         state.hasPendingImportedRules = true;
         updatePendingImportState();
         clearEditor();
@@ -1140,6 +1374,51 @@
             els.btnSaveImported.addEventListener('click', async function () {
                 if (!state.hasPendingImportedRules) return;
                 await saveRulesToFile('Imported rules saved.');
+            });
+        }
+
+        if (els.profileButtonBar) {
+            els.profileButtonBar.addEventListener('click', async function (e) {
+                const button = e.target.closest('button[data-profile-id]');
+                if (!button) return;
+                persistProfileEditorChanges();
+                const nextProfileId = String(button.getAttribute('data-profile-id') || '').trim() || SHOW_ALL_PROFILE_ID;
+                state.ruleProfiles.active_profile_id = nextProfileId;
+                state.selectedProfileId = nextProfileId;
+                renderTable();
+                renderProfiles();
+                await saveRulesToFile(nextProfileId === SHOW_ALL_PROFILE_ID
+                    ? 'Show All activated.'
+                    : 'Rule profile activated.');
+            });
+        }
+
+        if (els.btnSaveProfile) {
+            els.btnSaveProfile.addEventListener('click', async function () {
+                persistProfileEditorChanges();
+                renderProfiles();
+                await saveRulesToFile('Rule profile saved.');
+            });
+        }
+
+        if (els.profileRuleMembership) {
+            els.profileRuleMembership.addEventListener('change', function () {
+                persistProfileEditorChanges();
+                renderTable();
+            });
+        }
+
+        if (els.inpProfileShortName) {
+            els.inpProfileShortName.addEventListener('input', function () {
+                persistProfileEditorChanges();
+                renderProfileButtons();
+            });
+        }
+
+        if (els.inpProfileDescription) {
+            els.inpProfileDescription.addEventListener('input', function () {
+                persistProfileEditorChanges();
+                renderProfileButtons();
             });
         }
 
@@ -1296,7 +1575,9 @@
             }
             if (action === 'dup') {
                 await mutateAndPersist(function () {
-                    state.rules.splice(idx + 1, 0, cloneDeep(state.rules[idx]));
+                    const duplicate = cloneDeep(state.rules[idx]);
+                    duplicate.rule_id = generateRuleId();
+                    state.rules.splice(idx + 1, 0, duplicate);
                 }, 'Rule duplicated and saved.');
                 return;
             }
@@ -1355,6 +1636,9 @@
                 const isNew = state.editIndex === null;
                 if (!isNew) {
                     const existing = state.rules[state.editIndex];
+                    if (existing && existing.rule_id) {
+                        rule.rule_id = existing.rule_id;
+                    }
                     if (existing && existing.key) {
                         rule.key = existing.key;
                     }

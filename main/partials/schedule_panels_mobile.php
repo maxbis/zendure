@@ -408,6 +408,59 @@ window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, J
     var rulesLoaded = false;
     var rulesLoading = false;
     var rulesState = [];
+    var ruleProfilesState = { active_profile_id: 'show_all', profiles: [] };
+
+    function normalizeRuleProfiles(config, rules) {
+        var validRuleIds = {};
+        (rules || []).forEach(function(rule) {
+            var ruleId = rule && rule.rule_id ? String(rule.rule_id) : '';
+            if (ruleId) {
+                validRuleIds[ruleId] = true;
+            }
+        });
+        var profiles = Array.isArray(config && config.profiles) ? config.profiles : [];
+        var normalizedProfiles = profiles.map(function(profile) {
+            var seen = {};
+            var ruleIds = Array.isArray(profile && profile.rule_ids) ? profile.rule_ids.filter(function(ruleId) {
+                var normalizedId = String(ruleId || '').trim();
+                if (!normalizedId || !validRuleIds[normalizedId] || seen[normalizedId]) {
+                    return false;
+                }
+                seen[normalizedId] = true;
+                return true;
+            }).map(function(ruleId) {
+                return String(ruleId).trim();
+            }) : [];
+            return {
+                id: String((profile && profile.id) || '').trim(),
+                short_name: String((profile && profile.short_name) || '').trim(),
+                description: String((profile && profile.description) || '').trim(),
+                rule_ids: ruleIds
+            };
+        }).filter(function(profile) {
+            return !!profile.id && profile.id !== 'show_all';
+        });
+        var activeProfileId = config && typeof config.active_profile_id === 'string'
+            ? String(config.active_profile_id).trim()
+            : 'show_all';
+        if (activeProfileId !== 'show_all' && !normalizedProfiles.some(function(profile) { return profile.id === activeProfileId; })) {
+            activeProfileId = 'show_all';
+        }
+        return {
+            active_profile_id: activeProfileId,
+            profiles: normalizedProfiles
+        };
+    }
+
+    function ruleVisibleInActiveProfile(rule) {
+        if (!ruleProfilesState || ruleProfilesState.active_profile_id === 'show_all') {
+            return true;
+        }
+        var profile = (ruleProfilesState.profiles || []).find(function(item) {
+            return item.id === ruleProfilesState.active_profile_id;
+        });
+        return !!(profile && Array.isArray(profile.rule_ids) && profile.rule_ids.indexOf(rule.rule_id) !== -1);
+    }
 
     function setRulesStatus(text, type) {
         if (!rulesStatus) return;
@@ -426,7 +479,21 @@ window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, J
             return;
         }
 
-        rulesState.forEach(function(rule, idx) {
+        var visibleRules = rulesState
+            .map(function(rule, idx) { return { rule: rule, idx: idx }; })
+            .filter(function(entry) { return ruleVisibleInActiveProfile(entry.rule); });
+
+        if (!visibleRules.length) {
+            var emptyFiltered = document.createElement('li');
+            emptyFiltered.className = 'schedule-rules-empty';
+            emptyFiltered.textContent = 'No rules in the active profile.';
+            rulesList.appendChild(emptyFiltered);
+            return;
+        }
+
+        visibleRules.forEach(function(entry) {
+            var rule = entry.rule;
+            var idx = entry.idx;
             var li = document.createElement('li');
             li.className = 'schedule-rules-item';
 
@@ -456,14 +523,14 @@ window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, J
         if (!res.ok || !data.success || !Array.isArray(data.rules)) {
             throw new Error((data && data.error) ? data.error : 'Failed to load rules.');
         }
-        return data.rules;
+        return data;
     }
 
     async function saveRules() {
         var res = await fetch(rulesApiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rules: rulesState })
+            body: JSON.stringify({ rules: rulesState, rule_profiles: ruleProfilesState })
         });
         var data = await res.json();
         if (!res.ok || !data.success) {
@@ -479,12 +546,14 @@ window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, J
         setRulesStatus('Loading rules...', '');
         if (rulesRefreshBtn) rulesRefreshBtn.disabled = true;
         try {
-            var rules = await fetchRules();
+            var data = await fetchRules();
+            var rules = data.rules || [];
             rulesState = rules.map(function(rule) {
                 var out = Object.assign({}, rule || {});
                 out.enabled = out.enabled !== false;
                 return out;
             });
+            ruleProfilesState = normalizeRuleProfiles(data.rule_profiles || {}, rulesState);
             renderRulesList();
             setRulesStatus('Loaded ' + rulesState.length + ' rules.', 'ok');
             rulesLoaded = true;
@@ -503,7 +572,18 @@ window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, J
         setRulesStatus('Saving...', '');
         if (checkbox) checkbox.disabled = true;
         try {
-            await saveRules();
+            var result = await saveRules();
+            if (result && Array.isArray(result.rules)) {
+                rulesState = result.rules.map(function(rule) {
+                    var out = Object.assign({}, rule || {});
+                    out.enabled = out.enabled !== false;
+                    return out;
+                });
+            }
+            if (result) {
+                ruleProfilesState = normalizeRuleProfiles(result.rule_profiles || ruleProfilesState, rulesState);
+            }
+            renderRulesList();
             setRulesStatus((enabled ? 'Enabled' : 'Disabled') + ' "' + String(rulesState[index].name || ('Rule #' + (index + 1))) + '".', 'ok');
         } catch (e) {
             rulesState[index].enabled = prev;

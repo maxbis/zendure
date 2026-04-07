@@ -5,6 +5,9 @@
 date_default_timezone_set('Europe/Amsterdam');
 
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
+$profilesFile = __DIR__ . '/data/rule_profiles.json';
+const SHOW_ALL_PROFILE_ID = 'show_all';
+const DEFAULT_PROFILE_IDS = ['profile_a', 'profile_b', 'profile_c', 'profile_d', 'profile_e'];
 
 function jsonResponse(array $payload, int $status = 200): void
 {
@@ -49,6 +52,131 @@ function writeRulesFileAtomic(string $path, array $data): void
 function validateValue($value): bool
 {
     return $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+}
+
+function generateRuleId(): string
+{
+    try {
+        return 'rule_' . bin2hex(random_bytes(8));
+    } catch (Throwable $e) {
+        return 'rule_' . str_replace('.', '', uniqid('', true));
+    }
+}
+
+function normalizeRuleId($value, array &$usedIds): string
+{
+    $candidate = is_string($value) ? trim($value) : '';
+    if ($candidate === '' || isset($usedIds[$candidate])) {
+        do {
+            $candidate = generateRuleId();
+        } while (isset($usedIds[$candidate]));
+    }
+    $usedIds[$candidate] = true;
+    return $candidate;
+}
+
+function defaultRuleProfilesConfig(): array
+{
+    return [
+        'active_profile_id' => SHOW_ALL_PROFILE_ID,
+        'profiles' => [
+            ['id' => 'profile_a', 'short_name' => 'A', 'description' => '', 'rule_ids' => []],
+            ['id' => 'profile_b', 'short_name' => 'B', 'description' => '', 'rule_ids' => []],
+            ['id' => 'profile_c', 'short_name' => 'C', 'description' => '', 'rule_ids' => []],
+            ['id' => 'profile_d', 'short_name' => 'D', 'description' => '', 'rule_ids' => []],
+            ['id' => 'profile_e', 'short_name' => 'E', 'description' => '', 'rule_ids' => []],
+        ],
+    ];
+}
+
+function normalizeProfileRuleIds($value, array $validRuleIds): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+    $seen = [];
+    $normalized = [];
+    foreach ($value as $ruleId) {
+        if (!is_string($ruleId)) {
+            continue;
+        }
+        $trimmed = trim($ruleId);
+        if ($trimmed === '' || !isset($validRuleIds[$trimmed]) || isset($seen[$trimmed])) {
+            continue;
+        }
+        $seen[$trimmed] = true;
+        $normalized[] = $trimmed;
+    }
+    return $normalized;
+}
+
+function normalizeProfiles(array $config, array $rules): array
+{
+    $default = defaultRuleProfilesConfig();
+    $validRuleIds = [];
+    foreach ($rules as $rule) {
+        if (isset($rule['rule_id']) && is_string($rule['rule_id']) && $rule['rule_id'] !== '') {
+            $validRuleIds[$rule['rule_id']] = true;
+        }
+    }
+
+    $rawProfiles = isset($config['profiles']) && is_array($config['profiles']) ? $config['profiles'] : [];
+    $profilesById = [];
+
+    foreach ($rawProfiles as $profile) {
+        if (!is_array($profile)) {
+            continue;
+        }
+        $profileId = isset($profile['id']) && is_string($profile['id']) ? trim($profile['id']) : '';
+        if ($profileId === '' || $profileId === SHOW_ALL_PROFILE_ID) {
+            continue;
+        }
+        $shortName = isset($profile['short_name']) ? trim((string) $profile['short_name']) : '';
+        $description = isset($profile['description']) ? trim((string) $profile['description']) : '';
+        $profilesById[$profileId] = [
+            'id' => $profileId,
+            'short_name' => $shortName !== '' ? $shortName : strtoupper(substr($profileId, -1)),
+            'description' => $description,
+            'rule_ids' => normalizeProfileRuleIds($profile['rule_ids'] ?? [], $validRuleIds),
+        ];
+    }
+
+    foreach ($default['profiles'] as $index => $profile) {
+        $profileId = $profile['id'];
+        if (!isset($profilesById[$profileId])) {
+            $profilesById[$profileId] = $profile;
+            continue;
+        }
+        if ($profilesById[$profileId]['short_name'] === '') {
+            $profilesById[$profileId]['short_name'] = $profile['short_name'];
+        }
+    }
+
+    $orderedProfiles = [];
+    foreach (DEFAULT_PROFILE_IDS as $profileId) {
+        if (isset($profilesById[$profileId])) {
+            $orderedProfiles[] = $profilesById[$profileId];
+            unset($profilesById[$profileId]);
+        }
+    }
+    foreach ($profilesById as $profile) {
+        $orderedProfiles[] = $profile;
+    }
+
+    $activeProfileId = isset($config['active_profile_id']) && is_string($config['active_profile_id'])
+        ? trim($config['active_profile_id'])
+        : SHOW_ALL_PROFILE_ID;
+    if ($activeProfileId !== SHOW_ALL_PROFILE_ID) {
+        $knownIds = array_column($orderedProfiles, 'id');
+        if (!in_array($activeProfileId, $knownIds, true)) {
+            $activeProfileId = SHOW_ALL_PROFILE_ID;
+        }
+    }
+
+    return [
+        'active_profile_id' => $activeProfileId,
+        'profiles' => array_values($orderedProfiles),
+    ];
 }
 
 function normalizeOptionalRuleBound($value): ?int
@@ -135,6 +263,7 @@ function normalizeRuleColor($value): ?string
 function normalizeRules(array $rules): array
 {
     $out = [];
+    $usedRuleIds = [];
     foreach ($rules as $rule) {
         if (!is_array($rule) || !array_key_exists('value', $rule)) {
             continue;
@@ -148,6 +277,7 @@ function normalizeRules(array $rules): array
         }
 
         $normalized = [];
+        $normalized['rule_id'] = normalizeRuleId($rule['rule_id'] ?? null, $usedRuleIds);
         $normalized['name'] = $name;
         $normalized['value'] = is_numeric($rule['value']) ? (int) $rule['value'] : (string) $rule['value'];
         $normalized['enabled'] = !array_key_exists('enabled', $rule) ? true : (bool) $rule['enabled'];
@@ -228,21 +358,43 @@ if ($isApi) {
 
     try {
         if ($method === 'GET') {
-            $rules = readRulesFile($rulesFile);
-            jsonResponse(['success' => true, 'rules' => $rules]);
+            $rawRules = readRulesFile($rulesFile);
+            $rules = normalizeRules($rawRules);
+            if ($rules !== $rawRules) {
+                writeRulesFileAtomic($rulesFile, $rules);
+            }
+
+            $rawProfiles = readRulesFile($profilesFile);
+            $profiles = normalizeProfiles($rawProfiles, $rules);
+            if ($profiles !== $rawProfiles) {
+                writeRulesFileAtomic($profilesFile, $profiles);
+            }
+
+            jsonResponse([
+                'success' => true,
+                'rules' => $rules,
+                'rule_profiles' => $profiles,
+            ]);
         }
 
         if ($method === 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
             if (!is_array($input) || !isset($input['rules']) || !is_array($input['rules'])) {
-                jsonResponse(['success' => false, 'error' => 'Expected JSON body: { "rules": [] }'], 400);
+                jsonResponse(['success' => false, 'error' => 'Expected JSON body: { "rules": [], "rule_profiles": {} }'], 400);
             }
             $normalized = normalizeRules($input['rules']);
+            $normalizedProfiles = normalizeProfiles(
+                isset($input['rule_profiles']) && is_array($input['rule_profiles']) ? $input['rule_profiles'] : [],
+                $normalized
+            );
             writeRulesFileAtomic($rulesFile, $normalized);
+            writeRulesFileAtomic($profilesFile, $normalizedProfiles);
             jsonResponse([
                 'success' => true,
                 'message' => 'Rules saved successfully.',
                 'count' => count($normalized),
+                'rules' => $normalized,
+                'rule_profiles' => $normalizedProfiles,
             ]);
         }
 
@@ -421,6 +573,32 @@ if ($isApi) {
                 </div>
             </form>
         </section>
+    </section>
+
+    <section class="card">
+        <div class="card-header-row">
+            <h2>Rule Profiles</h2>
+            <button id="btn-save-profile" type="button">Save Profile</button>
+        </div>
+        <div class="rule-profiles-box">
+            <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
+            <div id="profile-editor" class="profile-editor" hidden>
+                <div class="profile-editor-grid">
+                    <div>
+                        <label for="inp-profile-short-name">Short Name</label>
+                        <input id="inp-profile-short-name" type="text" maxlength="20" placeholder="A">
+                    </div>
+                    <div>
+                        <label for="inp-profile-description">Description</label>
+                        <input id="inp-profile-description" type="text" maxlength="120" placeholder="Profile description">
+                    </div>
+                </div>
+                <div class="row">
+                    <label>Rules In Profile</label>
+                    <div id="profile-rule-membership" class="profile-rule-membership"></div>
+                </div>
+            </div>
+        </div>
     </section>
 </main>
 <script>

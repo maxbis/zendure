@@ -27,10 +27,12 @@
 date_default_timezone_set('Europe/Amsterdam');
 
 const CONDITIONS_FILE = __DIR__ . '/charge_schedule_conditions.json';
+const RULE_PROFILES_FILE = __DIR__ . '/rule_profiles.json';
 const PRICE_DIR = __DIR__ . '/price';
 const MAIN_CONFIG_FILE = __DIR__ . '/../config/config.json';
 const DEFAULT_LATITUDE = 52.3676;
 const DEFAULT_LONGITUDE = 4.9041;
+const SHOW_ALL_PROFILE_ID = 'show_all';
 
 function buildPriceFilePath(string $yyyymmdd): string
 {
@@ -176,6 +178,71 @@ function normalizeOptionalRuleBoundValue($value): ?int
         return (int) $value;
     }
     return null;
+}
+
+function normalizeRuleId($value): ?string
+{
+    if (!is_string($value)) {
+        return null;
+    }
+    $trimmed = trim($value);
+    return $trimmed === '' ? null : $trimmed;
+}
+
+function normalizeProfileConfig(array $raw, array $rules): array
+{
+    $validRuleIds = [];
+    foreach ($rules as $rule) {
+        if (isset($rule['rule_id']) && is_string($rule['rule_id']) && $rule['rule_id'] !== '') {
+            $validRuleIds[$rule['rule_id']] = true;
+        }
+    }
+
+    $profiles = [];
+    if (isset($raw['profiles']) && is_array($raw['profiles'])) {
+        foreach ($raw['profiles'] as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+            $profileId = isset($profile['id']) && is_string($profile['id']) ? trim($profile['id']) : '';
+            if ($profileId === '' || $profileId === SHOW_ALL_PROFILE_ID) {
+                continue;
+            }
+            $ruleIds = [];
+            $seen = [];
+            if (isset($profile['rule_ids']) && is_array($profile['rule_ids'])) {
+                foreach ($profile['rule_ids'] as $ruleId) {
+                    if (!is_string($ruleId)) {
+                        continue;
+                    }
+                    $trimmedId = trim($ruleId);
+                    if ($trimmedId === '' || !isset($validRuleIds[$trimmedId]) || isset($seen[$trimmedId])) {
+                        continue;
+                    }
+                    $seen[$trimmedId] = true;
+                    $ruleIds[] = $trimmedId;
+                }
+            }
+            $profiles[$profileId] = [
+                'id' => $profileId,
+                'short_name' => isset($profile['short_name']) ? trim((string) $profile['short_name']) : '',
+                'description' => isset($profile['description']) ? trim((string) $profile['description']) : '',
+                'rule_ids' => $ruleIds,
+            ];
+        }
+    }
+
+    $activeProfileId = isset($raw['active_profile_id']) && is_string($raw['active_profile_id'])
+        ? trim($raw['active_profile_id'])
+        : SHOW_ALL_PROFILE_ID;
+    if ($activeProfileId !== SHOW_ALL_PROFILE_ID && !isset($profiles[$activeProfileId])) {
+        $activeProfileId = SHOW_ALL_PROFILE_ID;
+    }
+
+    return [
+        'active_profile_id' => $activeProfileId,
+        'profiles' => $profiles,
+    ];
 }
 
 function matchesKeyPattern(string $ruleKey, string $slotKey): bool
@@ -645,6 +712,10 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
     if (array_key_exists('name', $entry) && is_string($entry['name']) && trim($entry['name']) !== '') {
         $rule['name'] = trim((string) $entry['name']);
     }
+    $ruleId = normalizeRuleId($entry['rule_id'] ?? null);
+    if ($ruleId !== null) {
+        $rule['rule_id'] = $ruleId;
+    }
     if (array_key_exists('enabled', $entry)) {
         $rule['enabled'] = (bool) $entry['enabled'];
     }
@@ -681,6 +752,22 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
         }
     }
     return $rule;
+}
+
+function ruleAllowedByProfile(array $rule, array $profileConfig): bool
+{
+    $activeProfileId = $profileConfig['active_profile_id'] ?? SHOW_ALL_PROFILE_ID;
+    if ($activeProfileId === SHOW_ALL_PROFILE_ID) {
+        return true;
+    }
+    if (!isset($rule['rule_id']) || !is_string($rule['rule_id']) || $rule['rule_id'] === '') {
+        return false;
+    }
+    $profiles = isset($profileConfig['profiles']) && is_array($profileConfig['profiles']) ? $profileConfig['profiles'] : [];
+    if (!isset($profiles[$activeProfileId]) || !isset($profiles[$activeProfileId]['rule_ids']) || !is_array($profiles[$activeProfileId]['rule_ids'])) {
+        return false;
+    }
+    return in_array($rule['rule_id'], $profiles[$activeProfileId]['rule_ids'], true);
 }
 
 /**
@@ -731,7 +818,7 @@ function normalizeRules(array $raw): array
     return $rules;
 }
 
-function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?array $ctx = null): array
+function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, array $profileConfig, ?array $ctx = null): array
 {
     $items = [];
     if ($ctx === null) {
@@ -744,6 +831,9 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
         foreach ($rules as $rule) {
             // Rules are enabled by default; only explicit boolean false disables evaluation.
             if (array_key_exists('enabled', $rule) && $rule['enabled'] === false) {
+                continue;
+            }
+            if (!ruleAllowedByProfile($rule, $profileConfig)) {
                 continue;
             }
             if (!matchesKeyPattern($rule['key'], $slotKey) || !ruleConditionsMatch($rule, $priceByHour, $hour, $yyyymmdd, $ctx)) {
@@ -760,6 +850,9 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, ?arr
             ];
             if (array_key_exists('name', $rule) && is_string($rule['name']) && $rule['name'] !== '') {
                 $items[count($items) - 1]['rule_name'] = $rule['name'];
+            }
+            if (array_key_exists('rule_id', $rule) && is_string($rule['rule_id']) && $rule['rule_id'] !== '') {
+                $items[count($items) - 1]['rule_id'] = $rule['rule_id'];
             }
             if (array_key_exists('_order', $rule) && is_numeric($rule['_order'])) {
                 $items[count($items) - 1]['rule_index'] = ((int) $rule['_order']) + 1;
@@ -797,6 +890,10 @@ function runResolve(): array
     $rawRules = $conditionsResult['data'];
 
     $rules = normalizeRules($rawRules);
+    $profilesResult = readJsonFileWithError(RULE_PROFILES_FILE);
+    $profileConfig = ($profilesResult['error'] === null && is_array($profilesResult['data']))
+        ? normalizeProfileConfig($profilesResult['data'], $rules)
+        : ['active_profile_id' => SHOW_ALL_PROFILE_ID, 'profiles' => []];
     $tz = new DateTimeZone('Europe/Amsterdam');
     $cfg = loadMainConfig();
     $latitude = getConfigFloat($cfg, 'latitude', DEFAULT_LATITUDE);
@@ -830,7 +927,7 @@ function runResolve(): array
             'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
             // ranking: key = rank (1 = cheapest), value = hour (0-23)
             'ranking' => $ctx['rank_to_hour'],
-            'items' => resolveForDate($dateYmd, $rules, $priceData, $ctx),
+            'items' => resolveForDate($dateYmd, $rules, $priceData, $profileConfig, $ctx),
         ];
         foreach ([
             'sunrise_time',

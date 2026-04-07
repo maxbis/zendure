@@ -85,6 +85,76 @@ code {
     flex-wrap: wrap;
 }
 
+.rule-profiles-box {
+    display: grid;
+    gap: 14px;
+    margin-top: 10px;
+}
+
+.profile-button-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.profile-filter-button {
+    min-width: 84px;
+}
+
+.profile-filter-button.is-active {
+    background: color-mix(in srgb, var(--primary) 30%, #0b1324);
+    border-color: #1d4ed8;
+}
+
+.profile-editor {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-editor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.profile-rule-membership {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.profile-rule-chip {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #0b1324;
+    margin-bottom: 0;
+}
+
+.profile-rule-chip input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.profile-rule-chip span {
+    flex: 1 1 auto;
+    text-align: left;
+    line-height: 1.2;
+    color: var(--text);
+}
+
 #btn-save-imported:not([hidden]) {
     background: #0f766e;
     border-color: #115e59;
@@ -1336,5 +1406,10 @@ button.danger.condition-remove-btn:hover {
 
     .limits-scale {
         font-size: 0.72rem;
+    }
+
+    .profile-editor-grid,
+    .profile-rule-membership {
+        grid-template-columns: 1fr;
     }
 }
