@@ -347,19 +347,31 @@
     .automation-refresh-btn {
         align-self: flex-start;
     }
-    
+
+    /* Row 1: badge + relative time | Row 2: details (full width) */
     .automation-entry {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: center;
+        column-gap: 12px;
+        row-gap: 8px;
     }
 
     .automation-entry-badge {
-        align-self: flex-start;
+        grid-column: 1;
+        grid-row: 1;
     }
 
     .automation-entry-time {
-        min-width: auto;
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+    }
+
+    .automation-entry-details {
+        grid-column: 1 / -1;
+        grid-row: 2;
     }
 }
 

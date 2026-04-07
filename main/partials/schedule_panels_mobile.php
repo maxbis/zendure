@@ -146,10 +146,10 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
     <div class="schedule-mobile-card__title-row">
         <h3 class="card-header schedule-mobile-card__heading">Schedule</h3>
         <label class="schedule-mobile-card__show-toggle" title="Show or hide this panel. Saved in this browser only.">
+            <span class="schedule-mobile-card__toggle-text" style="font-size: 0.6rem;">Show</span>
             <input type="checkbox" class="schedule-mobile-card__show-toggle-input" data-role="schedule-show-toggle" checked
                 aria-label="Show schedule panel" />
             <span class="schedule-mobile-card__show-track" aria-hidden="true"><span class="schedule-mobile-card__show-thumb"></span></span>
-            <span class="schedule-mobile-card__show-text">Show</span>
         </label>
     </div>
     <div class="schedule-mobile-card__body" data-role="schedule-panel-body">

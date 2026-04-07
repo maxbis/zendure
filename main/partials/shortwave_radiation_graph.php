@@ -7,10 +7,10 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
         <div class="shortwave-radiation-card__title-row">
             <h3 class="card-header shortwave-radiation-card__title">Shortwave Radiation <span class="shortwave-radiation-card__unit">(W/m²)</span></h3>
             <label class="shortwave-radiation-card__toggle" title="When off, Open-Meteo is not contacted and no error is shown.">
+                <span class="shortwave-radiation-card__toggle-text" style="font-size: 0.6rem;">Show</span>
                 <input type="checkbox" class="shortwave-radiation-card__toggle-input" data-role="fetch-toggle" checked
                     aria-label="Fetch shortwave radiation from Open-Meteo" />
                 <span class="shortwave-radiation-card__toggle-track" aria-hidden="true"><span class="shortwave-radiation-card__toggle-thumb"></span></span>
-                <span class="shortwave-radiation-card__toggle-text">Show</span>
             </label>
         </div>
         <div class="shortwave-radiation-card__status" data-role="status" hidden></div>
