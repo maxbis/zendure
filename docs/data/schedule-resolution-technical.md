@@ -173,6 +173,8 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
 | `spread_price` | `max_price - min_price` | cents/kWh |
 | `min_price_hour` | Hour of day minimum price | 0–23 |
 | `max_price_hour` | Hour of day maximum price | 0–23 |
+| `max_price_hour_am` | Hour of AM half-day maximum price | 0–11 |
+| `max_price_hour_pm` | Hour of PM half-day maximum price | 12–23 |
 | `sunrise_hour` | Sunrise hour (floored) from lat/lon | 0–23 |
 | `sunset_hour` | Sunset hour (ceil) from lat/lon | 0–23 |
 | `sunrise_offset_hour` | Hour relative to sunrise (`hour >= sunrise + N`) | integer |
@@ -194,7 +196,7 @@ A condition operand can be:
 - `"value": 12` — static literal
 - `"value_ref": "max_price_hour"` — resolved dynamically from price context
 
-Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`.
+Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`, `max_price_hour_am`, `max_price_hour_pm`.
 
 ---
 
@@ -214,7 +216,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
    - Find the price file at `main/data/price/YYYYMM/priceYYYYMMDD.json`
    - Skip dates without a price file
    - Build **price context** from price file:
-     - `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour` (all in cents/kWh)
+     - `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`, `max_price_hour_am`, `max_price_hour_pm`
      - `ranking_by_hour` — map `hour → rank`
    - Build **sun context** (from `main/config/config.json` lat/lon, defaulting to Amsterdam):
      - `sunrise_hour`, `sunset_hour`, `sunrise_time`, `sunset_time`
@@ -239,6 +241,8 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
       "spread_price": 25.7,
       "min_price_hour": 3,
       "max_price_hour": 18,
+      "max_price_hour_am": 11,
+      "max_price_hour_pm": 18,
       "sunrise_hour": 7,
       "sunset_hour": 18,
       "sunrise_time": "07:12",

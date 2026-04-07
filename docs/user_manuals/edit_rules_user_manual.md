@@ -69,6 +69,8 @@ Supported `field` values:
 - `spread_price`: daily spread (`max_price - min_price` in cents/kWh)
 - `min_price_hour`: hour (0-23) when min price occurs (first occurrence)
 - `max_price_hour`: hour (0-23) when max price occurs (first occurrence)
+- `max_price_hour_am`: hour (0-11) when the AM half-day max price occurs (first occurrence)
+- `max_price_hour_pm`: hour (12-23) when the PM half-day max price occurs (first occurrence)
 - `month`: current month (1-12)
 - `hour`: current hour (0-23)
 - `min_time`: lower bound hour (inclusive, equivalent to `hour >= value`)
@@ -97,6 +99,8 @@ Supported `value_ref`:
 - `spread_price`: daily price spread
 - `min_price_hour`: hour of lowest daily price
 - `max_price_hour`: hour of highest daily price
+- `max_price_hour_am`: hour of highest AM price (`00..11`)
+- `max_price_hour_pm`: hour of highest PM price (`12..23`)
 - `sunrise_hour`: sunrise hour for the date
 - `sunset_hour`: sunset hour for the date
 

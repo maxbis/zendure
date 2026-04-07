@@ -173,6 +173,8 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>spread_price</code></td><td>Daily spread: <code>max_price - min_price</code> (cents/kWh).</td></tr>
                 <tr><td><code>min_price_hour</code></td><td>Hour (0-23) when min price occurs (first occurrence).</td></tr>
                 <tr><td><code>max_price_hour</code></td><td>Hour (0-23) when max price occurs (first occurrence).</td></tr>
+                <tr><td><code>max_price_hour_am</code></td><td>Hour (0-11) when the AM half-day max price occurs (first occurrence).</td></tr>
+                <tr><td><code>max_price_hour_pm</code></td><td>Hour (12-23) when the PM half-day max price occurs (first occurrence).</td></tr>
                 <tr><td><code>sunrise_hour</code></td><td>Sunrise hour derived per rendered date using configured latitude/longitude. Rounded with <code>floor</code>.</td></tr>
                 <tr><td><code>sunset_hour</code></td><td>Sunset hour derived per rendered date using configured latitude/longitude. Rounded with <code>ceil</code>.</td></tr>
                 <tr><td><code>sunrise_offset_hour</code></td><td>Compares current hour to <code>sunrise_hour + offset</code>. Provide offset as numeric <code>value</code> (e.g. <code>-2</code>, <code>+1</code>).</td></tr>
@@ -203,7 +205,7 @@ date_default_timezone_set('Europe/Amsterdam');
     <section>
         <h2>value / value_ref</h2>
         <p>A condition can use a literal <code>value</code>, a dynamic <code>value_ref</code>, or both.</p>
-        <p>Supported <code>value_ref</code>: <code>min_price</code>, <code>max_price</code>, <code>spread_price</code>, <code>min_price_hour</code>, <code>max_price_hour</code>, <code>sunrise_hour</code>, <code>sunset_hour</code>.</p>
+        <p>Supported <code>value_ref</code>: <code>min_price</code>, <code>max_price</code>, <code>spread_price</code>, <code>min_price_hour</code>, <code>max_price_hour</code>, <code>max_price_hour_am</code>, <code>max_price_hour_pm</code>, <code>sunrise_hour</code>, <code>sunset_hour</code>.</p>
     </section>
 
     <section>

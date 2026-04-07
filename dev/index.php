@@ -122,6 +122,11 @@ $sections = [
                 'label' => 'Shortwave radiation API',
                 'description' => 'Solar forecast JSON from Open-Meteo, used for PathLab and solar-related testing.',
             ],
+            [
+                'href' => '/daily_report',
+                'label' => 'Daily report',
+                'description' => 'Daily report UI for reviewing the current day energy, battery, grid, and cost summary.',
+            ],
         ],
     ],
 ];

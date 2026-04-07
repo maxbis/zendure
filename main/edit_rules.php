@@ -98,7 +98,8 @@ function validateCondition(array $condition): bool
     ];
     $validOps = ['>', '>=', '<', '<=', '==', '!=', 'in'];
     $validValueRefs = [
-        'min_price', 'max_price', 'min_price_hour', 'max_price_hour', 'spread_price',
+        'min_price', 'max_price', 'min_price_hour', 'max_price_hour',
+        'max_price_hour_am', 'max_price_hour_pm', 'spread_price',
         'sunrise_hour', 'sunset_hour'
     ];
     if (!in_array($field, $validFields, true)) {

@@ -297,6 +297,80 @@ def test_resolver_emits_runtime_condition_metadata(backup_and_restore_price_file
     assert slot["runtime_conditions"][0]["field"] == "electricity_level"
 
 
+def test_resolver_emits_am_pm_max_price_hour_value_refs(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    today_prices = _build_hourly_prices(0.10)
+    tomorrow_prices = _build_hourly_prices(0.20)
+    today_prices["10"] = 0.99
+    today_prices["18"] = 1.23
+    _write_json(_price_file_path(today), today_prices)
+    _write_json(_price_file_path(tomorrow), tomorrow_prices)
+    _write_json(CONDITIONS_FILE, [{"name": "default", "key": "************", "value": 0, "enabled": True}])
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert today_group.get("max_price_hour_am") == 10
+    assert today_group.get("max_price_hour_pm") == 18
+
+
+def test_resolver_hour_conditions_support_am_pm_max_price_value_refs(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    today_prices = _build_hourly_prices(0.10)
+    tomorrow_prices = _build_hourly_prices(0.20)
+    today_prices["10"] = 0.99
+    today_prices["18"] = 1.23
+    _write_json(_price_file_path(today), today_prices)
+    _write_json(_price_file_path(tomorrow), tomorrow_prices)
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "am-max-hour",
+                "key": "************",
+                "value": 111,
+                "conditions": [{"field": "hour", "op": "==", "value_ref": "max_price_hour_am"}],
+                "enabled": True,
+            },
+            {
+                "name": "pm-max-hour",
+                "key": "************",
+                "value": 222,
+                "conditions": [{"field": "hour", "op": "==", "value_ref": "max_price_hour_pm"}],
+                "enabled": True,
+            },
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    by_time = {str(item.get("time")): item for item in today_group.get("items", [])}
+
+    assert by_time["1000"]["value"] == 111
+    assert by_time["1800"]["value"] == 222
+    assert sorted(by_time.keys()) == ["1000", "1800"]
+
+
+def test_resolver_am_pm_max_price_value_refs_use_first_tie_and_allow_null_half_day(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    today_prices = {f"{h:02d}": ("bad" if h >= 12 else 0.10) for h in range(24)}
+    today_prices["09"] = 0.80
+    today_prices["10"] = 0.80
+    _write_json(_price_file_path(today), today_prices)
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(CONDITIONS_FILE, [{"name": "default", "key": "************", "value": 0, "enabled": True}])
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert today_group.get("max_price_hour_am") == 9
+    assert today_group.get("max_price_hour_pm") is None
+
+
 def test_resolver_emits_sun_context_with_expected_rounding(backup_and_restore_price_files):
     today, tomorrow = _today_and_tomorrow_ymd()
     _write_json(_price_file_path(today), _build_hourly_prices(0.10))
