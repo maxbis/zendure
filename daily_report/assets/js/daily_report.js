@@ -200,7 +200,14 @@
             Number(row.grid_from_wh) || 0,
             Number(row.grid_to_wh) || 0
         ]));
-        const costValues = hours.map((row) => Number(row.net_cost)).filter((value) => Number.isFinite(value));
+        let runningNetCost = 0;
+        const cumulativeCostValues = hours.map((row) => {
+            const netCost = Number(row.net_cost);
+            if (!Number.isFinite(netCost)) return null;
+            runningNetCost += netCost;
+            return runningNetCost;
+        });
+        const costValues = cumulativeCostValues.filter((value) => Number.isFinite(value));
         const costMax = Math.max(0.001, ...costValues.map((value) => Math.abs(value)), 0.001);
 
         const lines = [];
@@ -221,7 +228,7 @@
             const discharge = Number(row.discharged_wh) || 0;
             const gridFrom = Number(row.grid_from_wh) || 0;
             const gridTo = Number(row.grid_to_wh) || 0;
-            const netCost = Number(row.net_cost);
+            const cumulativeNetCost = cumulativeCostValues[index];
 
             const chargeHeight = (charge / energyMax) * (plotHeight * 0.42);
             const dischargeHeight = (discharge / energyMax) * (plotHeight * 0.42);
@@ -233,8 +240,8 @@
             bars.push(rect(xBase + ((barWidth + 2) * 2), baseline - fromHeight, barWidth, fromHeight, palette.gridFrom));
             bars.push(rect(xBase + ((barWidth + 2) * 3), baseline, barWidth, toHeight, palette.gridTo));
 
-            if (Number.isFinite(netCost)) {
-                const costY = margin.top + (plotHeight * 0.18) - ((netCost / costMax) * (plotHeight * 0.12));
+            if (Number.isFinite(cumulativeNetCost)) {
+                const costY = margin.top + (plotHeight * 0.18) - ((cumulativeNetCost / costMax) * (plotHeight * 0.12));
                 costPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${costY.toFixed(2)}`);
             }
 
@@ -246,12 +253,12 @@
             ${lines.join('')}
             <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
             ${bars.join('')}
-            ${costPoints.length > 1 ? `<polyline points="${costPoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+            ${costPoints.length > 1 ? `<polyline points="${costPoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
             ${labels.join('')}
             <text x="${margin.left}" y="${(margin.top - 6).toFixed(2)}" fill="${palette.textSoft}" font-size="12">Above baseline: charge/import | below baseline: discharge/export</text>
         `;
         chartWrapEl.hidden = false;
-        setStatus('Hourly energy and net cost view.');
+        setStatus('Hourly energy and cumulative net cost view.');
     }
 
     async function loadReport(date) {

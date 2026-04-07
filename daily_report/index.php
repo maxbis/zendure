@@ -92,7 +92,7 @@ if ($requestedDate === '') {
                     <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
                     <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
                     <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
-                    <span><i class="legend-swatch legend-swatch--line"></i>Net cost</span>
+                    <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
                 </div>
             </div>
             <div class="chart-status" data-role="chart-status">Loading report...</div>
