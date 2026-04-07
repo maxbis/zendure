@@ -6,6 +6,7 @@ daily_report_bootstrap_env();
 
 /** Absolute path to daily_report/tools/hourly_daily_grid_battery_report.py */
 define('DAILY_REPORT_GENERATOR_SCRIPT', dirname(__DIR__) . '/tools/hourly_daily_grid_battery_report.py');
+define('DAILY_REPORT_ROOT', dirname(__DIR__));
 
 date_default_timezone_set('Europe/Amsterdam');
 
@@ -19,15 +20,32 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Method not allowed. Use GET.'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo dailyReportJsonEncode(['success' => false, 'error' => 'Method not allowed. Use GET.']);
     exit();
 }
 
 try {
-    echo json_encode(buildDailyReportPayload(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo dailyReportJsonEncode(buildDailyReportPayload());
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo dailyReportJsonEncode(['success' => false, 'error' => $e->getMessage()]);
+}
+
+/**
+ * @param array<string, mixed> $data
+ */
+function dailyReportJsonEncode(array $data): string
+{
+    $flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+    $json = json_encode($data, $flags);
+    if ($json === false) {
+        $fallback = json_encode(
+            ['success' => false, 'error' => 'JSON encoding failed: ' . json_last_error_msg()],
+            $flags
+        );
+        return $fallback !== false ? $fallback : '{"success":false,"error":"JSON encoding failed"}';
+    }
+    return $json;
 }
 
 function buildDailyReportPayload(): array
@@ -78,12 +96,28 @@ function requestDate(DateTimeZone $tz): string
     return $date;
 }
 
+function dailyReportDataRoot(): string
+{
+    $fromEnv = getenv('DAILY_REPORT_DATA_DIR');
+    if (!is_string($fromEnv)) {
+        return DAILY_REPORT_ROOT . '/data';
+    }
+    $trimmed = trim($fromEnv);
+    if ($trimmed === '') {
+        return DAILY_REPORT_ROOT . '/data';
+    }
+    if ($trimmed[0] === '/' || (strlen($trimmed) > 1 && ($trimmed[1] === ':' || $trimmed[0] === '\\'))) {
+        return rtrim(str_replace('\\', DIRECTORY_SEPARATOR, $trimmed), '/\\');
+    }
+    return rtrim(DAILY_REPORT_ROOT . DIRECTORY_SEPARATOR . $trimmed, '/\\');
+}
+
 function buildReportPath(string $date): string
 {
-    $root = dirname(__DIR__);
+    $root = dailyReportDataRoot();
     $yyyymm = str_replace('-', '', substr($date, 0, 7));
     $yyyymmdd = str_replace('-', '', $date);
-    return $root . '/data/' . $yyyymm . '/daily_report_' . $yyyymmdd . '.json';
+    return $root . '/' . $yyyymm . '/daily_report_' . $yyyymmdd . '.json';
 }
 
 function generateAndSaveReport(string $date, string $outputPath): void
@@ -94,13 +128,39 @@ function generateAndSaveReport(string $date, string $outputPath): void
     }
 
     $outputDir = dirname($outputPath);
-    if (!is_dir($outputDir) && !mkdir($outputDir, 0777, true) && !is_dir($outputDir)) {
-        throw new RuntimeException('Failed to create report output directory.');
+    if (!is_dir($outputDir)) {
+        $created = @mkdir($outputDir, 0755, true);
+        if (!$created && !is_dir($outputDir)) {
+            $phpUser = null;
+            if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+                $pw = posix_getpwuid(posix_geteuid());
+                $phpUser = is_array($pw) ? ($pw['name'] ?? null) : null;
+            }
+            $hint = 'Set DAILY_REPORT_DATA_DIR in daily_report/.env to an absolute path writable by PHP';
+            if ($phpUser) {
+                $hint .= ' (e.g. www-data), or create the directory and chown/chmod it for that user';
+            } else {
+                $hint .= ', or fix ownership on the data directory';
+            }
+            throw new RuntimeException(
+                'Cannot create report directory: ' . $outputDir . '. ' . $hint . '.'
+            );
+        }
+    }
+    if (!is_writable($outputDir)) {
+        throw new RuntimeException('Report directory is not writable: ' . $outputDir . '.');
+    }
+
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    if (in_array('exec', $disabled, true)) {
+        throw new RuntimeException(
+            'PHP exec() is disabled (php.ini disable_functions). Remove exec from that list, or generate reports via cron/CLI.'
+        );
     }
 
     $pythonBin = getenv('PYTHON_BIN');
     if (!is_string($pythonBin) || trim($pythonBin) === '') {
-        $pythonBin = 'python';
+        $pythonBin = 'python3';
     }
 
     $command = escapeshellarg($pythonBin)
@@ -112,10 +172,14 @@ function generateAndSaveReport(string $date, string $outputPath): void
     $outputLines = [];
     $exitCode = 0;
     exec($command, $outputLines, $exitCode);
+
     if ($exitCode !== 0) {
         $message = trim(implode("\n", $outputLines));
         if ($message === '') {
-            $message = 'Unknown error while generating daily report.';
+            $message = 'Report generator exited with code ' . $exitCode . ' and no output.';
+        }
+        if ($exitCode === 127 || stripos($message, 'No such file') !== false || stripos($message, 'not found') !== false) {
+            $message .= ' Hint: set PYTHON_BIN in daily_report/.env to the full path (e.g. /usr/bin/python3).';
         }
         throw new RuntimeException($message);
     }
