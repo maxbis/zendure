@@ -61,6 +61,38 @@
     gap: 8px;
 }
 
+/* Whole-card refresh indicator (replaces hiding the refresh button during auto-refresh) */
+[data-component="automation-status"] {
+    position: relative;
+}
+
+[data-component="automation-status"].automation-status--refreshing {
+    animation: automationStatusRefreshGlow 0.8s ease-in-out infinite;
+}
+
+@keyframes automationStatusRefreshGlow {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 1px rgba(100, 181, 246, 0.45),
+            0 2px 16px rgba(100, 181, 246, 0.12);
+    }
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(100, 181, 246, 0.7),
+            0 6px 32px rgba(100, 181, 246, 0.28);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-component="automation-status"].automation-status--refreshing {
+        animation: none;
+        box-shadow:
+            0 0 0 1px rgba(100, 181, 246, 0.55),
+            0 4px 24px rgba(100, 181, 246, 0.2);
+    }
+}
+
 .automation-control-link {
     display: inline-flex;
     align-items: center;
@@ -393,6 +425,24 @@ body.mobile-dark .automation-refresh-btn {
 body.mobile-dark .automation-control-link {
     color: var(--text-tertiary);
     opacity: 0.72;
+}
+
+body.mobile-dark [data-component="automation-status"].automation-status--refreshing {
+    animation: automationStatusRefreshGlowDark 1.1s ease-in-out infinite;
+}
+
+@keyframes automationStatusRefreshGlowDark {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 1px rgba(127, 200, 255, 0.55),
+            0 2px 20px rgba(100, 181, 246, 0.18);
+    }
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(127, 200, 255, 0.95),
+            0 8px 40px rgba(100, 181, 246, 0.4);
+    }
 }
 
 body.mobile-dark .automation-control-link:hover,

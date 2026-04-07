@@ -103,16 +103,70 @@ function maybeRefreshScheduleData() {
 }
 
 /**
- * Hide the refresh button temporarily to indicate auto-refresh is happening
+ * Legacy hook kept for callers; refresh UI is tied to refreshStatus() lifecycle.
  */
-function indicateAutoRefresh() {
-    const refreshBtn = document.getElementById('automation-refresh-btn');
-    if (refreshBtn) {
-        // Hide button for 1 second (button uses inline-flex in CSS)
-        refreshBtn.style.display = 'none';
-        setTimeout(() => {
-            refreshBtn.style.display = 'inline-flex';
-        }, 1000);
+function indicateAutoRefresh() {}
+
+/** Nested refreshStatus calls (e.g. overlapping timers). */
+let automationStatusRefreshDepth = 0;
+/** When depth went from 0 → 1 for the current wave (for minimum visible time). */
+let automationStatusRefreshWaveStart = 0;
+let automationStatusRefreshEndTimer = null;
+
+/**
+ * Keep the refresh look on screen at least this long so CSS animations can read
+ * (fetches often finish in under 300ms, which otherwise removes the class instantly).
+ */
+const AUTOMATION_STATUS_REFRESH_MIN_VISIBLE_MS = 1100;
+
+function setAutomationStatusRefreshingOnDom(isActive) {
+    const card = document.querySelector('[data-component="automation-status"]');
+    const btn = document.getElementById('automation-refresh-btn');
+    if (card) {
+        card.classList.toggle('automation-status--refreshing', isActive);
+    }
+    if (btn) {
+        btn.classList.toggle('refreshing', isActive);
+        if (isActive) {
+            btn.setAttribute('aria-busy', 'true');
+        } else {
+            btn.removeAttribute('aria-busy');
+        }
+    }
+}
+
+function beginAutomationStatusRefreshUi() {
+    if (automationStatusRefreshEndTimer !== null) {
+        clearTimeout(automationStatusRefreshEndTimer);
+        automationStatusRefreshEndTimer = null;
+    }
+    automationStatusRefreshDepth += 1;
+    if (automationStatusRefreshDepth === 1) {
+        automationStatusRefreshWaveStart = Date.now();
+        setAutomationStatusRefreshingOnDom(true);
+    }
+}
+
+function endAutomationStatusRefreshUi() {
+    automationStatusRefreshDepth = Math.max(0, automationStatusRefreshDepth - 1);
+    if (automationStatusRefreshDepth !== 0) {
+        return;
+    }
+    const elapsed = Date.now() - automationStatusRefreshWaveStart;
+    const waitMs = Math.max(0, AUTOMATION_STATUS_REFRESH_MIN_VISIBLE_MS - elapsed);
+
+    const finish = () => {
+        automationStatusRefreshEndTimer = null;
+        if (automationStatusRefreshDepth !== 0) {
+            return;
+        }
+        setAutomationStatusRefreshingOnDom(false);
+    };
+
+    if (waitMs > 0) {
+        automationStatusRefreshEndTimer = setTimeout(finish, waitMs);
+    } else {
+        finish();
     }
 }
 
@@ -218,6 +272,8 @@ function normalizeChargeStatusAll(allData) {
  * This unified function updates all three sections in one go
  */
 async function refreshStatus(isAutoRefresh = false) {
+    beginAutomationStatusRefreshUi();
+    try {
     // Log refresh operation
     if (DEBUG_MODE) {
         console.log('🔄 Refreshing all status sections...', isAutoRefresh ? '(Auto-refresh)' : '(Manual)');
@@ -335,6 +391,9 @@ async function refreshStatus(isAutoRefresh = false) {
 
     const timestamp = new Date().toLocaleTimeString();
     console.log(`✅ Refresh completed [${timestamp}]`);
+    } finally {
+        endAutomationStatusRefreshUi();
+    }
 }
 
 // ─── Pending power state ────────────────────────────────────────────────────
@@ -552,7 +611,6 @@ function startAutoRefresh() {
                     console.log('⏱️ Fast auto-refresh tick ' + (BOOST_TICK_COUNT - remainingBoostTicks + 1) + '/' + BOOST_TICK_COUNT);
                 }
 
-                indicateAutoRefresh();
                 refreshStatus(true);
                 maybeRefreshScheduleData();
 
@@ -592,7 +650,6 @@ function restartFastRefreshBurst(immediateRefresh = false) {
     }
 
     if (immediateRefresh && typeof refreshStatus === 'function') {
-        indicateAutoRefresh();
         refreshStatus(true);
         maybeRefreshScheduleData();
     }

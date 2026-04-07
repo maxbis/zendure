@@ -143,7 +143,16 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
 ?>
 <div class="layout">
 <div class="card schedule-mobile-card">
-    <h3 class="card-header">Schedule</h3>
+    <div class="schedule-mobile-card__title-row">
+        <h3 class="card-header schedule-mobile-card__heading">Schedule</h3>
+        <label class="schedule-mobile-card__show-toggle" title="Show or hide this panel. Saved in this browser only.">
+            <input type="checkbox" class="schedule-mobile-card__show-toggle-input" data-role="schedule-show-toggle" checked
+                aria-label="Show schedule panel" />
+            <span class="schedule-mobile-card__show-track" aria-hidden="true"><span class="schedule-mobile-card__show-thumb"></span></span>
+            <span class="schedule-mobile-card__show-text">Show</span>
+        </label>
+    </div>
+    <div class="schedule-mobile-card__body" data-role="schedule-panel-body">
     <div class="schedule-mobile-tabs" role="tablist">
         <button type="button" class="schedule-mobile-tab active" data-tab="schedule" role="tab" aria-selected="true">Schedule</button>
         <button type="button" class="schedule-mobile-tab" data-tab="entries" role="tab" aria-selected="false">Entries</button>
@@ -343,11 +352,53 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
             </div>
         </div>
     </div>
+    </div>
 </div>
 <script>
 window.SCHEDULE_RULE_COLOR_MAP = <?php echo json_encode($scheduleRuleColorMap, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
 
 (function() {
+    var SCHEDULE_PANEL_LS = 'zendure_charge_schedule_panel_show';
+
+    function readSchedulePanelShow() {
+        try {
+            var v = localStorage.getItem(SCHEDULE_PANEL_LS);
+            if (v === null) {
+                return true;
+            }
+            return v !== '0' && v !== 'false';
+        } catch (e) {
+            return true;
+        }
+    }
+
+    function writeSchedulePanelShow(on) {
+        try {
+            localStorage.setItem(SCHEDULE_PANEL_LS, on ? '1' : '0');
+        } catch (e) {}
+    }
+
+    (function initSchedulePanelShowToggle() {
+        var card = document.querySelector('.schedule-mobile-card');
+        if (!card) {
+            return;
+        }
+        var body = card.querySelector('[data-role="schedule-panel-body"]');
+        var input = card.querySelector('[data-role="schedule-show-toggle"]');
+        if (!body || !input) {
+            return;
+        }
+        var show = readSchedulePanelShow();
+        input.checked = show;
+        body.hidden = !show;
+
+        input.addEventListener('change', function() {
+            var on = !!input.checked;
+            body.hidden = !on;
+            writeSchedulePanelShow(on);
+        });
+    })();
+
     var tabs = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab');
     var panels = document.querySelectorAll('.schedule-mobile-card .schedule-mobile-tab-panel');
     var rulesApiUrl = 'edit_rules.php?api=1';

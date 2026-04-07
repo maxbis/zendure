@@ -1231,6 +1231,90 @@ body.mobile-dark {
     font-style: italic;
 }
 
+/* Schedule card: title row + Show toggle (visibility only; preference in localStorage) */
+.schedule-mobile-card__title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.schedule-mobile-card__heading {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.schedule-mobile-card__show-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    flex: 0 0 auto;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary, #8a9baa);
+}
+
+.schedule-mobile-card__show-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.schedule-mobile-card__show-track {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    transition: background 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.schedule-mobile-card__show-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-primary, #e8eef5);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.schedule-mobile-card__show-toggle-input:focus-visible + .schedule-mobile-card__show-track {
+    outline: 2px solid var(--accent-color, #64b5f6);
+    outline-offset: 2px;
+}
+
+.schedule-mobile-card__show-toggle-input:checked + .schedule-mobile-card__show-track {
+    background: rgba(100, 181, 246, 0.25);
+    border-color: rgba(100, 181, 246, 0.45);
+}
+
+.schedule-mobile-card__show-toggle-input:checked + .schedule-mobile-card__show-track .schedule-mobile-card__show-thumb {
+    transform: translateX(16px);
+    background: var(--accent-color, #64b5f6);
+}
+
+.schedule-mobile-card__show-toggle-input:not(:checked) ~ .schedule-mobile-card__show-text {
+    opacity: 0.65;
+}
+
+.schedule-mobile-card__body[hidden] {
+    display: none !important;
+}
+
 /* Schedule Mobile Card - Tabs (Schedule | Schedule entries) */
 .schedule-mobile-card .schedule-mobile-tabs {
     display: flex;

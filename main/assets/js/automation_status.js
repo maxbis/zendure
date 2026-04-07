@@ -10,11 +10,6 @@ async function performNormalRefresh() {
     const refreshBtn = document.getElementById('automation-refresh-btn');
     if (!refreshBtn) return;
 
-    // Hide button for 1 second (same as auto-refresh)
-    if (typeof indicateAutoRefresh === 'function') {
-        indicateAutoRefresh();
-    }
-
     refreshBtn.disabled = true;
     refreshBtn.style.opacity = '0.5';
 

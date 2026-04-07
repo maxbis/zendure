@@ -178,6 +178,17 @@
         return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${Math.max(0, height).toFixed(2)}" fill="${fill}" rx="3"></rect>`;
     }
 
+    function formatAxisWh(value) {
+        if (!Number.isFinite(value)) return '--';
+        return `${Math.round(value)} Wh`;
+    }
+
+    function formatAxisEur(value) {
+        if (!Number.isFinite(value)) return '--';
+        const prefix = value > 0 ? '+' : '';
+        return `${prefix}${value.toFixed(2)} EUR`;
+    }
+
     function buildChart(hours) {
         if (!chartEl || !chartWrapEl) return;
         if (!Array.isArray(hours) || hours.length === 0) {
@@ -188,7 +199,7 @@
 
         const width = 1200;
         const height = 420;
-        const margin = { top: 20, right: 24, bottom: 70, left: 52 };
+        const margin = { top: 20, right: 90, bottom: 70, left: 76 };
         const plotWidth = width - margin.left - margin.right;
         const plotHeight = height - margin.top - margin.bottom;
         const baseline = margin.top + (plotHeight * 0.58);
@@ -211,14 +222,37 @@
         const costMax = Math.max(0.001, ...costValues.map((value) => Math.abs(value)), 0.001);
 
         const lines = [];
+        const energyAxis = [];
+        const costAxis = [];
         const costPoints = [];
         const labels = [];
         const bars = [];
+        const energyScaleHeight = plotHeight * 0.42;
+        const costZeroY = margin.top + (plotHeight * 0.18);
+        const costScaleHeight = plotHeight * 0.12;
 
         for (let i = 0; i < 5; i += 1) {
             const y = margin.top + (plotHeight * (i / 4));
             lines.push(`<line x1="${margin.left}" y1="${y.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.stroke}" stroke-width="1"></line>`);
         }
+
+        [-1, -0.5, 0, 0.5, 1].forEach((ratio) => {
+            const value = energyMax * ratio;
+            const y = baseline - (ratio * energyScaleHeight);
+            energyAxis.push(`
+                <line x1="${(margin.left - 5).toFixed(2)}" y1="${y.toFixed(2)}" x2="${margin.left.toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1"></line>
+                <text x="${(margin.left - 9).toFixed(2)}" y="${(y + 4).toFixed(2)}" fill="${palette.textMuted}" font-size="10" text-anchor="end">${escapeHtml(formatAxisWh(value))}</text>
+            `);
+        });
+
+        [-1, -0.5, 0, 0.5, 1].forEach((ratio) => {
+            const value = costMax * ratio;
+            const y = costZeroY - (ratio * costScaleHeight);
+            costAxis.push(`
+                <line x1="${(margin.left + plotWidth).toFixed(2)}" y1="${y.toFixed(2)}" x2="${(margin.left + plotWidth + 5).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.cost}" stroke-width="1"></line>
+                <text x="${(margin.left + plotWidth + 9).toFixed(2)}" y="${(y + 4).toFixed(2)}" fill="${palette.cost}" font-size="10" text-anchor="start">${escapeHtml(formatAxisEur(value))}</text>
+            `);
+        });
 
         hours.forEach((row, index) => {
             const xBase = margin.left + (index * slotWidth);
@@ -230,10 +264,10 @@
             const gridTo = Number(row.grid_to_wh) || 0;
             const cumulativeNetCost = cumulativeCostValues[index];
 
-            const chargeHeight = (charge / energyMax) * (plotHeight * 0.42);
-            const dischargeHeight = (discharge / energyMax) * (plotHeight * 0.42);
-            const fromHeight = (gridFrom / energyMax) * (plotHeight * 0.42);
-            const toHeight = (gridTo / energyMax) * (plotHeight * 0.42);
+            const chargeHeight = (charge / energyMax) * energyScaleHeight;
+            const dischargeHeight = (discharge / energyMax) * energyScaleHeight;
+            const fromHeight = (gridFrom / energyMax) * energyScaleHeight;
+            const toHeight = (gridTo / energyMax) * energyScaleHeight;
 
             bars.push(rect(xBase + 0, baseline - chargeHeight, barWidth, chargeHeight, palette.charge));
             bars.push(rect(xBase + barWidth + 2, baseline, barWidth, dischargeHeight, palette.discharge));
@@ -241,7 +275,7 @@
             bars.push(rect(xBase + ((barWidth + 2) * 3), baseline, barWidth, toHeight, palette.gridTo));
 
             if (Number.isFinite(cumulativeNetCost)) {
-                const costY = margin.top + (plotHeight * 0.18) - ((cumulativeNetCost / costMax) * (plotHeight * 0.12));
+                const costY = costZeroY - ((cumulativeNetCost / costMax) * costScaleHeight);
                 costPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${costY.toFixed(2)}`);
             }
 
@@ -251,11 +285,17 @@
         chartEl.innerHTML = `
             <rect x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}" fill="rgba(255,255,255,0.02)" rx="18"></rect>
             ${lines.join('')}
+            <line x1="${margin.left.toFixed(2)}" y1="${margin.top.toFixed(2)}" x2="${margin.left.toFixed(2)}" y2="${(margin.top + plotHeight).toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1"></line>
+            <line x1="${(margin.left + plotWidth).toFixed(2)}" y1="${margin.top.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${(margin.top + plotHeight).toFixed(2)}" stroke="${palette.cost}" stroke-width="1"></line>
+            ${energyAxis.join('')}
+            ${costAxis.join('')}
             <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
             ${bars.join('')}
             ${costPoints.length > 1 ? `<polyline points="${costPoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
             ${labels.join('')}
             <text x="${margin.left}" y="${(margin.top - 6).toFixed(2)}" fill="${palette.textSoft}" font-size="12">Above baseline: charge/import | below baseline: discharge/export</text>
+            <text x="${margin.left}" y="${(height - 44).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="start">Energy scale</text>
+            <text x="${(margin.left + plotWidth).toFixed(2)}" y="${(height - 44).toFixed(2)}" fill="${palette.cost}" font-size="11" text-anchor="end">Cost scale</text>
         `;
         chartWrapEl.hidden = false;
         setStatus('Hourly energy and cumulative net cost view.');

@@ -4,7 +4,15 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
 ?>
 <div class="shortwave-radiation-block">
     <div class="card shortwave-radiation-card" id="<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?>">
-        <h3 class="card-header">Shortwave Radiation <span class="shortwave-radiation-card__unit">(W/m²)</span></h3>
+        <div class="shortwave-radiation-card__title-row">
+            <h3 class="card-header shortwave-radiation-card__title">Shortwave Radiation <span class="shortwave-radiation-card__unit">(W/m²)</span></h3>
+            <label class="shortwave-radiation-card__toggle" title="When off, Open-Meteo is not contacted and no error is shown.">
+                <input type="checkbox" class="shortwave-radiation-card__toggle-input" data-role="fetch-toggle" checked
+                    aria-label="Fetch shortwave radiation from Open-Meteo" />
+                <span class="shortwave-radiation-card__toggle-track" aria-hidden="true"><span class="shortwave-radiation-card__toggle-thumb"></span></span>
+                <span class="shortwave-radiation-card__toggle-text">Show</span>
+            </label>
+        </div>
         <div class="shortwave-radiation-card__status" data-role="status" hidden></div>
         <div class="shortwave-radiation-card__viewport" data-role="viewport" hidden>
             <div class="shortwave-radiation-card__content" data-role="content">
@@ -23,10 +31,88 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
         overflow: hidden;
     }
 
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__title {
+        margin: 0;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
     #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__unit {
         font-size: 0.85rem;
         color: var(--text-tertiary);
         font-weight: 500;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        flex: 0 0 auto;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-tertiary, #8a9baa);
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        pointer-events: none;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-track {
+        position: relative;
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        transition: background 0.15s ease, border-color 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #dfe9f5;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-input:focus-visible + .shortwave-radiation-card__toggle-track {
+        outline: 2px solid rgba(126, 200, 255, 0.85);
+        outline-offset: 2px;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-input:checked + .shortwave-radiation-card__toggle-track {
+        background: rgba(95, 176, 243, 0.35);
+        border-color: rgba(126, 200, 255, 0.45);
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-input:checked + .shortwave-radiation-card__toggle-track .shortwave-radiation-card__toggle-thumb {
+        transform: translateX(16px);
+        background: #7ec8ff;
+    }
+
+    #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__toggle-input:not(:checked) ~ .shortwave-radiation-card__toggle-text {
+        opacity: 0.65;
     }
 
     #<?php echo htmlspecialchars($shortwaveGraphId, ENT_QUOTES, 'UTF-8'); ?> .shortwave-radiation-card__status {
@@ -99,11 +185,72 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
         var contentEl = root.querySelector('[data-role="content"]');
         var chartEl = root.querySelector('[data-role="chart"]');
         var daysEl = root.querySelector('[data-role="days"]');
+        var fetchToggleEl = root.querySelector('[data-role="fetch-toggle"]');
         var apiUrl = <?php echo json_encode($shortwaveApiUrl, JSON_UNESCAPED_SLASHES); ?>;
+        var LS_KEY = 'zendure_shortwave_radiation_live';
         var latestPayload = null;
         var activeRequest = null;
         var hasRenderError = false;
         var resizeRaf = 0;
+
+        function readFetchEnabledFromStorage() {
+            try {
+                var v = localStorage.getItem(LS_KEY);
+                if (v === null) {
+                    return true;
+                }
+                return v !== '0' && v !== 'false';
+            } catch (e) {
+                return true;
+            }
+        }
+
+        function writeFetchEnabledToStorage(on) {
+            try {
+                localStorage.setItem(LS_KEY, on ? '1' : '0');
+            } catch (e) {}
+        }
+
+        var fetchEnabled = readFetchEnabledFromStorage();
+
+        function applyFetchDisabledQuiet() {
+            fetchEnabled = false;
+            latestPayload = null;
+            hasRenderError = false;
+            if (statusEl) {
+                statusEl.textContent = '';
+                statusEl.classList.remove('is-error');
+                statusEl.hidden = true;
+            }
+            if (viewportEl) viewportEl.hidden = true;
+            if (chartEl) {
+                chartEl.innerHTML = '';
+                chartEl.hidden = true;
+            }
+            if (daysEl) daysEl.hidden = true;
+            if (contentEl) {
+                contentEl.style.width = '';
+                contentEl.style.minWidth = '';
+            }
+        }
+
+        function applyFetchEnabledFromUi() {
+            fetchEnabled = !!(fetchToggleEl && fetchToggleEl.checked);
+            writeFetchEnabledToStorage(fetchEnabled);
+            if (!fetchEnabled) {
+                applyFetchDisabledQuiet();
+            } else {
+                refreshShortwaveRadiationGraph({ force: true }).catch(function() {
+                    return null;
+                });
+            }
+        }
+
+        if (fetchToggleEl) {
+            fetchToggleEl.checked = readFetchEnabledFromStorage();
+            fetchEnabled = !!fetchToggleEl.checked;
+            fetchToggleEl.addEventListener('change', applyFetchEnabledFromUi);
+        }
 
         function escapeHtml(value) {
             return String(value)
@@ -344,6 +491,10 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
         function refreshShortwaveRadiationGraph(options) {
             options = options || {};
 
+            if (!fetchEnabled) {
+                return Promise.resolve();
+            }
+
             if (activeRequest) {
                 return activeRequest;
             }
@@ -354,9 +505,15 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
 
             activeRequest = fetchPayload()
                 .then(function(payload) {
+                    if (!fetchEnabled) {
+                        return;
+                    }
                     render(payload);
                 })
                 .catch(function(error) {
+                    if (!fetchEnabled) {
+                        return;
+                    }
                     hasRenderError = true;
                     setStatus(error && error.message ? error.message : 'Failed to load shortwave radiation.', true);
                     console.warn('Shortwave radiation refresh failed:', error);
@@ -379,9 +536,13 @@ $shortwaveApiUrl = 'api/shortwave_radiation_api.php';
 
         window.refreshShortwaveRadiationGraph = refreshShortwaveRadiationGraph;
 
-        refreshShortwaveRadiationGraph({ force: true }).catch(function() {
-            return null;
-        });
+        if (fetchEnabled) {
+            refreshShortwaveRadiationGraph({ force: true }).catch(function() {
+                return null;
+            });
+        } else {
+            applyFetchDisabledQuiet();
+        }
 
         window.addEventListener('resize', queueResizeRender);
     })();
