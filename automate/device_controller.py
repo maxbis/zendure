@@ -577,7 +577,26 @@ class AutomateController(BaseDeviceController):
         else:
             self.limit_state = 0
 
-    def _send_power_feed(self, power_feed: int) -> Tuple[bool, Optional[str], int]:
+    @staticmethod
+    def _extract_live_power_feed(zendure_data: Optional[dict]) -> Optional[int]:
+        """Return signed live power from a Zendure snapshot when limits are available."""
+        if not isinstance(zendure_data, dict):
+            return None
+        props = zendure_data.get("properties", {})
+        if not isinstance(props, dict):
+            return None
+
+        input_limit = props.get("inputLimit")
+        output_limit = props.get("outputLimit")
+        try:
+            live_input = int(input_limit)
+            live_output = int(output_limit)
+        except (TypeError, ValueError):
+            return None
+
+        return live_output - live_input
+
+    def _send_power_feed(self, power_feed: int, zendure_data: Optional[dict] = None) -> Tuple[bool, Optional[str], int]:
         """
         Send power_feed value to Zendure device via /properties/write endpoint.
 
@@ -625,11 +644,24 @@ class AutomateController(BaseDeviceController):
             )
             power_feed = self.max_charge_power
 
+        live_power_feed = self._extract_live_power_feed(zendure_data)
+
         # Check if the new power value is the same as the previous one
         if self.previous_power is not None and power_feed == self.previous_power:
-            self.log('debug', f"Power value unchanged ({power_feed} W), skipping device update")
-            # Still accumulate since power is being maintained (operation is successful)
-            return (True, None, power_feed)
+            if live_power_feed is None or live_power_feed == power_feed:
+                self.log('debug', f"Power value unchanged ({power_feed} W), skipping device update")
+                # Still accumulate since power is being maintained (operation is successful)
+                return (True, None, power_feed)
+
+            props = zendure_data.get("properties", {}) if isinstance(zendure_data, dict) else {}
+            live_input = props.get("inputLimit")
+            live_output = props.get("outputLimit")
+            self.log(
+                'warning',
+                f"Stale device state detected for dedupe: requested={power_feed} W, previous={self.previous_power} W, "
+                f"live={live_power_feed} W, inputLimit={live_input}, outputLimit={live_output}; resending command",
+                message_key='stale_device_state_detected',
+            )
 
         url = f"http://{self.device_ip}/properties/write"
 
@@ -1207,7 +1239,7 @@ class AutomateController(BaseDeviceController):
                 message_key='netzero_target_summary',
             )
 
-        success, error_msg, actual_power = self._send_power_feed(target_power)
+        success, error_msg, actual_power = self._send_power_feed(target_power, zendure_data=zendure_data)
 
         if actual_power != target_power:
             min_power = None

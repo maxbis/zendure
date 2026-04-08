@@ -1667,6 +1667,26 @@ def test_controller_test_mode_skips_duplicate_simulated_send_after_state_update(
     assert any("Power value unchanged (150 W), skipping device update" in msg for _, msg in logs)
 
 
+def test_controller_test_mode_resends_duplicate_when_live_snapshot_disagrees():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.previous_power = -800
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message), kwargs.get("message_key")))
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        -800,
+        zendure_data={"properties": {"inputLimit": 240, "outputLimit": 0, "electricLevel": 100}},
+    )
+
+    assert result.success is True
+    assert result.power == -800
+    assert controller.previous_power == -800
+    assert any(key == "stale_device_state_detected" for _, _, key in logs)
+    assert not any("Power value unchanged (-800 W), skipping device update" in msg for _, msg, _ in logs)
+
+
 def test_schedule_power_bounds_clamp_to_signed_discharge_range():
     device_controller = _import_device_controller_module()
     controller = device_controller.AutomateController.__new__(device_controller.AutomateController)

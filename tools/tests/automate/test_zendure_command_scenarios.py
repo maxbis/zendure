@@ -53,6 +53,28 @@ SCENARIOS = [
         "command": "netzero",
         "p1_total_power": -500,
         "previous_power": 0,
+    },
+    {
+        "name": "slot_1900_forces_export_from_charge_request",
+        "command": "netzero",
+        "p1_total_power": -23,
+        "previous_power": 231,
+        "config": {
+            "NETZERO_TARGET_W": -20,
+        },
+        "schedule_entry": {
+            "time": "1900",
+            "key": "202604081900",
+            "min_power": -1200,
+            "max_power": -800,
+        },
+        "zendure_data": {
+            "properties": {
+                "inputLimit": 228,
+                "outputLimit": 0,
+                "electricLevel": 95,
+            }
+        },
     }
 ]
 
@@ -69,7 +91,10 @@ def _make_scenario_controller(device_controller_module):
     controller = device_controller_module.AutomateController.__new__(device_controller_module.AutomateController)
     controller.test_mode = False
     controller.config_path = Path("/tmp/config.jsonc")
-    controller.config = {"NETZERO_BI_DIRECTIONAL": True}
+    controller.config = {
+        "NETZERO_BI_DIRECTIONAL": True,
+        "NETZERO_TARGET_W": 0,
+    }
     controller.previous_power = None
     controller.power_feed_min_threshold = 30
     controller.power_feed_min_delta = 0
@@ -77,6 +102,8 @@ def _make_scenario_controller(device_controller_module):
     controller.limit_state = 0
     controller.min_charge_level = 15
     controller.max_charge_level = 96
+    controller.slow_charge_start_level = None
+    controller.slow_charge_max_power = None
     controller.max_discharge_power = 1200
     controller.max_charge_power = 1200
     controller.device_ip = "127.0.0.1"
@@ -114,6 +141,7 @@ def _make_scenario_controller(device_controller_module):
 def test_print_zendure_api_command_for_scenario(monkeypatch, scenario):
     device_controller = _import_device_controller_module()
     controller = _make_scenario_controller(device_controller)
+    controller.config.update(scenario.get("config", {}))
     controller.previous_power = scenario.get("previous_power")
     sent_requests = []
 
@@ -144,11 +172,13 @@ def test_print_zendure_api_command_for_scenario(monkeypatch, scenario):
         "zendure_data",
         {"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
     )
+    schedule_entry = scenario.get("schedule_entry")
 
     result = device_controller.AutomateController.set_power(
         controller,
         command,
         p1_data=p1_data,
+        schedule_entry=schedule_entry,
         zendure_data=zendure_data,
     )
 
@@ -165,3 +195,96 @@ def test_print_zendure_api_command_for_scenario(monkeypatch, scenario):
 
     # assert result.success is True
     # assert len(sent_requests) == 1
+
+
+def test_netzero_schedule_bounds_force_export_from_charge_request():
+    device_controller = _import_device_controller_module()
+    controller = _make_scenario_controller(device_controller)
+    controller.config.update({"NETZERO_TARGET_W": -20})
+    controller.previous_power = 231
+
+    target_power = device_controller.AutomateController._resolve_power_target(
+        controller,
+        "netzero",
+        p1_data={"total_power": -23},
+        schedule_entry={
+            "time": "1900",
+            "key": "202604081900",
+            "min_power": -1200,
+            "max_power": -800,
+        },
+        zendure_data={
+            "properties": {
+                "inputLimit": 228,
+                "outputLimit": 0,
+                "electricLevel": 95,
+            }
+        },
+        p1_source="mqtt",
+    )
+
+    runtime_context = controller._get_dynamic_power_context()
+
+    assert runtime_context["adjusted_p1_power"] == -3
+    assert runtime_context["current_input"] == 228
+    assert runtime_context["raw_power"] == 231
+    assert runtime_context["bounded_power"] == -800
+    assert runtime_context["final_power"] == 115
+    assert target_power == 115
+
+
+def test_set_power_resends_when_snapshot_contradicts_previous_power(monkeypatch):
+    device_controller = _import_device_controller_module()
+    controller = _make_scenario_controller(device_controller)
+    controller.config.update({"NETZERO_TARGET_W": -20})
+    controller.previous_power = -800
+    controller.power_feed_max_delta = 400
+    sent_requests = []
+    logs = []
+    controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message), kwargs.get("message_key")))
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"success": True}
+
+    def _fake_post(url, json, timeout, headers):
+        sent_requests.append(
+            {
+                "url": url,
+                "json": json,
+                "timeout": timeout,
+                "headers": headers,
+            }
+        )
+        return _Response()
+
+    monkeypatch.setattr(device_controller.requests, "post", _fake_post)
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        "netzero",
+        p1_data={"total_power": 980},
+        schedule_entry={
+            "time": "1900",
+            "key": "202604081900",
+            "min_power": -1200,
+            "max_power": -800,
+        },
+        zendure_data={
+            "properties": {
+                "inputLimit": 240,
+                "outputLimit": 0,
+                "electricLevel": 100,
+            }
+        },
+        p1_source="mqtt",
+    )
+
+    assert result.success is True
+    assert len(sent_requests) == 1
+    assert sent_requests[0]["json"]["properties"]["acMode"] == 2
+    assert sent_requests[0]["json"]["properties"]["outputLimit"] == 800
+    assert any(key == "stale_device_state_detected" for _, _, key in logs)
