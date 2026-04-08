@@ -376,6 +376,141 @@ def test_run_cycle_skips_control_when_mqtt_is_fresh_without_trigger_or_periodic_
     assert result is True
 
 
+def test_run_cycle_uses_boundary_control_with_fresh_mqtt_without_periodic_due():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: False,
+        is_stale=lambda _seconds: False,
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = ("0900", "100", "rule-a")
+    app._get_active_schedule_slot_signature = lambda: ("1000", "200", "rule-b")
+    app._get_mqtt_p1_data = lambda: {"total_power": -444}
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("HTTP fallback should not run when fresh MQTT data is available for boundary control")
+    )
+    captured = {"calls": 0}
+
+    def _run_pipeline(p1_data):
+        captured["calls"] += 1
+        captured["p1_data"] = p1_data
+        return True
+
+    app._run_full_control_pipeline = _run_pipeline
+
+    result = app._run_cycle()
+
+    assert result is True
+    assert captured["calls"] == 1
+    assert captured["p1_data"] == {"total_power": -444}
+    assert app._last_applied_schedule_slot_signature == ("1000", "200", "rule-b")
+
+
+def test_run_cycle_prefers_single_pipeline_when_mqtt_trigger_and_boundary_coincide():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: True,
+        is_stale=lambda _seconds: False,
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = ("0900", "100", "rule-a")
+    app._get_active_schedule_slot_signature = lambda: ("1000", "200", "rule-b")
+    app._get_mqtt_p1_data = lambda: {"total_power": -555}
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("HTTP fallback should not run when MQTT trigger already provided data")
+    )
+    captured = {"calls": 0}
+
+    def _run_pipeline(p1_data):
+        captured["calls"] += 1
+        captured["p1_data"] = p1_data
+        return True
+
+    app._run_full_control_pipeline = _run_pipeline
+
+    result = app._run_cycle()
+
+    assert result is True
+    assert captured["calls"] == 1
+    assert captured["p1_data"] == {"total_power": -555}
+    assert app._last_applied_schedule_slot_signature == ("1000", "200", "rule-b")
+
+
+def test_run_cycle_does_not_advance_boundary_signature_when_pipeline_fails():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: False,
+        is_stale=lambda _seconds: False,
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = ("0900", "100", "rule-a")
+    app._get_active_schedule_slot_signature = lambda: ("1000", "200", "rule-b")
+    app._get_mqtt_p1_data = lambda: {"total_power": -666}
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("HTTP fallback should not run when fresh MQTT data is available for boundary control")
+    )
+    app._run_full_control_pipeline = lambda _p1_data: False
+
+    result = app._run_cycle()
+
+    assert result is False
+    assert app._last_applied_schedule_slot_signature == ("0900", "100", "rule-a")
+
+
+def test_run_cycle_startup_without_baseline_does_not_trigger_boundary_control():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: False,
+        is_stale=lambda _seconds: False,
+        get_status_snapshot=lambda _seconds: {
+            "last_delta_watts": 1,
+            "last_triggered_change": False,
+            "change_threshold_watts": 25,
+            "total_power": 140,
+        },
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = automate_mqtt._UNKNOWN_SCHEDULE_SLOT_SIGNATURE
+    app._get_active_schedule_slot_signature = lambda: ("1000", "200", "rule-b")
+    app._get_mqtt_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("No control run should request MQTT reading before baseline is established")
+    )
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("No control run should fall back to HTTP before baseline is established")
+    )
+    app._run_full_control_pipeline = lambda _p1_data: (_ for _ in ()).throw(
+        AssertionError("Boundary control should not run before a baseline signature exists")
+    )
+
+    result = app._run_cycle()
+
+    assert result is True
+
+
 def test_log_startup_includes_charge_level_limits():
     automate_mqtt = _import_automate_mqtt_module()
     app = automate_mqtt.AutomationApp()

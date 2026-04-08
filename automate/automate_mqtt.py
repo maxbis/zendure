@@ -31,6 +31,8 @@ from status_updates_store import (
 from power_metere_loader import get_power_meter_reader
 from power_meter_mqtt_subscriber import MqttPowerMeterSubscriber
 
+_UNKNOWN_SCHEDULE_SLOT_SIGNATURE = object()
+
 # ============================================================================
 # CONSTANTS & DEFAULT CONFIG (override via config.jsonc)
 # ============================================================================
@@ -245,6 +247,7 @@ class AutomationApp:
         self._last_p1_read_source = "http"
         self._last_mqtt_status_log_ts = 0.0
         self._last_mqtt_debug_message_ts: Optional[float] = None
+        self._last_applied_schedule_slot_signature: Any = _UNKNOWN_SCHEDULE_SLOT_SIGNATURE
         self.loop_counter = 0
         self.last_retention_cleanup_ts: Optional[int] = None
 
@@ -1154,6 +1157,50 @@ class AutomationApp:
             timestamp=int(time.time()),
         )
 
+    def _get_active_schedule_slot_signature(self) -> Any:
+        """Return a stable signature for the current resolved schedule slot without refreshing."""
+        if self.schedule_controller is None:
+            return None
+        resolved = getattr(self.schedule_controller, "schedule_data", None)
+        if not resolved:
+            return None
+
+        try:
+            current_time_str = self.schedule_controller._get_current_time_str()
+            current_time_int = int(current_time_str)
+        except Exception:
+            return None
+
+        matching_entry = None
+        matching_time = None
+        for entry in resolved:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                entry_time = int(entry.get("time"))
+            except (TypeError, ValueError):
+                continue
+            if entry_time > current_time_int:
+                continue
+            if matching_time is None or entry_time >= matching_time:
+                matching_time = entry_time
+                matching_entry = entry
+
+        if matching_entry is None:
+            return None
+
+        return (
+            str(matching_entry.get("time")),
+            json.dumps(matching_entry.get("value"), sort_keys=True),
+            str(matching_entry.get("key")),
+        )
+
+    def _has_pending_schedule_boundary(self) -> bool:
+        """Return True when the active schedule slot changed since the last successful control run."""
+        if self._last_applied_schedule_slot_signature is _UNKNOWN_SCHEDULE_SLOT_SIGNATURE:
+            return False
+        return self._get_active_schedule_slot_signature() != self._last_applied_schedule_slot_signature
+
     def _run_full_control_pipeline(self, p1_data: Optional[dict]) -> bool:
         """Run the full control flow using the provided P1 reading."""
         self._update_p1_state(p1_data)
@@ -1199,8 +1246,9 @@ class AutomationApp:
         mqtt_changed = bool(mqtt_enabled and self.mqtt_helper.consume_power_change_event())
         mqtt_fresh = bool(mqtt_enabled and not self.mqtt_helper.is_stale(self.mqtt_stale_after_seconds))
         periodic_due = self._should_run_periodic_control()
+        boundary_due = self._has_pending_schedule_boundary()
 
-        if mqtt_enabled and mqtt_fresh and not mqtt_changed and not periodic_due:
+        if mqtt_enabled and mqtt_fresh and not mqtt_changed and not periodic_due and not boundary_due:
             snapshot = self.mqtt_helper.get_status_snapshot(self.mqtt_stale_after_seconds)
             delta_watts = snapshot.get("last_delta_watts")
             last_triggered_change = bool(snapshot.get("last_triggered_change"))
@@ -1212,20 +1260,32 @@ class AutomationApp:
                     message_key="mqtt_delta_below_threshold",
                 )
 
+        if boundary_due:
+            self.logger.debug(
+                "Schedule slot boundary detected; running immediate control pass",
+                message_key="schedule_slot_boundary_due",
+            )
+
+        def _run_pipeline_and_remember(p1_data: Optional[dict]) -> bool:
+            result = self._run_full_control_pipeline(p1_data)
+            if result:
+                self._last_applied_schedule_slot_signature = self._get_active_schedule_slot_signature()
+            return result
+
         if mqtt_changed and mqtt_fresh:
             p1_data = self._get_mqtt_p1_data()
             if p1_data is not None:
-                return self._run_full_control_pipeline(p1_data)
+                return _run_pipeline_and_remember(p1_data)
 
         if not mqtt_fresh:
             p1_data = self._accumulate_p1_data()
-            return self._run_full_control_pipeline(p1_data)
+            return _run_pipeline_and_remember(p1_data)
 
-        if periodic_due:
+        if periodic_due or boundary_due:
             p1_data = self._get_mqtt_p1_data()
             if p1_data is None:
                 p1_data = self._accumulate_p1_data()
-            return self._run_full_control_pipeline(p1_data)
+            return _run_pipeline_and_remember(p1_data)
 
         return True
 
