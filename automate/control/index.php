@@ -111,6 +111,10 @@ foreach ($groupedCommands as $groupKey => $commands) {
       flex-wrap: wrap;
     }
     .control-form {
+      display: grid;
+      gap: 10px;
+    }
+    .control-row {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
@@ -143,12 +147,23 @@ foreach ($groupedCommands as $groupKey => $commands) {
       color: var(--text-tertiary);
       line-height: 1.4;
     }
+    .control-help-inline {
+      margin-top: 0;
+      font-size: 13px;
+      color: var(--text-tertiary);
+      line-height: 1.4;
+      max-width: 520px;
+    }
     .netzero-submit {
       align-self: flex-end;
       min-height: 38px;
       white-space: nowrap;
     }
     @media (max-width: 640px) {
+      .control-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
       .control-input-wrap {
         flex-basis: 100%;
       }
@@ -343,25 +358,30 @@ foreach ($groupedCommands as $groupKey => $commands) {
           <?php endforeach; ?>
 
           <div class="command-group">
-            <div class="command-group-title">Netzero Target</div>
-            <div class="command-group-desc">Set the runtime <code>NETZERO_TARGET_W</code> override and SoC charge limits used by automation.</div>
+            <div class="command-group-title">Runtime Overrides</div>
+            <div class="command-group-desc">Adjust the runtime <code>NETZERO_TARGET_W</code> target and battery charge limits used by automation.</div>
             <div class="control-form">
-              <div class="control-input-wrap">
-                <label class="control-label" for="netzeroTargetInput">Target Watts</label>
-                <input id="netzeroTargetInput" class="control-input" type="number" step="1" inputmode="numeric" placeholder="0">
+              <div class="control-row">
+                <div class="control-input-wrap">
+                  <label class="control-label" for="netzeroTargetInput">Target Watts</label>
+                  <input id="netzeroTargetInput" class="control-input" type="number" step="1" inputmode="numeric" placeholder="0">
+                </div>
+                <button id="netzeroTargetSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Target</button>
               </div>
-              <div class="control-input-wrap">
-                <label class="control-label" for="minChargeLevelInput">Min Charge %</label>
-                <input id="minChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="15">
+              <div class="control-help-inline">Use negative values to prefer export, positive values to prefer import, and <code>0</code> for exact netzero.</div>
+              <div class="control-row">
+                <div class="control-input-wrap">
+                  <label class="control-label" for="minChargeLevelInput">Min Charge %</label>
+                  <input id="minChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="15">
+                </div>
+                <div class="control-input-wrap">
+                  <label class="control-label" for="maxChargeLevelInput">Max Charge %</label>
+                  <input id="maxChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="93">
+                </div>
+                <button id="chargeLevelSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Charge Limits</button>
               </div>
-              <div class="control-input-wrap">
-                <label class="control-label" for="maxChargeLevelInput">Max Charge %</label>
-                <input id="maxChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="93">
-              </div>
-              <button id="netzeroTargetSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Target</button>
-              <button id="chargeLevelSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Charge Limits</button>
             </div>
-            <div class="control-help">Use negative values to prefer export, positive values to prefer import, and <code>0</code> for exact netzero. Charge limits are runtime-only percentages and are normalized so min never exceeds max.</div>
+            <div class="control-help">Charge limits are runtime-only percentages and are normalized so min never exceeds max.</div>
           </div>
         </div>
 
