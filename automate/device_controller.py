@@ -594,7 +594,7 @@ class AutomateController(BaseDeviceController):
         except (TypeError, ValueError):
             return None
 
-        return live_output - live_input
+        return live_input - live_output
 
     def _send_power_feed(self, power_feed: int, zendure_data: Optional[dict] = None) -> Tuple[bool, Optional[str], int]:
         """
