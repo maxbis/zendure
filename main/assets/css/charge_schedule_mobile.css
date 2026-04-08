@@ -2607,6 +2607,36 @@ code {
 
 @media (max-width: 640px) {
     #edit-modal .edit-modal-limits-values {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    #edit-modal .edit-modal-limits-panel {
+        gap: 10px;
+        padding: 12px;
+    }
+
+    #edit-modal .edit-modal-limits-chip {
+        padding: 8px 10px;
+        border-radius: 10px;
+    }
+
+    #edit-modal .edit-modal-limits-chip-value-row {
+        gap: 6px;
+    }
+
+    #edit-modal .edit-modal-limits-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+    }
+
+    #edit-modal .edit-modal-limits-chip strong {
+        font-size: 0.9rem;
+    }
+
+    #edit-modal .power-range-indicator {
+        margin-top: 8px;
+        padding: 9px 10px;
+        font-size: 0.84rem;
     }
 }

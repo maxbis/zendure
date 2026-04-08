@@ -1005,7 +1005,7 @@ function ensurePriceGraphMobilePopup() {
                 </div>
             </div>
             <div class="price-graph-dialog-footer price-graph-mobile-popup-footer">
-                <div style="display:flex; gap:8px; align-items:center;">
+                <div _style="display:flex; gap:8px; align-items:center;" style="display:none;">
                     <button type="button"
                             class="btn btn-outline price-graph-mobile-popup-netzero">
                         🔌&nbsp;netZero
