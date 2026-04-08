@@ -374,3 +374,39 @@ def test_run_cycle_skips_control_when_mqtt_is_fresh_without_trigger_or_periodic_
     result = app._run_cycle()
 
     assert result is True
+
+
+def test_log_startup_includes_charge_level_limits():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+
+    captured: list[str] = []
+    app.logger = SimpleNamespace(
+        info=lambda message, *args, **kwargs: captured.append(str(message)),
+        warning=lambda message, *args, **kwargs: captured.append(str(message)),
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    app.controller = SimpleNamespace(
+        log_level="INFO",
+        config_path=Path("/tmp/config.jsonc"),
+        min_charge_level=15,
+        max_charge_level=93,
+        max_discharge_power=800,
+        max_charge_power=1200,
+        slow_charge_start_level=None,
+        slow_charge_max_power=None,
+        test_mode=False,
+    )
+    app.loop_interval_seconds = 20
+    app.fast_loop_interval_seconds = 2
+    app.api_refresh_interval_seconds = 300
+    app.mqtt_stale_after_seconds = 55
+    app.periodic_control_interval_seconds = 60
+
+    app._log_startup()
+
+    assert any(
+        "Battery SoC limits: MIN_CHARGE_LEVEL=15%, MAX_CHARGE_LEVEL=93%" in message
+        for message in captured
+    )

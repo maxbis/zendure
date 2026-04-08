@@ -2821,6 +2821,87 @@ def test_api_slow_charge_max_power_validation_and_missing_controller():
         runtime.cleanup()
 
 
+def test_api_charge_level_get_and_post_normalizes_values():
+    runtime = _start_test_api_server()
+    try:
+        runtime.controller.min_charge_level = 15
+        runtime.controller.max_charge_level = 93
+
+        get_min_response = requests.get(f"{runtime.base_url}/api/min_charge_level", timeout=2)
+        assert get_min_response.status_code == 200
+        assert get_min_response.json()["minChargeLevel"] == 15
+        assert get_min_response.json()["maxChargeLevel"] == 93
+
+        get_max_response = requests.get(f"{runtime.base_url}/api/max_charge_level", timeout=2)
+        assert get_max_response.status_code == 200
+        assert get_max_response.json()["minChargeLevel"] == 15
+        assert get_max_response.json()["maxChargeLevel"] == 93
+
+        post_min_response = requests.post(f"{runtime.base_url}/api/min_charge_level?value=93", timeout=2)
+        assert post_min_response.status_code == 200
+        assert post_min_response.json()["minChargeLevel"] == 93
+        assert post_min_response.json()["maxChargeLevel"] == 93
+        assert runtime.controller.min_charge_level == 93
+        assert runtime.controller.max_charge_level == 93
+
+        post_max_response = requests.post(f"{runtime.base_url}/api/max_charge_level?value=20", timeout=2)
+        assert post_max_response.status_code == 200
+        assert post_max_response.json()["minChargeLevel"] == 20
+        assert post_max_response.json()["maxChargeLevel"] == 20
+        assert runtime.controller.min_charge_level == 20
+        assert runtime.controller.max_charge_level == 20
+        assert runtime.events["controller_logs"][-1][0] == "info"
+        assert "MIN_CHARGE_LEVEL 93 -> 20%" in runtime.events["controller_logs"][-1][1]
+        assert "MAX_CHARGE_LEVEL 93 -> 20%" in runtime.events["controller_logs"][-1][1]
+
+        clamp_min_response = requests.post(f"{runtime.base_url}/api/min_charge_level?value=150", timeout=2)
+        assert clamp_min_response.status_code == 200
+        assert clamp_min_response.json()["minChargeLevel"] == 100
+        assert clamp_min_response.json()["maxChargeLevel"] == 100
+        assert runtime.controller.min_charge_level == 100
+        assert runtime.controller.max_charge_level == 100
+
+        clamp_max_response = requests.post(f"{runtime.base_url}/api/max_charge_level?value=-10", timeout=2)
+        assert clamp_max_response.status_code == 200
+        assert clamp_max_response.json()["minChargeLevel"] == 0
+        assert clamp_max_response.json()["maxChargeLevel"] == 0
+        assert runtime.controller.min_charge_level == 0
+        assert runtime.controller.max_charge_level == 0
+    finally:
+        runtime.cleanup()
+
+
+def test_api_charge_level_validation_and_missing_controller():
+    runtime = _start_test_api_server()
+    try:
+        missing_min_value = requests.post(f"{runtime.base_url}/api/min_charge_level", timeout=2)
+        assert missing_min_value.status_code == 400
+
+        invalid_min_value = requests.post(f"{runtime.base_url}/api/min_charge_level?value=abc", timeout=2)
+        assert invalid_min_value.status_code == 400
+
+        missing_max_value = requests.post(f"{runtime.base_url}/api/max_charge_level", timeout=2)
+        assert missing_max_value.status_code == 400
+
+        invalid_max_value = requests.post(f"{runtime.base_url}/api/max_charge_level?value=abc", timeout=2)
+        assert invalid_max_value.status_code == 400
+
+        runtime.server.controller = None
+        missing_controller_get_min = requests.get(f"{runtime.base_url}/api/min_charge_level", timeout=2)
+        assert missing_controller_get_min.status_code == 503
+
+        missing_controller_post_min = requests.post(f"{runtime.base_url}/api/min_charge_level?value=25", timeout=2)
+        assert missing_controller_post_min.status_code == 503
+
+        missing_controller_get_max = requests.get(f"{runtime.base_url}/api/max_charge_level", timeout=2)
+        assert missing_controller_get_max.status_code == 503
+
+        missing_controller_post_max = requests.post(f"{runtime.base_url}/api/max_charge_level?value=80", timeout=2)
+        assert missing_controller_post_max.status_code == 503
+    finally:
+        runtime.cleanup()
+
+
 def test_standby_check_sends_standby_only_once_per_zero_period(monkeypatch):
     automate_www = _import_automate_www_module()
     app = automate_www.AutomationApp()

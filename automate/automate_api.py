@@ -36,6 +36,8 @@ API_PATH_PAUSE = "/api/pause"
 API_PATH_LOG_LEVEL = "/api/loglevel"
 API_PATH_SLOW_CHARGE_MAX_POWER = "/api/slow_charge_max_power"
 API_PATH_NETZERO_TARGET_W = "/api/netzero_target_w"
+API_PATH_MIN_CHARGE_LEVEL = "/api/min_charge_level"
+API_PATH_MAX_CHARGE_LEVEL = "/api/max_charge_level"
 
 TEST_ENDPOINTS = [
     {"path": API_PATH_TEST, "optional_params": []},
@@ -52,6 +54,8 @@ TEST_ENDPOINTS = [
     {"path": API_PATH_LOG_LEVEL, "optional_params": [{"name": "level", "alt": "loglevel|log_level", "type": "string", "allowed": ["DEBUG", "INFO", "WARNING", "ERROR"], "description": "POST only: set runtime log level"}]},
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "optional_params": [{"name": "value", "type": "int", "min": 0, "description": "POST only: set runtime slow-charge max power; must be between 0 and MAX_CHARGE_POWER"}]},
     {"path": API_PATH_NETZERO_TARGET_W, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime NETZERO_TARGET_W override as a signed integer"}]},
+    {"path": API_PATH_MIN_CHARGE_LEVEL, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime MIN_CHARGE_LEVEL override as integer percent"}]},
+    {"path": API_PATH_MAX_CHARGE_LEVEL, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime MAX_CHARGE_LEVEL override as integer percent"}]},
 ]
 
 CONTROL_COMMANDS = [
@@ -66,6 +70,10 @@ CONTROL_COMMANDS = [
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "name": "slow_charge_max_power_set", "method": "POST", "description": "Set runtime slow-charge max power override", "example": f"{API_PATH_SLOW_CHARGE_MAX_POWER}?value=300"},
     {"path": API_PATH_NETZERO_TARGET_W, "name": "netzero_target_w_status", "method": "GET", "description": "Get current runtime NETZERO_TARGET_W override", "example": f"{API_PATH_NETZERO_TARGET_W}"},
     {"path": API_PATH_NETZERO_TARGET_W, "name": "netzero_target_w_set", "method": "POST", "description": "Set runtime NETZERO_TARGET_W override", "example": f"{API_PATH_NETZERO_TARGET_W}?value=-50"},
+    {"path": API_PATH_MIN_CHARGE_LEVEL, "name": "min_charge_level_status", "method": "GET", "description": "Get current runtime MIN_CHARGE_LEVEL override", "example": f"{API_PATH_MIN_CHARGE_LEVEL}"},
+    {"path": API_PATH_MIN_CHARGE_LEVEL, "name": "min_charge_level_set", "method": "POST", "description": "Set runtime MIN_CHARGE_LEVEL override", "example": f"{API_PATH_MIN_CHARGE_LEVEL}?value=15"},
+    {"path": API_PATH_MAX_CHARGE_LEVEL, "name": "max_charge_level_status", "method": "GET", "description": "Get current runtime MAX_CHARGE_LEVEL override", "example": f"{API_PATH_MAX_CHARGE_LEVEL}"},
+    {"path": API_PATH_MAX_CHARGE_LEVEL, "name": "max_charge_level_set", "method": "POST", "description": "Set runtime MAX_CHARGE_LEVEL override", "example": f"{API_PATH_MAX_CHARGE_LEVEL}?value=93"},
 ]
 
 
@@ -162,6 +170,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_loglevel_get",
         "_handle_slow_charge_max_power_get",
         "_handle_netzero_target_w_get",
+        "_handle_min_charge_level_get",
+        "_handle_max_charge_level_get",
     )
     STATEFUL_GET_ROUTES = (
         "_handle_automation_status",
@@ -177,6 +187,8 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_loglevel_post",
         "_handle_slow_charge_max_power_post",
         "_handle_netzero_target_w_post",
+        "_handle_min_charge_level_post",
+        "_handle_max_charge_level_post",
     )
 
     def _send_json(self, data, status=200, sort_keys=True):
@@ -465,6 +477,44 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
     def _parse_netzero_target_w(self, parsed) -> Optional[int]:
         return self._parse_int_query(parsed, "value")
 
+    def _parse_charge_level(self, parsed) -> Optional[int]:
+        return self._parse_int_query(parsed, "value")
+
+    def _get_normalized_charge_levels(self, controller: Any) -> tuple[int, int]:
+        try:
+            min_level = int(getattr(controller, "min_charge_level", 0))
+        except (TypeError, ValueError):
+            min_level = 0
+        try:
+            max_level = int(getattr(controller, "max_charge_level", 100))
+        except (TypeError, ValueError):
+            max_level = 100
+        min_level = max(0, min(100, min_level))
+        max_level = max(0, min(100, max_level))
+        if min_level > max_level:
+            max_level = min_level
+        return min_level, max_level
+
+    def _set_normalized_charge_levels(self, controller: Any, min_level: int, max_level: int) -> tuple[int, int]:
+        min_level = max(0, min(100, int(min_level)))
+        max_level = max(0, min(100, int(max_level)))
+        if min_level > max_level:
+            max_level = min_level
+        controller.min_charge_level = min_level
+        controller.max_charge_level = max_level
+        return min_level, max_level
+
+    def _charge_level_payload(self, controller: Any, message: Optional[str] = None) -> dict[str, Any]:
+        min_level, max_level = self._get_normalized_charge_levels(controller)
+        payload: dict[str, Any] = {
+            "ok": True,
+            "minChargeLevel": min_level,
+            "maxChargeLevel": max_level,
+        }
+        if message:
+            payload["message"] = message
+        return payload
+
     def _handle_loglevel_get(self, parsed) -> bool:
         if parsed.path != API_PATH_LOG_LEVEL:
             return False
@@ -582,6 +632,70 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             "message": f"NETZERO_TARGET_W set to {controller.netzero_target_w} W",
             "netzeroTargetW": controller.netzero_target_w,
         })
+        return True
+
+    def _handle_min_charge_level_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_MIN_CHARGE_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "MIN_CHARGE_LEVEL control not available"}, 503)
+            return True
+        self._send_json(self._charge_level_payload(controller))
+        return True
+
+    def _handle_max_charge_level_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_MAX_CHARGE_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "MAX_CHARGE_LEVEL control not available"}, 503)
+            return True
+        self._send_json(self._charge_level_payload(controller))
+        return True
+
+    def _handle_min_charge_level_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_MIN_CHARGE_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "MIN_CHARGE_LEVEL control not available"}, 503)
+            return True
+        desired = self._parse_charge_level(parsed)
+        if desired is None:
+            self._send_json({"ok": False, "error": "Invalid MIN_CHARGE_LEVEL. Use integer value query parameter."}, 400)
+            return True
+        old_min, old_max = self._get_normalized_charge_levels(controller)
+        new_min = max(0, min(100, desired))
+        new_max = old_max if new_min <= old_max else new_min
+        min_level, max_level = self._set_normalized_charge_levels(controller, new_min, new_max)
+        controller.log(
+            "info",
+            f"Runtime API override changed charge limits: MIN_CHARGE_LEVEL {old_min} -> {min_level}%, MAX_CHARGE_LEVEL {old_max} -> {max_level}%",
+        )
+        self._send_json(self._charge_level_payload(controller, f"Charge limits set to MIN={min_level}% MAX={max_level}%"))
+        return True
+
+    def _handle_max_charge_level_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_MAX_CHARGE_LEVEL:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "MAX_CHARGE_LEVEL control not available"}, 503)
+            return True
+        desired = self._parse_charge_level(parsed)
+        if desired is None:
+            self._send_json({"ok": False, "error": "Invalid MAX_CHARGE_LEVEL. Use integer value query parameter."}, 400)
+            return True
+        old_min, old_max = self._get_normalized_charge_levels(controller)
+        new_max = max(0, min(100, desired))
+        new_min = old_min if new_max >= old_min else new_max
+        min_level, max_level = self._set_normalized_charge_levels(controller, new_min, new_max)
+        controller.log(
+            "info",
+            f"Runtime API override changed charge limits: MIN_CHARGE_LEVEL {old_min} -> {min_level}%, MAX_CHARGE_LEVEL {old_max} -> {max_level}%",
+        )
+        self._send_json(self._charge_level_payload(controller, f"Charge limits set to MIN={min_level}% MAX={max_level}%"))
         return True
 
     def _handle_automation_status(self, parsed) -> bool:
