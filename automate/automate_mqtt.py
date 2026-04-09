@@ -248,6 +248,7 @@ class AutomationApp:
         self._last_mqtt_status_log_ts = 0.0
         self._last_mqtt_debug_message_ts: Optional[float] = None
         self._last_applied_schedule_slot_signature: Any = _UNKNOWN_SCHEDULE_SLOT_SIGNATURE
+        self.manual_schedule_refresh_pending = False
         self.loop_counter = 0
         self.last_retention_cleanup_ts: Optional[int] = None
 
@@ -431,6 +432,7 @@ class AutomationApp:
                 pause_setter=self._set_pause_override,
                 controller=self.controller,
                 status_updates_delta_token=token or None,
+                manual_schedule_refresh_callback=self.request_manual_schedule_refresh_control,
                 port=HTTP_API_PORT,
                 log_level_priorities=BaseDeviceController._LOG_LEVEL_PRIORITY,
             )
@@ -1146,6 +1148,10 @@ class AutomationApp:
             total_act_ret=self.last_total_act_ret,
         )
 
+    def request_manual_schedule_refresh_control(self) -> None:
+        """Queue a one-shot immediate control pass after a manual schedule refresh."""
+        self.manual_schedule_refresh_pending = True
+
     def _update_zendure_state(self) -> None:
         zendure_data = getattr(
             get_reader(self.controller.config_path), "last_zendure_data", None
@@ -1247,8 +1253,9 @@ class AutomationApp:
         mqtt_fresh = bool(mqtt_enabled and not self.mqtt_helper.is_stale(self.mqtt_stale_after_seconds))
         periodic_due = self._should_run_periodic_control()
         boundary_due = self._has_pending_schedule_boundary()
+        manual_refresh_due = self.manual_schedule_refresh_pending
 
-        if mqtt_enabled and mqtt_fresh and not mqtt_changed and not periodic_due and not boundary_due:
+        if mqtt_enabled and mqtt_fresh and not mqtt_changed and not periodic_due and not boundary_due and not manual_refresh_due:
             snapshot = self.mqtt_helper.get_status_snapshot(self.mqtt_stale_after_seconds)
             delta_watts = snapshot.get("last_delta_watts")
             last_triggered_change = bool(snapshot.get("last_triggered_change"))
@@ -1265,11 +1272,17 @@ class AutomationApp:
                 "Schedule slot boundary detected; running immediate control pass",
                 message_key="schedule_slot_boundary_due",
             )
+        if manual_refresh_due:
+            self.logger.debug(
+                "Manual schedule refresh requested; running immediate control pass",
+                message_key="manual_schedule_refresh_due",
+            )
 
         def _run_pipeline_and_remember(p1_data: Optional[dict]) -> bool:
             result = self._run_full_control_pipeline(p1_data)
             if result:
                 self._last_applied_schedule_slot_signature = self._get_active_schedule_slot_signature()
+                self.manual_schedule_refresh_pending = False
             return result
 
         if mqtt_changed and mqtt_fresh:
@@ -1281,7 +1294,7 @@ class AutomationApp:
             p1_data = self._accumulate_p1_data()
             return _run_pipeline_and_remember(p1_data)
 
-        if periodic_due or boundary_due:
+        if periodic_due or boundary_due or manual_refresh_due:
             p1_data = self._get_mqtt_p1_data()
             if p1_data is None:
                 p1_data = self._accumulate_p1_data()

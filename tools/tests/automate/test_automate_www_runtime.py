@@ -534,6 +534,8 @@ def _start_test_api_server(
     db_rows: list[tuple] | None = None,
     status_updates_delta_token: str | None = None,
     compute_wh_result: dict | None = None,
+    fetch_schedule_error: Exception | None = None,
+    manual_schedule_refresh_callback=None,
 ):
     automate_api = _import_automate_api_module()
     automate_www = _import_automate_www_module()
@@ -600,6 +602,7 @@ def _start_test_api_server(
         "refresh_zendure": 0,
         "restart": 0,
         "refresh_schedule": 0,
+        "manual_schedule_refresh": 0,
         "status_post_update": [],
         "pause_set": [],
         "compute_wh_calls": 0,
@@ -624,6 +627,8 @@ def _start_test_api_server(
 
     def fetch_schedule():
         events["refresh_schedule"] += 1
+        if fetch_schedule_error is not None:
+            raise fetch_schedule_error
 
     def post_update(*args):
         events["status_post_update"].append(args)
@@ -640,6 +645,10 @@ def _start_test_api_server(
         events["controller_logs"].append((level, message))
 
     controller.log = controller_log
+
+    if manual_schedule_refresh_callback is None:
+        def manual_schedule_refresh_callback():
+            events["manual_schedule_refresh"] += 1
 
     status_api_wrapper = None
     if with_db:
@@ -667,6 +676,7 @@ def _start_test_api_server(
         pause_setter=set_pause,
         controller=controller,
         status_updates_delta_token=status_updates_delta_token,
+        manual_schedule_refresh_callback=manual_schedule_refresh_callback,
         port=0,
         log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
     )
@@ -1966,7 +1976,7 @@ def test_controller_set_power_logs_when_device_limits_override_bounded_result():
     controller._resolve_power_target = device_controller.AutomateController._resolve_power_target.__get__(controller, device_controller.AutomateController)
     controller._normalize_schedule_bound = device_controller.AutomateController._normalize_schedule_bound
     controller._get_dynamic_power_context = device_controller.AutomateController._get_dynamic_power_context.__get__(controller, device_controller.AutomateController)
-    controller._send_power_feed = lambda value: (True, None, 0)
+    controller._send_power_feed = lambda value, zendure_data=None: (True, None, 0)
     controller.log = lambda level, message, *args, **kwargs: logs.append((level, str(message)))
 
     result = device_controller.AutomateController.set_power(
@@ -2612,6 +2622,7 @@ def test_create_http_server_wires_shared_state_and_callbacks():
         ),
     )
     controller = SimpleNamespace(log_level="INFO")
+    manual_refresh_calls: list[str] = []
 
     def _noop():
         return None
@@ -2628,6 +2639,7 @@ def test_create_http_server_wires_shared_state_and_callbacks():
         pause_setter=lambda _value: None,
         controller=controller,
         status_updates_delta_token="token123",
+        manual_schedule_refresh_callback=lambda: manual_refresh_calls.append("refresh"),
         port=0,
         log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
     )
@@ -2637,6 +2649,7 @@ def test_create_http_server_wires_shared_state_and_callbacks():
         assert server.status_api is status_api
         assert server.controller is controller
         assert server.status_updates_delta_token == "token123"
+        assert callable(server.manual_schedule_refresh_callback)
     finally:
         server.server_close()
 
@@ -2688,6 +2701,7 @@ def test_api_control_endpoints_and_unknown_path():
         assert refresh_response.status_code == 200
         assert refresh_response.json()["ok"] is True
         assert runtime.events["refresh_schedule"] == 1
+        assert runtime.events["manual_schedule_refresh"] == 1
         assert runtime.events["status_post_update"][0][0] == "Rescan"
 
         restart_response = requests.post(f"{runtime.base_url}/api/restart", timeout=2)
@@ -2722,6 +2736,19 @@ def test_api_control_endpoints_and_unknown_path():
 
         missing_response = requests.get(f"{runtime.base_url}/api/does-not-exist", timeout=2)
         assert missing_response.status_code == 404
+    finally:
+        runtime.cleanup()
+
+
+def test_api_refresh_does_not_arm_manual_refresh_when_fetch_fails():
+    runtime = _start_test_api_server(fetch_schedule_error=RuntimeError("boom"))
+    try:
+        refresh_response = requests.get(f"{runtime.base_url}/api/refresh", timeout=2)
+        assert refresh_response.status_code == 500
+        assert refresh_response.json()["ok"] is False
+        assert runtime.events["refresh_schedule"] == 1
+        assert runtime.events["manual_schedule_refresh"] == 0
+        assert runtime.events["status_post_update"] == []
     finally:
         runtime.cleanup()
 

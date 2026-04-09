@@ -511,6 +511,83 @@ def test_run_cycle_startup_without_baseline_does_not_trigger_boundary_control():
     assert result is True
 
 
+def test_request_manual_schedule_refresh_control_sets_pending_flag():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+
+    assert app.manual_schedule_refresh_pending is False
+
+    app.request_manual_schedule_refresh_control()
+
+    assert app.manual_schedule_refresh_pending is True
+
+
+def test_run_cycle_uses_manual_refresh_control_when_signature_is_unchanged():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: False,
+        is_stale=lambda _seconds: False,
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = ("0900", "100", "rule-a")
+    app._get_active_schedule_slot_signature = lambda: ("0900", "100", "rule-a")
+    app.manual_schedule_refresh_pending = True
+    app._get_mqtt_p1_data = lambda: {"total_power": -777}
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("HTTP fallback should not run when fresh MQTT data is available for manual refresh control")
+    )
+    captured = {"calls": 0}
+
+    def _run_pipeline(p1_data):
+        captured["calls"] += 1
+        captured["p1_data"] = p1_data
+        return True
+
+    app._run_full_control_pipeline = _run_pipeline
+
+    result = app._run_cycle()
+
+    assert result is True
+    assert captured["calls"] == 1
+    assert captured["p1_data"] == {"total_power": -777}
+    assert app._last_applied_schedule_slot_signature == ("0900", "100", "rule-a")
+    assert app.manual_schedule_refresh_pending is False
+
+
+def test_run_cycle_keeps_manual_refresh_pending_when_pipeline_fails():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    app.logger = _noop_logger()
+    app.shutdown_requested = False
+    app.mqtt_helper = SimpleNamespace(
+        is_enabled=lambda: True,
+        consume_power_change_event=lambda: False,
+        is_stale=lambda _seconds: False,
+    )
+    app._sleep_interrupted = lambda: None
+    app._log_mqtt_diagnostics_if_needed = lambda: None
+    app._should_run_periodic_control = lambda: False
+    app._last_applied_schedule_slot_signature = ("0900", "100", "rule-a")
+    app._get_active_schedule_slot_signature = lambda: ("0900", "100", "rule-a")
+    app.manual_schedule_refresh_pending = True
+    app._get_mqtt_p1_data = lambda: {"total_power": -778}
+    app._accumulate_p1_data = lambda: (_ for _ in ()).throw(
+        AssertionError("HTTP fallback should not run when fresh MQTT data is available for manual refresh control")
+    )
+    app._run_full_control_pipeline = lambda _p1_data: False
+
+    result = app._run_cycle()
+
+    assert result is False
+    assert app.manual_schedule_refresh_pending is True
+
+
 def test_log_startup_includes_charge_level_limits():
     automate_mqtt = _import_automate_mqtt_module()
     app = automate_mqtt.AutomationApp()

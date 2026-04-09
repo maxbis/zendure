@@ -386,6 +386,9 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             return True
         try:
             schedule_controller.fetch_schedule()
+            manual_refresh_callback = getattr(self.server, "manual_schedule_refresh_callback", None)
+            if callable(manual_refresh_callback):
+                manual_refresh_callback()
             status_api.post_update(EVENT_TYPE_RESCAN, None, None)
             self._send_json({"ok": True, "message": "Schedule refreshed"})
         except Exception as exc:
@@ -782,6 +785,7 @@ def create_http_server(
     pause_setter: Callable[[bool], None],
     controller: Any,
     status_updates_delta_token: Optional[str],
+    manual_schedule_refresh_callback: Optional[Callable[[], None]] = None,
     port: int = HTTP_API_PORT,
     log_level_priorities: Optional[dict[str, Any]] = None,
     ) -> AutomationTCPServer:
@@ -797,5 +801,6 @@ def create_http_server(
     server.pause_setter = pause_setter
     server.controller = controller
     server.status_updates_delta_token = status_updates_delta_token
+    server.manual_schedule_refresh_callback = manual_schedule_refresh_callback
     server.log_level_priorities = log_level_priorities
     return server
