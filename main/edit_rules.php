@@ -458,17 +458,17 @@ if ($isApi) {
             <div id="profile-selection-status" class="profile-selection-status" aria-live="polite"></div>
             <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
             <div id="profile-editor" class="profile-editor" hidden>
-                <div class="profile-editor-grid">
-                    <div>
+                <div class="profile-editor-column profile-editor-column-fields">
+                    <div class="profile-field-group">
                         <label for="inp-profile-short-name">Short Name</label>
                         <input id="inp-profile-short-name" type="text" maxlength="20" placeholder="A">
                     </div>
-                    <div>
+                    <div class="profile-field-group">
                         <label for="inp-profile-description">Description</label>
                         <input id="inp-profile-description" type="text" maxlength="120" placeholder="Profile description">
                     </div>
                 </div>
-                <div class="row">
+                <div class="profile-editor-column profile-editor-column-rules">
                     <label>Rules In Profile</label>
                     <div id="profile-rule-membership" class="profile-rule-membership"></div>
                 </div>

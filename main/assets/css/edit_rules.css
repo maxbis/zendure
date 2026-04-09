@@ -123,6 +123,7 @@ code {
 
 .profile-editor {
     display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
     padding: 14px;
     border: 1px solid var(--line);
@@ -130,18 +131,32 @@ code {
     background: rgba(255, 255, 255, 0.03);
 }
 
-.profile-editor-grid {
+.profile-editor-column {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+}
+
+.profile-editor-column-fields {
+    align-content: start;
+}
+
+.profile-editor-column-rules {
+    align-content: start;
+    min-width: 0;
+}
+
+.profile-field-group {
+    display: grid;
+    gap: 8px;
 }
 
 .profile-rule-membership {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
-    max-height: 260px;
+    max-height: 150px;
     overflow: auto;
+    padding-right: 4px;
 }
 
 .profile-rule-chip {
@@ -1423,7 +1438,7 @@ button.danger.condition-remove-btn:hover {
         font-size: 0.72rem;
     }
 
-    .profile-editor-grid,
+    .profile-editor,
     .profile-rule-membership {
         grid-template-columns: 1fr;
     }
