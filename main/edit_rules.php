@@ -446,6 +446,36 @@ if ($isApi) {
         <textarea id="raw-json-textarea" rows="12" readonly spellcheck="false"></textarea>
     </section>
 
+    <section class="card">
+        <div class="card-header-row">
+            <h2>Rule Profiles</h2>
+            <div class="actions">
+                <button id="btn-activate-profile" type="button" hidden>Activate Profile</button>
+                <button id="btn-save-profile" type="button">Save Profile</button>
+            </div>
+        </div>
+        <div class="rule-profiles-box">
+            <div id="profile-selection-status" class="profile-selection-status" aria-live="polite"></div>
+            <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
+            <div id="profile-editor" class="profile-editor" hidden>
+                <div class="profile-editor-grid">
+                    <div>
+                        <label for="inp-profile-short-name">Short Name</label>
+                        <input id="inp-profile-short-name" type="text" maxlength="20" placeholder="A">
+                    </div>
+                    <div>
+                        <label for="inp-profile-description">Description</label>
+                        <input id="inp-profile-description" type="text" maxlength="120" placeholder="Profile description">
+                    </div>
+                </div>
+                <div class="row">
+                    <label>Rules In Profile</label>
+                    <div id="profile-rule-membership" class="profile-rule-membership"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="grid">
         <section class="card">
             <div class="card-header-row rules-list-header">
@@ -573,36 +603,6 @@ if ($isApi) {
                 </div>
             </form>
         </section>
-    </section>
-
-    <section class="card">
-        <div class="card-header-row">
-            <h2>Rule Profiles</h2>
-            <div class="actions">
-                <button id="btn-activate-profile" type="button" hidden>Activate Profile</button>
-                <button id="btn-save-profile" type="button">Save Profile</button>
-            </div>
-        </div>
-        <div class="rule-profiles-box">
-            <div id="profile-selection-status" class="profile-selection-status" aria-live="polite"></div>
-            <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
-            <div id="profile-editor" class="profile-editor" hidden>
-                <div class="profile-editor-grid">
-                    <div>
-                        <label for="inp-profile-short-name">Short Name</label>
-                        <input id="inp-profile-short-name" type="text" maxlength="20" placeholder="A">
-                    </div>
-                    <div>
-                        <label for="inp-profile-description">Description</label>
-                        <input id="inp-profile-description" type="text" maxlength="120" placeholder="Profile description">
-                    </div>
-                </div>
-                <div class="row">
-                    <label>Rules In Profile</label>
-                    <div id="profile-rule-membership" class="profile-rule-membership"></div>
-                </div>
-            </div>
-        </div>
     </section>
 </main>
 <script>
