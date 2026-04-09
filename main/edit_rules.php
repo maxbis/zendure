@@ -578,9 +578,13 @@ if ($isApi) {
     <section class="card">
         <div class="card-header-row">
             <h2>Rule Profiles</h2>
-            <button id="btn-save-profile" type="button">Save Profile</button>
+            <div class="actions">
+                <button id="btn-activate-profile" type="button" hidden>Activate Profile</button>
+                <button id="btn-save-profile" type="button">Save Profile</button>
+            </div>
         </div>
         <div class="rule-profiles-box">
+            <div id="profile-selection-status" class="profile-selection-status" aria-live="polite"></div>
             <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
             <div id="profile-editor" class="profile-editor" hidden>
                 <div class="profile-editor-grid">

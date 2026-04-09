@@ -97,6 +97,11 @@ code {
     gap: 8px;
 }
 
+.profile-selection-status {
+    font-size: 0.95rem;
+    color: var(--muted);
+}
+
 .profile-filter-button {
     min-width: 84px;
 }
@@ -104,6 +109,16 @@ code {
 .profile-filter-button.is-active {
     background: color-mix(in srgb, var(--primary) 30%, #0b1324);
     border-color: #1d4ed8;
+}
+
+.profile-filter-button.is-live {
+    box-shadow: inset 0 0 0 1px #10b981;
+}
+
+.profile-filter-button.is-live::after {
+    content: " LIVE";
+    font-size: 0.72rem;
+    color: #86efac;
 }
 
 .profile-editor {

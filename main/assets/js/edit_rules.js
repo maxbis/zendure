@@ -65,6 +65,8 @@
         inpProfileShortName: document.getElementById('inp-profile-short-name'),
         inpProfileDescription: document.getElementById('inp-profile-description'),
         profileRuleMembership: document.getElementById('profile-rule-membership'),
+        profileSelectionStatus: document.getElementById('profile-selection-status'),
+        btnActivateProfile: document.getElementById('btn-activate-profile'),
         btnSaveProfile: document.getElementById('btn-save-profile'),
     };
 
@@ -219,6 +221,32 @@
 
     function getActiveProfileId() {
         return state.selectedProfileId || state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
+    }
+
+    function getRuntimeActiveProfileId() {
+        return state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
+    }
+
+    function getProfileLabel(profileId) {
+        if (profileId === SHOW_ALL_PROFILE_ID) {
+            return 'Show All';
+        }
+        const profile = getProfileById(profileId);
+        if (!profile) {
+            return profileId || 'Unknown';
+        }
+        return profile.short_name || profile.id;
+    }
+
+    function ensureSelectedProfileId() {
+        const selectedProfileId = state.selectedProfileId || '';
+        if (
+            selectedProfileId === SHOW_ALL_PROFILE_ID ||
+            state.ruleProfiles.profiles.some(function (profile) { return profile.id === selectedProfileId; })
+        ) {
+            return;
+        }
+        state.selectedProfileId = getRuntimeActiveProfileId();
     }
 
     function getProfileById(profileId) {
@@ -770,11 +798,42 @@
             if (getActiveProfileId() === profile.id) {
                 button.classList.add('is-active');
             }
+            if (getRuntimeActiveProfileId() === profile.id) {
+                button.classList.add('is-live');
+            }
             button.setAttribute('data-profile-id', profile.id);
             button.title = profile.description || profile.short_name || profile.id;
             button.textContent = profile.short_name || profile.id;
             els.profileButtonBar.appendChild(button);
         });
+    }
+
+    function renderProfileSelectionStatus() {
+        if (!els.profileSelectionStatus) return;
+        const selectedProfileId = getActiveProfileId();
+        const runtimeActiveProfileId = getRuntimeActiveProfileId();
+        const selectedLabel = getProfileLabel(selectedProfileId);
+        const runtimeLabel = getProfileLabel(runtimeActiveProfileId);
+        if (selectedProfileId === runtimeActiveProfileId) {
+            els.profileSelectionStatus.textContent = 'Editing live profile: ' + selectedLabel + '.';
+            return;
+        }
+        els.profileSelectionStatus.textContent = 'Editing profile: ' + selectedLabel + '. Live system still uses: ' + runtimeLabel + '.';
+    }
+
+    function renderProfileActivationControl() {
+        if (!els.btnActivateProfile) return;
+        const selectedProfileId = getActiveProfileId();
+        const runtimeActiveProfileId = getRuntimeActiveProfileId();
+        const isLiveSelection = selectedProfileId === runtimeActiveProfileId;
+        els.btnActivateProfile.hidden = isLiveSelection;
+        els.btnActivateProfile.disabled = isLiveSelection;
+        els.btnActivateProfile.textContent = selectedProfileId === SHOW_ALL_PROFILE_ID
+            ? 'Activate Show All'
+            : 'Activate Profile';
+        els.btnActivateProfile.title = isLiveSelection
+            ? 'Selected profile is already live.'
+            : ('Make ' + getProfileLabel(selectedProfileId) + ' the live profile.');
     }
 
     function renderProfileEditor() {
@@ -824,7 +883,10 @@
     }
 
     function renderProfiles() {
+        ensureSelectedProfileId();
         renderProfileButtons();
+        renderProfileSelectionStatus();
+        renderProfileActivationControl();
         renderProfileEditor();
     }
 
@@ -1184,12 +1246,14 @@
 
     async function saveRulesToFile(successMessage) {
         try {
+            const selectedProfileIdBeforeSave = state.selectedProfileId || getRuntimeActiveProfileId();
             const result = await apiSave();
             if (Array.isArray(result.rules)) {
                 state.rules = result.rules.map(normalizeRule);
             }
             state.ruleProfiles = normalizeRuleProfiles(result.rule_profiles || state.ruleProfiles, state.rules);
-            state.selectedProfileId = state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
+            state.selectedProfileId = selectedProfileIdBeforeSave;
+            ensureSelectedProfileId();
             state.hasPendingImportedRules = false;
             updatePendingImportState();
             renderTable();
@@ -1378,18 +1442,35 @@
         }
 
         if (els.profileButtonBar) {
-            els.profileButtonBar.addEventListener('click', async function (e) {
+            els.profileButtonBar.addEventListener('click', function (e) {
                 const button = e.target.closest('button[data-profile-id]');
                 if (!button) return;
                 persistProfileEditorChanges();
                 const nextProfileId = String(button.getAttribute('data-profile-id') || '').trim() || SHOW_ALL_PROFILE_ID;
-                state.ruleProfiles.active_profile_id = nextProfileId;
                 state.selectedProfileId = nextProfileId;
                 renderTable();
                 renderProfiles();
-                await saveRulesToFile(nextProfileId === SHOW_ALL_PROFILE_ID
+            });
+        }
+
+        if (els.btnActivateProfile) {
+            els.btnActivateProfile.addEventListener('click', async function () {
+                persistProfileEditorChanges();
+                const selectedProfileId = getActiveProfileId();
+                if (selectedProfileId === getRuntimeActiveProfileId()) {
+                    renderProfiles();
+                    return;
+                }
+                const previousActiveProfileId = getRuntimeActiveProfileId();
+                state.ruleProfiles.active_profile_id = selectedProfileId;
+                renderProfiles();
+                const ok = await saveRulesToFile(selectedProfileId === SHOW_ALL_PROFILE_ID
                     ? 'Show All activated.'
-                    : 'Rule profile activated.');
+                    : ('Rule profile activated: ' + getProfileLabel(selectedProfileId) + '.'));
+                if (!ok) {
+                    state.ruleProfiles.active_profile_id = previousActiveProfileId;
+                    renderProfiles();
+                }
             });
         }
 
@@ -1412,6 +1493,8 @@
             els.inpProfileShortName.addEventListener('input', function () {
                 persistProfileEditorChanges();
                 renderProfileButtons();
+                renderProfileSelectionStatus();
+                renderProfileActivationControl();
             });
         }
 
@@ -1419,6 +1502,8 @@
             els.inpProfileDescription.addEventListener('input', function () {
                 persistProfileEditorChanges();
                 renderProfileButtons();
+                renderProfileSelectionStatus();
+                renderProfileActivationControl();
             });
         }
 

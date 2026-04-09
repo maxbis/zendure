@@ -127,7 +127,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 | **mqttPowerMeter.topic** | string | Topic carrying the Shelly status payload to consume (for example `"shellypro3em-841fe890decc/status/em:0"`). Required when MQTT is enabled. | `power_meter_mqtt_subscriber.py`: subscription topic. |
 | **mqttPowerMeter.totalPowerPath** | string | Dot-notation path to total power within the MQTT JSON payload. Default `"total_act_power"`. | `power_meter_mqtt_subscriber.py`: payload parsing. |
 | **mqttPowerMeter.staleAfterSeconds** | number | Max allowed age for the latest MQTT message before `automate_mqtt.py` falls back to the normal HTTP read. Default `55`. | `automate_mqtt.py`: stale detection / HTTP fallback. |
-| **mqttPowerMeter.periodicControlIntervalSeconds** | number | Run the full control pipeline at least this often even when MQTT is fresh and unchanged. Default `60`. | `automate_mqtt.py`: periodic housekeeping control. |
+| **mqttPowerMeter.periodicControlIntervalSeconds** | number | Run the full control pipeline at least this often when MQTT is fresh and no thresholded MQTT change triggered a run. Default `60`. Schedule-slot boundary changes can still trigger an earlier control pass. | `automate_mqtt.py`: periodic housekeeping control fallback. |
 | **mqttPowerMeter.changeThresholdWatts** | number | Minimum absolute change in MQTT power before a power-change event is raised. Default `0`. | `power_meter_mqtt_subscriber.py`: event generation. |
 
 ### MQTT Shelly cumulative counters
