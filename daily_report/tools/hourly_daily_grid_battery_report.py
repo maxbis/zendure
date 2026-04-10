@@ -451,6 +451,8 @@ def build_daily_report(
     total_grid_from_cost = 0.0
     total_grid_to_cost = 0.0
     total_net_cost = 0.0
+    total_savings = 0.0
+    total_charge_cost = 0.0
 
     if price_file_found is None:
         price_file_found = prices_by_hour is not None
@@ -477,6 +479,8 @@ def build_daily_report(
         grid_from_cost = None
         grid_to_cost = None
         net_cost = None
+        savings_eur = None
+        charge_cost_eur = None
 
         if is_elapsed:
             charged_wh, discharged_wh = _integrate_power_window(
@@ -528,6 +532,10 @@ def build_daily_report(
                 total_grid_to += grid_to_wh
 
             if price_eur_per_kwh is not None:
+                savings_eur = (discharged_wh / 1000.0) * price_eur_per_kwh
+                charge_cost_eur = (charged_wh / 1000.0) * price_eur_per_kwh
+                total_savings += savings_eur
+                total_charge_cost += charge_cost_eur
                 if grid_from_wh is not None:
                     grid_from_cost = (grid_from_wh / 1000.0) * price_eur_per_kwh
                     total_grid_from_cost += grid_from_cost
@@ -552,6 +560,8 @@ def build_daily_report(
                 "grid_from_cost": _round_or_none(grid_from_cost, digits=4),
                 "grid_to_cost": _round_or_none(grid_to_cost, digits=4),
                 "net_cost": _round_or_none(net_cost, digits=4),
+                "savings_eur": _round_or_none(savings_eur, digits=4),
+                "charge_cost_eur": _round_or_none(charge_cost_eur, digits=4),
                 "is_partial_hour": is_partial_hour,
             }
         )
@@ -595,6 +605,8 @@ def build_daily_report(
             "grid_from_cost": _round_or_none(total_grid_from_cost, digits=4) if price_file_found else None,
             "grid_to_cost": _round_or_none(total_grid_to_cost, digits=4) if price_file_found else None,
             "net_cost": _round_or_none(total_net_cost, digits=4) if price_file_found else None,
+            "savings_eur": _round_or_none(total_savings, digits=4) if price_file_found else None,
+            "charge_cost_eur": _round_or_none(total_charge_cost, digits=4) if price_file_found else None,
         },
     }
 

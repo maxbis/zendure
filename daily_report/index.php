@@ -48,7 +48,7 @@ if ($requestedDate === '') {
             </div>
         </section>
 
-        <section class="status-grid status-grid--six">
+        <section class="status-grid status-grid--eight">
             <article class="summary-card summary-card--primary">
                 <div class="summary-label">Charged</div>
                 <div class="summary-value" data-role="charged-total">--</div>
@@ -78,6 +78,21 @@ if ($requestedDate === '') {
                 <div class="summary-label">Net Cost</div>
                 <div class="summary-value" data-role="net-cost-total">--</div>
                 <div class="summary-badge" data-role="cost-badge">Loading</div>
+            </article>
+            <article class="summary-card summary-card--savings">
+                <div class="summary-label">Savings</div>
+                <div class="summary-value" data-role="savings-total">--</div>
+                <div class="summary-subtle">Discharged kWh × hourly price</div>
+            </article>
+            <article class="summary-card summary-card--charge-cost">
+                <div class="summary-label">Charge Costs</div>
+                <div class="summary-value" data-role="charge-cost-total">--</div>
+                <div class="summary-subtle">Charged kWh × hourly price</div>
+            </article>
+            <article class="summary-card summary-card--pnl">
+                <div class="summary-label">P&amp;L</div>
+                <div class="summary-value" data-role="pnl-total">--</div>
+                <div class="summary-subtle">Charge costs - savings + net cost</div>
             </article>
         </section>
 

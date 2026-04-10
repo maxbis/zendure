@@ -118,6 +118,8 @@ def test_build_daily_report_full_day_metrics_and_totals():
     assert hour00["grid_from_cost"] == pytest.approx(0.002)
     assert hour00["grid_to_cost"] == pytest.approx(-0.0004)
     assert hour00["net_cost"] == pytest.approx(0.0016)
+    assert hour00["savings_eur"] == pytest.approx(0.0)
+    assert hour00["charge_cost_eur"] == pytest.approx(0.06)
 
     assert hour01["charged_wh"] == pytest.approx(0.0)
     assert hour01["discharged_wh"] == pytest.approx(225.0)
@@ -130,6 +132,8 @@ def test_build_daily_report_full_day_metrics_and_totals():
     assert hour01["grid_from_cost"] == pytest.approx(0.0033)
     assert hour01["grid_to_cost"] == pytest.approx(-0.0012)
     assert hour01["net_cost"] == pytest.approx(0.0021)
+    assert hour01["savings_eur"] == pytest.approx(0.0675)
+    assert hour01["charge_cost_eur"] == pytest.approx(0.0)
 
     assert hour02["charged_wh"] == pytest.approx(0.0)
     assert hour02["discharged_wh"] == pytest.approx(0.0)
@@ -138,6 +142,8 @@ def test_build_daily_report_full_day_metrics_and_totals():
     assert hour02["grid_from_cost"] == pytest.approx(0.0)
     assert hour02["grid_to_cost"] == pytest.approx(0.0)
     assert hour02["net_cost"] == pytest.approx(0.0)
+    assert hour02["savings_eur"] == pytest.approx(0.0)
+    assert hour02["charge_cost_eur"] == pytest.approx(0.0)
 
     assert report_data["price_file_found"] is True
     assert report_data["price_hours_available"] == 3
@@ -149,6 +155,8 @@ def test_build_daily_report_full_day_metrics_and_totals():
     assert report_data["totals"]["grid_from_cost"] == pytest.approx(0.0053)
     assert report_data["totals"]["grid_to_cost"] == pytest.approx(-0.0016)
     assert report_data["totals"]["net_cost"] == pytest.approx(0.0037)
+    assert report_data["totals"]["savings_eur"] == pytest.approx(0.0675)
+    assert report_data["totals"]["charge_cost_eur"] == pytest.approx(0.06)
 
 
 def test_build_daily_report_partial_day_future_hours_are_empty():
@@ -179,6 +187,8 @@ def test_build_daily_report_partial_day_future_hours_are_empty():
     assert hour00["grid_from_cost"] == pytest.approx(0.0012)
     assert hour00["grid_to_cost"] == pytest.approx(0.0)
     assert hour00["net_cost"] == pytest.approx(0.0012)
+    assert hour00["savings_eur"] == pytest.approx(0.0)
+    assert hour00["charge_cost_eur"] == pytest.approx(0.06)
     assert hour00["is_partial_hour"] is True
 
     assert hour01["charged_wh"] == 0.0
@@ -191,12 +201,16 @@ def test_build_daily_report_partial_day_future_hours_are_empty():
     assert hour01["grid_from_cost"] is None
     assert hour01["grid_to_cost"] is None
     assert hour01["net_cost"] is None
+    assert hour01["savings_eur"] is None
+    assert hour01["charge_cost_eur"] is None
 
     assert report_data["totals"]["charged_wh"] == pytest.approx(300.0)
     assert report_data["totals"]["battery_pct_delta_total"] == pytest.approx(5.0)
     assert report_data["totals"]["grid_from_cost"] == pytest.approx(0.0012)
     assert report_data["totals"]["grid_to_cost"] == pytest.approx(0.0)
     assert report_data["totals"]["net_cost"] == pytest.approx(0.0012)
+    assert report_data["totals"]["savings_eur"] == pytest.approx(0.0)
+    assert report_data["totals"]["charge_cost_eur"] == pytest.approx(0.06)
 
 
 def test_charged_and_discharged_match_existing_wh_query_logic():
@@ -326,9 +340,13 @@ def test_build_daily_report_missing_price_file_keeps_costs_null():
     assert report_data["hours"][0]["grid_from_cost"] is None
     assert report_data["hours"][0]["grid_to_cost"] is None
     assert report_data["hours"][0]["net_cost"] is None
+    assert report_data["hours"][0]["savings_eur"] is None
+    assert report_data["hours"][0]["charge_cost_eur"] is None
     assert report_data["totals"]["grid_from_cost"] is None
     assert report_data["totals"]["grid_to_cost"] is None
     assert report_data["totals"]["net_cost"] is None
+    assert report_data["totals"]["savings_eur"] is None
+    assert report_data["totals"]["charge_cost_eur"] is None
 
 
 def test_build_daily_report_falls_back_to_observed_electric_level_within_hour():

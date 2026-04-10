@@ -119,13 +119,23 @@
     function renderSummary(payload) {
         const report = payload.report || {};
         const totals = report.totals || {};
+        const netCost = Number(totals.net_cost);
+        const savings = Number(totals.savings_eur);
+        const chargeCost = Number(totals.charge_cost_eur);
+        const pnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
+            ? (chargeCost - savings + netCost) * -1
+            : null;
+
         setText('charged-total', formatWh(Number(totals.charged_wh)));
         setText('discharged-total', formatWh(Number(totals.discharged_wh)));
         setText('battery-delta-total', formatPercent(Number(totals.battery_pct_delta_total)));
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
-        setText('net-cost-total', formatEur(Number(totals.net_cost)));
-        setCostBadge(Number(totals.net_cost));
+        setText('net-cost-total', formatEur(netCost));
+        setText('savings-total', formatEur(savings));
+        setText('charge-cost-total', formatEur(chargeCost));
+        setText('pnl-total', formatEur(pnl));
+        setCostBadge(netCost);
 
         setText('saved-path', payload.savedPath || '--');
         setText('report-source', payload.source || '--');
