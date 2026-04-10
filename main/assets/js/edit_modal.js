@@ -7,7 +7,7 @@ class EditModal {
         this.apiUrl = apiUrl;
         this.currentOriginalKey = null;
         this.scheduleEntriesByKey = {};
-        this.limitMin = -1200;
+        this.limitMin = -1400;
         this.limitMax = 1200;
         this.limitStep = 100;
         this.modal = document.getElementById('edit-modal');
@@ -28,6 +28,7 @@ class EditModal {
 
     init() {
         this.setScheduleEntries(this.collectEntriesFromTable());
+        this.syncLimitRangeBounds();
 
         // Event Listeners
         document.getElementById('add-entry-btn').onclick = () => this.open();
@@ -256,6 +257,16 @@ class EditModal {
         }
         this.syncConstraintSlider();
         this.updatePowerRangeIndicator();
+    }
+
+    syncLimitRangeBounds() {
+        [this.limitsMinRange, this.limitsMaxRange].forEach((input, index) => {
+            if (!input) return;
+            input.min = String(this.limitMin);
+            input.max = String(this.limitMax);
+            input.step = String(this.limitStep);
+            input.value = String(index === 0 ? this.limitMin : this.limitMax);
+        });
     }
 
     snapLimitValue(rawValue) {

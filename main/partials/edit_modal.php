@@ -79,8 +79,8 @@
                         <div class="edit-modal-limits-slider" id="limits-slider">
                             <div class="edit-modal-limits-track"></div>
                             <div class="edit-modal-limits-selected-range" id="limits-selected-range"></div>
-                            <input type="range" class="edit-modal-limits-range" id="limits-min-range" min="-1200" max="1200" step="100" value="-1200" aria-label="Minimum power limit">
-                            <input type="range" class="edit-modal-limits-range" id="limits-max-range" min="-1200" max="1200" step="100" value="1200" aria-label="Maximum power limit">
+                            <input type="range" class="edit-modal-limits-range" id="limits-min-range" aria-label="Minimum power limit">
+                            <input type="range" class="edit-modal-limits-range" id="limits-max-range" aria-label="Maximum power limit">
                         </div>
                     </div>
                     <div id="power-range-indicator" class="power-range-indicator" hidden></div>
