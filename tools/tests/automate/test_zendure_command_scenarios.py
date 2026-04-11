@@ -92,7 +92,6 @@ def _make_scenario_controller(device_controller_module):
     controller.test_mode = False
     controller.config_path = Path("/tmp/config.jsonc")
     controller.config = {
-        "NETZERO_BI_DIRECTIONAL": True,
         "NETZERO_TARGET_W": 0,
     }
     controller.previous_power = None

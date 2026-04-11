@@ -203,6 +203,36 @@ def test_apply_power_settings_passes_mqtt_p1_source():
     assert captured["p1_data"] == {"total_power": 320}
 
 
+def test_apply_power_settings_recomputes_for_netzero_minus():
+    automate_mqtt = _import_automate_mqtt_module()
+    device_controller = _import_device_controller_module()
+    app = automate_mqtt.AutomationApp()
+    app.old_value = automate_mqtt.POWER_MODE_NETZERO_MINUS
+    app.value = automate_mqtt.POWER_MODE_NETZERO_MINUS
+    app.fast_loop_active = False
+    app._last_p1_read_source = "mqtt"
+    app.schedule_controller = SimpleNamespace(last_schedule_entry=None)
+    app.logger = _noop_logger()
+    app.status_api = SimpleNamespace(post_update=lambda *args, **kwargs: None)
+    app.last_total_act = None
+    app.last_total_act_ret = None
+    app.mqtt_helper = None
+
+    captured = {}
+
+    def _set_power(desired_power, p1_data=None, schedule_entry=None, zendure_data=None, p1_source=None):
+        captured["desired_power"] = desired_power
+        captured["p1_data"] = p1_data
+        return device_controller.PowerResult(success=True, power=-300)
+
+    app.controller = SimpleNamespace(set_power=_set_power)
+
+    app._apply_power_settings(automate_mqtt.POWER_MODE_NETZERO_MINUS, {"total_power": 320})
+
+    assert captured["desired_power"] == automate_mqtt.POWER_MODE_NETZERO_MINUS
+    assert captured["p1_data"] == {"total_power": 320}
+
+
 def test_apply_power_settings_enables_and_clears_fast_loop():
     automate_mqtt = _import_automate_mqtt_module()
     app = automate_mqtt.AutomationApp()
@@ -245,6 +275,29 @@ def test_apply_power_settings_enables_and_clears_fast_loop():
     app._apply_power_settings(automate_mqtt.POWER_MODE_NETZERO, {"total_power": 450})
     assert app.fast_loop_active is False
     assert app.value == -600
+
+
+def test_check_battery_limits_blocks_netzero_minus_at_min_charge_level():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+    warnings = []
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda msg, *_args, **_kwargs: warnings.append(str(msg)),
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    app.controller = SimpleNamespace(limit_state=-1, check_battery_limits=lambda: None)
+
+    assert app._check_battery_limits(automate_mqtt.POWER_MODE_NETZERO_MINUS) == 0
+    assert any("preventing discharge" in msg for msg in warnings)
+
+
+def test_normalize_fallback_value_accepts_netzero_minus():
+    automate_mqtt = _import_automate_mqtt_module()
+    app = automate_mqtt.AutomationApp()
+
+    assert app._normalize_fallback_value("netzero-") == automate_mqtt.POWER_MODE_NETZERO_MINUS
 
 
 def test_run_cycle_uses_mqtt_triggered_reading_for_control():

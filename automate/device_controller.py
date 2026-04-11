@@ -381,7 +381,7 @@ class PowerAccumulator:
 
         self.last_zendure_data: Optional[dict] = None
         # Snapshot of the active schedule entry copied in from the automation loop.
-        # Expected shape: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
+        # Expected shape: {"time": "HHmm", "value": int|"netzero"|"netzero+"|"netzero-"|None, "key": str|None}
         self.last_schedule_entry: Optional[Dict[str, Any]] = None
 
     def _log(self, level: str, message: str, message_key: Optional[str] = None):
@@ -822,20 +822,21 @@ class AutomateController(BaseDeviceController):
 
     def calculate_netzero_power(
         self,
-        mode: Literal['netzero', 'netzero+'] = 'netzero',
+        mode: Literal['netzero', 'netzero+', 'netzero-'] = 'netzero',
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
         zendure_data: Optional[Dict[str, Any]] = None,
         p1_source: Optional[str] = None,
         ) -> int:
         """
-        Calculate the actual power value needed to achieve netzero/netzero+ mode.
+        Calculate the actual power value needed to achieve a dynamic netzero mode.
 
         This method uses caller-supplied P1 meter data and current Zendure state,
         then calculates what power setting is needed to achieve zero feed-in.
 
         Args:
-            mode: 'netzero' (discharge only) or 'netzero+' (only charge, no discharge)
+            mode: 'netzero' (bidirectional), 'netzero+' (charge only), or
+                'netzero-' (discharge only)
             p1_data: Required normalized P1 meter data from the caller.
 
         Returns:
@@ -900,28 +901,13 @@ class AutomateController(BaseDeviceController):
             electric_level=electric_level,
         )
 
-        # Convert to controller convention (positive=charge, negative=discharge)
-        # Handle netzero+ mode (no discharge, only charge)
+        # Convert to controller convention (positive=charge, negative=discharge).
         if mode == 'netzero+':
             raw_target_power = new_input if new_input > 0 else 0
-
-            # If calculation says to discharge, return 1 (netzero+ doesn't discharge)
-            # if new_input > 0: # Charging is requested?
-            #     return new_input
-            # return 0
-
-            # if new_output > 0: # Discharging is requested?
-            #     return 0 # Netzero+ doesn't discharge, return 0
-            # else:
-            #     # Charging or stopped - if stopped (0), return 1 to avoid standby
-            #     return new_input if new_input > 0 else 0
-
+        elif mode == 'netzero-':
+            raw_target_power = -new_output if new_output > 0 else 0
         else:
-
-            if self.config.get('NETZERO_BI_DIRECTIONAL', False): # experimental to make netzero a true bi directional netzero mode
-                raw_target_power = -new_output + new_input
-            else: # default to the original netzero mode
-                raw_target_power = -new_output if new_output > 0 else 0
+            raw_target_power = -new_output + new_input
 
         self._last_dynamic_power_context = {
             'mode': mode,
@@ -980,7 +966,7 @@ class AutomateController(BaseDeviceController):
 
     def _resolve_power_target(
         self,
-        value: Union[int, Literal['netzero', 'netzero+'], None],
+        value: Union[int, Literal['netzero', 'netzero+', 'netzero-'], None],
         p1_data: Optional[Dict[str, Any]] = None,
         schedule_entry: Optional[Dict[str, Any]] = None,
         zendure_data: Optional[Dict[str, Any]] = None,
@@ -989,7 +975,7 @@ class AutomateController(BaseDeviceController):
         if isinstance(value, int):
             return value
 
-        if value == 'netzero' or value == 'netzero+' or value is None:
+        if value in ('netzero', 'netzero+', 'netzero-') or value is None:
             mode = value if value is not None else 'netzero'
             if p1_data is None:
                 raise ValueError("P1 meter data must be supplied by the caller for dynamic power modes")
@@ -1063,7 +1049,7 @@ class AutomateController(BaseDeviceController):
 
             return final_power
 
-        raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', or None")
+        raise ValueError(f"Invalid power value: {value}. Must be int, 'netzero', 'netzero+', 'netzero-', or None")
 
     def _apply_power_feed_max_delta(self, target_power: int) -> int:
         if not isinstance(target_power, int):
@@ -1089,7 +1075,7 @@ class AutomateController(BaseDeviceController):
     def _apply_schedule_power_bounds(
         self,
         power_value: int,
-        mode: Literal['netzero', 'netzero+'],
+        mode: Literal['netzero', 'netzero+', 'netzero-'],
         schedule_entry: Optional[Dict[str, Any]] = None,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> int:
@@ -1155,21 +1141,9 @@ class AutomateController(BaseDeviceController):
 
         return bounded_power
 
-            # # Regular netzero mode
-            # if new_output > 0: # Discharging is requested?
-            #     # Discharging: return negative value
-            #     return -new_output
-            # elif new_input > 0: # Charging is requested?
-            #     # If this is the case we might be starting oscilating due to readings lagging behind....
-            #     # Charging: return positive value
-            #     # return new_input, for now netzero mode is not allowed to charge
-            #     return 0
-            # else:
-            #     return 0
-
     def set_power(
             self,
-            value: Union[int, Literal['netzero', 'netzero+'], None] = 'netzero',
+            value: Union[int, Literal['netzero', 'netzero+', 'netzero-'], None] = 'netzero',
             p1_data: Optional[Dict[str, Any]] = None,
             schedule_entry: Optional[Dict[str, Any]] = None,
             zendure_data: Optional[Dict[str, Any]] = None,
@@ -1181,9 +1155,10 @@ class AutomateController(BaseDeviceController):
         Args:
             value: Power setting:
                 - int: Specific power feed in watts (positive=charge, negative=discharge, 0=stop)
-                - 'netzero' or None: Use dynamic zero feed-in calculation (default)
+                - 'netzero' or None: Use bidirectional dynamic zero feed-in calculation (default)
                 - 'netzero+': Use dynamic zero feed-in calculation, but only charge (no discharge)
-            p1_data: Required normalized P1 meter data when value is netzero/netzero+.
+                - 'netzero-': Use dynamic zero feed-in calculation, but only discharge (no charge)
+            p1_data: Required normalized P1 meter data when value is netzero/netzero+/netzero-.
 
         Returns:
             PowerResult: Result object with success status, power value, and optional error message
@@ -1206,7 +1181,7 @@ class AutomateController(BaseDeviceController):
             )
         except ValueError as exc:
             error_message = str(exc)
-            dynamic_mode = value == 'netzero' or value == 'netzero+' or value is None
+            dynamic_mode = value in ('netzero', 'netzero+', 'netzero-') or value is None
             if dynamic_mode and "must be supplied by the caller" not in error_message:
                 error_message = f"Zero feed-in calculation failed: {error_message}"
             return PowerResult(success=False, power=0, error=error_message)
@@ -1223,7 +1198,7 @@ class AutomateController(BaseDeviceController):
         target_power = self._apply_power_feed_max_delta(target_power)
         max_delta_limited = target_power != requested_power
 
-        if value in ('netzero', 'netzero+') or value is None:
+        if value in ('netzero', 'netzero+', 'netzero-') or value is None:
             raw_target = runtime_context.get('raw_power', requested_power)
             if max_delta_limited:
                 reason = 'max_delta'
@@ -1253,7 +1228,7 @@ class AutomateController(BaseDeviceController):
             except ValueError:
                 max_power = None
             if min_power is not None or max_power is not None:
-                mode_label = value if value in ('netzero', 'netzero+') else 'fixed'
+                mode_label = value if value in ('netzero', 'netzero+', 'netzero-') else 'fixed'
                 slot_time = schedule_entry.get('time') if isinstance(schedule_entry, dict) else None
                 slot_key = schedule_entry.get('key') if isinstance(schedule_entry, dict) else None
                 self.log(
@@ -1405,7 +1380,7 @@ class ScheduleController(BaseDeviceController):
         self.schedule_data: Optional[List[Dict[str, Any]]] = None
         self.schedule_date: Optional[date] = None
         # Snapshot of the active resolved schedule entry at the last lookup.
-        # Expected shape from the schedule API: {"time": "HHmm", "value": int|"netzero"|"netzero+"|None, "key": str|None}
+        # Expected shape from the schedule API: {"time": "HHmm", "value": int|"netzero"|"netzero+"|"netzero-"|None, "key": str|None}
         self.last_schedule_entry: Optional[Dict[str, Any]] = None
 
     def _get_current_time_str(self) -> str:
@@ -1480,7 +1455,7 @@ class ScheduleController(BaseDeviceController):
         self,
         resolved: List[Dict[str, Any]],
         current_time: str
-        ) -> Optional[Union[int, Literal['netzero', 'netzero+']]]:
+        ) -> Optional[Union[int, Literal['netzero', 'netzero+', 'netzero-']]]:
         """
         Find the schedule value for the current time.
 
@@ -1491,7 +1466,7 @@ class ScheduleController(BaseDeviceController):
             current_time: Current time in "HHMM" format (e.g., "1811" or "2300")
 
         Returns:
-            The value from the matching entry (int, 'netzero', 'netzero+'), or None if no match found
+            The value from the matching entry (int, 'netzero', 'netzero+', 'netzero-'), or None if no match found
 
         Raises:
             ValueError: If current_time format is invalid
@@ -1548,7 +1523,7 @@ class ScheduleController(BaseDeviceController):
     def get_desired_power(
         self,
         refresh: bool = False
-        ) -> Optional[Union[int, Literal['netzero', 'netzero+']]]:
+        ) -> Optional[Union[int, Literal['netzero', 'netzero+', 'netzero-']]]:
         """
         Determine desired power setting based on current schedule.
 
@@ -1556,7 +1531,7 @@ class ScheduleController(BaseDeviceController):
             refresh: If True, fetch fresh data from API; if False, use cached data
 
         Returns:
-            Desired power value (int, 'netzero', 'netzero+', or None)
+            Desired power value (int, 'netzero', 'netzero+', 'netzero-', or None)
 
         Raises:
             ValueError: If schedule data is invalid or missing required fields

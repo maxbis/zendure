@@ -59,8 +59,10 @@ RETENTION_CLEANUP_LOOP_INTERVAL = 500
 # Power mode strings and validation defaults
 POWER_MODE_NETZERO = "netzero"
 POWER_MODE_NETZERO_PLUS = "netzero+"
+POWER_MODE_NETZERO_MINUS = "netzero-"
 POWER_MODE_NETZERO_VALIDATION_W = -250
 POWER_MODE_NETZERO_PLUS_VALIDATION_W = 250
+POWER_MODE_NETZERO_MINUS_VALIDATION_W = -250
 
 # HTTP API endpoints
 API_PATH_TEST = "/api/test"
@@ -680,7 +682,7 @@ class AutomationApp:
             return None
         if isinstance(fallback_value, str):
             normalized = fallback_value.strip().lower()
-            if normalized in (POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS):
+            if normalized in (POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS, POWER_MODE_NETZERO_MINUS):
                 return normalized
             if normalized.lstrip('-').isdigit():
                 return int(normalized)
@@ -836,6 +838,8 @@ class AutomationApp:
             validation_power = POWER_MODE_NETZERO_VALIDATION_W
         elif desired_power == POWER_MODE_NETZERO_PLUS:
             validation_power = POWER_MODE_NETZERO_PLUS_VALIDATION_W
+        elif desired_power == POWER_MODE_NETZERO_MINUS:
+            validation_power = POWER_MODE_NETZERO_MINUS_VALIDATION_W
 
         if isinstance(validation_power, int):
             if validation_power > 0 and self.controller.limit_state == 1:
@@ -862,7 +866,7 @@ class AutomationApp:
         """Apply the power settings if changed."""
         should_apply = (
             self.old_value != desired_power
-            or (desired_power in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS])
+            or (desired_power in [POWER_MODE_NETZERO, POWER_MODE_NETZERO_PLUS, POWER_MODE_NETZERO_MINUS])
         )
         if not should_apply:
             self.value = desired_power

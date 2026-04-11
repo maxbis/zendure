@@ -253,7 +253,7 @@ function renderMiniTimeline(resolved, currentTime) {
                 barHeight = Math.min(100, 10 + (absValue / 3)) + '%';
                 barOpacity = Math.min(1.0, 0.6 + (absValue / 400));
             }
-        } else if (value === 'netzero' || value === 'netzero+') {
+        } else if (value === 'netzero' || value === 'netzero-' || value === 'netzero+') {
             barHeight = '80%';
             barOpacity = 0.9;
         }
@@ -329,7 +329,7 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
     let maxAbsValue = 0;
     const allValues = [...todayResolved, ...tomorrowResolved].map(slot => slot.value);
     allValues.forEach(val => {
-        if (val === 'netzero' || val === 'netzero+') {
+        if (val === 'netzero' || val === 'netzero-' || val === 'netzero+') {
             maxAbsValue = Math.max(maxAbsValue, 250);
         } else if (typeof val === 'number') {
             maxAbsValue = Math.max(maxAbsValue, Math.abs(val));
@@ -359,6 +359,8 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
             let barClass = 'bar-neutral';
             if (value === 'netzero') {
                 barClass = 'bar-netzero';
+            } else if (value === 'netzero-') {
+                barClass = 'bar-discharge';
             } else if (value === 'netzero+') {
                 barClass = 'bar-netzero-plus';
             } else if (typeof value === 'number') {
@@ -367,7 +369,7 @@ function renderBarGraph(todayResolved, tomorrowResolved, currentTime, todayDate,
 
             // Calculate bar height
             let barHeight = '4px'; // Minimum height
-            if (value === 'netzero' || value === 'netzero+') {
+            if (value === 'netzero' || value === 'netzero-' || value === 'netzero+') {
                 // Use 250 as proxy value
                 barHeight = Math.max(4, (250 / maxAbsValue) * 100) + '%';
             } else if (typeof value === 'number' && value !== 0) {

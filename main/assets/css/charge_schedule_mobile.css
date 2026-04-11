@@ -50,6 +50,11 @@ body.mobile-dark {
     font-weight: 500;
 }
 
+.netzero-minus {
+    color: var(--discharge-color);
+    font-weight: 500;
+}
+
 .netzero-plus {
     color: var(--netzero-plus-color);
     font-weight: 500;
@@ -268,6 +273,10 @@ body.mobile-dark {
     color: #64b5f6; /* Light blue for dark mode */
 }
 
+.schedule-item-value.netzero-minus {
+    color: #e57373; /* Match discharge-style emphasis for netzero- */
+}
+
 .schedule-item-value.netzero-plus {
     color: #85e157; /* Light yellow-green for dark mode */
 }
@@ -469,6 +478,10 @@ body.mobile-dark {
 
 #schedule-table tbody td.netzero {
     color: #64b5f6; /* Light blue for dark mode */
+}
+
+#schedule-table tbody td.netzero-minus {
+    color: #ef9a9a; /* Light red for dark mode */
 }
 
 #schedule-table tbody td.netzero-plus {
@@ -2223,8 +2236,8 @@ code {
 }
 .edit-modal-mode-options {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
     margin-top: 8px;
     text-align: center;
 }
@@ -2232,7 +2245,8 @@ code {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 14px;
+    min-height: 44px;
+    padding: 8px 10px;
     border-radius: 10px;
     background: #5a5a5a;
     border: 1px solid #777;
@@ -2257,15 +2271,17 @@ code {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    font-size: 0.9rem;
+    gap: 6px;
+    min-height: 100%;
+    font-size: 0.82rem;
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.1;
     text-align: center;
     white-space: nowrap;
+    transform: translateY(1px);
 }
 .edit-modal-toggle-icon {
-    font-size: 1rem;
+    font-size: 0.95rem;
     line-height: 1;
     flex: 0 0 auto;
 }
@@ -2297,9 +2313,19 @@ code {
     cursor: not-allowed;
 }
 
-@media (max-width: 360px) {
+@media (max-width: 420px) {
+    .edit-modal-toggle {
+        padding: 8px 8px;
+    }
+    .edit-modal-toggle-label {
+        gap: 4px;
+        font-size: 0.76rem;
+    }
+}
+
+@media (max-width: 320px) {
     .edit-modal-mode-options {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 #edit-modal input::selection {

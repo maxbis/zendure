@@ -21,12 +21,16 @@
                 <label>Value Mode</label>
                 <div class="edit-modal-mode-options">
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="netzero+" label="☀️ Only">
-                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">☀️</span><span>NetZero+</span></span>
+                        <input type="radio" name="val-mode" value="netzero-" label="⚡ Netzero-">
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">⚡</span><span>Netzero-</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
-                        <input type="radio" name="val-mode" value="netzero" label="Net Zero" checked>
+                        <input type="radio" name="val-mode" value="netzero" label="🔌 NetZero" checked>
                         <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🔌</span><span>NetZero</span></span>
+                    </label>
+                    <label class="edit-modal-toggle edit-modal-toggle-radio">
+                        <input type="radio" name="val-mode" value="netzero+" label="☀️ Netzero+">
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">☀️</span><span>Netzero+</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="fixed">

@@ -26,6 +26,10 @@ class EditModal {
         this.init();
     }
 
+    isDynamicMode(mode) {
+        return mode === 'netzero' || mode === 'netzero+' || mode === 'netzero-';
+    }
+
     init() {
         this.setScheduleEntries(this.collectEntriesFromTable());
         this.syncLimitRangeBounds();
@@ -472,7 +476,7 @@ class EditModal {
             if (!preserveConstraints) {
                 this.clearConstraintInputs();
             }
-        } else if (mode === 'netzero' || mode === 'netzero+') {
+        } else if (this.isDynamicMode(mode)) {
             if (wattsGroup) wattsGroup.style.display = 'none';
             if (constraintsGroup) constraintsGroup.style.display = 'grid';
             if (wattsInput) {
@@ -574,6 +578,18 @@ class EditModal {
                     if (this.limitsOff) this.limitsOff.checked = false;
                 }
                 this.syncModeInputs('netzero', { preserveConstraints: true });
+            } else if (value === 'netzero-') {
+                document.querySelector('input[name="val-mode"][value="netzero-"]').checked = true;
+                document.getElementById('inp-min-value').value = minValue ?? '';
+                document.getElementById('inp-max-value').value = maxValue ?? '';
+                if (minValue === '' && maxValue === '') {
+                    if (this.limitsOff) this.limitsOff.checked = true;
+                    if (this.limitsOn) this.limitsOn.checked = false;
+                } else {
+                    if (this.limitsOn) this.limitsOn.checked = true;
+                    if (this.limitsOff) this.limitsOff.checked = false;
+                }
+                this.syncModeInputs('netzero-', { preserveConstraints: true });
             } else if (value === 'netzero+') {
                 document.querySelector('input[name="val-mode"][value="netzero+"]').checked = true;
                 document.getElementById('inp-min-value').value = minValue ?? '';
@@ -664,7 +680,7 @@ class EditModal {
         const minRaw = minInput ? String(minInput.value || '').trim() : '';
         const maxRaw = maxInput ? String(maxInput.value || '').trim() : '';
         const mode = document.querySelector('input[name="val-mode"]:checked')?.value;
-        const enabled = mode === 'netzero' || mode === 'netzero+';
+        const enabled = this.isDynamicMode(mode);
 
         indicator.hidden = true;
         indicator.textContent = '';
@@ -879,6 +895,10 @@ class EditModal {
             val = 'netzero';
             minValue = this.getOptionalBoundValue('inp-min-value', 'minimum power limit');
             maxValue = this.getOptionalBoundValue('inp-max-value', 'maximum power limit');
+        } else if (mode === 'netzero-') {
+            val = 'netzero-';
+            minValue = this.getOptionalBoundValue('inp-min-value', 'minimum power limit');
+            maxValue = this.getOptionalBoundValue('inp-max-value', 'maximum power limit');
         } else if (mode === 'netzero+') {
             val = 'netzero+';
             minValue = this.getOptionalBoundValue('inp-min-value', 'minimum power limit');
@@ -930,6 +950,8 @@ class EditModal {
         let val;
         if (mode === 'netzero') {
             val = 'netzero';
+        } else if (mode === 'netzero-') {
+            val = 'netzero-';
         } else if (mode === 'netzero+') {
             val = 'netzero+';
         } else if (mode === 'auto') {

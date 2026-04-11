@@ -16,6 +16,8 @@ function getValueLabel($val)
         return '-';
     if ($val === 'netzero')
         return 'Net Zero';
+    if ($val === 'netzero-')
+        return 'Netzero-';
     if ($val === 'netzero+')
         return 'Solar Charge';
     if ($val === 'auto')
@@ -202,6 +204,8 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                             $catClass = 'neutral';
                             if ($val === 'netzero') {
                                 $catClass = 'netzero';
+                            } elseif ($val === 'netzero-') {
+                                $catClass = 'netzero-minus';
                             } elseif ($val === 'netzero+') {
                                 $catClass = 'netzero-plus';
                             } elseif (is_numeric($val)) {
@@ -253,6 +257,8 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                             $catClass = 'neutral';
                             if ($val === 'netzero') {
                                 $catClass = 'netzero';
+                            } elseif ($val === 'netzero-') {
+                                $catClass = 'netzero-minus';
                             } elseif ($val === 'netzero+') {
                                 $catClass = 'netzero-plus';
                             } elseif (is_numeric($val)) {
@@ -316,6 +322,8 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                             $valClass = 'neutral';
                             if ($v === 'netzero') {
                                 $valClass = 'netzero';
+                            } elseif ($v === 'netzero-') {
+                                $valClass = 'netzero-minus';
                             } elseif ($v === 'netzero+') {
                                 $valClass = 'netzero-plus';
                             } elseif (is_numeric($v)) {

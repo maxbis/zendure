@@ -736,11 +736,11 @@ def _import_device_controller_module():
     return device_controller
 
 
-def _make_minimal_automate_controller(device_controller_module, *, netzero_bi_directional: bool = True):
+def _make_minimal_automate_controller(device_controller_module):
     controller = device_controller_module.AutomateController.__new__(device_controller_module.AutomateController)
     controller.test_mode = True
     controller.config_path = Path("/tmp/config.jsonc")
-    controller.config = {"NETZERO_BI_DIRECTIONAL": netzero_bi_directional}
+    controller.config = {}
     controller.previous_power = None
     controller.power_feed_min_threshold = 30
     controller.power_feed_min_delta = 0
@@ -1181,6 +1181,28 @@ def test_command_handler_uses_dynamic_power_setter_for_netzero():
     assert calls
 
 
+def test_command_handler_uses_dynamic_power_setter_for_netzero_minus_alias():
+    automate_www = _import_automate_www_module()
+    calls = []
+    logs = []
+    handler = automate_www.CommandHandler(
+        controller=SimpleNamespace(set_power=lambda value: (_ for _ in ()).throw(AssertionError("should not call controller.set_power for dynamic mode"))),
+        schedule_controller=SimpleNamespace(),
+        status_api=SimpleNamespace(post_update=lambda *args, **kwargs: calls.append(("status", args, kwargs))),
+        logger=SimpleNamespace(
+            info=lambda msg, *_args, **_kwargs: logs.append(("info", str(msg))),
+            warning=lambda msg, *_args, **_kwargs: logs.append(("warning", str(msg))),
+            error=lambda msg, *_args, **_kwargs: logs.append(("error", str(msg))),
+            debug=lambda msg, *_args, **_kwargs: logs.append(("debug", str(msg))),
+        ),
+        dynamic_power_setter=lambda mode: (True, -321, None),
+    )
+
+    assert handler.handle("nzm") is True
+    assert any(level == "info" and "Power set to netzero-" in msg for level, msg in logs)
+    assert calls
+
+
 def test_controller_set_power_requires_p1_data_for_dynamic_modes():
     device_controller = _import_device_controller_module()
     controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
@@ -1307,31 +1329,11 @@ def test_controller_set_power_reversal_guard_uses_bounded_target_sign():
     assert any("bounded_target=100, final_target=-100" in msg for _, msg in logs)
 
 
-def test_calculate_netzero_power_blocks_charge_when_netzero_bi_directional_is_false():
+def test_calculate_netzero_power_allows_charge_in_bidirectional_netzero():
     device_controller = _import_device_controller_module()
     controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
     controller.log = lambda *args, **kwargs: None
-    controller.config = {"NETZERO_BI_DIRECTIONAL": False}
-    controller.accumulator = SimpleNamespace(last_zendure_data=None)
-    controller.previous_power = 0
-    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
-    controller._calculate_new_settings = lambda p1_power, current_input, current_output, electric_level: (250, 0)
-
-    result = device_controller.AutomateController.calculate_netzero_power(
-        controller,
-        mode="netzero",
-        p1_data={"total_power": -250},
-        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
-    )
-
-    assert result == 0
-
-
-def test_calculate_netzero_power_allows_charge_when_netzero_bi_directional_is_true():
-    device_controller = _import_device_controller_module()
-    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
-    controller.log = lambda *args, **kwargs: None
-    controller.config = {"NETZERO_BI_DIRECTIONAL": True}
+    controller.config = {}
     controller.accumulator = SimpleNamespace(last_zendure_data=None)
     controller.previous_power = 0
     controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
@@ -1345,6 +1347,26 @@ def test_calculate_netzero_power_allows_charge_when_netzero_bi_directional_is_tr
     )
 
     assert result == 250
+
+
+def test_calculate_netzero_minus_power_never_charges():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.config = {}
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+    controller._calculate_new_settings = lambda p1_power, current_input, current_output, electric_level: (250, 0)
+
+    result = device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero-",
+        p1_data={"total_power": -250},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert result == 0
 
 
 def test_calculate_netzero_plus_power_never_discharges():
@@ -1366,6 +1388,26 @@ def test_calculate_netzero_plus_power_never_discharges():
     assert result == 0
 
 
+def test_calculate_netzero_minus_power_returns_discharge_when_requested():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.config = {}
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+    controller._calculate_new_settings = lambda p1_power, current_input, current_output, electric_level: (0, 250)
+
+    result = device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero-",
+        p1_data={"total_power": 250},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert result == -250
+
+
 @pytest.mark.parametrize(
     ("target_w", "p1_power", "expected_adjusted"),
     [
@@ -1377,7 +1419,7 @@ def test_calculate_netzero_power_applies_configured_target_offset(target_w, p1_p
     device_controller = _import_device_controller_module()
     controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
     controller.log = lambda *args, **kwargs: None
-    controller.config = {"NETZERO_BI_DIRECTIONAL": True, "NETZERO_TARGET_W": target_w}
+    controller.config = {"NETZERO_TARGET_W": target_w}
     controller.accumulator = SimpleNamespace(last_zendure_data=None)
     controller.previous_power = 0
     controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
@@ -1401,6 +1443,34 @@ def test_calculate_netzero_power_applies_configured_target_offset(target_w, p1_p
     assert controller._last_dynamic_power_context["p1_power"] == p1_power
     assert controller._last_dynamic_power_context["netzero_target_w"] == target_w
     assert controller._last_dynamic_power_context["adjusted_p1_power"] == expected_adjusted
+
+
+def test_calculate_netzero_minus_power_applies_configured_target_offset():
+    device_controller = _import_device_controller_module()
+    controller = device_controller.AutomateController.__new__(device_controller.AutomateController)
+    controller.log = lambda *args, **kwargs: None
+    controller.config = {"NETZERO_TARGET_W": -25}
+    controller.accumulator = SimpleNamespace(last_zendure_data=None)
+    controller.previous_power = 0
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+
+    captured = {}
+
+    def fake_calculate_new_settings(p1_power, current_input, current_output, electric_level):
+        captured["p1_power"] = p1_power
+        return (0, 0)
+
+    controller._calculate_new_settings = fake_calculate_new_settings
+
+    device_controller.AutomateController.calculate_netzero_power(
+        controller,
+        mode="netzero-",
+        p1_data={"total_power": 250},
+        zendure_data={"properties": {"inputLimit": 0, "outputLimit": 0, "electricLevel": 50}},
+    )
+
+    assert captured["p1_power"] == 275
+    assert controller._last_dynamic_power_context["netzero_target_w"] == -25
 
 
 def test_controller_set_power_applies_max_delta_to_fixed_values():
@@ -3085,6 +3155,17 @@ def test_runtime_condition_false_uses_fallback():
     assert app._apply_runtime_conditions("netzero") == 0
 
 
+def test_runtime_condition_false_accepts_netzero_minus_fallback():
+    slot = {
+        "time": "2000",
+        "value": "netzero",
+        "runtime_conditions": [{"field": "electricity_level", "op": ">=", "value": 90}],
+        "fallback_value": "netzero-",
+    }
+    app, _logs = _build_app_with_slot(slot, electric_level=88)
+    assert app._apply_runtime_conditions("netzero") == "netzero-"
+
+
 def test_runtime_condition_false_logs_slot_level_and_bounds():
     slot = {
         "time": "2000",
@@ -3168,6 +3249,22 @@ def test_runtime_invalid_condition_is_skipped_and_does_not_break():
     app, logs = _build_app_with_slot(slot, electric_level=88)
     assert app._apply_runtime_conditions("netzero") == "netzero"
     assert any(level == "warning" and "Unsupported runtime field" in msg for level, msg in logs)
+
+
+def test_check_battery_limits_blocks_netzero_minus_at_min_charge_level():
+    automate_www = _import_automate_www_module()
+    app = automate_www.AutomationApp()
+    warnings = []
+    app.logger = SimpleNamespace(
+        info=lambda *_args, **_kwargs: None,
+        warning=lambda msg, *_args, **_kwargs: warnings.append(str(msg)),
+        error=lambda *_args, **_kwargs: None,
+        debug=lambda *_args, **_kwargs: None,
+    )
+    app.controller = SimpleNamespace(limit_state=-1, check_battery_limits=lambda: None)
+
+    assert app._check_battery_limits(automate_www.POWER_MODE_NETZERO_MINUS) == 0
+    assert any("preventing discharge" in msg for msg in warnings)
 
 
 if __name__ == "__main__":
