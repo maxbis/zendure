@@ -83,15 +83,15 @@
     ];
     const editorHelpTexts = {
         'inp-name': 'Rule name shown in the rules list and source labels.',
-        'inp-value-mode': 'Select output mode: fixed watts, netzero, or netzero+.',
+        'inp-value-mode': 'Select output mode: fixed watts, netzero, netzero-, or netzero+.',
         'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
         'inp-color': 'Optional hex color override for graph bars when this rule is active, for example #FF7043.',
         'inp-month': 'Optional month filter. Comma-separated values 1-12 (e.g. 10,11,12,1,2,3).',
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
-        'inp-min-value': 'Optional signed minimum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
-        'inp-max-value': 'Optional signed maximum power for netzero and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
+        'inp-min-value': 'Optional signed minimum power for netzero, netzero-, and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
+        'inp-max-value': 'Optional signed maximum power for netzero, netzero-, and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail.',
     };
     const trackedFieldIds = [
@@ -118,8 +118,9 @@
         'inp-fallback-value',
     ];
     const runtimeOnlyConditionFields = new Set(['electricity_level', 'electric_level', 'electricLevel']);
-    const LIMIT_MIN = -1200;
-    const LIMIT_MAX = 1200;
+    const EDIT_RULES_CONFIG = window.EDIT_RULES_CONFIG || {};
+    const LIMIT_MIN = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMin)) ? Number(EDIT_RULES_CONFIG.limitMin) : -1200;
+    const LIMIT_MAX = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMax)) ? Number(EDIT_RULES_CONFIG.limitMax) : 1200;
     const LIMIT_STEP = 100;
     const SHOW_ALL_PROFILE_ID = 'show_all';
 
@@ -305,7 +306,7 @@
         if (rule.max_time !== undefined && rule.max_time !== null && rule.max_time !== '') {
             out.max_time = String(rule.max_time);
         }
-        if (rule.value === 'netzero' || rule.value === 'netzero+') {
+        if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') {
             out.min_power = rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== ''
                 ? Number(rule.min_power)
                 : null;
@@ -400,8 +401,9 @@
         if (!els.limitsSlider || !els.limitsSelectedRange || !els.limitsMinRange || !els.limitsMaxRange) return;
         const minValue = snapLimitValue(els.limitsMinRange.value);
         const maxValue = snapLimitValue(els.limitsMaxRange.value);
-        const startPercent = ((minValue - LIMIT_MIN) / (LIMIT_MAX - LIMIT_MIN)) * 100;
-        const endPercent = ((maxValue - LIMIT_MIN) / (LIMIT_MAX - LIMIT_MIN)) * 100;
+        const totalRange = LIMIT_MAX - LIMIT_MIN;
+        const startPercent = totalRange === 0 ? 0 : ((minValue - LIMIT_MIN) / totalRange) * 100;
+        const endPercent = totalRange === 0 ? 100 : ((maxValue - LIMIT_MIN) / totalRange) * 100;
         els.limitsSelectedRange.style.left = startPercent + '%';
         els.limitsSelectedRange.style.width = Math.max(0, endPercent - startPercent) + '%';
         els.limitsSlider.style.setProperty('--limits-start', startPercent + '%');
@@ -448,7 +450,7 @@
 
     function syncLimitsState(options) {
         const opts = options || {};
-        const modeAllowsLimits = els.inpValueMode.value === 'netzero' || els.inpValueMode.value === 'netzero+';
+        const modeAllowsLimits = els.inpValueMode.value === 'netzero' || els.inpValueMode.value === 'netzero-' || els.inpValueMode.value === 'netzero+';
         const limitsEnabled = modeAllowsLimits && !!els.limitsOn?.checked;
 
         if (els.limitsRow) {
@@ -659,6 +661,7 @@
         els.inpFallbackValue.classList.remove(
             'fallback-neutral',
             'fallback-netzero',
+            'fallback-netzero-minus',
             'fallback-netzero-plus',
             'fallback-negative',
             'fallback-positive'
@@ -670,6 +673,10 @@
         }
         if (value === 'netzero') {
             els.inpFallbackValue.classList.add('fallback-netzero');
+            return;
+        }
+        if (value === 'netzero-') {
+            els.inpFallbackValue.classList.add('fallback-netzero-minus');
             return;
         }
         if (value === 'netzero+') {
@@ -689,10 +696,14 @@
     function updateValueModeTone() {
         if (!els.inpValueMode) return;
         const value = String(els.inpValueMode.value || '');
-        els.inpValueMode.classList.remove('value-mode-fixed', 'value-mode-netzero', 'value-mode-netzero-plus');
+        els.inpValueMode.classList.remove('value-mode-fixed', 'value-mode-netzero', 'value-mode-netzero-minus', 'value-mode-netzero-plus');
 
         if (value === 'netzero') {
             els.inpValueMode.classList.add('value-mode-netzero');
+            return;
+        }
+        if (value === 'netzero-') {
+            els.inpValueMode.classList.add('value-mode-netzero-minus');
             return;
         }
         if (value === 'netzero+') {
@@ -1036,7 +1047,7 @@
         els.editorTitle.textContent = safeName ? ('Editing Rule #' + (idx + 1) + ' · ' + safeName) : ('Editing Rule #' + (idx + 1));
         els.inpName.value = rule.name || '';
 
-        if (rule.value === 'netzero' || rule.value === 'netzero+') {
+        if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') {
             els.inpValueMode.value = rule.value;
             els.inpFixedValue.value = '';
             els.inpFixedValue.disabled = true;
@@ -1122,7 +1133,7 @@
     function readRuleFromForm() {
         let value;
         const mode = els.inpValueMode.value;
-        if (mode === 'netzero' || mode === 'netzero+') {
+        if (mode === 'netzero' || mode === 'netzero-' || mode === 'netzero+') {
             value = mode;
         } else {
             const raw = els.inpFixedValue.value.trim();
@@ -1162,7 +1173,7 @@
         const maxTime = els.inpMaxTime.value.trim();
         if (maxTime) rule.max_time = maxTime;
 
-        if (mode === 'netzero' || mode === 'netzero+') {
+        if (mode === 'netzero' || mode === 'netzero-' || mode === 'netzero+') {
             rule.min_power = null;
             rule.max_power = null;
             if (els.limitsOn && els.limitsOn.checked) {
@@ -1185,7 +1196,7 @@
 
         const fallbackRaw = els.inpFallbackValue.value.trim();
         if (fallbackRaw) {
-            if (fallbackRaw === 'netzero' || fallbackRaw === 'netzero+') {
+            if (fallbackRaw === 'netzero' || fallbackRaw === 'netzero-' || fallbackRaw === 'netzero+') {
                 rule.fallback_value = fallbackRaw;
             } else {
                 const fallbackNumber = Number(fallbackRaw);
@@ -1341,7 +1352,7 @@
             .map(normalizeRule)
             .filter(function (rule) {
                 if (!rule || !rule.name) return false;
-                if (rule.value === 'netzero' || rule.value === 'netzero+') return true;
+                if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') return true;
                 return Number.isFinite(Number(rule.value));
             });
         return normalized;

@@ -4,10 +4,14 @@
 
 date_default_timezone_set('Europe/Amsterdam');
 
+require_once __DIR__ . '/includes/config_loader.php';
+
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
 $profilesFile = __DIR__ . '/data/rule_profiles.json';
 const SHOW_ALL_PROFILE_ID = 'show_all';
 const DEFAULT_PROFILE_IDS = ['profile_a', 'profile_b', 'profile_c', 'profile_d', 'profile_e'];
+const DEFAULT_LIMIT_MIN = -1200;
+const DEFAULT_LIMIT_MAX = 1200;
 
 function jsonResponse(array $payload, int $status = 200): void
 {
@@ -51,7 +55,22 @@ function writeRulesFileAtomic(string $path, array $data): void
 
 function validateValue($value): bool
 {
-    return $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
+}
+
+function resolveRuleEditorLimits(): array
+{
+    $min = ConfigLoader::get('minGridPower', DEFAULT_LIMIT_MIN);
+    $max = ConfigLoader::get('maxGridPower', DEFAULT_LIMIT_MAX);
+
+    $min = is_numeric($min) ? (int) $min : DEFAULT_LIMIT_MIN;
+    $max = is_numeric($max) ? (int) $max : DEFAULT_LIMIT_MAX;
+
+    if ($min > $max) {
+        return ['min' => DEFAULT_LIMIT_MIN, 'max' => DEFAULT_LIMIT_MAX];
+    }
+
+    return ['min' => $min, 'max' => $max];
 }
 
 function generateRuleId(): string
@@ -297,7 +316,7 @@ function normalizeRules(array $rules): array
         if (array_key_exists('fallback_value', $rule) && $rule['fallback_value'] !== '' && $rule['fallback_value'] !== null && validateValue($rule['fallback_value'])) {
             $normalized['fallback_value'] = is_numeric($rule['fallback_value']) ? (int) $rule['fallback_value'] : (string) $rule['fallback_value'];
         }
-        if ($normalized['value'] === 'netzero' || $normalized['value'] === 'netzero+') {
+        if ($normalized['value'] === 'netzero' || $normalized['value'] === 'netzero-' || $normalized['value'] === 'netzero+') {
             $minValue = array_key_exists('min_power', $rule) ? normalizeOptionalRuleBound($rule['min_power']) : null;
             $maxValue = array_key_exists('max_power', $rule) ? normalizeOptionalRuleBound($rule['max_power']) : null;
             $normalized['min_power'] = $minValue;
@@ -403,6 +422,10 @@ if ($isApi) {
         jsonResponse(['success' => false, 'error' => $e->getMessage()], 500);
     }
 }
+
+$editorLimits = resolveRuleEditorLimits();
+$editorLimitMin = $editorLimits['min'];
+$editorLimitMax = $editorLimits['max'];
 ?>
 <!doctype html>
 <html lang="en">
@@ -500,6 +523,7 @@ if ($isApi) {
                         <select id="inp-value-mode" class="value-mode-select">
                             <option value="fixed">Fixed</option>
                             <option value="netzero">netzero</option>
+                            <option value="netzero-">netzero-</option>
                             <option value="netzero+">netzero+</option>
                         </select>
                     </div>
@@ -552,18 +576,18 @@ if ($isApi) {
                         <div class="limits-value-row">
                             <div class="limits-value-chip limits-value-chip-min">
                                 <span class="limits-value-label">Min</span>
-                                <strong id="limits-min-display">-1200 W</strong>
+                                <strong id="limits-min-display"><?php echo $editorLimitMin; ?> W</strong>
                             </div>
                             <div class="limits-value-chip limits-value-chip-max">
                                 <span class="limits-value-label">Max</span>
-                                <strong id="limits-max-display">1200 W</strong>
+                                <strong id="limits-max-display"><?php echo $editorLimitMax; ?> W</strong>
                             </div>
                         </div>
                         <div id="limits-slider" class="limits-slider">
                             <div class="limits-slider-track"></div>
                             <div id="limits-selected-range" class="limits-selected-range"></div>
-                            <input id="limits-min-range" class="limits-range limits-range-min" type="range" min="-1200" max="1200" step="100" value="-1200" aria-label="Minimum power limit">
-                            <input id="limits-max-range" class="limits-range limits-range-max" type="range" min="-1200" max="1200" step="100" value="1200" aria-label="Maximum power limit">
+                            <input id="limits-min-range" class="limits-range limits-range-min" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="100" value="<?php echo $editorLimitMin; ?>" aria-label="Minimum power limit">
+                            <input id="limits-max-range" class="limits-range limits-range-max" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="100" value="<?php echo $editorLimitMax; ?>" aria-label="Maximum power limit">
                         </div>
                         <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                     </div>
@@ -577,6 +601,7 @@ if ($isApi) {
                         <select id="inp-fallback-value" class="fallback-select">
                             <option value="">Select fallback value</option>
                             <option value="netzero">netzero</option>
+                            <option value="netzero-">netzero-</option>
                             <option value="netzero+">netzero+</option>
                             <option value="-800">-800</option>
                             <option value="-400">-400</option>
@@ -608,6 +633,10 @@ if ($isApi) {
 <script>
 window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8'); ?>?api=1';
 window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
+window.EDIT_RULES_CONFIG = <?php echo json_encode([
+    'limitMin' => $editorLimitMin,
+    'limitMax' => $editorLimitMax,
+], JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>
 <script src="assets/js/edit_rules_color_picker.js"></script>
