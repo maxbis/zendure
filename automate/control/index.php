@@ -125,6 +125,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
       flex-direction: column;
       gap: 6px;
       flex: 0 0 120px;
+      min-width: 0;
     }
     .control-label {
       font-size: 13px;
@@ -158,6 +159,19 @@ foreach ($groupedCommands as $groupKey => $commands) {
       align-self: flex-end;
       min-height: 38px;
       white-space: nowrap;
+      min-width: 0;
+    }
+    @media (max-width: 820px) {
+      .control-row {
+        align-items: stretch;
+      }
+      .netzero-submit {
+        flex: 1 0 100%;
+        width: 100%;
+      }
+      .control-help-inline {
+        max-width: 100%;
+      }
     }
     @media (max-width: 640px) {
       .control-row {
