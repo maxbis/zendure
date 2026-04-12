@@ -746,6 +746,13 @@ body.mobile-dark {
     background: #f44336;
 }
 
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-minus"]::after {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #f44336;
+}
+
 .price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-plus"]::after {
     width: 5px;
     height: 5px;
