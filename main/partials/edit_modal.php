@@ -34,7 +34,7 @@
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="fixed">
-                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🎚️</span><span>Watts&nbsp;(W)</span></span>
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🎚️</span><span>Value</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="clear" label="Clear">
