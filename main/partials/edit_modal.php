@@ -34,11 +34,11 @@
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="fixed">
-                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">⚡</span><span>Watts&nbsp;(W)</span></span>
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🎚️</span><span>Watts&nbsp;(W)</span></span>
                     </label>
                     <label class="edit-modal-toggle edit-modal-toggle-radio">
                         <input type="radio" name="val-mode" value="clear" label="Clear">
-                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🗑️</span><span>Clear (0 W)</span></span>
+                        <span class="edit-modal-toggle-label"><span class="edit-modal-toggle-icon">🗑️</span><span>Clear</span></span>
                     </label>
                 </div>
                 <input type="radio" name="val-mode" value="auto" label="Auto" class="edit-modal-hidden-mode" tabindex="-1" aria-hidden="true">

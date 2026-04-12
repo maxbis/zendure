@@ -37,20 +37,22 @@ function renderToday(resolved, currentHour, currentTime) {
         const isCurrent = (time === currentActiveTime);
 
         const bgClass = getTimeClass(h);
-        const valDisplay = getValueLabel(val);
+        const valDisplay = getScheduleValueDisplay(slot);
         const valClass = getValueClass(val);
         const isConditionSlot = slot && slot.source === 'condition';
         const ruleLabel = formatRuleDisplayLabel(slot);
         const ruleColor = getScheduleRuleColor(slot);
 
         const div = document.createElement('div');
-        div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
+        div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''} ${isConditionSlot && ruleName ? 'has-meta' : ''}`;
         div.innerHTML = `
             <div class="schedule-item-main">
                 <div class="schedule-item-time">${formatTime(time)}</div>
-                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                <div class="schedule-item-content">
+                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                    ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                </div>
             </div>
-            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
             ${slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
         `;
         container.appendChild(div);
@@ -78,7 +80,7 @@ function renderTomorrow(resolved) {
         const time = String(slot.time);
         const h = parseInt(time.substring(0, 2), 10);
         const bgClass = getTimeClass(h);
-        const valDisplay = getValueLabel(slot.value);
+        const valDisplay = getScheduleValueDisplay(slot);
         const valClass = getValueClass(slot.value);
         const isConditionSlot = slot && slot.source === 'condition';
         const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
@@ -86,13 +88,15 @@ function renderTomorrow(resolved) {
         const ruleColor = getScheduleRuleColor(slot);
 
         const div = document.createElement('div');
-        div.className = `schedule-item ${bgClass}`;
+        div.className = `schedule-item ${bgClass} ${isConditionSlot && ruleName ? 'has-meta' : ''}`;
         div.innerHTML = `
             <div class="schedule-item-main">
                 <div class="schedule-item-time">${formatTime(time)}</div>
-                <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                <div class="schedule-item-content">
+                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                    ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                </div>
             </div>
-            ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
         `;
         container.appendChild(div);
     });
