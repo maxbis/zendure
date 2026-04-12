@@ -1618,6 +1618,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
         if (value === 'netzero') {
             return 'netzero';
         }
+        if (value === 'netzero-') {
+            return 'netzero-minus';
+        }
         if (value === 'netzero+') {
             return 'netzero-plus';
         }
@@ -1634,6 +1637,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
                 .trim();
             if (normalized === 'net zero' || normalized === 'netzero') {
                 return 'netzero';
+            }
+            if (normalized === 'netzero-' || normalized === 'net zero-') {
+                return 'netzero-minus';
             }
             if (normalized === 'netzero+' || normalized === 'solar charge' || normalized.includes('only')) {
                 return 'netzero-plus';
