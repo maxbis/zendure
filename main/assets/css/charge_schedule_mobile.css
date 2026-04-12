@@ -2269,6 +2269,44 @@ code {
     color: #e8e8e8;
     cursor: pointer;
     user-select: none;
+    position: relative;
+    isolation: isolate;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+.edit-modal-toggle::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 2px;
+    background: var(--edit-modal-toggle-ring, transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    transition: opacity 120ms ease;
+}
+.edit-modal-toggle:has(input[value="netzero-"]:not(:disabled)) {
+    background: color-mix(in srgb, var(--discharge-color) 20%, #5a5a5a);
+    border-color: color-mix(in srgb, var(--discharge-color) 36%, #777);
+}
+.edit-modal-toggle:has(input[value="netzero"]:not(:disabled)) {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--discharge-color) 20%, #5a5a5a) 0 50%,
+        color-mix(in srgb, var(--netzero-plus-color) 20%, #5a5a5a) 50% 100%
+    );
+    border-color: color-mix(in srgb, var(--netzero-plus-color) 30%, #777);
+}
+.edit-modal-toggle:has(input[value="netzero+"]:not(:disabled)) {
+    background: color-mix(in srgb, var(--netzero-plus-color) 20%, #5a5a5a);
+    border-color: color-mix(in srgb, var(--netzero-plus-color) 36%, #777);
+}
+.edit-modal-toggle:not(:has(input:checked)):not(:has(input:disabled)) {
+    filter: saturate(0.88) brightness(0.94);
 }
 .edit-modal-toggle input {
     position: absolute;
@@ -2295,34 +2333,93 @@ code {
     text-align: center;
     white-space: nowrap;
     transform: translateY(1px);
+    position: relative;
+    z-index: 1;
+    transition: color 120ms ease, filter 120ms ease, opacity 120ms ease;
 }
 .edit-modal-toggle-icon {
     font-size: 0.95rem;
     line-height: 1;
     flex: 0 0 auto;
+    transition: filter 120ms ease, opacity 120ms ease;
 }
 .edit-modal-toggle-check {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: #2f2f2f;
-    border: 1px solid #666;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(14, 23, 39, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.16);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
-    color: #1b1b1b;
-}
-.edit-modal-toggle:has(input:checked) {
-    background: #f2f59a;
-    border-color: #d6d97c;
-    color: #1f1f1f;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-.edit-modal-toggle:has(input:checked) .edit-modal-toggle-check {
-    background: #1e88e5;
-    border-color: #1e88e5;
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1;
     color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.34);
+    opacity: 0;
+    transform: scale(0.88);
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+.edit-modal-toggle:not(:has(input:checked)):not(:has(input:disabled)) .edit-modal-toggle-label,
+.edit-modal-toggle:not(:has(input:checked)):not(:has(input:disabled)) .edit-modal-toggle-icon {
+    opacity: 0.74;
+}
+.edit-modal-toggle:has(input:checked:not(:disabled)) {
+    color: #ffffff;
+}
+.edit-modal-toggle:has(input:checked:not(:disabled)) .edit-modal-toggle-label,
+.edit-modal-toggle:has(input:checked:not(:disabled)) .edit-modal-toggle-icon {
+    opacity: 1;
+    filter: none;
+}
+.edit-modal-toggle:has(input[value="netzero-"]:checked:not(:disabled)) {
+    border-color: color-mix(in srgb, var(--discharge-color) 78%, #ffffff);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--discharge-color) 34%, transparent),
+        0 0 20px color-mix(in srgb, var(--discharge-color) 24%, transparent);
+}
+.edit-modal-toggle:has(input[value="netzero"]:checked:not(:disabled)) {
+    --edit-modal-toggle-ring: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--discharge-color) 84%, #ffffff) 0 50%,
+        color-mix(in srgb, var(--netzero-plus-color) 84%, #ffffff) 50% 100%
+    );
+    border-color: transparent;
+    box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.04),
+        0 0 18px color-mix(in srgb, var(--discharge-color) 20%, transparent),
+        0 0 20px color-mix(in srgb, var(--netzero-plus-color) 20%, transparent);
+}
+.edit-modal-toggle:has(input[value="netzero"]:checked:not(:disabled))::after {
+    opacity: 1;
+}
+.edit-modal-toggle:has(input[value="netzero+"]:checked:not(:disabled)) {
+    border-color: color-mix(in srgb, var(--netzero-plus-color) 78%, #ffffff);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--netzero-plus-color) 34%, transparent),
+        0 0 20px color-mix(in srgb, var(--netzero-plus-color) 24%, transparent);
+}
+.edit-modal-toggle:has(input[value="fixed"]:checked:not(:disabled)) {
+    border-color: rgba(134, 176, 255, 0.78);
+    box-shadow:
+        0 0 0 2px rgba(134, 176, 255, 0.22),
+        0 0 20px rgba(100, 181, 246, 0.22);
+}
+.edit-modal-toggle:has(input[value="clear"]:checked:not(:disabled)) {
+    border-color: rgba(188, 124, 124, 0.74);
+    box-shadow:
+        0 0 0 2px rgba(188, 124, 124, 0.2),
+        0 0 20px rgba(188, 124, 124, 0.2);
+}
+.edit-modal-toggle:has(input:checked:not(:disabled)) .edit-modal-toggle-check {
+    opacity: 1;
+    transform: scale(1);
 }
 .edit-modal-toggle:has(input:disabled) {
     opacity: 0.42;
