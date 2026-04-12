@@ -248,7 +248,7 @@ function extractTimeFromKey($key)
 
 function isSupportedScheduleValue($value)
 {
-    return $value === 'auto' || $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'auto' || $value === 'netzero-' || $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
 }
 
 function matchesAndBeforeTime($entryKey, $datetime, $slotTime)
