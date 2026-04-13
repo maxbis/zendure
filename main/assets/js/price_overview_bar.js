@@ -145,7 +145,7 @@ function parseOptionalScheduleBound(value) {
 }
 
 function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry) {
-    if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero+') {
+    if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero-' && scheduleValue !== 'netzero+') {
         return '';
     }
 
@@ -183,7 +183,7 @@ function escapePopupHtml(value) {
 }
 
 function formatRuleOutputValue(value) {
-    if (value === 'netzero' || value === 'netzero+') {
+    if (value === 'netzero' || value === 'netzero-' || value === 'netzero+') {
         return String(value);
     }
     const numeric = Number(value);
@@ -278,7 +278,7 @@ function renderRuleDetailBody(rule) {
     const normalizedValue = typeof rule.value === 'string'
         ? rule.value.trim().toLowerCase()
         : '';
-    const isDynamicOutput = normalizedValue === 'netzero' || normalizedValue === 'netzero+';
+    const isDynamicOutput = normalizedValue === 'netzero' || normalizedValue === 'netzero-' || normalizedValue === 'netzero+';
     const fields = [];
     fields.push({
         label: 'Output',

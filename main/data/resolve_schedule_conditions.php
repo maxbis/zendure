@@ -145,7 +145,7 @@ function isValidRuleKey(string $key): bool
 
 function isValidRuleValue($value): bool
 {
-    return $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
 }
 
 function normalizeRuleValue($value)
@@ -734,7 +734,7 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
     if (array_key_exists('fallback_value', $entry) && isValidRuleValue($entry['fallback_value'])) {
         $rule['fallback_value'] = normalizeRuleValue($entry['fallback_value']);
     }
-    if ($rule['value'] === 'netzero' || $rule['value'] === 'netzero+') {
+    if ($rule['value'] === 'netzero' || $rule['value'] === 'netzero-' || $rule['value'] === 'netzero+') {
         $minValue = array_key_exists('min_power', $entry) ? normalizeOptionalRuleBoundValue($entry['min_power']) : null;
         $maxValue = array_key_exists('max_power', $entry) ? normalizeOptionalRuleBoundValue($entry['max_power']) : null;
         if ($minValue !== null) {
