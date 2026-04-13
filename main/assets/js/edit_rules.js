@@ -83,15 +83,15 @@
     ];
     const editorHelpTexts = {
         'inp-name': 'Rule name shown in the rules list and source labels.',
-        'inp-value-mode': 'Select output mode: fixed watts, netzero, netzero-, or netzero+.',
+        'inp-value-mode': 'Select output mode: fixed watts, netzero, netzero-, or netzero+. Netzero+ limits are charge-only, netzero- limits are discharge-only.',
         'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
         'inp-color': 'Optional hex color override for graph bars when this rule is active, for example #FF7043.',
         'inp-month': 'Optional month filter. Comma-separated values 1-12 (e.g. 10,11,12,1,2,3).',
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
-        'inp-min-value': 'Optional signed minimum power for netzero, netzero-, and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
-        'inp-max-value': 'Optional signed maximum power for netzero, netzero-, and netzero+ rules only. Negative = discharge, positive = charge. Spinner uses 100 W steps.',
+        'inp-min-value': 'Optional minimum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
+        'inp-max-value': 'Optional maximum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail.',
     };
     const trackedFieldIds = [
@@ -306,13 +306,14 @@
         if (rule.max_time !== undefined && rule.max_time !== null && rule.max_time !== '') {
             out.max_time = String(rule.max_time);
         }
-        if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') {
-            out.min_power = rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== ''
-                ? Number(rule.min_power)
-                : null;
-            out.max_power = rule.max_power !== undefined && rule.max_power !== null && rule.max_power !== ''
-                ? Number(rule.max_power)
-                : null;
+        if (isDynamicLimitMode(rule.value)) {
+            const normalizedLimits = normalizeLimitPair(
+                rule.min_power !== undefined && rule.min_power !== null && rule.min_power !== '' ? Number(rule.min_power) : null,
+                rule.max_power !== undefined && rule.max_power !== null && rule.max_power !== '' ? Number(rule.max_power) : null,
+                rule.value
+            );
+            out.min_power = normalizedLimits.minValue;
+            out.max_power = normalizedLimits.maxValue;
         }
         if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
             out.fallback_value = rule.fallback_value;
@@ -367,52 +368,96 @@
         input.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
     }
 
-    function snapLimitValue(rawValue) {
-        const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue)) return 0;
-        const snapped = Math.round(numericValue / LIMIT_STEP) * LIMIT_STEP;
-        return Math.min(LIMIT_MAX, Math.max(LIMIT_MIN, snapped));
+    function isDynamicLimitMode(mode) {
+        return mode === 'netzero' || mode === 'netzero-' || mode === 'netzero+';
     }
 
-    function parseStoredLimitValue(input, fallbackValue) {
+    function getLimitBoundsForMode(mode) {
+        if (mode === 'netzero+') {
+            return { min: 0, max: LIMIT_MAX };
+        }
+        if (mode === 'netzero-') {
+            return { min: LIMIT_MIN, max: 0 };
+        }
+        return { min: LIMIT_MIN, max: LIMIT_MAX };
+    }
+
+    function snapLimitValue(rawValue, mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero'), fallbackValue = 0) {
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue)) return fallbackValue;
+        const snapped = Math.round(numericValue / LIMIT_STEP) * LIMIT_STEP;
+        const bounds = getLimitBoundsForMode(mode);
+        return Math.min(bounds.max, Math.max(bounds.min, snapped));
+    }
+
+    function normalizeLimitPair(minValue, maxValue, mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero'), options = {}) {
+        const bounds = getLimitBoundsForMode(mode);
+        let normalizedMin = minValue === null ? null : snapLimitValue(minValue, mode, bounds.min);
+        let normalizedMax = maxValue === null ? null : snapLimitValue(maxValue, mode, bounds.max);
+
+        if (normalizedMin !== null && normalizedMax !== null && normalizedMin > normalizedMax) {
+            if (options.activeThumb === 'min') {
+                normalizedMax = normalizedMin;
+            } else if (options.activeThumb === 'max') {
+                normalizedMin = normalizedMax;
+            } else {
+                normalizedMin = normalizedMax;
+            }
+        }
+
+        return {
+            minValue: normalizedMin,
+            maxValue: normalizedMax,
+            bounds,
+        };
+    }
+
+    function parseStoredLimitValue(input, fallbackValue, mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero')) {
         if (!input) return fallbackValue;
         const rawValue = String(input.value || '').trim();
         if (rawValue === '') return fallbackValue;
-        return snapLimitValue(rawValue);
+        return snapLimitValue(rawValue, mode, fallbackValue);
     }
 
-    function formatLimitValue(value) {
-        const numericValue = snapLimitValue(value);
+    function formatLimitValue(value, mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero')) {
+        const numericValue = snapLimitValue(value, mode);
         return numericValue > 0 ? ('+' + numericValue + ' W') : (numericValue + ' W');
     }
 
-    function setLimitHiddenInput(input, value) {
+    function setLimitHiddenInput(input, value, mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero')) {
         if (!input) return;
         if (value === null || value === undefined || value === '') {
             input.value = '';
         } else {
-            input.value = String(snapLimitValue(value));
+            const bounds = getLimitBoundsForMode(mode);
+            const fallbackValue = input.id === 'inp-min-value' ? bounds.min : bounds.max;
+            input.value = String(snapLimitValue(value, mode, fallbackValue));
         }
         updateFieldState(input.id);
         updatePowerInputState(input);
     }
 
-    function updateLimitsVisuals() {
+    function updateLimitsVisuals(mode = (els.inpValueMode ? els.inpValueMode.value : 'netzero')) {
         if (!els.limitsSlider || !els.limitsSelectedRange || !els.limitsMinRange || !els.limitsMaxRange) return;
-        const minValue = snapLimitValue(els.limitsMinRange.value);
-        const maxValue = snapLimitValue(els.limitsMaxRange.value);
-        const totalRange = LIMIT_MAX - LIMIT_MIN;
-        const startPercent = totalRange === 0 ? 0 : ((minValue - LIMIT_MIN) / totalRange) * 100;
-        const endPercent = totalRange === 0 ? 100 : ((maxValue - LIMIT_MIN) / totalRange) * 100;
+        const bounds = getLimitBoundsForMode(mode);
+        els.limitsMinRange.min = String(bounds.min);
+        els.limitsMinRange.max = String(bounds.max);
+        els.limitsMaxRange.min = String(bounds.min);
+        els.limitsMaxRange.max = String(bounds.max);
+        const minValue = snapLimitValue(els.limitsMinRange.value, mode, bounds.min);
+        const maxValue = snapLimitValue(els.limitsMaxRange.value, mode, bounds.max);
+        const totalRange = bounds.max - bounds.min;
+        const startPercent = totalRange === 0 ? 0 : ((minValue - bounds.min) / totalRange) * 100;
+        const endPercent = totalRange === 0 ? 100 : ((maxValue - bounds.min) / totalRange) * 100;
         els.limitsSelectedRange.style.left = startPercent + '%';
         els.limitsSelectedRange.style.width = Math.max(0, endPercent - startPercent) + '%';
         els.limitsSlider.style.setProperty('--limits-start', startPercent + '%');
         els.limitsSlider.style.setProperty('--limits-end', endPercent + '%');
         if (els.limitsMinDisplay) {
-            els.limitsMinDisplay.textContent = formatLimitValue(minValue);
+            els.limitsMinDisplay.textContent = formatLimitValue(minValue, mode);
         }
         if (els.limitsMaxDisplay) {
-            els.limitsMaxDisplay.textContent = formatLimitValue(maxValue);
+            els.limitsMaxDisplay.textContent = formatLimitValue(maxValue, mode);
         }
         updateLimitValueTone(els.limitsMinDisplay, minValue);
         updateLimitValueTone(els.limitsMaxDisplay, maxValue);
@@ -450,8 +495,10 @@
 
     function syncLimitsState(options) {
         const opts = options || {};
-        const modeAllowsLimits = els.inpValueMode.value === 'netzero' || els.inpValueMode.value === 'netzero-' || els.inpValueMode.value === 'netzero+';
+        const mode = els.inpValueMode.value;
+        const modeAllowsLimits = isDynamicLimitMode(mode);
         const limitsEnabled = modeAllowsLimits && !!els.limitsOn?.checked;
+        const bounds = getLimitBoundsForMode(mode);
 
         if (els.limitsRow) {
             els.limitsRow.hidden = !modeAllowsLimits;
@@ -472,50 +519,47 @@
             els.limitsMaxRange.disabled = !limitsEnabled;
         }
 
-        let minValue = els.limitsMinRange ? snapLimitValue(els.limitsMinRange.value) : parseStoredLimitValue(els.inpMinValue, LIMIT_MIN);
-        let maxValue = els.limitsMaxRange ? snapLimitValue(els.limitsMaxRange.value) : parseStoredLimitValue(els.inpMaxValue, LIMIT_MAX);
+        let minValue = opts.activeThumb === 'min'
+            ? snapLimitValue(els.limitsMinRange ? els.limitsMinRange.value : bounds.min, mode, bounds.min)
+            : parseStoredLimitValue(els.inpMinValue, bounds.min, mode);
+        let maxValue = opts.activeThumb === 'max'
+            ? snapLimitValue(els.limitsMaxRange ? els.limitsMaxRange.value : bounds.max, mode, bounds.max)
+            : parseStoredLimitValue(els.inpMaxValue, bounds.max, mode);
 
         if (opts.resetToDefaults) {
-            minValue = LIMIT_MIN;
-            maxValue = LIMIT_MAX;
+            minValue = bounds.min;
+            maxValue = bounds.max;
         }
 
         if (limitsEnabled) {
-            minValue = snapLimitValue(els.limitsMinRange ? els.limitsMinRange.value : minValue);
-            maxValue = snapLimitValue(els.limitsMaxRange ? els.limitsMaxRange.value : maxValue);
-            if (minValue > maxValue) {
-                if (opts.activeThumb === 'min') {
-                    maxValue = minValue;
-                } else {
-                    minValue = maxValue;
-                }
-            }
+            const normalized = normalizeLimitPair(minValue, maxValue, mode, opts);
+            minValue = normalized.minValue ?? bounds.min;
+            maxValue = normalized.maxValue ?? bounds.max;
             if (els.limitsMinRange) {
+                els.limitsMinRange.min = String(bounds.min);
+                els.limitsMinRange.max = String(bounds.max);
                 els.limitsMinRange.value = String(minValue);
             }
             if (els.limitsMaxRange) {
+                els.limitsMaxRange.min = String(bounds.min);
+                els.limitsMaxRange.max = String(bounds.max);
                 els.limitsMaxRange.value = String(maxValue);
             }
-            setLimitHiddenInput(els.inpMinValue, minValue);
-            setLimitHiddenInput(els.inpMaxValue, maxValue);
+            setLimitHiddenInput(els.inpMinValue, minValue, mode);
+            setLimitHiddenInput(els.inpMaxValue, maxValue, mode);
         } else {
-            if (opts.resetToDefaults) {
-                if (els.limitsMinRange) {
-                    els.limitsMinRange.value = String(LIMIT_MIN);
-                }
-                if (els.limitsMaxRange) {
-                    els.limitsMaxRange.value = String(LIMIT_MAX);
-                }
-            } else {
-                if (els.limitsMinRange) {
-                    els.limitsMinRange.value = String(minValue);
-                }
-                if (els.limitsMaxRange) {
-                    els.limitsMaxRange.value = String(maxValue);
-                }
+            if (els.limitsMinRange) {
+                els.limitsMinRange.min = String(bounds.min);
+                els.limitsMinRange.max = String(bounds.max);
+                els.limitsMinRange.value = String(bounds.min);
             }
-            setLimitHiddenInput(els.inpMinValue, null);
-            setLimitHiddenInput(els.inpMaxValue, null);
+            if (els.limitsMaxRange) {
+                els.limitsMaxRange.min = String(bounds.min);
+                els.limitsMaxRange.max = String(bounds.max);
+                els.limitsMaxRange.value = String(bounds.max);
+            }
+            setLimitHiddenInput(els.inpMinValue, null, mode);
+            setLimitHiddenInput(els.inpMaxValue, null, mode);
         }
 
         if (els.inpMinValue) {
@@ -525,7 +569,7 @@
             els.inpMaxValue.disabled = !limitsEnabled;
         }
 
-        updateLimitsVisuals();
+        updateLimitsVisuals(mode);
         updatePowerRangeIndicator();
     }
 
@@ -536,6 +580,8 @@
         const minRaw = String(els.inpMinValue?.value || '').trim();
         const maxRaw = String(els.inpMaxValue?.value || '').trim();
         const enabled = !els.inpMinValue.disabled && !els.inpMaxValue.disabled && !!els.limitsOn?.checked;
+        const mode = els.inpValueMode.value;
+        const bounds = getLimitBoundsForMode(mode);
 
         indicator.hidden = true;
         indicator.textContent = '';
@@ -556,7 +602,12 @@
         const minValue = minRaw === '' ? null : parseInt(minRaw, 10);
         const maxValue = maxRaw === '' ? null : parseInt(maxRaw, 10);
 
-        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+        const outOfBounds = (
+            (minValue !== null && (minValue < bounds.min || minValue > bounds.max)) ||
+            (maxValue !== null && (maxValue < bounds.min || maxValue > bounds.max))
+        );
+
+        if (outOfBounds || (minValue !== null && maxValue !== null && minValue > maxValue)) {
             indicator.hidden = false;
             indicator.textContent = 'Invalid range';
             indicator.classList.add('is-invalid');
@@ -567,6 +618,16 @@
 
         if (minValue === null || maxValue === null) {
             if (minValue !== null) {
+                if (mode === 'netzero+') {
+                    indicator.textContent = `Charge-only from ${minValue} W`;
+                    indicator.classList.add('is-charge');
+                    return;
+                }
+                if (mode === 'netzero-') {
+                    indicator.textContent = `Discharge floor: ${minValue} W`;
+                    indicator.classList.add('is-discharge');
+                    return;
+                }
                 if (minValue > 0) {
                     indicator.textContent = `Charge-only from ${minValue} W`;
                     indicator.classList.add('is-charge');
@@ -583,6 +644,16 @@
             }
 
             if (maxValue !== null) {
+                if (mode === 'netzero+') {
+                    indicator.textContent = `Charge cap: ${maxValue} W`;
+                    indicator.classList.add('is-charge');
+                    return;
+                }
+                if (mode === 'netzero-') {
+                    indicator.textContent = `Discharge-only up to ${maxValue} W`;
+                    indicator.classList.add('is-discharge');
+                    return;
+                }
                 if (maxValue < 0) {
                     indicator.textContent = `Discharge-only up to ${maxValue} W`;
                     indicator.classList.add('is-discharge');
@@ -598,6 +669,22 @@
                 return;
             }
 
+            return;
+        }
+
+        if (mode === 'netzero+') {
+            indicator.textContent = minValue === 0
+                ? `Idle-to-charge range: ${minValue} to ${maxValue} W`
+                : `Charge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-charge');
+            return;
+        }
+
+        if (mode === 'netzero-') {
+            indicator.textContent = maxValue === 0
+                ? `Discharge-to-idle range: ${minValue} to ${maxValue} W`
+                : `Discharge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-discharge');
             return;
         }
 
@@ -1009,8 +1096,8 @@
         els.inpMaxValue.value = '';
         if (els.limitsOff) els.limitsOff.checked = true;
         if (els.limitsOn) els.limitsOn.checked = false;
-        if (els.limitsMinRange) els.limitsMinRange.value = String(LIMIT_MIN);
-        if (els.limitsMaxRange) els.limitsMaxRange.value = String(LIMIT_MAX);
+        if (els.limitsMinRange) els.limitsMinRange.value = String(getLimitBoundsForMode('netzero').min);
+        if (els.limitsMaxRange) els.limitsMaxRange.value = String(getLimitBoundsForMode('netzero').max);
         els.inpFallbackValue.value = '';
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
@@ -1047,7 +1134,7 @@
         els.editorTitle.textContent = safeName ? ('Editing Rule #' + (idx + 1) + ' · ' + safeName) : ('Editing Rule #' + (idx + 1));
         els.inpName.value = rule.name || '';
 
-        if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') {
+        if (isDynamicLimitMode(rule.value)) {
             els.inpValueMode.value = rule.value;
             els.inpFixedValue.value = '';
             els.inpFixedValue.disabled = true;
@@ -1061,15 +1148,20 @@
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
         const hasLimits = (rule.min_power !== undefined && rule.min_power !== null) || (rule.max_power !== undefined && rule.max_power !== null);
-        els.inpMinValue.value = rule.min_power !== undefined && rule.min_power !== null ? String(rule.min_power) : '';
-        els.inpMaxValue.value = rule.max_power !== undefined && rule.max_power !== null ? String(rule.max_power) : '';
+        const normalizedLimits = normalizeLimitPair(
+            rule.min_power !== undefined && rule.min_power !== null ? rule.min_power : null,
+            rule.max_power !== undefined && rule.max_power !== null ? rule.max_power : null,
+            els.inpValueMode.value
+        );
+        els.inpMinValue.value = normalizedLimits.minValue !== null ? String(normalizedLimits.minValue) : '';
+        els.inpMaxValue.value = normalizedLimits.maxValue !== null ? String(normalizedLimits.maxValue) : '';
         if (els.limitsOff) els.limitsOff.checked = !hasLimits;
         if (els.limitsOn) els.limitsOn.checked = hasLimits;
         if (els.limitsMinRange) {
-            els.limitsMinRange.value = String(rule.min_power !== undefined && rule.min_power !== null ? snapLimitValue(rule.min_power) : LIMIT_MIN);
+            els.limitsMinRange.value = String(normalizedLimits.minValue !== null ? normalizedLimits.minValue : normalizedLimits.bounds.min);
         }
         if (els.limitsMaxRange) {
-            els.limitsMaxRange.value = String(rule.max_power !== undefined && rule.max_power !== null ? snapLimitValue(rule.max_power) : LIMIT_MAX);
+            els.limitsMaxRange.value = String(normalizedLimits.maxValue !== null ? normalizedLimits.maxValue : normalizedLimits.bounds.max);
         }
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
         updateValueModeFields();
@@ -1133,7 +1225,7 @@
     function readRuleFromForm() {
         let value;
         const mode = els.inpValueMode.value;
-        if (mode === 'netzero' || mode === 'netzero-' || mode === 'netzero+') {
+        if (isDynamicLimitMode(mode)) {
             value = mode;
         } else {
             const raw = els.inpFixedValue.value.trim();
@@ -1173,7 +1265,7 @@
         const maxTime = els.inpMaxTime.value.trim();
         if (maxTime) rule.max_time = maxTime;
 
-        if (mode === 'netzero' || mode === 'netzero-' || mode === 'netzero+') {
+        if (isDynamicLimitMode(mode)) {
             rule.min_power = null;
             rule.max_power = null;
             if (els.limitsOn && els.limitsOn.checked) {
@@ -1184,6 +1276,9 @@
                 }
                 rule.min_power = parseInt(minValue, 10);
                 rule.max_power = parseInt(maxValue, 10);
+                const normalizedLimits = normalizeLimitPair(rule.min_power, rule.max_power, mode);
+                rule.min_power = normalizedLimits.minValue;
+                rule.max_power = normalizedLimits.maxValue;
             }
             if (
                 rule.min_power !== null &&
@@ -1563,13 +1658,13 @@
 
         if (els.limitsOff) {
             els.limitsOff.addEventListener('change', function () {
-                syncLimitsState();
+                syncLimitsState({ resetToDefaults: false });
             });
         }
 
         if (els.limitsOn) {
             els.limitsOn.addEventListener('change', function () {
-                syncLimitsState();
+                syncLimitsState({ resetToDefaults: !!els.limitsOn.checked });
             });
         }
 
