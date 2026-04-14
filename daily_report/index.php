@@ -3,10 +3,13 @@ declare(strict_types=1);
 
 date_default_timezone_set('Europe/Amsterdam');
 
+require_once __DIR__ . '/../main/includes/price_conversion.php';
+
 $requestedDate = isset($_GET['date']) && is_string($_GET['date']) ? trim($_GET['date']) : '';
 if ($requestedDate === '') {
     $requestedDate = (new DateTimeImmutable('now', new DateTimeZone('Europe/Amsterdam')))->format('Y-m-d');
 }
+$priceConversionConfig = getPriceConversionConfig();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -87,11 +90,13 @@ if ($requestedDate === '') {
             <article class="summary-card summary-card--charge-cost">
                 <div class="summary-label">Charge Costs</div>
                 <div class="summary-value" data-role="charge-cost-total">--</div>
+                <div class="summary-secondary summary-secondary--charge-cost" data-role="charge-cost-spot-total">--</div>
                 <div class="summary-subtle">Charged kWh × hourly price</div>
             </article>
             <article class="summary-card summary-card--pnl">
                 <div class="summary-label">P&amp;L</div>
                 <div class="summary-value" data-role="pnl-total">--</div>
+                <div class="summary-secondary summary-secondary--pnl" data-role="pnl-spot-total">--</div>
                 <div class="summary-subtle">Charge costs - savings + net cost</div>
             </article>
         </section>
@@ -132,6 +137,7 @@ if ($requestedDate === '') {
                                 <th>Grid from</th>
                                 <th>Grid to</th>
                                 <th>Price</th>
+                                <th>Spot Price</th>
                                 <th>Import cost</th>
                                 <th>Export cost</th>
                                 <th>Net cost</th>
@@ -139,7 +145,7 @@ if ($requestedDate === '') {
                             </tr>
                         </thead>
                         <tbody data-role="hourly-table-body">
-                            <tr><td colspan="13" class="table-placeholder">Loading report...</td></tr>
+                            <tr><td colspan="14" class="table-placeholder">Loading report...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -160,11 +166,19 @@ if ($requestedDate === '') {
     </main>
 
     <script>
+        window.PRICE_CONVERSION_CONFIG = {
+            supplierMarkupEurPerKwh: <?php echo json_encode($priceConversionConfig['supplierMarkupEurPerKwh'], JSON_UNESCAPED_SLASHES); ?>,
+            energyTaxEurPerKwh: <?php echo json_encode($priceConversionConfig['energyTaxEurPerKwh'], JSON_UNESCAPED_SLASHES); ?>,
+            vatMultiplier: <?php echo json_encode($priceConversionConfig['vatMultiplier'], JSON_UNESCAPED_SLASHES); ?>,
+            consumerPrecision: <?php echo json_encode($priceConversionConfig['consumerPrecision'], JSON_UNESCAPED_SLASHES); ?>,
+            spotPrecision: <?php echo json_encode($priceConversionConfig['spotPrecision'], JSON_UNESCAPED_SLASHES); ?>
+        };
         window.DAILY_REPORT_BOOT = {
             apiUrl: 'api/report_data.php',
             requestedDate: <?php echo json_encode($requestedDate, JSON_UNESCAPED_SLASHES); ?>
         };
     </script>
+    <script src="../main/assets/js/price_conversion.js"></script>
     <script src="assets/js/daily_report.js"></script>
 </body>
 </html>

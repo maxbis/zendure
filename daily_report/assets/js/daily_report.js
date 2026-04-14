@@ -62,6 +62,39 @@
         return `EUR ${value.toFixed(4)}/kWh`;
     }
 
+    function toFiniteNumber(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    }
+
+    function deriveSpotPrice(value) {
+        if (typeof convertConsumerToSpotPrice !== 'function') return null;
+        return convertConsumerToSpotPrice(value);
+    }
+
+    function computeSpotChargeCost(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) return null;
+
+        let total = 0;
+        let hasAny = false;
+
+        hours.forEach((row) => {
+            const chargedWh = toFiniteNumber(row && row.charged_wh);
+            const consumerPrice = toFiniteNumber(row && row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
+            if (!Number.isFinite(chargedWh) || !Number.isFinite(spotPrice)) return;
+
+            total += (chargedWh / 1000) * spotPrice;
+            hasAny = true;
+        });
+
+        return hasAny ? total : null;
+    }
+
     function formatBool(value) {
         return value ? 'Yes' : 'No';
     }
@@ -122,8 +155,12 @@
         const netCost = Number(totals.net_cost);
         const savings = Number(totals.savings_eur);
         const chargeCost = Number(totals.charge_cost_eur);
+        const spotChargeCost = computeSpotChargeCost(report.hours);
         const pnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
             ? (chargeCost - savings + netCost) * -1
+            : null;
+        const spotPnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(spotChargeCost)
+            ? (spotChargeCost - savings + netCost) * -1
             : null;
 
         setText('charged-total', formatWh(Number(totals.charged_wh)));
@@ -134,7 +171,9 @@
         setText('net-cost-total', formatEur(netCost));
         setText('savings-total', formatEur(savings));
         setText('charge-cost-total', formatEur(chargeCost));
+        setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEur(spotChargeCost)}` : '--');
         setText('pnl-total', formatEur(pnl));
+        setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--');
         setCostBadge(netCost);
 
         setText('saved-path', payload.savedPath || '--');
@@ -153,12 +192,14 @@
     function renderTable(hours) {
         if (!tableBodyEl) return;
         if (!Array.isArray(hours) || hours.length === 0) {
-            tableBodyEl.innerHTML = '<tr><td colspan="13" class="table-placeholder">No hourly rows available.</td></tr>';
+            tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">No hourly rows available.</td></tr>';
             return;
         }
         tableBodyEl.innerHTML = hours.map((row) => {
             const netCost = Number(row.net_cost);
             const costClass = Number.isFinite(netCost) ? (netCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
+            const consumerPrice = toFiniteNumber(row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
             return `
                 <tr>
                     <td>${escapeHtml(row.hour || '--')}</td>
@@ -169,7 +210,8 @@
                     <td>${escapeHtml(formatPercent(Number(row.battery_pct_delta)))}</td>
                     <td>${escapeHtml(formatWh(Number(row.grid_from_wh)))}</td>
                     <td>${escapeHtml(formatWh(Number(row.grid_to_wh)))}</td>
-                    <td>${escapeHtml(formatPrice(Number(row.price_eur_per_kwh)))}</td>
+                    <td>${escapeHtml(formatPrice(consumerPrice))}</td>
+                    <td>${escapeHtml(formatPrice(spotPrice))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_from_cost)))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_to_cost)))}</td>
                     <td class="${costClass}">${escapeHtml(formatEur(netCost))}</td>

@@ -14,6 +14,7 @@ require_once $validateFile;
 require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include centralized configuration loader
 require_once __DIR__ . '/includes/config_loader.php';
+require_once __DIR__ . '/includes/price_conversion.php';
 
 $configLoadError = ConfigLoader::getLoadError();
 if ($configLoadError !== null) {
@@ -71,6 +72,7 @@ $resolvedToday = resolveScheduleForDateWithConditions($schedule, $today, $includ
 $resolvedTomorrow = resolveScheduleForDateWithConditions($schedule, $tomorrow, $includeConditions);
 $currentHour = date('H') . '00';
 $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
+$priceConversionConfig = getPriceConversionConfig();
 
 ?>
 <!DOCTYPE html>
@@ -159,6 +161,13 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                 popupNetzeroReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroReferenceW', 200), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroPlusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroPlusReferenceW', 300), JSON_UNESCAPED_SLASHES); ?>
             };
+            window.PRICE_CONVERSION_CONFIG = {
+                supplierMarkupEurPerKwh: <?php echo json_encode($priceConversionConfig['supplierMarkupEurPerKwh'], JSON_UNESCAPED_SLASHES); ?>,
+                energyTaxEurPerKwh: <?php echo json_encode($priceConversionConfig['energyTaxEurPerKwh'], JSON_UNESCAPED_SLASHES); ?>,
+                vatMultiplier: <?php echo json_encode($priceConversionConfig['vatMultiplier'], JSON_UNESCAPED_SLASHES); ?>,
+                consumerPrecision: <?php echo json_encode($priceConversionConfig['consumerPrecision'], JSON_UNESCAPED_SLASHES); ?>,
+                spotPrecision: <?php echo json_encode($priceConversionConfig['spotPrecision'], JSON_UNESCAPED_SLASHES); ?>
+            };
         </script>
 
         <!-- Core modules (must load first) -->
@@ -180,6 +189,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
         <script src="assets/js/components/price_graph_component.js"></script>
         
         <!-- Feature modules -->
+        <script src="assets/js/price_conversion.js"></script>
         <script src="assets/js/price_overview_bar.js"></script>
         <script src="assets/js/automation_status.js"></script>
         <script src="assets/js/charge_status.js"></script>

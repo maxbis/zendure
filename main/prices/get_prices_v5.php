@@ -11,11 +11,10 @@ declare(strict_types=1);
  * If no file for tomorrow and time (NL) >= 14:00: fetches "morgen", saves, returns data.
  */
 
+require_once __DIR__ . '/../includes/price_conversion.php';
+
 const JEROEN_BASE_URL = 'https://jeroen.nl/api/dynamische-energieprijzen/v2/?type=json';
 const TIMEZONE_NL = 'Europe/Amsterdam';
-const INKOOPVERGOEDING = 0.0219;
-const BELASTING = 0.08980;
-const BTW = 1.21;
 const TOMORROW_FETCH_HOUR = 14;
 
 if (!defined('PRICE_DIR')) {
@@ -303,9 +302,7 @@ function parseHourlyPrices(array $rows): array {
         $quarterPrices = $group['quarter_prices_excl'];
         $count = count($quarterPrices);
         $averageExcl = $count > 0 ? round(array_sum($quarterPrices) / $count, 6) : null;
-        $consumerPrice = $averageExcl !== null
-            ? round(($averageExcl + INKOOPVERGOEDING + BELASTING) * BTW, 4)
-            : null;
+        $consumerPrice = convertSpotToConsumerPrice($averageExcl);
 
         $result[] = [
             'date_nl' => $group['date_nl'],

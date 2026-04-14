@@ -225,6 +225,27 @@ body {
     text-overflow: ellipsis;
 }
 
+.summary-secondary {
+    margin-top: 5px;
+    min-height: 1.05rem;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    color: rgba(232, 240, 230, 0.52);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.summary-secondary--charge-cost {
+    color: rgba(143, 184, 201, 0.58);
+}
+
+.summary-secondary--pnl {
+    color: rgba(247, 165, 133, 0.56);
+}
+
 .summary-subtle {
     margin-top: auto;
     padding-top: 6px;

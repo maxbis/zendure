@@ -84,16 +84,6 @@ function formatPriceCents(price) {
     return Math.round(price * 100).toString();
 }
 
-/**
- * Spot price (excl. tax) from price incl. 21% VAT: P_excl = (P_incl / 1.21) − 0.10880
- * @param {number|null} pIncl - Price incl. tax (€/kWh) or null
- * @returns {number|null} Spot price or null
- */
-function spotPriceFromIncl(pIncl) {
-    if (pIncl == null || typeof pIncl !== 'number' || Number.isNaN(pIncl)) return null;
-    return (pIncl / 1.21) - 0.09;
-}
-
 let priceGraphPopup = null;
 let priceGraphPopupActiveBar = null;
 let priceGraphPopupActiveContainer = null;
@@ -1131,7 +1121,9 @@ function renderPriceGraphMobilePopupContent() {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
-    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceValue = typeof convertConsumerToSpotPrice === 'function'
+        ? convertConsumerToSpotPrice(priceValue)
+        : null;
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
@@ -1309,7 +1301,9 @@ function showPriceGraphPopup(bar, container) {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
-    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceValue = typeof convertConsumerToSpotPrice === 'function'
+        ? convertConsumerToSpotPrice(priceValue)
+        : null;
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
