@@ -160,32 +160,11 @@ foreach ($groupedCommands as $groupKey => $commands) {
       min-height: 38px;
       white-space: nowrap;
       min-width: 0;
+      max-width: 100%;
     }
     @media (max-width: 820px) {
-      .control-row {
-        align-items: stretch;
-      }
-      .netzero-submit {
-        flex: 1 0 100%;
-        width: 100%;
-      }
       .control-help-inline {
         max-width: 100%;
-      }
-    }
-    @media (max-width: 640px) {
-      .control-row {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .control-input-wrap {
-        flex-basis: 100%;
-      }
-      .control-input {
-        width: 100%;
-      }
-      .netzero-submit {
-        width: 100%;
       }
     }
     .command-btn {
