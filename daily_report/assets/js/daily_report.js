@@ -201,6 +201,9 @@
         const report = payload.report || {};
         const totals = report.totals || {};
         const batteryStats = computeBatteryStats(report.hours);
+        const batteryDeltaRange = Number.isFinite(batteryStats.min) && Number.isFinite(batteryStats.max)
+            ? Math.abs(batteryStats.max - batteryStats.min)
+            : null;
         const netCost = Number(totals.net_cost);
         const savings = Number(totals.savings_eur);
         const chargeCost = Number(totals.charge_cost_eur);
@@ -214,7 +217,12 @@
 
         setText('charged-total', formatWh(Number(totals.charged_wh)));
         setText('discharged-total', formatWh(Number(totals.discharged_wh)));
-        setText('battery-delta-total', formatPercent(Number(totals.battery_pct_delta_total)));
+        setText(
+            'battery-delta-total',
+            Number.isFinite(batteryDeltaRange)
+                ? formatPercent(batteryDeltaRange)
+                : formatPercent(Number(totals.battery_pct_delta_total))
+        );
         setText(
             'battery-delta-range',
             Number.isFinite(batteryStats.start) || Number.isFinite(batteryStats.end)

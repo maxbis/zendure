@@ -206,6 +206,7 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert 'data-role="charge-cost-spot-total"' in page_php
     assert 'data-role="pnl-spot-total"' in page_php
     assert "computeBatteryStats(report.hours)" in daily_report_js
+    assert "Math.abs(batteryStats.max - batteryStats.min)" in daily_report_js
     assert "`Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`" in daily_report_js
     assert "computeSpotChargeCost(report.hours)" in daily_report_js
     assert "`Spot ${formatEur(spotChargeCost)}`" in daily_report_js
