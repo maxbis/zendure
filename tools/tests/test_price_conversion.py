@@ -201,8 +201,12 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert page_php.index("../main/assets/js/price_conversion.js") < page_php.index("assets/js/daily_report.js")
     assert "convertConsumerToSpotPrice" in daily_report_js
     assert "formatPrice(spotPrice)" in daily_report_js
+    assert 'data-role="battery-delta-range"' in page_php
+    assert 'data-role="battery-delta-extrema"' in page_php
     assert 'data-role="charge-cost-spot-total"' in page_php
     assert 'data-role="pnl-spot-total"' in page_php
+    assert "computeBatteryStats(report.hours)" in daily_report_js
+    assert "`Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`" in daily_report_js
     assert "computeSpotChargeCost(report.hours)" in daily_report_js
     assert "`Spot ${formatEur(spotChargeCost)}`" in daily_report_js
     assert "`Spot ${formatEur(spotPnl)}`" in daily_report_js

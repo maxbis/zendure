@@ -51,6 +51,11 @@
         return `${prefix}${value.toFixed(2)}%`;
     }
 
+    function formatPercentNeutral(value) {
+        const formatted = formatPercent(value);
+        return formatted.startsWith('+') ? formatted.slice(1) : formatted;
+    }
+
     function formatEur(value) {
         if (!Number.isFinite(value)) return '--';
         const prefix = value > 0 ? '+' : '';
@@ -93,6 +98,49 @@
         });
 
         return hasAny ? total : null;
+    }
+
+    function computeBatteryStats(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) {
+            return { start: null, end: null, min: null, max: null };
+        }
+
+        let start = null;
+        let end = null;
+        let min = null;
+        let max = null;
+
+        hours.forEach((row) => {
+            const startValue = toFiniteNumber(row && row.battery_pct_start);
+            const endValue = toFiniteNumber(row && row.battery_pct_end);
+
+            if (start === null) {
+                const fallbackStart = endValue;
+                start = Number.isFinite(startValue) ? startValue : fallbackStart;
+            }
+
+            [startValue, endValue].forEach((value) => {
+                if (!Number.isFinite(value)) return;
+                min = min === null ? value : Math.min(min, value);
+                max = max === null ? value : Math.max(max, value);
+            });
+        });
+
+        for (let index = hours.length - 1; index >= 0; index -= 1) {
+            const row = hours[index];
+            const endValue = toFiniteNumber(row && row.battery_pct_end);
+            const fallbackEnd = toFiniteNumber(row && row.battery_pct_start);
+            if (Number.isFinite(endValue)) {
+                end = endValue;
+                break;
+            }
+            if (Number.isFinite(fallbackEnd)) {
+                end = fallbackEnd;
+                break;
+            }
+        }
+
+        return { start, end, min, max };
     }
 
     function formatBool(value) {
@@ -152,6 +200,7 @@
     function renderSummary(payload) {
         const report = payload.report || {};
         const totals = report.totals || {};
+        const batteryStats = computeBatteryStats(report.hours);
         const netCost = Number(totals.net_cost);
         const savings = Number(totals.savings_eur);
         const chargeCost = Number(totals.charge_cost_eur);
@@ -166,6 +215,18 @@
         setText('charged-total', formatWh(Number(totals.charged_wh)));
         setText('discharged-total', formatWh(Number(totals.discharged_wh)));
         setText('battery-delta-total', formatPercent(Number(totals.battery_pct_delta_total)));
+        setText(
+            'battery-delta-range',
+            Number.isFinite(batteryStats.start) || Number.isFinite(batteryStats.end)
+                ? `Start ${formatPercentNeutral(batteryStats.start)} / End ${formatPercentNeutral(batteryStats.end)}`
+                : '--'
+        );
+        setText(
+            'battery-delta-extrema',
+            Number.isFinite(batteryStats.min) || Number.isFinite(batteryStats.max)
+                ? `Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`
+                : 'Interpolated day delta'
+        );
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
         setText('net-cost-total', formatEur(netCost));

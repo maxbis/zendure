@@ -65,7 +65,8 @@ $priceConversionConfig = getPriceConversionConfig();
             <article class="summary-card">
                 <div class="summary-label">Battery Delta</div>
                 <div class="summary-value" data-role="battery-delta-total">--</div>
-                <div class="summary-subtle">Interpolated day delta</div>
+                <div class="summary-secondary" data-role="battery-delta-range">--</div>
+                <div class="summary-subtle" data-role="battery-delta-extrema">Interpolated day delta</div>
             </article>
             <article class="summary-card">
                 <div class="summary-label">Grid From</div>
