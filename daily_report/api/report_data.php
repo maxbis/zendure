@@ -76,6 +76,7 @@ function buildDailyReportPayload(): array
         'requestedDate' => $requestedDate,
         'source' => $source,
         'savedPath' => $reportPath,
+        'savedPathDisplay' => formatDisplayPath($reportPath),
         'savedAt' => $savedAt,
         'report' => $report,
     ];
@@ -118,6 +119,21 @@ function buildReportPath(string $date): string
     $yyyymm = str_replace('-', '', substr($date, 0, 7));
     $yyyymmdd = str_replace('-', '', $date);
     return $root . '/' . $yyyymm . '/daily_report_' . $yyyymmdd . '.json';
+}
+
+function formatDisplayPath(string $path): string
+{
+    $normalizedPath = str_replace('\\', '/', $path);
+    $dailyReportRoot = rtrim(str_replace('\\', '/', DAILY_REPORT_ROOT), '/');
+
+    if ($dailyReportRoot !== '') {
+        $prefix = $dailyReportRoot . '/';
+        if (strncmp($normalizedPath, $prefix, strlen($prefix)) === 0) {
+            return ltrim(substr($normalizedPath, strlen($dailyReportRoot)), '/');
+        }
+    }
+
+    return $normalizedPath;
 }
 
 function generateAndSaveReport(string $date, string $outputPath): void

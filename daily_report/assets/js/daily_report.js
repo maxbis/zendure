@@ -245,7 +245,7 @@
         setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--');
         setCostBadge(netCost);
 
-        setText('saved-path', payload.savedPath || '--');
+        setText('saved-path', payload.savedPathDisplay || payload.savedPath || '--');
         setText('report-source', payload.source || '--');
         setText('chart-title', report.date || payload.requestedDate || 'Selected day');
 
