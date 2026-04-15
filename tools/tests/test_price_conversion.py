@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,8 +20,6 @@ PRICE_CONVERSION_JS_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_convers
 PRICE_OVERVIEW_BAR_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_overview_bar.js"
 DAILY_REPORT_INDEX_FILE = REPO_ROOT / "daily_report" / "index.php"
 DAILY_REPORT_JS_FILE = REPO_ROOT / "daily_report" / "assets" / "js" / "daily_report.js"
-DAILY_REPORT_API_FILE = REPO_ROOT / "daily_report" / "api" / "report_data.php"
-DAILY_REPORT_DATA_DIR = REPO_ROOT / "daily_report" / "data"
 MAIN_PRICE_DIR = REPO_ROOT / "main" / "data" / "price"
 TZ_NL = ZoneInfo("Europe/Amsterdam")
 
@@ -214,42 +211,3 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "computeSpotChargeCost(report.hours)" in daily_report_js
     assert "`Spot ${formatEur(spotChargeCost)}`" in daily_report_js
     assert "`Spot ${formatEur(spotPnl)}`" in daily_report_js
-    assert "payload.savedPathDisplay || payload.savedPath || '--'" in daily_report_js
-
-
-def test_daily_report_api_returns_display_safe_saved_path():
-    test_date = f"2099-12-{(uuid.uuid4().int % 28) + 1:02d}"
-    yyyymm = test_date.replace("-", "")[:6]
-    yyyymmdd = test_date.replace("-", "")
-    report_path = DAILY_REPORT_DATA_DIR / yyyymm / f"daily_report_{yyyymmdd}.json"
-    report_payload = {
-        "date": test_date,
-        "generated_at": "2099-12-01T00:00:00+01:00",
-        "hours": [],
-        "totals": {},
-        "is_partial_day": False,
-        "price_file_found": False,
-        "price_file_path": None,
-        "price_hours_available": 0,
-        "timezone": "Europe/Amsterdam",
-    }
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
-
-    php_code = (
-        '$_SERVER["REQUEST_METHOD"] = "GET";'
-        f'$_GET["date"] = "{test_date}";'
-        f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
-    )
-
-    try:
-        payload = _run_php_json(["php", "-r", php_code])
-    finally:
-        report_path.unlink(missing_ok=True)
-        try:
-            report_path.parent.rmdir()
-        except OSError:
-            pass
-
-    assert payload["savedPath"] == str(report_path)
-    assert payload["savedPathDisplay"] == f"data/{yyyymm}/daily_report_{yyyymmdd}.json"

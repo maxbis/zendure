@@ -41,10 +41,6 @@ $priceConversionConfig = getPriceConversionConfig();
                     </div>
                 </form>
                 <div class="meta-pill">
-                    <span class="meta-label">Saved JSON</span>
-                    <span class="meta-value" data-role="saved-path">Waiting for report</span>
-                </div>
-                <div class="meta-pill">
                     <span class="meta-label">Data source</span>
                     <span class="meta-value" data-role="report-source">Waiting for report</span>
                 </div>
