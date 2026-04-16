@@ -100,6 +100,28 @@ body {
     align-content: start;
 }
 
+.view-switch {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+.view-switch a {
+    color: var(--text-main);
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+}
+.view-switch a:hover {
+    text-decoration-color: rgba(255, 255, 255, 0.55);
+}
+.view-switch__current {
+    font-weight: 600;
+    color: var(--text-main);
+}
+.view-switch__sep {
+    margin: 0 0.35em;
+    opacity: 0.5;
+}
+
 .meta-pill,
 .nav-card {
     padding: 16px 18px;
