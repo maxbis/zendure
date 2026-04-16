@@ -75,6 +75,12 @@
         return `${prefix}EUR ${value.toFixed(4)}`;
     }
 
+    function formatEurCents(value) {
+        if (!Number.isFinite(value)) return '--';
+        const prefix = value > 0 ? '+' : '';
+        return `${prefix}EUR ${value.toFixed(2)}`;
+    }
+
     function formatBool(value) {
         return value ? 'Yes' : 'No';
     }
@@ -119,15 +125,15 @@
         }
         if (value > 0) {
             el.classList.add('is-negative');
-            el.textContent = `Net import ${formatEur(value)}`;
+            el.textContent = `Net import ${formatEurCents(value)}`;
             return;
         }
         if (value < 0) {
             el.classList.add('is-positive');
-            el.textContent = `Net export ${formatEur(value)}`;
+            el.textContent = `Net export ${formatEurCents(value)}`;
             return;
         }
-        el.textContent = 'Balanced EUR 0.0000';
+        el.textContent = 'Balanced EUR 0.00';
     }
 
     function escapeHtml(value) {
@@ -192,13 +198,13 @@
         );
         setText('grid-from-total', formatKwhFromWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatKwhFromWh(Number(totals.grid_to_wh)));
-        setText('net-cost-total', formatEur(netCost));
-        setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEur(spotNetCost)}` : '--');
-        setText('savings-total', formatEur(savings));
-        setText('charge-cost-total', formatEur(chargeCost));
-        setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEur(spotChargeCost)}` : '--');
-        setText('pnl-total', formatEur(pnl));
-        setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--');
+        setText('net-cost-total', formatEurCents(netCost));
+        setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEurCents(spotNetCost)}` : '--');
+        setText('savings-total', formatEurCents(savings));
+        setText('charge-cost-total', formatEurCents(chargeCost));
+        setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEurCents(spotChargeCost)}` : '--');
+        setText('pnl-total', formatEurCents(pnl));
+        setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEurCents(spotPnl)}` : '--');
         setCostBadge(netCost);
 
         setText('chart-title', report.month || payload.requestedMonth || 'Selected month');

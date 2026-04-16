@@ -443,10 +443,20 @@ def test_monthly_report_page_and_js_wiring():
     assert "api/report_data.php" not in monthly_report_js
     assert "const apiUrl = boot.apiUrl || 'api/monthly_report_data.php';" in monthly_report_js
     assert "function formatKwhFromWh(value)" in monthly_report_js
+    assert "function formatEurCents(value)" in monthly_report_js
     assert "setText('charged-total', formatKwhFromWh(Number(totals.charged_wh)));" in monthly_report_js
     assert "setText('discharged-total', formatKwhFromWh(Number(totals.discharged_wh)));" in monthly_report_js
     assert "setText('grid-from-total', formatKwhFromWh(Number(totals.grid_from_wh)));" in monthly_report_js
     assert "setText('grid-to-total', formatKwhFromWh(Number(totals.grid_to_wh)));" in monthly_report_js
+    assert "setText('net-cost-total', formatEurCents(netCost));" in monthly_report_js
+    assert "setText('savings-total', formatEurCents(savings));" in monthly_report_js
+    assert "setText('charge-cost-total', formatEurCents(chargeCost));" in monthly_report_js
+    assert "setText('pnl-total', formatEurCents(pnl));" in monthly_report_js
+    assert "setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEurCents(spotNetCost)}` : '--');" in monthly_report_js
+    assert "setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEurCents(spotChargeCost)}` : '--');" in monthly_report_js
+    assert "setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEurCents(spotPnl)}` : '--');" in monthly_report_js
+    assert "el.textContent = `Net import ${formatEurCents(value)}`;" in monthly_report_js
+    assert "<td class=\"${netCostClass}\">${escapeHtml(formatEur(netCost))}</td>" in monthly_report_js
     assert "<td>${escapeHtml(formatWh(Number(row.charged_wh)))}</td>" in monthly_report_js
     assert "<td>${escapeHtml(formatWh(Number(row.grid_from_wh)))}</td>" in monthly_report_js
     assert "spot_net_cost_eur" in monthly_report_js
