@@ -242,6 +242,10 @@ body {
     color: rgba(143, 184, 201, 0.58);
 }
 
+.summary-secondary--net-cost {
+    color: rgba(122, 191, 169, 0.56);
+}
+
 .summary-secondary--pnl {
     color: rgba(247, 165, 133, 0.56);
 }

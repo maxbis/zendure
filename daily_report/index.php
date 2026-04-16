@@ -77,6 +77,7 @@ $priceConversionConfig = getPriceConversionConfig();
             <article class="summary-card">
                 <div class="summary-label">Net Cost</div>
                 <div class="summary-value" data-role="net-cost-total">--</div>
+                <div class="summary-secondary summary-secondary--net-cost" data-role="net-cost-spot-total">--</div>
                 <div class="summary-badge" data-role="cost-badge">Loading</div>
             </article>
             <article class="summary-card summary-card--savings">

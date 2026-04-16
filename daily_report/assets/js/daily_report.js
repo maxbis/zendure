@@ -100,6 +100,34 @@
         return hasAny ? total : null;
     }
 
+    function computeSpotNetCost(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) return null;
+
+        let total = 0;
+        let hasAny = false;
+
+        hours.forEach((row) => {
+            const gridFromWh = toFiniteNumber(row && row.grid_from_wh);
+            const gridToWh = toFiniteNumber(row && row.grid_to_wh);
+            const consumerPrice = toFiniteNumber(row && row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
+
+            const gridFromCost = Number.isFinite(gridFromWh) && Number.isFinite(consumerPrice)
+                ? (gridFromWh / 1000) * consumerPrice
+                : null;
+            const gridToCostSpot = Number.isFinite(gridToWh) && Number.isFinite(spotPrice)
+                ? -1 * ((gridToWh / 1000) * spotPrice)
+                : null;
+
+            if (!Number.isFinite(gridFromCost) && !Number.isFinite(gridToCostSpot)) return;
+
+            total += (gridFromCost || 0) + (gridToCostSpot || 0);
+            hasAny = true;
+        });
+
+        return hasAny ? total : null;
+    }
+
     function computeBatteryStats(hours) {
         if (!Array.isArray(hours) || hours.length === 0) {
             return { start: null, end: null, min: null, max: null };
@@ -205,14 +233,15 @@
             ? Math.abs(batteryStats.max - batteryStats.min)
             : null;
         const netCost = Number(totals.net_cost);
+        const spotNetCost = computeSpotNetCost(report.hours);
         const savings = Number(totals.savings_eur);
         const chargeCost = Number(totals.charge_cost_eur);
         const spotChargeCost = computeSpotChargeCost(report.hours);
         const pnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
             ? (chargeCost - savings + netCost) * -1
             : null;
-        const spotPnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(spotChargeCost)
-            ? (spotChargeCost - savings + netCost) * -1
+        const spotPnl = Number.isFinite(spotNetCost) && Number.isFinite(savings) && Number.isFinite(spotChargeCost)
+            ? (spotChargeCost - savings + spotNetCost) * -1
             : null;
 
         setText('charged-total', formatWh(Number(totals.charged_wh)));
@@ -238,6 +267,7 @@
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
         setText('net-cost-total', formatEur(netCost));
+        setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEur(spotNetCost)}` : '--');
         setText('savings-total', formatEur(savings));
         setText('charge-cost-total', formatEur(chargeCost));
         setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEur(spotChargeCost)}` : '--');
