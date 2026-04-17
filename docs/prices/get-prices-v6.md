@@ -74,6 +74,7 @@ When not `null`, each of `today` and `tomorrow` is an **object**:
   - Inkoopvergoeding
   - Belasting
   - BTW (21%)
+  - Conversion logic from the shared helper `main/includes/price_conversion.php`
 
 Example (excerpt):
 
@@ -211,8 +212,10 @@ Otherwise the script only reads from the existing price files and does not call 
 - **Source:** ENTSO-E Transparency Platform, Document Type **A44** (Day-ahead prices), in-domain and out-domain **10YNL----------L** (Netherlands).
 - **Resolution:** 15-minute periods; the script aggregates to **hourly** by averaging the four quarter-hour prices per hour in NL time.
 - **Consumer price** is computed from the hourly average EUR/MWh as:  
-  `(kwh_price + inkoopvergoeding + belasting) * BTW`  
-  (constants are defined in the script.)
+  `kwh_price = average_price_eur_mwh / 1000`  
+  `consumer = (kwh_price + supplierMarkupEurPerKwh + energyTaxEurPerKwh) * vatMultiplier`
+- The shared conversion values are read from `main/config/config.json` under `priceConversion`.
+- The canonical implementation lives in `main/includes/price_conversion.php`.
 
 ---
 

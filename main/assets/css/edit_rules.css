@@ -589,17 +589,18 @@ select.is-field-filled {
     box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
 }
 
+.fallback-select.fallback-netzero-minus,
+.fallback-select.fallback-negative {
+    color: var(--fallback-negative);
+    border-color: rgba(255, 139, 139, 0.45);
+    box-shadow: 0 0 0 1px rgba(255, 139, 139, 0.18);
+}
+
 .fallback-select.fallback-netzero-plus,
 .fallback-select.fallback-positive {
     color: var(--fallback-positive);
     border-color: rgba(127, 215, 127, 0.45);
     box-shadow: 0 0 0 1px rgba(127, 215, 127, 0.18);
-}
-
-.fallback-select.fallback-negative {
-    color: var(--fallback-negative);
-    border-color: rgba(255, 139, 139, 0.45);
-    box-shadow: 0 0 0 1px rgba(255, 139, 139, 0.18);
 }
 
 .fallback-select option {
@@ -609,6 +610,10 @@ select.is-field-filled {
 
 .fallback-select option[value="netzero"] {
     color: var(--fallback-netzero);
+}
+
+.fallback-select option[value="netzero-"] {
+    color: var(--fallback-negative);
 }
 
 .fallback-select option[value="netzero+"] {
@@ -639,6 +644,13 @@ select.is-field-filled {
     box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
 }
 
+.value-mode-select.value-mode-netzero-minus {
+    color: var(--fallback-negative);
+    -webkit-text-fill-color: var(--fallback-negative);
+    border-color: rgba(255, 139, 139, 0.45);
+    box-shadow: 0 0 0 1px rgba(255, 139, 139, 0.18);
+}
+
 .value-mode-select.value-mode-netzero-plus {
     color: var(--fallback-positive);
     -webkit-text-fill-color: var(--fallback-positive);
@@ -653,6 +665,10 @@ select.is-field-filled {
 
 .value-mode-select option[value="netzero"] {
     color: var(--fallback-netzero);
+}
+
+.value-mode-select option[value="netzero-"] {
+    color: var(--fallback-negative);
 }
 
 .value-mode-select option[value="netzero+"] {

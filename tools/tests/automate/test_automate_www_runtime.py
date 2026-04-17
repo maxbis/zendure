@@ -41,8 +41,10 @@ AUTOMATE_DATA_DIR = REPO_ROOT / "automate" / "data"
 TEST_DESCRIPTIONS = [
     ("test_base_schedule_resolution_reads_object_entries", "Checks raw schedule object entries resolve into standard slot values."),
     ("test_base_schedule_resolution_propagates_signed_power_bounds", "Checks raw schedule netzero entries expose min_power and max_power in resolved slots."),
+    ("test_base_schedule_resolution_propagates_signed_power_bounds_for_netzero_minus", "Checks raw schedule netzero- entries expose min_power and max_power in resolved slots."),
     ("test_base_schedule_resolution_rejects_non_integer_bounds", "Checks raw schedule min_power/max_power reject non-integer values."),
     ("test_resolver_wildcard_and_specific_rule_precedence", "Checks wildcard base rule and specific-hour override precedence."),
+    ("test_resolver_emits_signed_power_bounds_from_netzero_minus_rules", "Checks resolver includes min_power and max_power for netzero- rules."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
     ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
     ("test_sun_offset_condition_matches_from_dynamic_offset_field", "Checks sunset_offset_hour conditions apply using numeric offsets."),
@@ -221,6 +223,25 @@ def test_base_schedule_resolution_propagates_signed_power_bounds():
     assert by_time["1500"]["max_power"] == -100
 
 
+def test_base_schedule_resolution_propagates_signed_power_bounds_for_netzero_minus():
+    today, _ = _today_and_tomorrow_ymd()
+
+    php_code = (
+        f'require "{(REPO_ROOT / "main" / "api" / "charge_schedule_functions.php").as_posix()}"; '
+        '$schedule=['
+        '"********0000"=>["value"=>0],'
+        f'"{today}1500"=>["value"=>"netzero-","min_power"=>-700,"max_power"=>-100]'
+        '];'
+        f'echo json_encode(resolveScheduleForDate($schedule, "{today}"));'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+    by_time = {str(item.get("time")): item for item in payload}
+
+    assert by_time["1500"]["value"] == "netzero-"
+    assert by_time["1500"]["min_power"] == -700
+    assert by_time["1500"]["max_power"] == -100
+
+
 def test_base_schedule_resolution_rejects_non_integer_bounds():
     today, _ = _today_and_tomorrow_ymd()
 
@@ -265,6 +286,35 @@ def test_resolver_emits_signed_power_bounds_from_rules(backup_and_restore_price_
     assert by_time["1500"]["value"] == "netzero"
     assert by_time["1500"]["min_power"] == -300
     assert by_time["1500"]["max_power"] == 300
+
+
+def test_resolver_emits_signed_power_bounds_from_netzero_minus_rules(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+
+    rules = [
+        {"name": "default", "key": "************", "value": 0, "enabled": True},
+        {
+            "name": "signed-bounds-netzero-minus",
+            "key": "********1500",
+            "value": "netzero-",
+            "min_power": -300,
+            "max_power": 0,
+            "enabled": True,
+        },
+    ]
+    _write_json(CONDITIONS_FILE, rules)
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    by_time = {str(item.get("time")): item for item in today_group.get("items", [])}
+
+    assert by_time["1500"]["value"] == "netzero-"
+    assert by_time["1500"]["min_power"] == -300
+    assert by_time["1500"]["max_power"] == 0
 
 
 def test_resolver_emits_runtime_condition_metadata(backup_and_restore_price_files):

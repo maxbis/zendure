@@ -100,6 +100,28 @@ body {
     align-content: start;
 }
 
+.view-switch {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+.view-switch a {
+    color: var(--text-main);
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+}
+.view-switch a:hover {
+    text-decoration-color: rgba(255, 255, 255, 0.55);
+}
+.view-switch__current {
+    font-weight: 600;
+    color: var(--text-main);
+}
+.view-switch__sep {
+    margin: 0 0.35em;
+    opacity: 0.5;
+}
+
 .meta-pill,
 .nav-card {
     padding: 16px 18px;
@@ -223,6 +245,31 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.summary-secondary {
+    margin-top: 5px;
+    min-height: 1.05rem;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    color: rgba(232, 240, 230, 0.52);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.summary-secondary--charge-cost {
+    color: rgba(143, 184, 201, 0.58);
+}
+
+.summary-secondary--net-cost {
+    color: rgba(122, 191, 169, 0.56);
+}
+
+.summary-secondary--pnl {
+    color: rgba(247, 165, 133, 0.56);
 }
 
 .summary-subtle {

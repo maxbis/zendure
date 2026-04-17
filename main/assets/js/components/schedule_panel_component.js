@@ -122,7 +122,7 @@ class SchedulePanelComponent extends Component {
             const isCurrent = (time === currentActiveTime);
             
             const bgClass = getTimeClass(h);
-            const valDisplay = getValueLabel(slot.value);
+            const valDisplay = getScheduleValueDisplay(slot);
             const valClass = getValueClass(slot.value);
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
@@ -130,15 +130,17 @@ class SchedulePanelComponent extends Component {
             const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
-            div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''}`;
+            div.className = `schedule-item ${bgClass} ${isCurrent ? 'slot-current' : ''} ${isConditionSlot && ruleName ? 'has-meta' : ''}`;
             // Don't render key column in mobile (it's hidden via CSS anyway)
             const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
             div.innerHTML = `
                 <div class="schedule-item-main">
                     <div class="schedule-item-time">${formatTime(time)}</div>
-                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                    <div class="schedule-item-content">
+                        <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                        ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                    </div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
                 ${!isMobile && slot.key ? `<div class="schedule-item-key">${slot.key}</div>` : ''}
             `;
             container.appendChild(div);
@@ -165,7 +167,7 @@ class SchedulePanelComponent extends Component {
             const h = parseInt(time.substring(0, 2));
             
             const bgClass = getTimeClass(h);
-            const valDisplay = getValueLabel(slot.value);
+            const valDisplay = getScheduleValueDisplay(slot);
             const valClass = getValueClass(slot.value);
             const isConditionSlot = slot && slot.source === 'condition';
             const ruleName = slot && slot.rule_name ? String(slot.rule_name) : '';
@@ -173,15 +175,17 @@ class SchedulePanelComponent extends Component {
             const ruleColor = getScheduleRuleColor(slot);
             
             const div = document.createElement('div');
-            div.className = `schedule-item ${bgClass}`;
+            div.className = `schedule-item ${bgClass} ${isConditionSlot && ruleName ? 'has-meta' : ''}`;
             // Don't render key column in mobile
             const isMobile = window.innerWidth < 768 || document.body.classList.contains('mobile-dark');
             div.innerHTML = `
                 <div class="schedule-item-main">
                     <div class="schedule-item-time">${formatTime(time)}</div>
-                    <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                    <div class="schedule-item-content">
+                        <div class="schedule-item-value ${valClass}">${valDisplay}</div>
+                        ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
+                    </div>
                 </div>
-                ${isConditionSlot && ruleName ? `<div class="schedule-item-meta" title="${escapeHtml(ruleLabel)}">${ruleColor ? `<span class="schedule-rule-color-dot" style="background:${escapeHtml(ruleColor)};" aria-hidden="true"></span>` : ''}<span class="schedule-item-rule-name">${escapeHtml(ruleLabel)}</span></div>` : ''}
             `;
             container.appendChild(div);
         });

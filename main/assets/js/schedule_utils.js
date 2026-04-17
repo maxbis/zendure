@@ -27,6 +27,26 @@ function getValueLabel(value) {
     return value + ' W';
 }
 
+function getInlineLimitsLabel(slot) {
+    if (!slot || typeof slot !== 'object') return '';
+
+    const parts = [];
+    if (slot.min_power !== null && slot.min_power !== undefined && !Number.isNaN(Number(slot.min_power))) {
+        parts.push(`Min ${parseInt(slot.min_power, 10)} W`);
+    }
+    if (slot.max_power !== null && slot.max_power !== undefined && !Number.isNaN(Number(slot.max_power))) {
+        parts.push(`Max ${parseInt(slot.max_power, 10)} W`);
+    }
+
+    return parts.join(' / ');
+}
+
+function getScheduleValueDisplay(slot) {
+    const valueLabel = getValueLabel(slot ? slot.value : null);
+    const limitsLabel = getInlineLimitsLabel(slot);
+    return limitsLabel ? `${valueLabel} ${limitsLabel}` : valueLabel;
+}
+
 /**
  * Get CSS class for time-of-day styling
  * @param {number} hour - Hour of day (0-23)

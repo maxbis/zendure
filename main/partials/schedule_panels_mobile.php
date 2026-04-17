@@ -27,6 +27,23 @@ function getValueLabel($val)
     return $val . ' W';
 }
 
+function getInlineLimitsLabel($slot)
+{
+    if (!is_array($slot)) {
+        return '';
+    }
+
+    $parts = [];
+    if (array_key_exists('min_power', $slot) && $slot['min_power'] !== null && is_numeric($slot['min_power'])) {
+        $parts[] = 'Min ' . intval($slot['min_power']) . ' W';
+    }
+    if (array_key_exists('max_power', $slot) && $slot['max_power'] !== null && is_numeric($slot['max_power'])) {
+        $parts[] = 'Max ' . intval($slot['max_power']) . ' W';
+    }
+
+    return implode(' / ', $parts);
+}
+
 function getRuleDisplayLabel($slot)
 {
     $ruleName = isset($slot['rule_name']) ? trim((string) $slot['rule_name']) : '';
@@ -201,6 +218,8 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
+                            $limitsLabel = getInlineLimitsLabel($slot);
+                            $valueDisplay = $limitsLabel !== '' ? ($valDisplay . ' ' . $limitsLabel) : $valDisplay;
                             $catClass = 'neutral';
                             if ($val === 'netzero') {
                                 $catClass = 'netzero';
@@ -212,22 +231,24 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                                 $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
                             }
                             ?>
-                            <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isCurrent ? 'slot-current' : ''; ?>">
+                            <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isCurrent ? 'slot-current' : ''; ?> <?php echo $isConditionSlot && $ruleName !== '' ? 'has-meta' : ''; ?>">
                                 <div class="schedule-item-main">
                                     <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
                                     </div>
-                                    <div class="schedule-item-value <?php echo $catClass; ?>">
-                                        <?php echo htmlspecialchars($valDisplay); ?>
+                                    <div class="schedule-item-content">
+                                        <div class="schedule-item-value <?php echo $catClass; ?>">
+                                            <?php echo htmlspecialchars($valueDisplay); ?>
+                                        </div>
+                                        <?php if ($isConditionSlot && $ruleName !== ''): ?>
+                                            <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
+                                                <?php if ($ruleColor !== ''): ?>
+                                                    <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                                <?php endif; ?>
+                                                <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
-                                <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
-                                        <?php if ($ruleColor !== ''): ?>
-                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
-                                        <?php endif; ?>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
-                                    </div>
-                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -254,6 +275,8 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                             $isConditionSlot = (isset($slot['source']) && $slot['source'] === 'condition');
 
                             $valDisplay = getValueLabel($val);
+                            $limitsLabel = getInlineLimitsLabel($slot);
+                            $valueDisplay = $limitsLabel !== '' ? ($valDisplay . ' ' . $limitsLabel) : $valDisplay;
                             $catClass = 'neutral';
                             if ($val === 'netzero') {
                                 $catClass = 'netzero';
@@ -265,22 +288,24 @@ $scheduleRuleColorMap = loadScheduleRuleColorMap();
                                 $catClass = ($val > 0) ? 'charge' : (($val < 0) ? 'discharge' : 'neutral');
                             }
                             ?>
-                            <div class="schedule-item <?php echo $bgClass; ?>">
+                            <div class="schedule-item <?php echo $bgClass; ?> <?php echo $isConditionSlot && $ruleName !== '' ? 'has-meta' : ''; ?>">
                                 <div class="schedule-item-main">
                                     <div class="schedule-item-time"><?php echo substr($time, 0, 2) . ':' . substr($time, 2, 2); ?>
                                     </div>
-                                    <div class="schedule-item-value <?php echo $catClass; ?>">
-                                        <?php echo htmlspecialchars($valDisplay); ?>
+                                    <div class="schedule-item-content">
+                                        <div class="schedule-item-value <?php echo $catClass; ?>">
+                                            <?php echo htmlspecialchars($valueDisplay); ?>
+                                        </div>
+                                        <?php if ($isConditionSlot && $ruleName !== ''): ?>
+                                            <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
+                                                <?php if ($ruleColor !== ''): ?>
+                                                    <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
+                                                <?php endif; ?>
+                                                <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
-                                <?php if ($isConditionSlot && $ruleName !== ''): ?>
-                                    <div class="schedule-item-meta" title="<?php echo htmlspecialchars($ruleLabel); ?>">
-                                        <?php if ($ruleColor !== ''): ?>
-                                            <span class="schedule-rule-color-dot" style="background: <?php echo htmlspecialchars($ruleColor); ?>;" aria-hidden="true"></span>
-                                        <?php endif; ?>
-                                        <span class="schedule-item-rule-name"><?php echo htmlspecialchars($ruleLabel); ?></span>
-                                    </div>
-                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>

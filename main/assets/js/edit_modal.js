@@ -263,25 +263,65 @@ class EditModal {
         this.updatePowerRangeIndicator();
     }
 
-    syncLimitRangeBounds() {
+    getSelectedMode() {
+        return document.querySelector('input[name="val-mode"]:checked')?.value || 'netzero';
+    }
+
+    getLimitBounds(mode = this.getSelectedMode()) {
+        if (mode === 'netzero+') {
+            return { min: 0, max: this.limitMax };
+        }
+        if (mode === 'netzero-') {
+            return { min: this.limitMin, max: 0 };
+        }
+        return { min: this.limitMin, max: this.limitMax };
+    }
+
+    syncLimitRangeBounds(mode = this.getSelectedMode()) {
+        const bounds = this.getLimitBounds(mode);
         [this.limitsMinRange, this.limitsMaxRange].forEach((input, index) => {
             if (!input) return;
-            input.min = String(this.limitMin);
-            input.max = String(this.limitMax);
+            input.min = String(bounds.min);
+            input.max = String(bounds.max);
             input.step = String(this.limitStep);
-            input.value = String(index === 0 ? this.limitMin : this.limitMax);
+            const fallbackValue = index === 0 ? bounds.min : bounds.max;
+            input.value = String(this.snapLimitValue(input.value, mode, fallbackValue));
         });
+        return bounds;
     }
 
-    snapLimitValue(rawValue) {
+    snapLimitValue(rawValue, mode = this.getSelectedMode(), fallbackValue = 0) {
         const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue)) return 0;
+        if (!Number.isFinite(numericValue)) return fallbackValue;
         const snapped = Math.round(numericValue / this.limitStep) * this.limitStep;
-        return Math.min(this.limitMax, Math.max(this.limitMin, snapped));
+        const bounds = this.getLimitBounds(mode);
+        return Math.min(bounds.max, Math.max(bounds.min, snapped));
     }
 
-    formatLimitValue(value) {
-        const numericValue = this.snapLimitValue(value);
+    normalizeConstraintPair(minValue, maxValue, mode = this.getSelectedMode(), options = {}) {
+        const bounds = this.getLimitBounds(mode);
+        let normalizedMin = minValue === null ? null : this.snapLimitValue(minValue, mode, bounds.min);
+        let normalizedMax = maxValue === null ? null : this.snapLimitValue(maxValue, mode, bounds.max);
+
+        if (normalizedMin !== null && normalizedMax !== null && normalizedMin > normalizedMax) {
+            if (options.activeThumb === 'min') {
+                normalizedMax = normalizedMin;
+            } else if (options.activeThumb === 'max') {
+                normalizedMin = normalizedMax;
+            } else {
+                normalizedMin = normalizedMax;
+            }
+        }
+
+        return {
+            minValue: normalizedMin,
+            maxValue: normalizedMax,
+            bounds,
+        };
+    }
+
+    formatLimitValue(value, mode = this.getSelectedMode()) {
+        const numericValue = this.snapLimitValue(value, mode);
         return numericValue > 0 ? `+${numericValue} W` : `${numericValue} W`;
     }
 
@@ -289,20 +329,22 @@ class EditModal {
         return document.getElementById(inputId);
     }
 
-    getStoredLimitValue(inputId) {
+    getStoredLimitValue(inputId, mode = this.getSelectedMode()) {
         const input = this.getConstraintInput(inputId);
         if (!input) return null;
         const rawValue = String(input.value || '').trim();
         if (rawValue === '') return null;
-        return this.snapLimitValue(rawValue);
+        const bounds = this.getLimitBounds(mode);
+        return this.snapLimitValue(rawValue, mode, inputId === 'inp-min-value' ? bounds.min : bounds.max);
     }
 
-    setConstraintValue(inputId, value) {
+    setConstraintValue(inputId, value, mode = this.getSelectedMode()) {
         const input = this.getConstraintInput(inputId);
         if (!input) return;
+        const bounds = this.getLimitBounds(mode);
         input.value = value === null || value === undefined || value === ''
             ? ''
-            : String(this.snapLimitValue(value));
+            : String(this.snapLimitValue(value, mode, inputId === 'inp-min-value' ? bounds.min : bounds.max));
         this.updateConstraintInputState(input);
     }
 
@@ -312,6 +354,8 @@ class EditModal {
 
     setLimitsEnabled(enabled, options = {}) {
         const shouldResetToDefaults = options.resetToDefaults === true;
+        const mode = options.mode || this.getSelectedMode();
+        const bounds = this.getLimitBounds(mode);
         if (this.limitsOn) {
             this.limitsOn.checked = !!enabled;
         }
@@ -321,24 +365,29 @@ class EditModal {
 
         if (enabled) {
             if (shouldResetToDefaults) {
-                this.setConstraintValue('inp-min-value', this.limitMin);
-                this.setConstraintValue('inp-max-value', this.limitMax);
+                this.setConstraintValue('inp-min-value', bounds.min, mode);
+                this.setConstraintValue('inp-max-value', bounds.max, mode);
             } else {
-                const minStored = this.getStoredLimitValue('inp-min-value');
-                const maxStored = this.getStoredLimitValue('inp-max-value');
+                const minStored = this.getStoredLimitValue('inp-min-value', mode);
+                const maxStored = this.getStoredLimitValue('inp-max-value', mode);
+                const normalized = this.normalizeConstraintPair(minStored, maxStored, mode);
                 if (minStored === null) {
-                    this.setConstraintValue('inp-min-value', this.limitMin);
+                    this.setConstraintValue('inp-min-value', bounds.min, mode);
+                } else {
+                    this.setConstraintValue('inp-min-value', normalized.minValue, mode);
                 }
                 if (maxStored === null) {
-                    this.setConstraintValue('inp-max-value', this.limitMax);
+                    this.setConstraintValue('inp-max-value', bounds.max, mode);
+                } else {
+                    this.setConstraintValue('inp-max-value', normalized.maxValue, mode);
                 }
             }
         } else {
-            this.setConstraintValue('inp-min-value', null);
-            this.setConstraintValue('inp-max-value', null);
+            this.setConstraintValue('inp-min-value', null, mode);
+            this.setConstraintValue('inp-max-value', null, mode);
         }
 
-        this.syncConstraintSlider();
+        this.syncConstraintSlider({ mode });
         this.updatePowerRangeIndicator();
     }
 
@@ -383,33 +432,32 @@ class EditModal {
             return;
         }
 
-        const minStored = this.getStoredLimitValue('inp-min-value');
-        const maxStored = this.getStoredLimitValue('inp-max-value');
+        const mode = options.mode || this.getSelectedMode();
+        const bounds = this.syncLimitRangeBounds(mode);
+        const minStored = this.getStoredLimitValue('inp-min-value', mode);
+        const maxStored = this.getStoredLimitValue('inp-max-value', mode);
         const limitsEnabled = this.areLimitsEnabled();
 
-        let minSliderValue = minStored === null ? this.limitMin : minStored;
-        let maxSliderValue = maxStored === null ? this.limitMax : maxStored;
+        let minSliderValue = minStored === null ? bounds.min : minStored;
+        let maxSliderValue = maxStored === null ? bounds.max : maxStored;
 
         if (options.activeThumb === 'min') {
-            minSliderValue = this.snapLimitValue(this.limitsMinRange.value);
+            minSliderValue = this.snapLimitValue(this.limitsMinRange.value, mode, bounds.min);
         }
         if (options.activeThumb === 'max') {
-            maxSliderValue = this.snapLimitValue(this.limitsMaxRange.value);
+            maxSliderValue = this.snapLimitValue(this.limitsMaxRange.value, mode, bounds.max);
         }
 
-        if (minSliderValue > maxSliderValue) {
-            if (options.activeThumb === 'min') {
-                maxSliderValue = minSliderValue;
-            } else {
-                minSliderValue = maxSliderValue;
-            }
-        }
+        const normalized = this.normalizeConstraintPair(minSliderValue, maxSliderValue, mode, options);
+        minSliderValue = normalized.minValue ?? bounds.min;
+        maxSliderValue = normalized.maxValue ?? bounds.max;
 
         this.limitsMinRange.value = String(minSliderValue);
         this.limitsMaxRange.value = String(maxSliderValue);
 
-        const startPercent = ((minSliderValue - this.limitMin) / (this.limitMax - this.limitMin)) * 100;
-        const endPercent = ((maxSliderValue - this.limitMin) / (this.limitMax - this.limitMin)) * 100;
+        const totalRange = bounds.max - bounds.min;
+        const startPercent = totalRange === 0 ? 0 : ((minSliderValue - bounds.min) / totalRange) * 100;
+        const endPercent = totalRange === 0 ? 100 : ((maxSliderValue - bounds.min) / totalRange) * 100;
         this.limitsSelectedRange.style.left = `${startPercent}%`;
         this.limitsSelectedRange.style.width = `${Math.max(0, endPercent - startPercent)}%`;
         if (this.limitsSlider) {
@@ -418,11 +466,11 @@ class EditModal {
         }
 
         if (this.limitsMinDisplay) {
-            this.limitsMinDisplay.textContent = minStored === null ? 'Unset' : this.formatLimitValue(minStored);
+            this.limitsMinDisplay.textContent = minStored === null ? 'Unset' : this.formatLimitValue(minStored, mode);
             this.updateLimitValueTone(this.limitsMinDisplay, minSliderValue, minStored === null);
         }
         if (this.limitsMaxDisplay) {
-            this.limitsMaxDisplay.textContent = maxStored === null ? 'Unset' : this.formatLimitValue(maxStored);
+            this.limitsMaxDisplay.textContent = maxStored === null ? 'Unset' : this.formatLimitValue(maxStored, mode);
             this.updateLimitValueTone(this.limitsMaxDisplay, maxSliderValue, maxStored === null);
         }
 
@@ -441,24 +489,26 @@ class EditModal {
 
     handleLimitRangeInput(which) {
         if (!this.areLimitsEnabled()) return;
+        const mode = this.getSelectedMode();
+        const bounds = this.getLimitBounds(mode);
         if (which === 'min') {
-            const minValue = this.limitsMinRange ? this.snapLimitValue(this.limitsMinRange.value) : this.limitMin;
-            const maxStored = this.getStoredLimitValue('inp-max-value');
-            this.setConstraintValue('inp-min-value', minValue);
+            const minValue = this.limitsMinRange ? this.snapLimitValue(this.limitsMinRange.value, mode, bounds.min) : bounds.min;
+            const maxStored = this.getStoredLimitValue('inp-max-value', mode);
+            this.setConstraintValue('inp-min-value', minValue, mode);
             if (maxStored !== null && minValue > maxStored) {
-                this.setConstraintValue('inp-max-value', minValue);
+                this.setConstraintValue('inp-max-value', minValue, mode);
             }
-            this.syncConstraintSlider({ activeThumb: 'min' });
+            this.syncConstraintSlider({ activeThumb: 'min', mode });
             return;
         }
 
-        const maxValue = this.limitsMaxRange ? this.snapLimitValue(this.limitsMaxRange.value) : this.limitMax;
-        const minStored = this.getStoredLimitValue('inp-min-value');
-        this.setConstraintValue('inp-max-value', maxValue);
+        const maxValue = this.limitsMaxRange ? this.snapLimitValue(this.limitsMaxRange.value, mode, bounds.max) : bounds.max;
+        const minStored = this.getStoredLimitValue('inp-min-value', mode);
+        this.setConstraintValue('inp-max-value', maxValue, mode);
         if (minStored !== null && maxValue < minStored) {
-            this.setConstraintValue('inp-min-value', maxValue);
+            this.setConstraintValue('inp-min-value', maxValue, mode);
         }
-        this.syncConstraintSlider({ activeThumb: 'max' });
+        this.syncConstraintSlider({ activeThumb: 'max', mode });
     }
 
     syncModeInputs(mode, options = {}) {
@@ -466,6 +516,7 @@ class EditModal {
         const constraintsGroup = document.getElementById('group-constraints');
         const wattsInput = document.getElementById('inp-watts');
         const preserveConstraints = options.preserveConstraints === true;
+        this.syncLimitRangeBounds(mode);
 
         if (mode === 'fixed') {
             if (wattsGroup) wattsGroup.style.display = 'block';
@@ -487,13 +538,24 @@ class EditModal {
             if (!preserveConstraints) {
                 if (this.limitsOff) this.limitsOff.checked = true;
                 if (this.limitsOn) this.limitsOn.checked = false;
-                this.setLimitsEnabled(false);
-            } else if (this.getStoredLimitValue('inp-min-value') === null && this.getStoredLimitValue('inp-max-value') === null) {
-                if (this.limitsOff) this.limitsOff.checked = true;
-                if (this.limitsOn) this.limitsOn.checked = false;
             } else {
-                if (this.limitsOn) this.limitsOn.checked = true;
-                if (this.limitsOff) this.limitsOff.checked = false;
+                const normalized = this.normalizeConstraintPair(
+                    this.getStoredLimitValue('inp-min-value', mode),
+                    this.getStoredLimitValue('inp-max-value', mode),
+                    mode
+                );
+                this.setConstraintValue('inp-min-value', normalized.minValue, mode);
+                this.setConstraintValue('inp-max-value', normalized.maxValue, mode);
+                if (normalized.minValue === null && normalized.maxValue === null) {
+                    if (this.limitsOff) this.limitsOff.checked = true;
+                    if (this.limitsOn) this.limitsOn.checked = false;
+                } else {
+                    if (this.limitsOn) this.limitsOn.checked = true;
+                    if (this.limitsOff) this.limitsOff.checked = false;
+                }
+            }
+            if (!preserveConstraints) {
+                this.setLimitsEnabled(false, { mode });
             }
         } else {
             if (wattsGroup) wattsGroup.style.display = 'block';
@@ -511,7 +573,7 @@ class EditModal {
         this.updateWattsInputState();
         this.updateConstraintInputState(document.getElementById('inp-min-value'));
         this.updateConstraintInputState(document.getElementById('inp-max-value'));
-        this.syncConstraintSlider();
+        this.syncConstraintSlider({ mode });
         this.updatePowerRangeIndicator();
     }
 
@@ -568,8 +630,8 @@ class EditModal {
 
             if (value === 'netzero') {
                 document.querySelector('input[name="val-mode"][value="netzero"]').checked = true;
-                document.getElementById('inp-min-value').value = minValue ?? '';
-                document.getElementById('inp-max-value').value = maxValue ?? '';
+                this.setConstraintValue('inp-min-value', minValue ?? '', 'netzero');
+                this.setConstraintValue('inp-max-value', maxValue ?? '', 'netzero');
                 if (minValue === '' && maxValue === '') {
                     if (this.limitsOff) this.limitsOff.checked = true;
                     if (this.limitsOn) this.limitsOn.checked = false;
@@ -580,8 +642,8 @@ class EditModal {
                 this.syncModeInputs('netzero', { preserveConstraints: true });
             } else if (value === 'netzero-') {
                 document.querySelector('input[name="val-mode"][value="netzero-"]').checked = true;
-                document.getElementById('inp-min-value').value = minValue ?? '';
-                document.getElementById('inp-max-value').value = maxValue ?? '';
+                this.setConstraintValue('inp-min-value', minValue ?? '', 'netzero-');
+                this.setConstraintValue('inp-max-value', maxValue ?? '', 'netzero-');
                 if (minValue === '' && maxValue === '') {
                     if (this.limitsOff) this.limitsOff.checked = true;
                     if (this.limitsOn) this.limitsOn.checked = false;
@@ -592,8 +654,8 @@ class EditModal {
                 this.syncModeInputs('netzero-', { preserveConstraints: true });
             } else if (value === 'netzero+') {
                 document.querySelector('input[name="val-mode"][value="netzero+"]').checked = true;
-                document.getElementById('inp-min-value').value = minValue ?? '';
-                document.getElementById('inp-max-value').value = maxValue ?? '';
+                this.setConstraintValue('inp-min-value', minValue ?? '', 'netzero+');
+                this.setConstraintValue('inp-max-value', maxValue ?? '', 'netzero+');
                 if (minValue === '' && maxValue === '') {
                     if (this.limitsOff) this.limitsOff.checked = true;
                     if (this.limitsOn) this.limitsOn.checked = false;
@@ -631,7 +693,7 @@ class EditModal {
     }
 
     handleModeChange(mode) {
-        this.syncModeInputs(mode, { preserveConstraints: false });
+        this.syncModeInputs(mode, { preserveConstraints: this.isDynamicMode(mode) && this.areLimitsEnabled() });
     }
 
     updateWattsInputState() {
@@ -679,8 +741,9 @@ class EditModal {
         const maxInput = document.getElementById('inp-max-value');
         const minRaw = minInput ? String(minInput.value || '').trim() : '';
         const maxRaw = maxInput ? String(maxInput.value || '').trim() : '';
-        const mode = document.querySelector('input[name="val-mode"]:checked')?.value;
+        const mode = this.getSelectedMode();
         const enabled = this.isDynamicMode(mode);
+        const bounds = this.getLimitBounds(mode);
 
         indicator.hidden = true;
         indicator.textContent = '';
@@ -704,7 +767,12 @@ class EditModal {
         const minValue = minRaw === '' ? null : parseInt(minRaw, 10);
         const maxValue = maxRaw === '' ? null : parseInt(maxRaw, 10);
 
-        if (minValue !== null && maxValue !== null && minValue > maxValue) {
+        const outOfBounds = (
+            (minValue !== null && (minValue < bounds.min || minValue > bounds.max)) ||
+            (maxValue !== null && (maxValue < bounds.min || maxValue > bounds.max))
+        );
+
+        if (outOfBounds || (minValue !== null && maxValue !== null && minValue > maxValue)) {
             indicator.hidden = false;
             indicator.textContent = 'Invalid range';
             indicator.classList.add('is-invalid');
@@ -715,6 +783,16 @@ class EditModal {
 
         if (minValue === null || maxValue === null) {
             if (minValue !== null) {
+                if (mode === 'netzero+') {
+                    indicator.textContent = `Charge-only from ${minValue} W`;
+                    indicator.classList.add('is-charge');
+                    return;
+                }
+                if (mode === 'netzero-') {
+                    indicator.textContent = `Discharge floor: ${minValue} W`;
+                    indicator.classList.add('is-discharge');
+                    return;
+                }
                 if (minValue > 0) {
                     indicator.textContent = `Charge-only from ${minValue} W`;
                     indicator.classList.add('is-charge');
@@ -731,6 +809,16 @@ class EditModal {
             }
 
             if (maxValue !== null) {
+                if (mode === 'netzero+') {
+                    indicator.textContent = `Charge cap: ${maxValue} W`;
+                    indicator.classList.add('is-charge');
+                    return;
+                }
+                if (mode === 'netzero-') {
+                    indicator.textContent = `Discharge-only up to ${maxValue} W`;
+                    indicator.classList.add('is-discharge');
+                    return;
+                }
                 if (maxValue < 0) {
                     indicator.textContent = `Discharge-only up to ${maxValue} W`;
                     indicator.classList.add('is-discharge');
@@ -746,6 +834,22 @@ class EditModal {
                 return;
             }
 
+            return;
+        }
+
+        if (mode === 'netzero+') {
+            indicator.textContent = minValue === 0
+                ? `Idle-to-charge range: ${minValue} to ${maxValue} W`
+                : `Charge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-charge');
+            return;
+        }
+
+        if (mode === 'netzero-') {
+            indicator.textContent = maxValue === 0
+                ? `Discharge-to-idle range: ${minValue} to ${maxValue} W`
+                : `Discharge-only range: ${minValue} to ${maxValue} W`;
+            indicator.classList.add('is-discharge');
             return;
         }
 
@@ -921,6 +1025,14 @@ class EditModal {
             if (isNaN(val)) {
                 return alert('Invalid watts value');
             }
+        }
+
+        if (this.isDynamicMode(mode)) {
+            const normalized = this.normalizeConstraintPair(minValue, maxValue, mode);
+            minValue = normalized.minValue;
+            maxValue = normalized.maxValue;
+            this.setConstraintValue('inp-min-value', minValue, mode);
+            this.setConstraintValue('inp-max-value', maxValue, mode);
         }
 
         if (minValue !== null && maxValue !== null && minValue > maxValue) {

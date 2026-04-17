@@ -11,11 +11,10 @@ declare(strict_types=1);
  * If no file for tomorrow and time (NL) >= 14:00: fetches tomorrow, saves, returns data.
  */
 
+require_once __DIR__ . '/../includes/price_conversion.php';
+
 const ENERGYZERO_BASE_URL = 'https://public.api.energyzero.nl/public/v1/prices';
 const TIMEZONE_NL = 'Europe/Amsterdam';
-const INKOOPVERGOEDING = 0.0219;
-const BELASTING = 0.08980;
-const BTW = 1.21;
 const TOMORROW_FETCH_HOUR = 14;
 
 define('PRICE_DIR', __DIR__ . '/../data/price');
@@ -187,9 +186,7 @@ function parseHourlyPrices(array $payload): array {
         $sourcePrices = $group['source_prices'];
         $count = count($sourcePrices);
         $averageSource = $count > 0 ? round(array_sum($sourcePrices) / $count, 6) : null;
-        $consumerPrice = $averageSource !== null
-            ? round(($averageSource + INKOOPVERGOEDING + BELASTING) * BTW, 4)
-            : null;
+        $consumerPrice = convertSpotToConsumerPrice($averageSource);
 
         $result[] = [
             'date_nl' => $group['date_nl'],

@@ -85,16 +85,6 @@ function formatPriceCents(price) {
     return Math.round(price * 100).toString();
 }
 
-/**
- * Spot price (excl. tax) from price incl. 21% VAT: P_excl = (P_incl / 1.21) − 0.10880
- * @param {number|null} pIncl - Price incl. tax (€/kWh) or null
- * @returns {number|null} Spot price or null
- */
-function spotPriceFromIncl(pIncl) {
-    if (pIncl == null || typeof pIncl !== 'number' || Number.isNaN(pIncl)) return null;
-    return (pIncl / 1.21) - 0.09;
-}
-
 let priceGraphPopup = null;
 let priceGraphPopupActiveBar = null;
 let priceGraphPopupActiveContainer = null;
@@ -146,7 +136,7 @@ function parseOptionalScheduleBound(value) {
 }
 
 function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry) {
-    if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero+') {
+    if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero-' && scheduleValue !== 'netzero+') {
         return '';
     }
 
@@ -184,7 +174,7 @@ function escapePopupHtml(value) {
 }
 
 function formatRuleOutputValue(value) {
-    if (value === 'netzero' || value === 'netzero+') {
+    if (value === 'netzero' || value === 'netzero-' || value === 'netzero+') {
         return String(value);
     }
     const numeric = Number(value);
@@ -279,7 +269,7 @@ function renderRuleDetailBody(rule) {
     const normalizedValue = typeof rule.value === 'string'
         ? rule.value.trim().toLowerCase()
         : '';
-    const isDynamicOutput = normalizedValue === 'netzero' || normalizedValue === 'netzero+';
+    const isDynamicOutput = normalizedValue === 'netzero' || normalizedValue === 'netzero-' || normalizedValue === 'netzero+';
     const fields = [];
     fields.push({
         label: 'Output',
@@ -1139,7 +1129,9 @@ function renderPriceGraphMobilePopupContent() {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
-    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceValue = typeof convertConsumerToSpotPrice === 'function'
+        ? convertConsumerToSpotPrice(priceValue)
+        : null;
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
@@ -1317,7 +1309,9 @@ function showPriceGraphPopup(bar, container) {
     const priceValue = rawPrice === '' || rawPrice === undefined ? null : Number(rawPrice);
     const priceDisplay = isProxy ? 'No price data available' : (priceValue === null || Number.isNaN(priceValue) ? 'N/A' : formatPrice(priceValue));
 
-    const spotPriceValue = spotPriceFromIncl(priceValue);
+    const spotPriceValue = typeof convertConsumerToSpotPrice === 'function'
+        ? convertConsumerToSpotPrice(priceValue)
+        : null;
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
@@ -1626,6 +1620,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
         if (value === 'netzero') {
             return 'netzero';
         }
+        if (value === 'netzero-') {
+            return 'netzero-minus';
+        }
         if (value === 'netzero+') {
             return 'netzero-plus';
         }
@@ -1642,6 +1639,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
                 .trim();
             if (normalized === 'net zero' || normalized === 'netzero') {
                 return 'netzero';
+            }
+            if (normalized === 'netzero-' || normalized === 'net zero-') {
+                return 'netzero-minus';
             }
             if (normalized === 'netzero+' || normalized === 'solar charge' || normalized.includes('only')) {
                 return 'netzero-plus';

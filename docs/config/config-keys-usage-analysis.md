@@ -21,6 +21,11 @@ Used directly by `main/charge_schedule_mobile.php`:
 - `popupNetzeroReferenceW` (default: 200, reference power in watts for netzero mode)
 - `popupNetzeroMinusReferenceW` (default: -180, reference power in watts for netzero- mode)
 - `popupNetzeroPlusReferenceW` (default: 300, reference power in watts for netzero+ mode)
+- `priceConversion.supplierMarkupEurPerKwh` (default: 0.0219, added to spot/source price before VAT)
+- `priceConversion.energyTaxEurPerKwh` (default: 0.0898, added to spot/source price before VAT)
+- `priceConversion.vatMultiplier` (default: 1.21, VAT multiplier used for price conversion)
+- `priceConversion.consumerPrecision` (default: 4, rounding digits for spot/source -> consumer conversion)
+- `priceConversion.spotPrecision` (default: 6, rounding digits for consumer -> spot/source conversion)
 
 ## Proxy/API Keys
 
@@ -45,3 +50,5 @@ Used by server-side proxy endpoints:
 - The active local schedule endpoint configured today is:
   - `http://localhost/zendure/main/data/api/data_api.php?type=schedule&resolved=1`
 - Earlier docs referenced legacy `schedule/` paths and older key maps; this file supersedes those for current operations.
+- `main/includes/price_conversion.php` is the canonical PHP helper for price conversion.
+- `main/assets/js/price_conversion.js` mirrors the same config-backed math for browser UI display.

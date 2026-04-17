@@ -287,3 +287,78 @@ def test_set_power_resends_when_snapshot_contradicts_previous_power(monkeypatch)
     assert sent_requests[0]["json"]["properties"]["acMode"] == 2
     assert sent_requests[0]["json"]["properties"]["outputLimit"] == 800
     assert any(key == "stale_device_state_detected" for _, _, key in logs)
+
+
+@pytest.mark.parametrize(
+    ("mode", "p1_total_power", "expected_sign"),
+    [
+        ("netzero-", -400, 0),
+        ("netzero-", 400, -1),
+        ("netzero", -400, 1),
+        ("netzero", 400, -1),
+        ("netzero+", -400, 1),
+        ("netzero+", 400, 0),
+    ],
+)
+def test_dynamic_mode_sign_matrix_for_p1_readings(monkeypatch, mode, p1_total_power, expected_sign):
+    device_controller = _import_device_controller_module()
+    controller = _make_scenario_controller(device_controller)
+    controller.previous_power = None
+    controller.power_feed_min_delta = 0
+    controller.power_feed_min_threshold = 30
+    controller.power_feed_max_delta = 5000
+    controller.reversal_ramp_guard = device_controller.ReversalRampGuard(enabled=False)
+    sent_requests = []
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"success": True}
+
+    def _fake_post(url, json, timeout, headers):
+        sent_requests.append(
+            {
+                "url": url,
+                "json": json,
+                "timeout": timeout,
+                "headers": headers,
+            }
+        )
+        return _Response()
+
+    monkeypatch.setattr(device_controller.requests, "post", _fake_post)
+
+    result = device_controller.AutomateController.set_power(
+        controller,
+        mode,
+        p1_data={"total_power": p1_total_power},
+        zendure_data={
+            "properties": {
+                "inputLimit": 0,
+                "outputLimit": 0,
+                "electricLevel": 50,
+            }
+        },
+        p1_source="mqtt",
+    )
+
+    assert result.success is True
+    assert len(sent_requests) == 1
+
+    if expected_sign < 0:
+        assert result.power < 0
+        assert sent_requests[0]["json"]["properties"]["acMode"] == 2
+        assert sent_requests[0]["json"]["properties"]["outputLimit"] > 0
+        assert sent_requests[0]["json"]["properties"]["inputLimit"] == 0
+    elif expected_sign > 0:
+        assert result.power > 0
+        assert sent_requests[0]["json"]["properties"]["acMode"] == 1
+        assert sent_requests[0]["json"]["properties"]["inputLimit"] > 0
+        assert sent_requests[0]["json"]["properties"]["outputLimit"] == 0
+    else:
+        assert result.power == 0
+        properties = sent_requests[0]["json"]["properties"]
+        assert properties.get("inputLimit", 0) == 0
+        assert properties.get("outputLimit", 0) == 0

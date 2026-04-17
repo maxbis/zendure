@@ -29,7 +29,7 @@ function isValidScheduleKey($key)
 function normalizeScheduleValue($value)
 {
     if (!isSupportedScheduleValue($value)) {
-        throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero+', or a number");
+        throw new Exception("Invalid value. Must be 'auto', 'netzero', 'netzero-', 'netzero+', or a number");
     }
     return is_numeric($value) ? (int) $value : $value;
 }
@@ -80,8 +80,8 @@ function normalizeRawScheduleEntry($entry)
 
     $hasMin = array_key_exists('min_power', $entry);
     $hasMax = array_key_exists('max_power', $entry);
-    if (($hasMin || $hasMax) && $normalizedValue !== 'netzero' && $normalizedValue !== 'netzero+') {
-        throw new Exception("Fields 'min_power' and 'max_power' are only allowed for 'netzero' and 'netzero+' entries");
+    if (($hasMin || $hasMax) && $normalizedValue !== 'netzero' && $normalizedValue !== 'netzero-' && $normalizedValue !== 'netzero+') {
+        throw new Exception("Fields 'min_power' and 'max_power' are only allowed for 'netzero', 'netzero-', and 'netzero+' entries");
     }
 
     if ($hasMin) {
@@ -248,7 +248,7 @@ function extractTimeFromKey($key)
 
 function isSupportedScheduleValue($value)
 {
-    return $value === 'auto' || $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'auto' || $value === 'netzero-' || $value === 'netzero' || $value === 'netzero+' || is_numeric($value);
 }
 
 function matchesAndBeforeTime($entryKey, $datetime, $slotTime)

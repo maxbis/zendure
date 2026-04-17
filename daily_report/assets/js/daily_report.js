@@ -51,6 +51,11 @@
         return `${prefix}${value.toFixed(2)}%`;
     }
 
+    function formatPercentNeutral(value) {
+        const formatted = formatPercent(value);
+        return formatted.startsWith('+') ? formatted.slice(1) : formatted;
+    }
+
     function formatEur(value) {
         if (!Number.isFinite(value)) return '--';
         const prefix = value > 0 ? '+' : '';
@@ -60,6 +65,110 @@
     function formatPrice(value) {
         if (!Number.isFinite(value)) return '--';
         return `EUR ${value.toFixed(4)}/kWh`;
+    }
+
+    function toFiniteNumber(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    }
+
+    function deriveSpotPrice(value) {
+        if (typeof convertConsumerToSpotPrice !== 'function') return null;
+        return convertConsumerToSpotPrice(value);
+    }
+
+    function computeSpotChargeCost(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) return null;
+
+        let total = 0;
+        let hasAny = false;
+
+        hours.forEach((row) => {
+            const chargedWh = toFiniteNumber(row && row.charged_wh);
+            const consumerPrice = toFiniteNumber(row && row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
+            if (!Number.isFinite(chargedWh) || !Number.isFinite(spotPrice)) return;
+
+            total += (chargedWh / 1000) * spotPrice;
+            hasAny = true;
+        });
+
+        return hasAny ? total : null;
+    }
+
+    function computeSpotNetCost(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) return null;
+
+        let total = 0;
+        let hasAny = false;
+
+        hours.forEach((row) => {
+            const gridFromWh = toFiniteNumber(row && row.grid_from_wh);
+            const gridToWh = toFiniteNumber(row && row.grid_to_wh);
+            const consumerPrice = toFiniteNumber(row && row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
+
+            const gridFromCost = Number.isFinite(gridFromWh) && Number.isFinite(consumerPrice)
+                ? (gridFromWh / 1000) * consumerPrice
+                : null;
+            const gridToCostSpot = Number.isFinite(gridToWh) && Number.isFinite(spotPrice)
+                ? -1 * ((gridToWh / 1000) * spotPrice)
+                : null;
+
+            if (!Number.isFinite(gridFromCost) && !Number.isFinite(gridToCostSpot)) return;
+
+            total += (gridFromCost || 0) + (gridToCostSpot || 0);
+            hasAny = true;
+        });
+
+        return hasAny ? total : null;
+    }
+
+    function computeBatteryStats(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) {
+            return { start: null, end: null, min: null, max: null };
+        }
+
+        let start = null;
+        let end = null;
+        let min = null;
+        let max = null;
+
+        hours.forEach((row) => {
+            const startValue = toFiniteNumber(row && row.battery_pct_start);
+            const endValue = toFiniteNumber(row && row.battery_pct_end);
+
+            if (start === null) {
+                const fallbackStart = endValue;
+                start = Number.isFinite(startValue) ? startValue : fallbackStart;
+            }
+
+            [startValue, endValue].forEach((value) => {
+                if (!Number.isFinite(value)) return;
+                min = min === null ? value : Math.min(min, value);
+                max = max === null ? value : Math.max(max, value);
+            });
+        });
+
+        for (let index = hours.length - 1; index >= 0; index -= 1) {
+            const row = hours[index];
+            const endValue = toFiniteNumber(row && row.battery_pct_end);
+            const fallbackEnd = toFiniteNumber(row && row.battery_pct_start);
+            if (Number.isFinite(endValue)) {
+                end = endValue;
+                break;
+            }
+            if (Number.isFinite(fallbackEnd)) {
+                end = fallbackEnd;
+                break;
+            }
+        }
+
+        return { start, end, min, max };
     }
 
     function formatBool(value) {
@@ -119,25 +228,53 @@
     function renderSummary(payload) {
         const report = payload.report || {};
         const totals = report.totals || {};
+        const batteryStats = computeBatteryStats(report.hours);
+        const batteryDeltaRange = Number.isFinite(batteryStats.min) && Number.isFinite(batteryStats.max)
+            ? Math.abs(batteryStats.max - batteryStats.min)
+            : null;
         const netCost = Number(totals.net_cost);
+        const spotNetCost = computeSpotNetCost(report.hours);
         const savings = Number(totals.savings_eur);
         const chargeCost = Number(totals.charge_cost_eur);
+        const spotChargeCost = computeSpotChargeCost(report.hours);
         const pnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
             ? (chargeCost - savings + netCost) * -1
+            : null;
+        const spotPnl = Number.isFinite(spotNetCost) && Number.isFinite(savings) && Number.isFinite(spotChargeCost)
+            ? (spotChargeCost - savings + spotNetCost) * -1
             : null;
 
         setText('charged-total', formatWh(Number(totals.charged_wh)));
         setText('discharged-total', formatWh(Number(totals.discharged_wh)));
-        setText('battery-delta-total', formatPercent(Number(totals.battery_pct_delta_total)));
+        setText(
+            'battery-delta-total',
+            Number.isFinite(batteryDeltaRange)
+                ? formatPercent(batteryDeltaRange)
+                : formatPercent(Number(totals.battery_pct_delta_total))
+        );
+        setText(
+            'battery-delta-range',
+            Number.isFinite(batteryStats.start) || Number.isFinite(batteryStats.end)
+                ? `Start ${formatPercentNeutral(batteryStats.start)} / End ${formatPercentNeutral(batteryStats.end)}`
+                : '--'
+        );
+        setText(
+            'battery-delta-extrema',
+            Number.isFinite(batteryStats.min) || Number.isFinite(batteryStats.max)
+                ? `Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`
+                : 'Interpolated day delta'
+        );
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
         setText('net-cost-total', formatEur(netCost));
+        setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEur(spotNetCost)}` : '--');
         setText('savings-total', formatEur(savings));
         setText('charge-cost-total', formatEur(chargeCost));
+        setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEur(spotChargeCost)}` : '--');
         setText('pnl-total', formatEur(pnl));
+        setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--');
         setCostBadge(netCost);
 
-        setText('saved-path', payload.savedPath || '--');
         setText('report-source', payload.source || '--');
         setText('chart-title', report.date || payload.requestedDate || 'Selected day');
 
@@ -153,12 +290,14 @@
     function renderTable(hours) {
         if (!tableBodyEl) return;
         if (!Array.isArray(hours) || hours.length === 0) {
-            tableBodyEl.innerHTML = '<tr><td colspan="13" class="table-placeholder">No hourly rows available.</td></tr>';
+            tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">No hourly rows available.</td></tr>';
             return;
         }
         tableBodyEl.innerHTML = hours.map((row) => {
             const netCost = Number(row.net_cost);
             const costClass = Number.isFinite(netCost) ? (netCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
+            const consumerPrice = toFiniteNumber(row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
             return `
                 <tr>
                     <td>${escapeHtml(row.hour || '--')}</td>
@@ -169,7 +308,8 @@
                     <td>${escapeHtml(formatPercent(Number(row.battery_pct_delta)))}</td>
                     <td>${escapeHtml(formatWh(Number(row.grid_from_wh)))}</td>
                     <td>${escapeHtml(formatWh(Number(row.grid_to_wh)))}</td>
-                    <td>${escapeHtml(formatPrice(Number(row.price_eur_per_kwh)))}</td>
+                    <td>${escapeHtml(formatPrice(consumerPrice))}</td>
+                    <td>${escapeHtml(formatPrice(spotPrice))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_from_cost)))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_to_cost)))}</td>
                     <td class="${costClass}">${escapeHtml(formatEur(netCost))}</td>

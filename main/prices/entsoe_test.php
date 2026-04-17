@@ -12,12 +12,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/entsoe_config.php';
+require_once __DIR__ . '/../includes/price_conversion.php';
 
 const ENTSOE_BASE_URL = 'https://web-api.tp.entsoe.eu/api?documentType=A44&in_Domain=10YNL----------L&out_Domain=10YNL----------L';
 const TIMEZONE_NL = 'Europe/Amsterdam';
-const INKOOPVERGOEDING = 0.0219;
-const BELASTING = 0.08980;
-const BTW = 1.21;
 
 define('PRICE_DIR', __DIR__ . '/../data/price');
 
@@ -159,9 +157,7 @@ function parseHourlyPrices(string $xmlContent): array {
         $count = count($quarterPrices);
         $average = $count > 0 ? round(array_sum($quarterPrices) / $count, 4) : null;
         $kwhPrice = $average !== null ? round($average / 1000, 4) : null;
-        $consumerPrice = $kwhPrice !== null
-            ? round(($kwhPrice + INKOOPVERGOEDING + BELASTING) * BTW, 4)
-            : null;
+        $consumerPrice = convertSpotToConsumerPrice($kwhPrice);
 
         $result[] = [
             'date_nl' => $group['date_nl'],
