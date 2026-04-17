@@ -9,11 +9,17 @@ function getPriceOverviewNumberConfig(key, fallback) {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function getPriceOverviewObjectConfig(key) {
+    const value = window.PRICE_OVERVIEW_CONFIG ? window.PRICE_OVERVIEW_CONFIG[key] : undefined;
+    return (value && typeof value === 'object' && !Array.isArray(value)) ? value : null;
+}
+
 const PRICE_PROXY_NO_DATA = getPriceOverviewNumberConfig('priceProxyNoData', 0.24);
 const POPUP_POWER_EFFICIENCY = getPriceOverviewNumberConfig('popupPowerEfficiency', 0.9);
 const POPUP_NETZERO_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroReferenceW', 200);
 const POPUP_NETZERO_MINUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroMinusReferenceW', -180);
 const POPUP_NETZERO_PLUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroPlusReferenceW', 300);
+const POPUP_HOURLY_REFERENCE_RANGES = getPriceOverviewObjectConfig('popupHourlyReferenceRanges');
 
 /**
  * Interpolates between two RGB colors
@@ -120,6 +126,59 @@ function formatPopupPercent(pct, opts) {
     const decimals = (opts && Number.isInteger(opts.decimals)) ? opts.decimals : 1;
     const prefix = (opts && typeof opts.prefix === 'string') ? opts.prefix : '';
     return ` (${prefix}${pct.toFixed(decimals)}%)`;
+}
+
+function getPopupFallbackReferencePower(mode) {
+    if (mode === 'netzero-') return POPUP_NETZERO_MINUS_REFERENCE_W;
+    if (mode === 'netzero+') return POPUP_NETZERO_PLUS_REFERENCE_W;
+    return -POPUP_NETZERO_REFERENCE_W;
+}
+
+function parsePopupHourRangeKey(rangeKey) {
+    const raw = String(rangeKey || '').trim();
+    if (raw === '') return null;
+
+    if (/^\d+$/.test(raw)) {
+        const hour = Number(raw);
+        if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+        return { start: hour, end: hour };
+    }
+
+    const match = raw.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (!match) return null;
+
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
+    if (start < 0 || start > 23 || end < 0 || end > 23 || end < start) return null;
+    return { start, end };
+}
+
+function getPopupReferencePowerForHour(hour, mode) {
+    const fallback = getPopupFallbackReferencePower(mode);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+        return fallback;
+    }
+
+    if (!POPUP_HOURLY_REFERENCE_RANGES) {
+        return fallback;
+    }
+
+    let resolved = null;
+    Object.keys(POPUP_HOURLY_REFERENCE_RANGES).forEach((rangeKey) => {
+        const parsedRange = parsePopupHourRangeKey(rangeKey);
+        if (!parsedRange) return;
+        if (hour < parsedRange.start || hour > parsedRange.end) return;
+
+        const entry = POPUP_HOURLY_REFERENCE_RANGES[rangeKey];
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+
+        const parsedValue = Number(entry[mode]);
+        if (!Number.isFinite(parsedValue)) return;
+        resolved = parsedValue;
+    });
+
+    return resolved === null ? fallback : resolved;
 }
 
 function getRawScheduleEntry(scheduleEntry) {
@@ -469,7 +528,7 @@ function renderPopupSource(sourceEl, options) {
     }
 }
 
-function formatScheduleDisplayWithPercent(scheduleValue) {
+function formatScheduleDisplayWithPercent(scheduleValue, hourValue) {
     if (scheduleValue === undefined || scheduleValue === null || scheduleValue === '') {
         return '—';
     }
@@ -479,15 +538,15 @@ function formatScheduleDisplayWithPercent(scheduleValue) {
 
     const normalized = raw.toLowerCase();
     if (normalized === 'netzero' || normalized === 'net zero') {
-        const pct = powerToCapacityPercent(POPUP_NETZERO_REFERENCE_W);
+        const pct = powerToCapacityPercent(getPopupReferencePowerForHour(hourValue, 'netzero'));
         return `netzero${formatPopupPercent(pct, { prefix: '\u00b1' })}`;
     }
     if (normalized === 'netzero-' || normalized === 'net zero-') {
-        const pct = powerToCapacityPercent(POPUP_NETZERO_MINUS_REFERENCE_W);
+        const pct = powerToCapacityPercent(getPopupReferencePowerForHour(hourValue, 'netzero-'));
         return `netzero-${formatPopupPercent(pct, { prefix: '-' })}`;
     }
     if (normalized === 'netzero+' || normalized === 'net zero+') {
-        const pct = powerToCapacityPercent(POPUP_NETZERO_PLUS_REFERENCE_W);
+        const pct = powerToCapacityPercent(getPopupReferencePowerForHour(hourValue, 'netzero+'));
         return `netzero+${formatPopupPercent(pct, { prefix: '+' })}`;
     }
 
@@ -522,7 +581,7 @@ function getPopupForecastBatteryState() {
     };
 }
 
-function estimateSchedulePowerForPopup(scheduleValue) {
+function estimateSchedulePowerForPopup(scheduleValue, hourValue) {
     if (scheduleValue === undefined || scheduleValue === null || scheduleValue === '') {
         return 0;
     }
@@ -530,13 +589,13 @@ function estimateSchedulePowerForPopup(scheduleValue) {
     if (typeof scheduleValue === 'string') {
         const normalized = scheduleValue.trim().toLowerCase();
         if (normalized === 'netzero' || normalized === 'net zero') {
-            return -POPUP_NETZERO_REFERENCE_W;
+            return getPopupReferencePowerForHour(hourValue, 'netzero');
         }
         if (normalized === 'netzero-' || normalized === 'net zero-') {
-            return POPUP_NETZERO_MINUS_REFERENCE_W;
+            return getPopupReferencePowerForHour(hourValue, 'netzero-');
         }
         if (normalized === 'netzero+' || normalized === 'net zero+') {
-            return POPUP_NETZERO_PLUS_REFERENCE_W;
+            return getPopupReferencePowerForHour(hourValue, 'netzero+');
         }
     }
 
@@ -544,8 +603,8 @@ function estimateSchedulePowerForPopup(scheduleValue) {
     return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
-function clampSchedulePowerForPopup(scheduleValue, minValue, maxValue) {
-    let effectivePowerW = estimateSchedulePowerForPopup(scheduleValue);
+function clampSchedulePowerForPopup(scheduleValue, minValue, maxValue, hourValue) {
+    let effectivePowerW = estimateSchedulePowerForPopup(scheduleValue, hourValue);
 
     const parsedMin = Number(minValue);
     if (Number.isFinite(parsedMin)) {
@@ -661,7 +720,8 @@ function getPopupForecastForBar(targetBar) {
         const scheduledPowerW = clampSchedulePowerForPopup(
             bar.dataset.scheduleValue,
             bar.dataset.minValue,
-            bar.dataset.maxValue
+            bar.dataset.maxValue,
+            hour
         );
         const percentPerHour = powerToCapacityPercent(scheduledPowerW);
         const rawDeltaPercent = percentPerHour == null ? 0 : percentPerHour * durationHours;
@@ -1135,7 +1195,7 @@ function renderPriceGraphMobilePopupContent() {
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
-    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
+    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue, hourValue);
     const scheduleEntry = scheduleMap && Object.prototype.hasOwnProperty.call(scheduleMap, key) ? scheduleMap[key] : null;
     const minValue = bar.dataset.minValue;
     const maxValue = bar.dataset.maxValue;
@@ -1315,7 +1375,7 @@ function showPriceGraphPopup(bar, container) {
     const spotPriceDisplay = spotPriceValue != null ? `Spot price: ${formatPrice(spotPriceValue)}` : '';
 
     const scheduleValue = bar.dataset.scheduleValue;
-    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue);
+    const scheduleDisplay = formatScheduleDisplayWithPercent(scheduleValue, hourValue);
     let scheduleEntry = null;
     if (bar.dataset.scheduleEntry) {
         try {

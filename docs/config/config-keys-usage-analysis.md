@@ -21,6 +21,7 @@ Used directly by `main/charge_schedule_mobile.php`:
 - `popupNetzeroReferenceW` (default: 200, reference power in watts for netzero mode)
 - `popupNetzeroMinusReferenceW` (default: -180, reference power in watts for netzero- mode)
 - `popupNetzeroPlusReferenceW` (default: 300, reference power in watts for netzero+ mode)
+- `popupHourlyReferenceRanges` (default: `{}`, optional object keyed by single hour like `9` or inclusive range like `0-8`; each entry may define `netzero-`, `netzero`, and `netzero+`; entries are evaluated in order, last matching entry wins, and missing/invalid values fall back to the scalar mode defaults above)
 - `priceConversion.supplierMarkupEurPerKwh` (default: 0.0219, added to spot/source price before VAT)
 - `priceConversion.energyTaxEurPerKwh` (default: 0.0898, added to spot/source price before VAT)
 - `priceConversion.vatMultiplier` (default: 1.21, VAT multiplier used for price conversion)

@@ -33,3 +33,29 @@
 [2026-02-21 10:06:40] P1 deltas: import_delta=18 Wh, export_delta=3 Wh, actual power=7.0 W
 [2026-02-21 10:06:41] 🔍 P1 power (grid-status): 7.0
 [2026-02-21 10:06:41] Power value unchanged (286 W), skipping device update
+
+    "popupNetzeroMinusReferenceW": -180,
+    "popupNetzeroReferenceW": -100,
+    "popupNetzeroPlusReferenceW": 300,
+    "popupHourlyReferenceRanges": {
+        "0-8": {
+            "netzero-": -180,
+            "netzero": -100,
+            "netzero+": 300
+        },
+        "9": {
+            "netzero-": -280,
+            "netzero": -100,
+            "netzero+": 300
+        },
+        "10-16": {
+            "netzero-": -220,
+            "netzero": -90,
+            "netzero+": 360
+        },
+        "17-23": {
+            "netzero-": -180,
+            "netzero": -100,
+            "netzero+": 300
+        }
+    },

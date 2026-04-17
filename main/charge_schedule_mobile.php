@@ -160,7 +160,8 @@ $priceConversionConfig = getPriceConversionConfig();
                 popupPowerEfficiency: <?php echo json_encode(ConfigLoader::get('popupPowerEfficiency', 0.9), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroReferenceW', 200), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroMinusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroMinusReferenceW', -180), JSON_UNESCAPED_SLASHES); ?>,
-                popupNetzeroPlusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroPlusReferenceW', 300), JSON_UNESCAPED_SLASHES); ?>
+                popupNetzeroPlusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroPlusReferenceW', 300), JSON_UNESCAPED_SLASHES); ?>,
+                popupHourlyReferenceRanges: <?php echo json_encode(ConfigLoader::get('popupHourlyReferenceRanges', new stdClass()), JSON_UNESCAPED_SLASHES); ?>
             };
             window.PRICE_CONVERSION_CONFIG = {
                 supplierMarkupEurPerKwh: <?php echo json_encode($priceConversionConfig['supplierMarkupEurPerKwh'], JSON_UNESCAPED_SLASHES); ?>,
