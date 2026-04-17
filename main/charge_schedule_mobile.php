@@ -157,6 +157,7 @@ $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
                 priceProxyNoData: <?php echo json_encode(ConfigLoader::get('priceProxyNoData', 0.24), JSON_UNESCAPED_SLASHES); ?>,
                 popupPowerEfficiency: <?php echo json_encode(ConfigLoader::get('popupPowerEfficiency', 0.9), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroReferenceW', 200), JSON_UNESCAPED_SLASHES); ?>,
+                popupNetzeroMinusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroMinusReferenceW', -180), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroPlusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroPlusReferenceW', 300), JSON_UNESCAPED_SLASHES); ?>
             };
         </script>

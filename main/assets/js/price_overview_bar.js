@@ -12,6 +12,7 @@ function getPriceOverviewNumberConfig(key, fallback) {
 const PRICE_PROXY_NO_DATA = getPriceOverviewNumberConfig('priceProxyNoData', 0.24);
 const POPUP_POWER_EFFICIENCY = getPriceOverviewNumberConfig('popupPowerEfficiency', 0.9);
 const POPUP_NETZERO_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroReferenceW', 200);
+const POPUP_NETZERO_MINUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroMinusReferenceW', -180);
 const POPUP_NETZERO_PLUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroPlusReferenceW', 300);
 
 /**
@@ -491,6 +492,10 @@ function formatScheduleDisplayWithPercent(scheduleValue) {
         const pct = powerToCapacityPercent(POPUP_NETZERO_REFERENCE_W);
         return `netzero${formatPopupPercent(pct, { prefix: '\u00b1' })}`;
     }
+    if (normalized === 'netzero-' || normalized === 'net zero-') {
+        const pct = powerToCapacityPercent(POPUP_NETZERO_MINUS_REFERENCE_W);
+        return `netzero-${formatPopupPercent(pct, { prefix: '-' })}`;
+    }
     if (normalized === 'netzero+' || normalized === 'net zero+') {
         const pct = powerToCapacityPercent(POPUP_NETZERO_PLUS_REFERENCE_W);
         return `netzero+${formatPopupPercent(pct, { prefix: '+' })}`;
@@ -536,6 +541,9 @@ function estimateSchedulePowerForPopup(scheduleValue) {
         const normalized = scheduleValue.trim().toLowerCase();
         if (normalized === 'netzero' || normalized === 'net zero') {
             return -POPUP_NETZERO_REFERENCE_W;
+        }
+        if (normalized === 'netzero-' || normalized === 'net zero-') {
+            return POPUP_NETZERO_MINUS_REFERENCE_W;
         }
         if (normalized === 'netzero+' || normalized === 'net zero+') {
             return POPUP_NETZERO_PLUS_REFERENCE_W;

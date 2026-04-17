@@ -19,6 +19,7 @@ Used directly by `main/charge_schedule_mobile.php`:
 - `priceProxyNoData` (default: 0.24, fallback price when proxy has no data)
 - `popupPowerEfficiency` (default: 0.9, efficiency factor for power calculations)
 - `popupNetzeroReferenceW` (default: 200, reference power in watts for netzero mode)
+- `popupNetzeroMinusReferenceW` (default: -180, reference power in watts for netzero- mode)
 - `popupNetzeroPlusReferenceW` (default: 300, reference power in watts for netzero+ mode)
 
 ## Proxy/API Keys
