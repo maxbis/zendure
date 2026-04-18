@@ -223,6 +223,12 @@ body {
         var(--card-bg);
 }
 
+.summary-card--price-variation {
+    background:
+        linear-gradient(140deg, rgba(255, 209, 102, 0.12), rgba(126, 137, 255, 0.06)),
+        var(--card-bg);
+}
+
 .summary-card--pnl {
     background:
         linear-gradient(140deg, rgba(247, 127, 95, 0.12), rgba(255, 209, 102, 0.06)),

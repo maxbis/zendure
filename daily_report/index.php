@@ -82,6 +82,12 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                 <div class="summary-value" data-role="grid-to-total">--</div>
                 <div class="summary-subtle">Export energy</div>
             </article>
+            <article class="summary-card summary-card--price-variation">
+                <div class="summary-label">Price Variation</div>
+                <div class="summary-value" data-role="price-variation-total">--</div>
+                <div class="summary-secondary summary-secondary--price-variation" data-role="price-variation-range">--</div>
+                <div class="summary-subtle" data-role="price-variation-indicator">No hourly prices</div>
+            </article>
             <article class="summary-card">
                 <div class="summary-label">Net Cost</div>
                 <div class="summary-value" data-role="net-cost-total">--</div>

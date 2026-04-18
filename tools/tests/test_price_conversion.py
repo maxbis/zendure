@@ -20,6 +20,7 @@ PRICE_CONVERSION_JS_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_convers
 PRICE_OVERVIEW_BAR_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_overview_bar.js"
 DAILY_REPORT_INDEX_FILE = REPO_ROOT / "daily_report" / "index.php"
 DAILY_REPORT_JS_FILE = REPO_ROOT / "daily_report" / "assets" / "js" / "daily_report.js"
+DAILY_REPORT_SAMPLE_FILE = REPO_ROOT / "daily_report" / "data" / "202604" / "daily_report_20260416.json"
 MAIN_PRICE_DIR = REPO_ROOT / "main" / "data" / "price"
 TZ_NL = ZoneInfo("Europe/Amsterdam")
 
@@ -203,10 +204,20 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "formatPrice(spotPrice)" in daily_report_js
     assert 'data-role="battery-delta-range"' in page_php
     assert 'data-role="battery-delta-extrema"' in page_php
+    assert 'data-role="price-variation-total"' in page_php
+    assert 'data-role="price-variation-range"' in page_php
+    assert 'data-role="price-variation-indicator"' in page_php
     assert 'data-role="net-cost-spot-total"' in page_php
     assert 'data-role="charge-cost-spot-total"' in page_php
     assert 'data-role="pnl-spot-total"' in page_php
     assert "computeBatteryStats(report.hours)" in daily_report_js
+    assert "computePriceVariationStats(report.hours)" in daily_report_js
+    assert "row && row.price_eur_per_kwh" in daily_report_js
+    assert "const range = max - min;" in daily_report_js
+    assert "const cvPct = mean > 0 ? (stddev / mean) * 100 : null;" in daily_report_js
+    assert "formatPrice(priceVariation.range)" in daily_report_js
+    assert "`Min ${formatPrice(priceVariation.min)} / Max ${formatPrice(priceVariation.max)}`" in daily_report_js
+    assert "`CV ${formatPercentNeutral(priceVariation.cvPct)}`" in daily_report_js
     assert "Math.abs(batteryStats.max - batteryStats.min)" in daily_report_js
     assert "`Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`" in daily_report_js
     assert "computeSpotNetCost(report.hours)" in daily_report_js
@@ -215,3 +226,20 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "`Spot ${formatEur(spotChargeCost)}`" in daily_report_js
     assert "(spotChargeCost - savings + spotNetCost) * -1" in daily_report_js
     assert "`Spot ${formatEur(spotPnl)}`" in daily_report_js
+
+
+def test_daily_report_sample_price_variation_metrics_match_expected_day():
+    payload = json.loads(DAILY_REPORT_SAMPLE_FILE.read_text(encoding="utf-8"))
+    prices = [row["price_eur_per_kwh"] for row in payload["hours"] if row.get("price_eur_per_kwh") is not None]
+
+    assert prices
+
+    mean = sum(prices) / len(prices)
+    variance = sum((value - mean) ** 2 for value in prices) / len(prices)
+    stddev = variance ** 0.5
+    cv_pct = (stddev / mean) * 100
+
+    assert min(prices) == pytest.approx(0.1836)
+    assert max(prices) == pytest.approx(0.3538)
+    assert (max(prices) - min(prices)) == pytest.approx(0.1702)
+    assert cv_pct == pytest.approx(16.344634637496515)

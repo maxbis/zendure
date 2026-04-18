@@ -68,6 +68,11 @@ foreach ($groupedCommands as $groupKey => $commands) {
   <style>
     body.mobile-dark { align-items: flex-start; }
     .control-wrap { width: 100%; }
+    .header h1 a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .header h1 a:hover { opacity: 0.92; }
     .control-subtitle {
       color: var(--text-secondary);
       margin-bottom: 10px;
@@ -316,7 +321,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
 <body class="mobile-dark">
   <div class="container control-wrap">
     <div class="header">
-      <h1>⚡ Zendure Energy Manager</h1>
+      <h1><a href="../../main">⚡ Zendure Energy Manager</a></h1>
     </div>
 
     <div class="card">

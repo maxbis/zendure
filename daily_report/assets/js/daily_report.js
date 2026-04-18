@@ -81,6 +81,30 @@
         return convertConsumerToSpotPrice(value);
     }
 
+    function computePriceVariationStats(hours) {
+        if (!Array.isArray(hours) || hours.length === 0) {
+            return { min: null, max: null, range: null, cvPct: null, hasPrices: false };
+        }
+
+        const prices = hours
+            .map((row) => toFiniteNumber(row && row.price_eur_per_kwh))
+            .filter((value) => Number.isFinite(value));
+
+        if (prices.length === 0) {
+            return { min: null, max: null, range: null, cvPct: null, hasPrices: false };
+        }
+
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const range = max - min;
+        const mean = prices.reduce((total, value) => total + value, 0) / prices.length;
+        const variance = prices.reduce((total, value) => total + ((value - mean) ** 2), 0) / prices.length;
+        const stddev = Math.sqrt(variance);
+        const cvPct = mean > 0 ? (stddev / mean) * 100 : null;
+
+        return { min, max, range, cvPct, hasPrices: true };
+    }
+
     function computeSpotChargeCost(hours) {
         if (!Array.isArray(hours) || hours.length === 0) return null;
 
@@ -229,6 +253,7 @@
         const report = payload.report || {};
         const totals = report.totals || {};
         const batteryStats = computeBatteryStats(report.hours);
+        const priceVariation = computePriceVariationStats(report.hours);
         const batteryDeltaRange = Number.isFinite(batteryStats.min) && Number.isFinite(batteryStats.max)
             ? Math.abs(batteryStats.max - batteryStats.min)
             : null;
@@ -266,6 +291,19 @@
         );
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
+        setText('price-variation-total', priceVariation.hasPrices ? formatPrice(priceVariation.range) : '--');
+        setText(
+            'price-variation-range',
+            priceVariation.hasPrices
+                ? `Min ${formatPrice(priceVariation.min)} / Max ${formatPrice(priceVariation.max)}`
+                : '--'
+        );
+        setText(
+            'price-variation-indicator',
+            priceVariation.hasPrices
+                ? `CV ${formatPercentNeutral(priceVariation.cvPct)}`
+                : 'No hourly prices'
+        );
         setText('net-cost-total', formatEur(netCost));
         setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEur(spotNetCost)}` : '--');
         setText('savings-total', formatEur(savings));
