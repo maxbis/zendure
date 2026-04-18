@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -19,6 +20,7 @@ CHARGE_SCHEDULE_MOBILE_FILE = REPO_ROOT / "main" / "charge_schedule_mobile.php"
 PRICE_CONVERSION_JS_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_conversion.js"
 PRICE_OVERVIEW_BAR_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_overview_bar.js"
 DAILY_REPORT_INDEX_FILE = REPO_ROOT / "daily_report" / "index.php"
+DAILY_REPORT_API_FILE = REPO_ROOT / "daily_report" / "api" / "report_data.php"
 DAILY_REPORT_JS_FILE = REPO_ROOT / "daily_report" / "assets" / "js" / "daily_report.js"
 DAILY_REPORT_SAMPLE_FILE = REPO_ROOT / "daily_report" / "data" / "202604" / "daily_report_20260416.json"
 MAIN_PRICE_DIR = REPO_ROOT / "main" / "data" / "price"
@@ -60,6 +62,15 @@ def _price_file_path(yyyymmdd: str) -> Path:
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_daily_report_fixture(path: Path, date: str) -> None:
+    _write_json(path, {
+        "date": date,
+        "timezone": "Europe/Amsterdam",
+        "hours": [],
+        "totals": {}
+    })
 
 
 @pytest.fixture
@@ -191,6 +202,88 @@ def test_price_popup_uses_shared_js_helper():
     assert page_php.index("assets/js/price_conversion.js") < page_php.index("assets/js/price_overview_bar.js")
 
 
+def test_daily_report_api_get_saved_report_disables_regenerate(tmp_path: Path):
+    data_dir = tmp_path / "daily-report-data"
+    report_path = data_dir / "202604" / "daily_report_20260416.json"
+    _write_daily_report_fixture(report_path, "2026-04-16")
+
+    php_code = (
+        f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
+        '$_SERVER["REQUEST_METHOD"] = "GET";'
+        '$_GET["date"] = "2026-04-16";'
+        f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+
+    assert payload["success"] is True
+    assert payload["requestedDate"] == "2026-04-16"
+    assert payload["source"] == "saved"
+    assert payload["canRegenerate"] is False
+    assert payload["savedAt"]
+    assert payload["report"]["date"] == "2026-04-16"
+
+
+def test_daily_report_api_post_regenerate_forces_overwrite_and_enables_button(tmp_path: Path):
+    data_dir = tmp_path / "daily-report-data"
+    generator_script = tmp_path / "stub_generator.py"
+    generator_script.write_text(
+        "\n".join([
+            "import argparse",
+            "import json",
+            "from pathlib import Path",
+            "",
+            "parser = argparse.ArgumentParser()",
+            "parser.add_argument('--date', required=True)",
+            "parser.add_argument('--output', required=True)",
+            "args = parser.parse_args()",
+            "",
+            "payload = {",
+            "    'date': args.date,",
+            "    'timezone': 'Europe/Amsterdam',",
+            "    'generated_at': '2026-04-18T12:00:00+02:00',",
+            "    'hours': [],",
+            "    'totals': {}",
+            "}",
+            "output = Path(args.output)",
+            "output.parent.mkdir(parents=True, exist_ok=True)",
+            "output.write_text(json.dumps(payload), encoding='utf-8')",
+        ]),
+        encoding="utf-8",
+    )
+
+    php_code = (
+        f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
+        f'putenv("PYTHON_BIN={sys.executable}");'
+        f'define("DAILY_REPORT_GENERATOR_SCRIPT", "{generator_script.as_posix()}");'
+        '$_SERVER["REQUEST_METHOD"] = "POST";'
+        '$_POST["date"] = "2026-04-17";'
+        '$_POST["action"] = "regenerate";'
+        f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
+    )
+    payload = _run_php_json(["php", "-r", php_code])
+    saved_report = data_dir / "202604" / "daily_report_20260417.json"
+
+    assert payload["success"] is True
+    assert payload["requestedDate"] == "2026-04-17"
+    assert payload["source"] == "regenerated_manual"
+    assert payload["canRegenerate"] is True
+    assert payload["savedAt"]
+    assert payload["report"]["date"] == "2026-04-17"
+    assert saved_report.exists()
+
+    php_code_invalid = (
+        f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
+        '$_SERVER["REQUEST_METHOD"] = "POST";'
+        '$_POST["date"] = "2026-04-17";'
+        '$_POST["action"] = "invalid";'
+        f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
+    )
+    invalid_payload = _run_php_json(["php", "-r", php_code_invalid])
+
+    assert invalid_payload["success"] is False
+    assert "Invalid action" in invalid_payload["error"]
+
+
 def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     page_php = DAILY_REPORT_INDEX_FILE.read_text(encoding="utf-8")
     daily_report_js = DAILY_REPORT_JS_FILE.read_text(encoding="utf-8")
@@ -200,8 +293,14 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "window.PRICE_CONVERSION_CONFIG" in page_php
     assert "../main/assets/js/price_conversion.js" in page_php
     assert page_php.index("../main/assets/js/price_conversion.js") < page_php.index("assets/js/daily_report.js")
+    assert 'data-role="report-regenerate"' in page_php
     assert "convertConsumerToSpotPrice" in daily_report_js
     assert "formatPrice(spotPrice)" in daily_report_js
+    assert "const regenerateButtonEl = document.querySelector('[data-role=\"report-regenerate\"]');" in daily_report_js
+    assert "setRegenerateButtonState(Boolean(payload && payload.canRegenerate), false);" in daily_report_js
+    assert "method: 'POST'" in daily_report_js
+    assert "action: 'regenerate'" in daily_report_js
+    assert "new URLSearchParams({" in daily_report_js
     assert 'data-role="battery-delta-range"' in page_php
     assert 'data-role="battery-delta-extrema"' in page_php
     assert 'data-role="price-variation-total"' in page_php

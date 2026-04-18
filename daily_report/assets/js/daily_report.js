@@ -13,6 +13,7 @@
     const dateInputEl = document.querySelector('#report-date');
     const prevDayEl = document.querySelector('[data-role="prev-day"]');
     const nextDayEl = document.querySelector('[data-role="next-day"]');
+    const regenerateButtonEl = document.querySelector('[data-role="report-regenerate"]');
 
     function cssColor(name, fallback) {
         const value = rootStyles.getPropertyValue(name).trim();
@@ -38,6 +39,14 @@
 
     function setStatus(message) {
         if (chartStatusEl) chartStatusEl.textContent = message;
+    }
+
+    function setRegenerateButtonState(canRegenerate, isBusy) {
+        if (!regenerateButtonEl) return;
+
+        regenerateButtonEl.hidden = !canRegenerate;
+        regenerateButtonEl.disabled = Boolean(isBusy);
+        regenerateButtonEl.textContent = isBusy ? 'Regenerating...' : 'Regenerate';
     }
 
     function formatWh(value) {
@@ -247,6 +256,13 @@
             return;
         }
         el.textContent = 'Balanced EUR 0.0000';
+    }
+
+    function applyPayload(payload) {
+        renderSummary(payload);
+        renderTable(payload.report && payload.report.hours ? payload.report.hours : []);
+        buildChart(payload.report && payload.report.hours ? payload.report.hours : []);
+        setRegenerateButtonState(Boolean(payload && payload.canRegenerate), false);
     }
 
     function renderSummary(payload) {
@@ -491,6 +507,7 @@
         if (chartWrapEl) chartWrapEl.hidden = true;
         if (dateInputEl) dateInputEl.value = date;
         updateQueryDate(date);
+        setRegenerateButtonState(false, false);
 
         const url = new URL(apiUrl, window.location.href);
         url.searchParams.set('date', date);
@@ -501,15 +518,40 @@
             throw new Error(payload && payload.error ? payload.error : 'Failed to load daily report.');
         }
 
-        renderSummary(payload);
-        renderTable(payload.report && payload.report.hours ? payload.report.hours : []);
-        buildChart(payload.report && payload.report.hours ? payload.report.hours : []);
+        applyPayload(payload);
+    }
+
+    async function regenerateReport(date) {
+        setStatus('Regenerating report...');
+        setRegenerateButtonState(true, true);
+
+        const response = await fetch(new URL(apiUrl, window.location.href).toString(), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            },
+            body: new URLSearchParams({
+                date,
+                action: 'regenerate'
+            }).toString()
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+            setRegenerateButtonState(true, false);
+            throw new Error(payload && payload.error ? payload.error : 'Failed to regenerate daily report.');
+        }
+
+        if (dateInputEl) dateInputEl.value = payload.requestedDate || date;
+        updateQueryDate(payload.requestedDate || date);
+        applyPayload(payload);
     }
 
     function handleError(error) {
         setStatus(error && error.message ? error.message : 'Failed to load daily report.');
+        setRegenerateButtonState(Boolean(regenerateButtonEl && !regenerateButtonEl.hidden), false);
         if (tableBodyEl) {
-            tableBodyEl.innerHTML = '<tr><td colspan="13" class="table-placeholder">Failed to load report.</td></tr>';
+            tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">Failed to load report.</td></tr>';
         }
     }
 
@@ -544,6 +586,13 @@
         nextDayEl.addEventListener('click', () => {
             const current = dateInputEl && dateInputEl.value ? dateInputEl.value : boot.requestedDate;
             loadReport(shiftDate(current, 1)).catch(handleError);
+        });
+    }
+
+    if (regenerateButtonEl) {
+        regenerateButtonEl.addEventListener('click', () => {
+            const current = dateInputEl && dateInputEl.value ? dateInputEl.value : boot.requestedDate;
+            regenerateReport(current).catch(handleError);
         });
     }
 

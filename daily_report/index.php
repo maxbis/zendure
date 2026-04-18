@@ -50,7 +50,10 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                 </form>
                 <div class="meta-pill">
                     <span class="meta-label">Data source</span>
-                    <span class="meta-value" data-role="report-source">Waiting for report</span>
+                    <div class="meta-pill__row">
+                        <span class="meta-value" data-role="report-source">Waiting for report</span>
+                        <button type="button" class="meta-action-button" data-role="report-regenerate" hidden>Regenerate</button>
+                    </div>
                 </div>
             </div>
         </section>
