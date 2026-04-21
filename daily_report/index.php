@@ -136,6 +136,26 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
             </div>
         </section>
 
+        <section class="chart-card">
+            <div class="chart-card__header">
+                <div>
+                    <p class="chart-kicker">Daily Value View</p>
+                    <h2 data-role="money-chart-title">Selected day</h2>
+                </div>
+                <div class="chart-legend">
+                    <span><i class="legend-swatch legend-swatch--charge"></i>Charged</span>
+                    <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
+                    <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
+                    <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
+                    <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
+                </div>
+            </div>
+            <div class="chart-status" data-role="money-chart-status">Loading report...</div>
+            <div class="chart-wrap" data-role="money-chart-wrap" hidden>
+                <svg class="daily-report-chart" data-role="money-chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Daily report value chart"></svg>
+            </div>
+        </section>
+
         <section class="detail-grid">
             <article class="detail-card">
                 <h3>Hourly table</h3>

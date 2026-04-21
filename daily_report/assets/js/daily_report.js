@@ -8,6 +8,9 @@
     const chartEl = document.querySelector('[data-role="chart"]');
     const chartWrapEl = document.querySelector('[data-role="chart-wrap"]');
     const chartStatusEl = document.querySelector('[data-role="chart-status"]');
+    const moneyChartEl = document.querySelector('[data-role="money-chart"]');
+    const moneyChartWrapEl = document.querySelector('[data-role="money-chart-wrap"]');
+    const moneyChartStatusEl = document.querySelector('[data-role="money-chart-status"]');
     const tableBodyEl = document.querySelector('[data-role="hourly-table-body"]');
     const dateFormEl = document.querySelector('[data-role="date-form"]');
     const dateInputEl = document.querySelector('#report-date');
@@ -37,8 +40,16 @@
         if (el) el.textContent = value;
     }
 
+    function setChartStatus(el, message) {
+        if (el) el.textContent = message;
+    }
+
     function setStatus(message) {
-        if (chartStatusEl) chartStatusEl.textContent = message;
+        setChartStatus(chartStatusEl, message);
+    }
+
+    function setMoneyChartStatus(message) {
+        setChartStatus(moneyChartStatusEl, message);
     }
 
     function setRegenerateButtonState(canRegenerate, isBusy) {
@@ -261,7 +272,8 @@
     function applyPayload(payload) {
         renderSummary(payload);
         renderTable(payload.report && payload.report.hours ? payload.report.hours : []);
-        buildChart(payload.report && payload.report.hours ? payload.report.hours : []);
+        buildEnergyChart(payload.report && payload.report.hours ? payload.report.hours : []);
+        buildMoneyChart(payload.report && payload.report.hours ? payload.report.hours : []);
         setRegenerateButtonState(Boolean(payload && payload.canRegenerate), false);
     }
 
@@ -331,6 +343,7 @@
 
         setText('report-source', payload.source || '--');
         setText('chart-title', report.date || payload.requestedDate || 'Selected day');
+        setText('money-chart-title', report.date || payload.requestedDate || 'Selected day');
 
         setText('meta-date', payload.requestedDate || '--');
         setText('meta-timezone', report.timezone || '--');
@@ -382,8 +395,9 @@
             .replace(/'/g, '&#39;');
     }
 
-    function rect(x, y, width, height, fill) {
-        return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${Math.max(0, height).toFixed(2)}" fill="${fill}" rx="3"></rect>`;
+    function rect(x, y, width, height, fill, titleText = null) {
+        const title = titleText ? `<title>${escapeHtml(titleText)}</title>` : '';
+        return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${Math.max(0, height).toFixed(2)}" fill="${fill}" rx="3">${title}</rect>`;
     }
 
     function formatAxisWh(value) {
@@ -397,11 +411,58 @@
         return `${prefix}${value.toFixed(2)} EUR`;
     }
 
+    function formatAxisCents(value) {
+        if (!Number.isFinite(value)) return '--';
+        const prefix = value > 0 ? '+' : '';
+        const decimals = Math.abs(value) >= 10 || Number.isInteger(value) ? 0 : 1;
+        return `${prefix}${value.toFixed(decimals)} c`;
+    }
+
+    function formatTooltipCents(value) {
+        if (!Number.isFinite(value)) return '--';
+        const prefix = value > 0 ? '+' : '';
+        return `${prefix}${value.toFixed(2)} c`;
+    }
+
     function clamp(value, min, max) {
         return Math.min(Math.max(value, min), max);
     }
 
-    function buildChart(hours) {
+    const MONEY_CHART_AXIS_MAX = 40;
+    const MONEY_CHART_LINE_AXIS_MAX = 200;
+
+    function toCents(value) {
+        const numericValue = toFiniteNumber(value);
+        return Number.isFinite(numericValue) ? numericValue * 100 : null;
+    }
+
+    function buildCumulativeValues(hours, valueKey) {
+        let runningValue = 0;
+        return hours.map((row) => {
+            const value = toFiniteNumber(row && row[valueKey]);
+            if (!Number.isFinite(value)) return null;
+            runningValue += value;
+            return runningValue;
+        });
+    }
+
+    function computeNiceStep(value) {
+        const safeValue = Number.isFinite(value) && value > 0 ? value : 1;
+        const magnitude = 10 ** Math.floor(Math.log10(safeValue));
+        const normalized = safeValue / magnitude;
+        if (normalized <= 1) return magnitude;
+        if (normalized <= 2) return 2 * magnitude;
+        if (normalized <= 2.5) return 2.5 * magnitude;
+        if (normalized <= 5) return 5 * magnitude;
+        return 10 * magnitude;
+    }
+
+    function computeSymmetricAxisMax(maxAbsValue) {
+        const step = computeNiceStep(Math.max(maxAbsValue, 1) / 4);
+        return step * 4;
+    }
+
+    function buildEnergyChart(hours) {
         if (!chartEl || !chartWrapEl) return;
         if (!Array.isArray(hours) || hours.length === 0) {
             chartWrapEl.hidden = true;
@@ -417,13 +478,7 @@
         const baseline = margin.top + (plotHeight / 2);
         const slotWidth = plotWidth / Math.max(1, hours.length);
         const fixedEnergyMax = 800;
-        let runningNetCost = 0;
-        const cumulativeCostValues = hours.map((row) => {
-            const netCost = Number(row.net_cost);
-            if (!Number.isFinite(netCost)) return null;
-            runningNetCost += netCost;
-            return runningNetCost;
-        });
+        const cumulativeCostValues = buildCumulativeValues(hours, 'net_cost');
         const fixedCostMax = 2;
 
         const energyAxis = [];
@@ -464,16 +519,25 @@
             const gridFrom = Number(row.grid_from_wh) || 0;
             const gridTo = Number(row.grid_to_wh) || 0;
             const cumulativeNetCost = cumulativeCostValues[index];
+            const tooltipSummary = [
+                `Hour ${row.hour || '--'}`,
+                `Charged: ${formatWh(Number(row.charged_wh))}`,
+                `Discharged: ${formatWh(Number(row.discharged_wh))}`,
+                `Grid from: ${formatWh(Number(row.grid_from_wh))}`,
+                `Grid to: ${formatWh(Number(row.grid_to_wh))}`,
+                `Price: ${formatPrice(toFiniteNumber(row.price_eur_per_kwh))}`,
+                `Net cost: ${formatEur(Number(row.net_cost))}`,
+            ].join('\n');
 
             const chargeHeight = (clamp(charge, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
             const dischargeHeight = (clamp(discharge, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
             const fromHeight = (clamp(gridFrom, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
             const toHeight = (clamp(gridTo, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
 
-            bars.push(rect(xBase + 0, baseline - chargeHeight, barWidth, chargeHeight, palette.charge));
-            bars.push(rect(xBase + barWidth + 2, baseline, barWidth, dischargeHeight, palette.discharge));
-            bars.push(rect(xBase + ((barWidth + 2) * 2), baseline - fromHeight, barWidth, fromHeight, palette.gridFrom));
-            bars.push(rect(xBase + ((barWidth + 2) * 3), baseline, barWidth, toHeight, palette.gridTo));
+            bars.push(rect(xBase + 0, baseline - chargeHeight, barWidth, chargeHeight, palette.charge, tooltipSummary));
+            bars.push(rect(xBase + barWidth + 2, baseline, barWidth, dischargeHeight, palette.discharge, tooltipSummary));
+            bars.push(rect(xBase + ((barWidth + 2) * 2), baseline - fromHeight, barWidth, fromHeight, palette.gridFrom, tooltipSummary));
+            bars.push(rect(xBase + ((barWidth + 2) * 3), baseline, barWidth, toHeight, palette.gridTo, tooltipSummary));
 
             if (Number.isFinite(cumulativeNetCost)) {
                 const costY = costZeroY - (clamp(cumulativeNetCost, -fixedCostMax, fixedCostMax) / fixedCostMax) * costScaleHeight;
@@ -502,9 +566,135 @@
         setStatus('Hourly energy and cumulative net cost view.');
     }
 
+    function buildMoneyChart(hours) {
+        if (!moneyChartEl || !moneyChartWrapEl) return;
+        if (!Array.isArray(hours) || hours.length === 0) {
+            moneyChartWrapEl.hidden = true;
+            setMoneyChartStatus('No hourly value data available.');
+            return;
+        }
+
+        const width = 1200;
+        const height = 420;
+        const margin = { top: 20, right: 86, bottom: 70, left: 86 };
+        const plotWidth = width - margin.left - margin.right;
+        const plotHeight = height - margin.top - margin.bottom;
+        const baseline = margin.top + (plotHeight / 2);
+        const slotWidth = plotWidth / Math.max(1, hours.length);
+
+        const rows = hours.map((row) => ({
+            hour: row.hour,
+            chargeCents: toCents(row.charge_cost_eur),
+            dischargeCents: toCents(row.savings_eur),
+            gridFromCents: toCents(row.grid_from_cost),
+            gridToCents: toCents(row.grid_to_cost),
+        }));
+        const cumulativeNetCostCents = buildCumulativeValues(hours, 'net_cost')
+            .map((value) => (Number.isFinite(value) ? value * 100 : null));
+
+        const hasAnyValues = rows.some((row, index) => (
+            Number.isFinite(row.chargeCents)
+            || Number.isFinite(row.dischargeCents)
+            || Number.isFinite(row.gridFromCents)
+            || Number.isFinite(row.gridToCents)
+            || Number.isFinite(cumulativeNetCostCents[index])
+        ));
+
+        if (!hasAnyValues) {
+            moneyChartWrapEl.hidden = true;
+            setMoneyChartStatus('No hourly value data available.');
+            return;
+        }
+
+        const axisMax = MONEY_CHART_AXIS_MAX;
+        const lineAxisMax = MONEY_CHART_LINE_AXIS_MAX;
+        const scaleHeight = plotHeight / 2;
+        const tickStep = axisMax / 4;
+        const axis = [];
+        const lineAxis = [];
+        const guides = [];
+        const linePoints = [];
+        const labels = [];
+        const bars = [];
+
+        for (let tick = -4; tick <= 4; tick += 1) {
+            const value = tick * tickStep;
+            const ratio = value / axisMax;
+            const y = baseline - (ratio * scaleHeight);
+            guides.push(`<line x1="${margin.left.toFixed(2)}" y1="${y.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.guide}" stroke-width="1" stroke-dasharray="4 4"></line>`);
+            axis.push(`
+                <line x1="${(margin.left - 5).toFixed(2)}" y1="${y.toFixed(2)}" x2="${margin.left.toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1"></line>
+                <text x="${(margin.left - 9).toFixed(2)}" y="${(y + 4).toFixed(2)}" fill="${palette.textMuted}" font-size="10" text-anchor="end">${escapeHtml(formatAxisCents(value))}</text>
+            `);
+        }
+
+        for (let tick = -4; tick <= 4; tick += 1) {
+            const value = tick * (lineAxisMax / 4);
+            const ratio = value / lineAxisMax;
+            const y = baseline - (ratio * scaleHeight);
+            lineAxis.push(`
+                <line x1="${(margin.left + plotWidth).toFixed(2)}" y1="${y.toFixed(2)}" x2="${(margin.left + plotWidth + 5).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${palette.cost}" stroke-width="1"></line>
+                <text x="${(margin.left + plotWidth + 9).toFixed(2)}" y="${(y + 4).toFixed(2)}" fill="${palette.cost}" font-size="10" text-anchor="start">${escapeHtml(formatAxisCents(value))}</text>
+            `);
+        }
+
+        function pushSignedBar(x, widthValue, centsValue, fill, titleText = null) {
+            if (!Number.isFinite(centsValue)) return;
+            const heightValue = (Math.abs(clamp(centsValue, -axisMax, axisMax)) / axisMax) * scaleHeight;
+            const y = centsValue >= 0 ? baseline - heightValue : baseline;
+            bars.push(rect(x, y, widthValue, heightValue, fill, titleText));
+        }
+
+        rows.forEach((row, index) => {
+            const xBase = margin.left + (index * slotWidth);
+            const groupWidth = Math.max(8, slotWidth - 6);
+            const barWidth = Math.max(2, groupWidth / 4 - 2);
+            const cumulativeNetCost = cumulativeNetCostCents[index];
+            const hourSummary = [
+                `Hour ${row.hour || '--'}`,
+                `Charged: ${formatTooltipCents(row.chargeCents)}`,
+                `Discharged: ${formatTooltipCents(row.dischargeCents)}`,
+                `Grid from: ${formatTooltipCents(row.gridFromCents)}`,
+                `Grid to: ${formatTooltipCents(row.gridToCents)}`,
+            ].join('\n');
+
+            pushSignedBar(xBase + 0, barWidth, row.chargeCents, palette.charge, hourSummary);
+            pushSignedBar(xBase + barWidth + 2, barWidth, row.dischargeCents !== null ? -1 * row.dischargeCents : null, palette.discharge, hourSummary);
+            pushSignedBar(xBase + ((barWidth + 2) * 2), barWidth, row.gridFromCents, palette.gridFrom, hourSummary);
+            pushSignedBar(xBase + ((barWidth + 2) * 3), barWidth, row.gridToCents, palette.gridTo, hourSummary);
+
+            if (Number.isFinite(cumulativeNetCost)) {
+                const lineY = baseline - ((clamp(cumulativeNetCost, -lineAxisMax, lineAxisMax) / lineAxisMax) * scaleHeight);
+                linePoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${lineY.toFixed(2)}`);
+            }
+
+            labels.push(`<text x="${(xBase + groupWidth / 2).toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour || '--')}</text>`);
+        });
+
+        moneyChartEl.innerHTML = `
+            <rect x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}" fill="rgba(255,255,255,0.02)" rx="18"></rect>
+            <line x1="${margin.left.toFixed(2)}" y1="${margin.top.toFixed(2)}" x2="${margin.left.toFixed(2)}" y2="${(margin.top + plotHeight).toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1"></line>
+            <line x1="${(margin.left + plotWidth).toFixed(2)}" y1="${margin.top.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${(margin.top + plotHeight).toFixed(2)}" stroke="${palette.cost}" stroke-width="1"></line>
+            ${guides.join('')}
+            ${axis.join('')}
+            ${lineAxis.join('')}
+            <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
+            ${bars.join('')}
+            ${linePoints.length > 1 ? `<polyline points="${linePoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+            ${labels.join('')}
+            <text x="${margin.left}" y="${(margin.top - 6).toFixed(2)}" fill="${palette.textSoft}" font-size="12">Above baseline: charge/import cost | below baseline: discharge/export value</text>
+            <text x="${margin.left}" y="${(height - 44).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="start">Cents scale</text>
+            <text x="${(margin.left + plotWidth).toFixed(2)}" y="${(height - 44).toFixed(2)}" fill="${palette.cost}" font-size="11" text-anchor="end">Line scale</text>
+        `;
+        moneyChartWrapEl.hidden = false;
+        setMoneyChartStatus('Hourly value and cumulative net cost view.');
+    }
+
     async function loadReport(date) {
         setStatus('Loading report...');
+        setMoneyChartStatus('Loading report...');
         if (chartWrapEl) chartWrapEl.hidden = true;
+        if (moneyChartWrapEl) moneyChartWrapEl.hidden = true;
         if (dateInputEl) dateInputEl.value = date;
         updateQueryDate(date);
         setRegenerateButtonState(false, false);
@@ -523,6 +713,7 @@
 
     async function regenerateReport(date) {
         setStatus('Regenerating report...');
+        setMoneyChartStatus('Regenerating report...');
         setRegenerateButtonState(true, true);
 
         const response = await fetch(new URL(apiUrl, window.location.href).toString(), {
@@ -549,7 +740,10 @@
 
     function handleError(error) {
         setStatus(error && error.message ? error.message : 'Failed to load daily report.');
+        setMoneyChartStatus(error && error.message ? error.message : 'Failed to load daily report.');
         setRegenerateButtonState(Boolean(regenerateButtonEl && !regenerateButtonEl.hidden), false);
+        if (chartWrapEl) chartWrapEl.hidden = true;
+        if (moneyChartWrapEl) moneyChartWrapEl.hidden = true;
         if (tableBodyEl) {
             tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">Failed to load report.</td></tr>';
         }
