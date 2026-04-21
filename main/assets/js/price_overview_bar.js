@@ -194,9 +194,9 @@ function parseOptionalScheduleBound(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry) {
+function resolveScheduleLimits(scheduleValue, minValue, maxValue, scheduleEntry) {
     if (scheduleValue !== 'netzero' && scheduleValue !== 'netzero-' && scheduleValue !== 'netzero+') {
-        return '';
+        return { minValue: null, maxValue: null, hasLimits: false };
     }
 
     let resolvedMin = parseOptionalScheduleBound(minValue);
@@ -214,13 +214,22 @@ function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEnt
         }
     }
 
-    const hasMin = resolvedMin !== null;
-    const hasMax = resolvedMax !== null;
+    return {
+        minValue: resolvedMin,
+        maxValue: resolvedMax,
+        hasLimits: resolvedMin !== null || resolvedMax !== null
+    };
+}
+
+function formatScheduleLimitsText(scheduleValue, minValue, maxValue, scheduleEntry) {
+    const resolvedLimits = resolveScheduleLimits(scheduleValue, minValue, maxValue, scheduleEntry);
+    const hasMin = resolvedLimits.minValue !== null;
+    const hasMax = resolvedLimits.maxValue !== null;
 
     if (!hasMin && !hasMax) return '';
-    if (hasMin && hasMax) return `Limits: ${resolvedMin} to ${resolvedMax} W`;
-    if (hasMin) return `Limits: min ${resolvedMin} W`;
-    return `Limits: max ${resolvedMax} W`;
+    if (hasMin && hasMax) return `Limits: ${resolvedLimits.minValue} to ${resolvedLimits.maxValue} W`;
+    if (hasMin) return `Limits: min ${resolvedLimits.minValue} W`;
+    return `Limits: max ${resolvedLimits.maxValue} W`;
 }
 
 function escapePopupHtml(value) {
@@ -1735,13 +1744,32 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
             }
             scheduleByDate[dateKey].push({
                 key: entry.key,
-                value: getRawScheduleEntryValue(entry)
+                value: getRawScheduleEntryValue(entry),
+                scheduleEntry: entry
             });
         });
         Object.values(scheduleByDate).forEach((entries) => {
             entries.sort((a, b) => a.key.localeCompare(b.key));
         });
     }
+
+    const getActiveRawScheduleEntry = (dateStr, hourKey) => {
+        const entries = scheduleByDate[dateStr];
+        if (!entries || entries.length === 0) {
+            return null;
+        }
+
+        let activeEntry = null;
+        for (const entry of entries) {
+            const entryHour = entry.key.slice(8, 10);
+            if (entryHour <= hourKey) {
+                activeEntry = entry.scheduleEntry || null;
+            } else {
+                break;
+            }
+        }
+        return activeEntry;
+    };
 
     const getActiveScheduleInfo = (dateStr, hourKey) => {
         const hourMap = scheduleHourMapByDate[dateStr];
@@ -1964,7 +1992,8 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
                 minValue,
                 maxValue
             } = getActiveScheduleInfo(dateStr, hourKey);
-            const rawScheduleEntry = scheduleMap[key];
+            const rawScheduleEntry = getActiveRawScheduleEntry(dateStr, hourKey);
+            const resolvedLimits = resolveScheduleLimits(scheduledValue, minValue, maxValue, rawScheduleEntry);
 
             // Create bar element
             const barDiv = document.createElement('div');
@@ -1980,6 +2009,9 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
                 barDiv.classList.add('has-schedule');
                 barDiv.dataset.scheduleType = scheduleType;
                 barDiv.dataset.scheduleValue = scheduledValue;
+                if (resolvedLimits.hasLimits) {
+                    barDiv.dataset.hasLimits = 'true';
+                }
                 if (hasRuntimeCondition === true) {
                     barDiv.classList.add('has-runtime-condition');
                     barDiv.dataset.runtimeCondition = 'true';
@@ -2000,11 +2032,11 @@ function renderPriceGraph(priceData, currentHour, scheduleEntries, editModal, ru
             if (ruleIndex !== undefined && ruleIndex !== null && String(ruleIndex).trim() !== '') {
                 barDiv.dataset.ruleIndex = String(ruleIndex);
             }
-            if (minValue !== undefined && minValue !== null && Number.isFinite(Number(minValue))) {
-                barDiv.dataset.minValue = String(minValue);
+            if (resolvedLimits.minValue !== null) {
+                barDiv.dataset.minValue = String(resolvedLimits.minValue);
             }
-            if (maxValue !== undefined && maxValue !== null && Number.isFinite(Number(maxValue))) {
-                barDiv.dataset.maxValue = String(maxValue);
+            if (resolvedLimits.maxValue !== null) {
+                barDiv.dataset.maxValue = String(resolvedLimits.maxValue);
             }
             barDiv.setAttribute('aria-label', `${hourKey}:00 - ${hasRealPrice ? priceDisplay : 'No price data available'}`);
             

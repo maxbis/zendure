@@ -760,6 +760,14 @@ body.mobile-dark {
     background: var(--netzero-plus-color);
 }
 
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero"][data-has-limits="true"]::after,
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-minus"][data-has-limits="true"]::after,
+.price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="netzero-plus"][data-has-limits="true"]::after {
+    width: 8px;
+    height: 2px;
+    border-radius: 0;
+}
+
 .price-graph-row-mobile .price-graph-bar.has-schedule[data-schedule-type="charge"]::after {
     background: #4caf50;
 }
