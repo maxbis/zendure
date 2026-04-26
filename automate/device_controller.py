@@ -624,7 +624,7 @@ class AutomateController(BaseDeviceController):
         if power_feed < 0 and self.limit_state == -1:
             self.log(
                 'warning',
-                f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge",
+                f"Battery at min_charge_level ({self.min_charge_level}%), preventing discharge",    
                 message_key='battery_min_discharge_block',
             )
             power_feed = 0
@@ -751,7 +751,7 @@ class AutomateController(BaseDeviceController):
                 effective_desired = 0
                 self.log(
                     'warning',
-                    f"Charge level at/above {self.max_charge_level}%, preventing charge",
+                    f"Charge level at/above {self.max_charge_level}%, actual level {electric_level}%, preventing charge",
                     message_key='battery_max_charge_block',
                 )
             # Too empty to discharge
@@ -759,7 +759,7 @@ class AutomateController(BaseDeviceController):
                 effective_desired = 0
                 self.log(
                     'warning',
-                    f"Charge level at/below {self.min_charge_level}%, preventing discharge",
+                    f"Charge level at/below {self.min_charge_level}%, actual level {electric_level}%, preventing discharge",
                     message_key='battery_min_discharge_block',
                 )
 
