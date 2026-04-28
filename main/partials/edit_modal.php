@@ -52,6 +52,24 @@
                 <div class="form-group" id="group-watts">
                     <label>Watts (Positive = Charge, Negative = Discharge)</label>
                     <input type="number" id="inp-watts" placeholder="0" step="100">
+                    <div class="edit-modal-fixed-panel">
+                        <div class="edit-modal-fixed-values">
+                            <div class="edit-modal-limits-chip edit-modal-fixed-chip">
+                                <div class="edit-modal-limits-chip-header">
+                                    <div class="edit-modal-limits-chip-value-row">
+                                        <span class="edit-modal-limits-label">Value</span>
+                                        <strong id="fixed-watts-display">0 W</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="edit-modal-fixed-slider" id="fixed-watts-slider">
+                            <div class="edit-modal-limits-track"></div>
+                            <div class="edit-modal-fixed-selected-range" id="fixed-watts-selected-range"></div>
+                            <input type="range" class="edit-modal-fixed-range" id="fixed-watts-range" aria-label="Fixed power value">
+                        </div>
+                        <div id="fixed-watts-indicator" class="power-range-indicator is-neutral">Idle: 0 W</div>
+                    </div>
                 </div>
                 <div class="edit-modal-grid" id="group-constraints" style="display:none;">
                     <input type="hidden" id="inp-min-value" value="">

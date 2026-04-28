@@ -7,12 +7,18 @@ class EditModal {
         this.apiUrl = apiUrl;
         this.currentOriginalKey = null;
         this.scheduleEntriesByKey = {};
-        this.limitMin = -1400;
-        this.limitMax = 1200;
+        const sharedBounds = this.resolveSharedPowerBounds();
+        this.limitMin = sharedBounds.min;
+        this.limitMax = sharedBounds.max;
         this.limitStep = 100;
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.powerRangeIndicator = document.getElementById('power-range-indicator');
+        this.fixedWattsSlider = document.getElementById('fixed-watts-slider');
+        this.fixedWattsSelectedRange = document.getElementById('fixed-watts-selected-range');
+        this.fixedWattsRange = document.getElementById('fixed-watts-range');
+        this.fixedWattsDisplay = document.getElementById('fixed-watts-display');
+        this.fixedWattsIndicator = document.getElementById('fixed-watts-indicator');
         this.limitsSlider = document.getElementById('limits-slider');
         this.limitsSelectedRange = document.getElementById('limits-selected-range');
         this.limitsMinRange = document.getElementById('limits-min-range');
@@ -28,6 +34,24 @@ class EditModal {
 
     isDynamicMode(mode) {
         return mode === 'netzero' || mode === 'netzero+' || mode === 'netzero-';
+    }
+
+    resolveSharedPowerBounds() {
+        const fallbackMin = -1200;
+        const fallbackMax = 1200;
+        const globalMin = typeof GRID_MIN_POWER !== 'undefined' ? Number(GRID_MIN_POWER) : fallbackMin;
+        const globalMax = typeof GRID_MAX_POWER !== 'undefined' ? Number(GRID_MAX_POWER) : fallbackMax;
+
+        let min = Number.isFinite(globalMin) ? globalMin : fallbackMin;
+        let max = Number.isFinite(globalMax) ? globalMax : fallbackMax;
+        min = Math.min(min, 0);
+        max = Math.max(max, 0);
+
+        if (min > max) {
+            return { min: fallbackMin, max: fallbackMax };
+        }
+
+        return { min, max };
     }
 
     init() {
@@ -111,6 +135,11 @@ class EditModal {
         timeInput.addEventListener('blur', (e) => this.handleEmptyToWildcard(e, 4));
         if (wattsInput) {
             wattsInput.addEventListener('input', () => this.updateWattsInputState());
+        }
+        if (this.fixedWattsRange) {
+            const syncFixedRange = () => this.updateWattsInputState({ source: 'slider' });
+            this.fixedWattsRange.addEventListener('input', syncFixedRange);
+            this.fixedWattsRange.addEventListener('change', syncFixedRange);
         }
         [minValueInput, maxValueInput].forEach((input) => {
             if (input) {
@@ -323,6 +352,12 @@ class EditModal {
     formatLimitValue(value, mode = this.getSelectedMode()) {
         const numericValue = this.snapLimitValue(value, mode);
         return numericValue > 0 ? `+${numericValue} W` : `${numericValue} W`;
+    }
+
+    updateIndicatorTone(element, tone = 'neutral') {
+        if (!element) return;
+        element.classList.remove('is-charge', 'is-discharge', 'is-bidirectional', 'is-partial', 'is-invalid', 'is-neutral');
+        element.classList.add(`is-${tone}`);
     }
 
     getConstraintInput(inputId) {
@@ -696,20 +731,64 @@ class EditModal {
         this.syncModeInputs(mode, { preserveConstraints: this.isDynamicMode(mode) && this.areLimitsEnabled() });
     }
 
-    updateWattsInputState() {
+    updateWattsInputState(options = {}) {
         const wattsInput = document.getElementById('inp-watts');
         if (!wattsInput) return;
 
+        if (options.source === 'slider' && this.fixedWattsRange && !wattsInput.disabled) {
+            const sliderValue = this.snapLimitValue(this.fixedWattsRange.value, 'fixed', 0);
+            wattsInput.value = String(sliderValue);
+            wattsInput.setAttribute('value', wattsInput.value);
+        }
+
         wattsInput.classList.remove('is-charging', 'is-discharging');
-        if (wattsInput.disabled) return;
-
         const rawValue = wattsInput.value.trim();
-        if (rawValue === '') return;
-
         const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue) || numericValue === 0) return;
+        const hasFiniteValue = Number.isFinite(numericValue);
+        if (!wattsInput.disabled && hasFiniteValue && numericValue !== 0) {
+            wattsInput.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+        }
 
-        wattsInput.classList.add(numericValue > 0 ? 'is-charging' : 'is-discharging');
+        if (!this.fixedWattsRange || !this.fixedWattsSlider || !this.fixedWattsSelectedRange || !this.fixedWattsDisplay || !this.fixedWattsIndicator) {
+            return;
+        }
+
+        const sliderValue = hasFiniteValue ? this.snapLimitValue(numericValue, 'fixed', 0) : 0;
+        this.fixedWattsRange.min = String(this.limitMin);
+        this.fixedWattsRange.max = String(this.limitMax);
+        this.fixedWattsRange.step = String(this.limitStep);
+        this.fixedWattsRange.value = String(sliderValue);
+        this.fixedWattsRange.disabled = wattsInput.disabled;
+        this.fixedWattsSlider.classList.toggle('is-disabled', wattsInput.disabled);
+        this.updateLimitThumbTone(this.fixedWattsRange, sliderValue);
+
+        const totalRange = this.limitMax - this.limitMin;
+        const centerPercent = totalRange === 0 ? 50 : ((0 - this.limitMin) / totalRange) * 100;
+        const valuePercent = totalRange === 0 ? 50 : ((sliderValue - this.limitMin) / totalRange) * 100;
+        const startPercent = Math.min(centerPercent, valuePercent);
+        const endPercent = Math.max(centerPercent, valuePercent);
+        this.fixedWattsSelectedRange.style.left = `${startPercent}%`;
+        this.fixedWattsSelectedRange.style.width = `${Math.max(0, endPercent - startPercent)}%`;
+        this.fixedWattsSlider.style.setProperty('--fixed-center', `${centerPercent}%`);
+
+        const displayValue = hasFiniteValue ? numericValue : 0;
+        const sliderTone = sliderValue < 0 ? 'negative' : (sliderValue > 0 ? 'positive' : 'neutral');
+        const indicatorTone = displayValue < 0 ? 'discharge' : (displayValue > 0 ? 'charge' : 'neutral');
+
+        this.fixedWattsSelectedRange.classList.remove('is-negative', 'is-positive', 'is-neutral');
+        this.fixedWattsSelectedRange.classList.add(`is-${sliderTone}`);
+
+        this.fixedWattsDisplay.textContent = this.formatLimitValue(displayValue, 'fixed');
+        this.updateLimitValueTone(this.fixedWattsDisplay, displayValue, false);
+
+        let indicatorText = `Idle: ${this.formatLimitValue(0, 'fixed')}`;
+        if (displayValue < 0) {
+            indicatorText = `Fixed discharge: ${this.formatLimitValue(displayValue, 'fixed')}`;
+        } else if (displayValue > 0) {
+            indicatorText = `Fixed charge: ${this.formatLimitValue(displayValue, 'fixed')}`;
+        }
+        this.fixedWattsIndicator.textContent = indicatorText;
+        this.updateIndicatorTone(this.fixedWattsIndicator, indicatorTone);
     }
 
     updateConstraintInputState(input) {

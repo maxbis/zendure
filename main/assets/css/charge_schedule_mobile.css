@@ -2487,6 +2487,141 @@ code {
     font-weight: 700;
 }
 
+#edit-modal .edit-modal-fixed-panel {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+#edit-modal .edit-modal-fixed-values {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+#edit-modal .edit-modal-fixed-chip {
+    min-width: 0;
+}
+
+#edit-modal .edit-modal-fixed-slider {
+    --fixed-center: 50%;
+    position: relative;
+    height: 34px;
+}
+
+#edit-modal .edit-modal-fixed-slider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: var(--fixed-center);
+    width: 2px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(219, 228, 240, 0.72);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 1px rgba(11, 19, 36, 0.18);
+    pointer-events: none;
+}
+
+#edit-modal .edit-modal-fixed-slider .edit-modal-limits-track {
+    background: linear-gradient(90deg, rgba(255, 139, 139, 0.28), rgba(142, 197, 255, 0.18) 50%, rgba(134, 239, 172, 0.28));
+}
+
+#edit-modal .edit-modal-fixed-selected-range {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 10px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px rgba(142, 197, 255, 0.16);
+}
+
+#edit-modal .edit-modal-fixed-selected-range.is-negative {
+    background: linear-gradient(90deg, rgba(255, 139, 139, 0.98), rgba(255, 183, 183, 0.88));
+}
+
+#edit-modal .edit-modal-fixed-selected-range.is-positive {
+    background: linear-gradient(90deg, rgba(127, 215, 127, 0.88), rgba(134, 239, 172, 0.98));
+}
+
+#edit-modal .edit-modal-fixed-selected-range.is-neutral {
+    background: rgba(142, 197, 255, 0.76);
+}
+
+#edit-modal .edit-modal-fixed-slider.is-disabled {
+    opacity: 0.45;
+}
+
+#edit-modal .edit-modal-fixed-range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#edit-modal .edit-modal-fixed-range::-webkit-slider-runnable-track {
+    height: 34px;
+    background: transparent;
+}
+
+#edit-modal .edit-modal-fixed-range::-moz-range-track {
+    height: 34px;
+    background: transparent;
+}
+
+#edit-modal .edit-modal-fixed-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin-top: 6px;
+    border-radius: 50%;
+    border: 2px solid #dbe4f0;
+    background: #0b1324;
+    box-shadow: 0 0 0 4px rgba(11, 19, 36, 0.68);
+    cursor: ew-resize;
+}
+
+#edit-modal .edit-modal-fixed-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #dbe4f0;
+    background: #0b1324;
+    box-shadow: 0 0 0 4px rgba(11, 19, 36, 0.68);
+    cursor: ew-resize;
+}
+
+#edit-modal .edit-modal-fixed-range.is-negative::-webkit-slider-thumb {
+    border-color: #ff8b8b;
+}
+
+#edit-modal .edit-modal-fixed-range.is-positive::-webkit-slider-thumb {
+    border-color: #86efac;
+}
+
+#edit-modal .edit-modal-fixed-range.is-neutral::-webkit-slider-thumb {
+    border-color: #d1d5db;
+}
+
+#edit-modal .edit-modal-fixed-range.is-negative::-moz-range-thumb {
+    border-color: #ff8b8b;
+}
+
+#edit-modal .edit-modal-fixed-range.is-positive::-moz-range-thumb {
+    border-color: #86efac;
+}
+
+#edit-modal .edit-modal-fixed-range.is-neutral::-moz-range-thumb {
+    border-color: #d1d5db;
+}
+
 #edit-modal .edit-modal-limits-panel {
     grid-column: 1 / -1;
     display: grid;
@@ -2752,7 +2887,18 @@ code {
     background: rgba(153, 27, 27, 0.24);
 }
 
+#edit-modal .power-range-indicator.is-neutral {
+    color: #d7dee9;
+    border-color: rgba(215, 222, 233, 0.32);
+    background: rgba(255, 255, 255, 0.04);
+}
+
 @media (max-width: 640px) {
+    #edit-modal .edit-modal-fixed-panel {
+        gap: 10px;
+        padding: 12px;
+    }
+
     #edit-modal .edit-modal-limits-values {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
