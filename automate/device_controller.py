@@ -577,6 +577,26 @@ class AutomateController(BaseDeviceController):
         else:
             self.limit_state = 0
 
+        if self.limit_state == -1:
+            state_label = "MIN"
+            charge_allowed = "yes"
+            discharge_allowed = "no"
+        elif self.limit_state == 1:
+            state_label = "MAX"
+            charge_allowed = "no"
+            discharge_allowed = "yes"
+        else:
+            state_label = "OK"
+            charge_allowed = "yes"
+            discharge_allowed = "yes"
+
+        self.log(
+            'info',
+            f"Battery limit check: level={battery_level}% min={self.min_charge_level}% "
+            f"max={self.max_charge_level}% state={state_label} "
+            f"charge_allowed={charge_allowed} discharge_allowed={discharge_allowed}",
+        )
+
     @staticmethod
     def _extract_live_power_feed(zendure_data: Optional[dict]) -> Optional[int]:
         """Return signed live power from a Zendure snapshot when limits are available."""

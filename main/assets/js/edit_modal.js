@@ -38,7 +38,7 @@ class EditModal {
 
     resolveSharedPowerBounds() {
         const fallbackMin = -1200;
-        const fallbackMax = 1200;
+        const fallbackMax = 2000;
         const globalMin = typeof GRID_MIN_POWER !== 'undefined' ? Number(GRID_MIN_POWER) : fallbackMin;
         const globalMax = typeof GRID_MAX_POWER !== 'undefined' ? Number(GRID_MAX_POWER) : fallbackMax;
 
