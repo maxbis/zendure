@@ -396,6 +396,14 @@ function renderRuleDetailBody(rule) {
         });
     });
 
+    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+    if (conditions.length > 0) {
+        fields.push({
+            label: 'Condition relation',
+            value: escapePopupHtml(String(rule.condition_relation || 'and').toUpperCase())
+        });
+    }
+
     const fieldsHtml = fields.map((field) => `
         <div class="price-graph-rule-detail-field">
             <div class="price-graph-rule-detail-field-label">${escapePopupHtml(field.label)}</div>
@@ -403,7 +411,6 @@ function renderRuleDetailBody(rule) {
         </div>
     `).join('');
 
-    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
     const conditionsHtml = conditions.length > 0
         ? `
             <div class="price-graph-rule-detail-section">

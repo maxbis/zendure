@@ -980,6 +980,29 @@ form {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+}
+
+.conditions-header-main {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.condition-relation-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.condition-relation-controls label {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.condition-relation-note {
+    margin-top: 6px;
 }
 
 #conditions-list {
@@ -1008,8 +1031,45 @@ form {
 
 .condition-row {
     display: grid;
-    grid-template-columns: minmax(150px, 1fr) 60px 60px minmax(130px, 1fr) auto;
+    grid-template-columns: minmax(176px, 0.92fr) 54px minmax(62px, 0.54fr) minmax(110px, 0.82fr) auto;
     gap: 8px;
+    align-items: center;
+}
+
+.condition-field-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.condition-kind-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-width: 22px;
+    min-height: 20px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    line-height: 1.1;
+    cursor: help;
+}
+
+.condition-kind-badge.is-static {
+    background: rgba(59, 130, 246, 0.18);
+    color: #bfdbfe;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
+.condition-kind-badge.is-runtime {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+    border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
 .condition-remove-btn {
@@ -1033,6 +1093,15 @@ button.danger.condition-remove-btn:hover {
     opacity: 1;
 }
 
+#inp-condition-relation,
+.fallback-select,
+.value-mode-select,
+.condition-row select {
+    font-size: 0.86rem;
+    padding: 6px 8px;
+    min-height: 34px;
+}
+
 .condition-remove-icon {
     width: 16px;
     height: 16px;
@@ -1046,6 +1115,10 @@ button.danger.condition-remove-btn:hover {
 @media (max-width: 960px) {
     .grid {
         grid-template-columns: 1fr;
+    }
+    .conditions-header {
+        align-items: stretch;
+        flex-direction: column;
     }
     .condition-row {
         grid-template-columns: 1fr;

@@ -47,7 +47,8 @@ Each rule has:
   - `max_time` (inclusive upper hour)
   - `min_power` (optional minimum signed watt bound for `netzero` / `netzero+`)
   - `max_power` (optional maximum signed watt bound for `netzero` / `netzero+`)
-  - `conditions`: all conditions are ANDed
+  - `conditions`: condition rows combined with rule relation (`AND` by default, `OR` for static-only rules)
+  - `condition_relation`: optional per-rule relation for `conditions[]` rows (`and` or `or`)
 - `fallback_value` (optional): fallback power value used by runtime integrations when runtime conditions fail (integer watts, `netzero`, or `netzero+`)
 
 Notes:
@@ -59,6 +60,11 @@ Notes:
 - `fallback_value` is optional and independent of `value` type
 
 ## 5. Condition Fields
+
+Condition row types:
+
+- `Static condition`: evaluated in the PHP resolver and can participate in `AND` or `OR`
+- `Runtime condition`: currently `electricity_level`; shown separately in the editor and always forces the rule relation back to `AND`
 
 Supported `field` values:
 
@@ -115,7 +121,14 @@ If both `value_ref` and a numeric `value` are present, `value` is added as an of
 - `value_ref=min_price` and `value=1` means `min_price + 1`
 - `field=hour`, `op=<`, `value_ref=min_price_hour`, `value=1` means `hour < min_price_hour + 1`
 
-## 7. Save Behavior
+## 7. Condition Relation
+
+- `condition_relation=and` means all static condition rows must match
+- `condition_relation=or` means any static condition row may match
+- top-level filters `month`, `hour`, `min_time`, `max_time` always remain AND filters
+- if a rule contains `electricity_level`, the relation is forced to `and`
+
+## 8. Save Behavior
 
 There is one save flow.
 
@@ -123,7 +136,7 @@ There is one save flow.
 - `Duplicate`, `Delete`, `Up`, `Down` also write file immediately.
 - File write is atomic (temp file + rename).
 
-## 8. Effective Schedule Priority
+## 9. Effective Schedule Priority
 
 At API merge time (`data_api.php`):
 
@@ -131,7 +144,7 @@ At API merge time (`data_api.php`):
 2. Conditions can overwrite wildcard/empty slots
 3. Manual non-wildcard slots keep priority and are not overwritten by conditions
 
-## 9. Example Rules
+## 10. Example Rules
 
 ```json
 [
@@ -153,9 +166,19 @@ At API merge time (`data_api.php`):
   {
     "name": "Charge Cheapest On Spread",
     "value": 800,
+    "condition_relation": "and",
     "conditions": [
       { "field": "spread_price", "op": ">=", "value": 12 },
       { "field": "ranking", "op": "<=", "value": 2 }
+    ]
+  },
+  {
+    "name": "Extreme Price Hours",
+    "value": -800,
+    "condition_relation": "or",
+    "conditions": [
+      { "field": "price", "op": "<", "value_ref": "min_price", "value": 1 },
+      { "field": "price", "op": ">", "value_ref": "max_price", "value": -1 }
     ]
   },
   {
@@ -169,7 +192,7 @@ At API merge time (`data_api.php`):
 ]
 ```
 
-## 10. Validation Tips
+## 11. Validation Tips
 
 - Ensure JSON is valid (no trailing commas)
 - Always provide `name`
@@ -177,6 +200,6 @@ At API merge time (`data_api.php`):
 - For `min_power` / `max_power`, use integer watt values
 - Use `Raw JSON` + `Copy` to review/export config quickly
 
-## 11. Related Manuals
+## 12. Related Manuals
 
 - `[install_dir]/docs/user_manuals/min-max-values_user_manual.md`

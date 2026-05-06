@@ -152,7 +152,8 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>min_power</code> (optional)</td><td>Minimum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"min_power": -700</code></td></tr>
                 <tr><td><code>max_power</code> (optional)</td><td>Maximum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"max_power": -100</code></td></tr>
                 <tr><td><code>fallback_value</code> (optional)</td><td>Optional fallback power used by runtime integrations when runtime conditions fail. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"fallback_value": 0</code></td></tr>
-                <tr><td><code>conditions</code></td><td>Array of condition objects. All conditions are combined with AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
+                <tr><td><code>conditions</code></td><td>Array of condition objects. Static rows use <code>condition_relation</code>; runtime-only rows force AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
+                <tr><td><code>condition_relation</code> (optional)</td><td>How static <code>conditions[]</code> rows are combined. Supported values: <code>and</code>, <code>or</code>. Default is <code>and</code>.</td><td><code>"condition_relation": "or"</code></td></tr>
             </tbody>
         </table>
         </div>
@@ -198,8 +199,16 @@ date_default_timezone_set('Europe/Amsterdam');
     <section>
         <h2>Runtime Metadata</h2>
         <p>Rules using <code>electricity_level</code> are saved as normal rules. In resolved schedule output, those conditions are exposed under <code>runtime_conditions</code> while <code>value</code> remains unchanged for backward compatibility.</p>
+        <p>When a rule contains runtime-only conditions such as <code>electricity_level</code>, its effective condition relation is forced to <code>AND</code>.</p>
         <p>When present, <code>min_power</code> and <code>max_power</code> are also exposed in resolved output for <code>netzero</code> / <code>netzero+</code> rules so the Python runtime can apply them.</p>
         <p class="muted"><code>fallback_value</code> does not have its own min/max fields.</p>
+    </section>
+
+    <section>
+        <h2>Condition Relation</h2>
+        <p><code>condition_relation = and</code> means all static <code>conditions[]</code> rows must match.</p>
+        <p><code>condition_relation = or</code> means any static <code>conditions[]</code> row may match.</p>
+        <p>Top-level filters such as <code>month</code>, <code>hour</code>, <code>min_time</code>, and <code>max_time</code> are always evaluated as AND filters outside the relation toggle.</p>
     </section>
 
     <section>

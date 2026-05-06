@@ -52,6 +52,10 @@ TEST_DESCRIPTIONS = [
     ("test_resolver_hour_condition_supports_value_ref_positive_offset", "Checks hour comparisons support value_ref with a numeric offset."),
     ("test_resolver_plain_max_price_value_ref_still_works", "Checks plain value_ref comparisons keep their previous behavior."),
     ("test_resolver_invalid_value_ref_offset_does_not_match", "Checks non-numeric offsets on value_ref conditions are treated as invalid."),
+    ("test_resolver_condition_relation_or_matches_any_static_condition", "Checks OR relation matches when any static condition row passes."),
+    ("test_resolver_condition_relation_or_still_respects_top_level_filters", "Checks OR relation does not bypass top-level AND filters."),
+    ("test_resolver_condition_relation_invalid_defaults_to_and", "Checks invalid condition relations fall back to AND."),
+    ("test_resolver_runtime_condition_forces_effective_and_relation", "Checks runtime-only condition rows force effective AND behavior."),
     ("test_sun_offset_condition_matches_from_dynamic_offset_field", "Checks sunset_offset_hour conditions apply using numeric offsets."),
     ("test_data_api_manual_override_wins_over_condition_if_include_conditions_enabled", "Checks manual concrete schedule entries win over condition merge when include_conditions=true."),
     ("test_runtime_condition_true_keeps_base_value", "Checks runtime condition true keeps base value."),
@@ -517,6 +521,121 @@ def test_resolver_invalid_value_ref_offset_does_not_match(backup_and_restore_pri
                 "key": "************",
                 "value": 555,
                 "conditions": [{"field": "price", "op": ">", "value_ref": "max_price", "value": "bad"}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert today_group.get("items", []) == []
+
+
+def test_resolver_condition_relation_or_matches_any_static_condition(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "or-static-match",
+                "key": "************",
+                "value": 666,
+                "condition_relation": "or",
+                "conditions": [
+                    {"field": "hour", "op": "==", "value": 0},
+                    {"field": "price", "op": ">", "value_ref": "max_price", "value": -1},
+                ],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["0000", "2300"]
+
+
+def test_resolver_condition_relation_or_still_respects_top_level_filters(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "or-with-hour-filter",
+                "key": "************",
+                "value": 777,
+                "hour": "23",
+                "condition_relation": "or",
+                "conditions": [
+                    {"field": "hour", "op": "==", "value": 0},
+                    {"field": "price", "op": ">", "value_ref": "max_price", "value": -1},
+                ],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["2300"]
+
+
+def test_resolver_condition_relation_invalid_defaults_to_and(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "invalid-relation-defaults-and",
+                "key": "************",
+                "value": 888,
+                "condition_relation": "bogus",
+                "conditions": [
+                    {"field": "hour", "op": "==", "value": 0},
+                    {"field": "price", "op": ">", "value_ref": "max_price", "value": -1},
+                ],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert today_group.get("items", []) == []
+
+
+def test_resolver_runtime_condition_forces_effective_and_relation(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "runtime-forces-and",
+                "key": "************",
+                "value": "netzero",
+                "fallback_value": 0,
+                "condition_relation": "or",
+                "conditions": [
+                    {"field": "hour", "op": "==", "value": 0},
+                    {"field": "price", "op": ">", "value_ref": "max_price", "value": -1},
+                    {"field": "electricity_level", "op": ">=", "value": 90},
+                ],
                 "enabled": True,
             }
         ],

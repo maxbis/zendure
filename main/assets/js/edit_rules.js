@@ -60,6 +60,8 @@
         inpFallbackValue: document.getElementById('inp-fallback-value'),
         powerRangeIndicator: document.getElementById('power-range-indicator'),
         conditionsList: document.getElementById('conditions-list'),
+        inpConditionRelation: document.getElementById('inp-condition-relation'),
+        conditionRelationNote: document.getElementById('condition-relation-note'),
         profileButtonBar: document.getElementById('profile-button-bar'),
         profileEditor: document.getElementById('profile-editor'),
         inpProfileShortName: document.getElementById('inp-profile-short-name'),
@@ -93,6 +95,7 @@
         'inp-min-value': 'Optional minimum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
         'inp-max-value': 'Optional maximum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
         'inp-fallback-value': 'Optional value when runtime conditions fail.',
+        'inp-condition-relation': 'Choose how static condition rows are combined inside this rule. Runtime-only rows force AND.',
     };
     const trackedFieldIds = [
         'inp-name',
@@ -126,6 +129,17 @@
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
+    }
+
+    function normalizeConditionRelation(value) {
+        return String(value || '').trim().toLowerCase() === 'or' ? 'or' : 'and';
+    }
+
+    function conditionsContainRuntimeOnlyRows(conditions) {
+        if (!Array.isArray(conditions)) return false;
+        return conditions.some(function (condition) {
+            return condition && runtimeOnlyConditionFields.has(String(condition.field || '').trim());
+        });
     }
 
     function setStatus(text, type) {
@@ -329,6 +343,10 @@
                 });
             if (out.conditions.length === 0) {
                 delete out.conditions;
+            } else {
+                out.condition_relation = conditionsContainRuntimeOnlyRows(out.conditions)
+                    ? 'and'
+                    : normalizeConditionRelation(rule.condition_relation);
             }
         }
         return out;
@@ -725,9 +743,36 @@
     function hasRuntimeConditionRows() {
         const rows = Array.from(els.conditionsList.querySelectorAll('.condition-row'));
         return rows.some(function (row) {
-            const fieldSel = row.querySelector('select');
+            const fieldSel = row.querySelector('[data-role="condition-field"]');
             return fieldSel && runtimeOnlyConditionFields.has(fieldSel.value);
         });
+    }
+
+    function updateConditionRelationUi() {
+        if (!els.inpConditionRelation) return;
+        const hasRuntimeRows = hasRuntimeConditionRows();
+        if (hasRuntimeRows && els.inpConditionRelation.value !== 'and') {
+            els.inpConditionRelation.value = 'and';
+        }
+        els.inpConditionRelation.disabled = hasRuntimeRows;
+        if (els.conditionRelationNote) {
+            els.conditionRelationNote.textContent = hasRuntimeRows
+                ? 'Runtime-only condition present. Relation is forced to AND for this rule.'
+                : 'OR applies only to static condition rows. Runtime-only rows force AND.';
+        }
+    }
+
+    function updateConditionRowKind(row) {
+        if (!row) return;
+        const fieldSel = row.querySelector('[data-role="condition-field"]');
+        const badge = row.querySelector('.condition-kind-badge');
+        if (!fieldSel || !badge) return;
+        const isRuntimeOnly = runtimeOnlyConditionFields.has(fieldSel.value);
+        badge.textContent = isRuntimeOnly ? 'R' : 'S';
+        badge.title = isRuntimeOnly ? 'Runtime condition' : 'Static condition';
+        badge.setAttribute('aria-label', isRuntimeOnly ? 'Runtime condition' : 'Static condition');
+        badge.classList.toggle('is-runtime', isRuntimeOnly);
+        badge.classList.toggle('is-static', !isRuntimeOnly);
     }
 
     function updateFallbackVisibility() {
@@ -740,6 +785,7 @@
         }
         updateFallbackTone();
         updateFieldState('inp-fallback-value');
+        updateConditionRelationUi();
     }
 
     function updateFallbackTone() {
@@ -1012,6 +1058,7 @@
         row.className = 'condition-row';
 
         const fieldSel = document.createElement('select');
+        fieldSel.setAttribute('data-role', 'condition-field');
         conditionFields.forEach((f) => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -1051,6 +1098,13 @@
         valueRefSel.value = condition?.value_ref || '';
         valueRefSel.title = 'Optional dynamic reference value (for example min_price or sunset_hour). Combine with value to apply a numeric offset.';
 
+        const fieldWrap = document.createElement('div');
+        fieldWrap.className = 'condition-field-wrap';
+        const kindBadge = document.createElement('div');
+        kindBadge.className = 'condition-kind-badge is-static';
+        fieldWrap.appendChild(fieldSel);
+        fieldWrap.appendChild(kindBadge);
+
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'danger condition-remove-btn';
@@ -1071,14 +1125,16 @@
         });
 
         fieldSel.addEventListener('change', function () {
+            updateConditionRowKind(row);
             updateFallbackVisibility();
         });
 
-        row.appendChild(fieldSel);
+        row.appendChild(fieldWrap);
         row.appendChild(opSel);
         row.appendChild(valueInp);
         row.appendChild(valueRefSel);
         row.appendChild(delBtn);
+        updateConditionRowKind(row);
         return row;
     }
 
@@ -1099,6 +1155,9 @@
         if (els.limitsMinRange) els.limitsMinRange.value = String(getLimitBoundsForMode('netzero').min);
         if (els.limitsMaxRange) els.limitsMaxRange.value = String(getLimitBoundsForMode('netzero').max);
         els.inpFallbackValue.value = '';
+        if (els.inpConditionRelation) {
+            els.inpConditionRelation.value = 'and';
+        }
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
         els.conditionsList.innerHTML = '';
@@ -1164,6 +1223,9 @@
             els.limitsMaxRange.value = String(normalizedLimits.maxValue !== null ? normalizedLimits.maxValue : normalizedLimits.bounds.max);
         }
         els.inpFallbackValue.value = rule.fallback_value !== undefined ? String(rule.fallback_value) : '';
+        if (els.inpConditionRelation) {
+            els.inpConditionRelation.value = normalizeConditionRelation(rule.condition_relation);
+        }
         updateValueModeFields();
         els.conditionsList.innerHTML = '';
         (rule.conditions || []).forEach((condition) => {
@@ -1305,6 +1367,9 @@
         const conditions = readConditionRows();
         if (conditions.length > 0) {
             rule.conditions = conditions;
+            rule.condition_relation = conditionsContainRuntimeOnlyRows(conditions)
+                ? 'and'
+                : normalizeConditionRelation(els.inpConditionRelation ? els.inpConditionRelation.value : 'and');
         }
 
         return normalizeRule(rule);
@@ -1688,6 +1753,12 @@
             updateFallbackTone();
         });
 
+        if (els.inpConditionRelation) {
+            els.inpConditionRelation.addEventListener('change', function () {
+                updateConditionRelationUi();
+            });
+        }
+
         trackedFieldIds.forEach(function (inputId) {
             const input = document.getElementById(inputId);
             if (!input) return;
@@ -1860,8 +1931,9 @@
     attachEvents();
     updateValueModeFields();
     updateValueModeTone();
-    updateFallbackTone();
-    syncLimitsState({ resetToDefaults: true });
-    updateAllFieldStates();
-    loadRules();
+        updateFallbackTone();
+        syncLimitsState({ resetToDefaults: true });
+        updateAllFieldStates();
+        updateConditionRelationUi();
+        loadRules();
 })();

@@ -160,7 +160,8 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
 | `min_power` | int/null | Optional lower signed watt bound for `netzero` / `netzero+` |
 | `max_power` | int/null | Optional upper signed watt bound for `netzero` / `netzero+` |
 | `fallback_value` | int/string | Used at runtime if `electricity_level` condition can't be evaluated |
-| `conditions` | array | All conditions must match (AND logic) |
+| `conditions` | array | Static condition rows are combined by `condition_relation` |
+| `condition_relation` | string | Optional relation for static `conditions[]` rows: `and` or `or` (default: `and`) |
 
 ### Condition Fields
 
@@ -189,6 +190,13 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
 
 `>` `>=` `<` `<=` `==` `!=` `in`  
 For list fields (`month`, `hour`), use `in` (the default).
+
+### Condition Relation
+
+- `condition_relation = and` means all static `conditions[]` rows must match
+- `condition_relation = or` means any static `conditions[]` row may match
+- top-level filters `month`, `hour`, `min_time`, `max_time` remain separate AND prefilters
+- runtime-only rows such as `electricity_level` force the effective relation back to `and`
 
 ### `value` vs `value_ref`
 
@@ -227,7 +235,9 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
 4. For each hour 0–23:
    - Walk rules in order
    - Filter by `enabled`, key pattern match
-   - Evaluate all **static** conditions (all must pass — AND logic)
+   - Evaluate top-level filters (`month`, `hour`, `min_time`, `max_time`) as AND filters
+   - Evaluate static `conditions[]` rows using `condition_relation`
+   - If `condition_relation` is `and`, all static rows must pass; if `or`, any static row may pass
    - **Runtime-only** conditions (`electricity_level`) are skipped here; they are passed through as metadata
    - **First matching rule fires** — break
 5. Emit `{ time, value, ranking, rule_name?, rule_index?, runtime_conditions?, fallback_value?, min_power?, max_power? }` per matched hour

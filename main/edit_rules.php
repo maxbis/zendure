@@ -58,6 +58,20 @@ function validateValue($value): bool
     return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
 }
 
+function isRuntimeOnlyConditionField(string $field): bool
+{
+    return in_array($field, ['electricity_level', 'electric_level', 'electricLevel'], true);
+}
+
+function normalizeConditionRelationValue($value): string
+{
+    if (!is_string($value)) {
+        return 'and';
+    }
+    $normalized = strtolower(trim($value));
+    return $normalized === 'or' ? 'or' : 'and';
+}
+
 function resolveRuleEditorLimits(): array
 {
     $min = ConfigLoader::get('minGridPower', DEFAULT_LIMIT_MIN);
@@ -344,6 +358,7 @@ function normalizeRules(array $rules): array
 
         if (isset($rule['conditions']) && is_array($rule['conditions'])) {
             $conditions = [];
+            $hasRuntimeOnlyCondition = false;
             foreach ($rule['conditions'] as $condition) {
                 if (!is_array($condition) || !validateCondition($condition)) {
                     continue;
@@ -358,9 +373,14 @@ function normalizeRules(array $rules): array
                 if (isset($condition['value_ref']) && $condition['value_ref'] !== '') {
                     $conditions[count($conditions) - 1]['value_ref'] = (string) $condition['value_ref'];
                 }
+                if (isRuntimeOnlyConditionField((string) $condition['field'])) {
+                    $hasRuntimeOnlyCondition = true;
+                }
             }
             if (!empty($conditions)) {
                 $normalized['conditions'] = $conditions;
+                $conditionRelation = normalizeConditionRelationValue($rule['condition_relation'] ?? 'and');
+                $normalized['condition_relation'] = $hasRuntimeOnlyCondition ? 'and' : $conditionRelation;
             }
         }
 
@@ -627,9 +647,19 @@ $editorLimitMax = $editorLimits['max'];
 
                 <div class="row">
                     <div class="conditions-header">
-                        <label title="All listed conditions must be true (AND).">Conditions</label>
+                        <div class="conditions-header-main">
+                            <label title="Static condition rows use this relation. Runtime-only rows force AND.">Conditions</label>
+                            <div class="condition-relation-controls">
+                                <label for="inp-condition-relation">Relation</label>
+                                <select id="inp-condition-relation" title="Choose how static condition rows are combined within this rule.">
+                                    <option value="and">AND</option>
+                                    <option value="or">OR</option>
+                                </select>
+                            </div>
+                        </div>
                         <button id="btn-add-condition" type="button" title="Add a new condition row.">Add Condition</button>
                     </div>
+                    <div id="condition-relation-note" class="muted condition-relation-note">OR applies only to static condition rows. Runtime-only rows force AND.</div>
                     <div id="conditions-list"></div>
                 </div>
 

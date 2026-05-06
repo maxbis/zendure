@@ -150,6 +150,15 @@ function isValidRuleValue($value): bool
     return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
 }
 
+function normalizeConditionRelationValue($value): string
+{
+    if (!is_string($value)) {
+        return 'and';
+    }
+    $normalized = strtolower(trim($value));
+    return $normalized === 'or' ? 'or' : 'and';
+}
+
 function normalizeRuleValue($value)
 {
     return is_numeric($value) ? (int) $value : $value;
@@ -624,12 +633,13 @@ function isRuntimeOnlyConditionField(string $field): bool
  * Split rule conditions into static and runtime-only groups.
  *
  * @param array $rule
- * @return array{static:array,runtime:array}
+ * @return array{static:array,runtime:array,filters:array}
  */
 function splitRuleConditions(array $rule): array
 {
     $staticConditions = [];
     $runtimeConditions = [];
+    $filterConditions = [];
 
     $conditions = isset($rule['conditions']) && is_array($rule['conditions']) ? $rule['conditions'] : [];
     foreach ($conditions as $condition) {
@@ -645,19 +655,74 @@ function splitRuleConditions(array $rule): array
     }
 
     if (array_key_exists('min_time', $rule)) {
-        $staticConditions[] = ['field' => 'min_time', 'op' => '>=', 'value' => $rule['min_time']];
+        $filterConditions[] = ['field' => 'min_time', 'op' => '>=', 'value' => $rule['min_time']];
     }
     if (array_key_exists('max_time', $rule)) {
-        $staticConditions[] = ['field' => 'max_time', 'op' => '<=', 'value' => $rule['max_time']];
+        $filterConditions[] = ['field' => 'max_time', 'op' => '<=', 'value' => $rule['max_time']];
     }
     if (array_key_exists('month', $rule)) {
-        $staticConditions[] = ['field' => 'month', 'op' => 'in', 'value' => $rule['month']];
+        $filterConditions[] = ['field' => 'month', 'op' => 'in', 'value' => $rule['month']];
     }
     if (array_key_exists('hour', $rule)) {
-        $staticConditions[] = ['field' => 'hour', 'op' => 'in', 'value' => $rule['hour']];
+        $filterConditions[] = ['field' => 'hour', 'op' => 'in', 'value' => $rule['hour']];
     }
 
-    return ['static' => $staticConditions, 'runtime' => $runtimeConditions];
+    return ['static' => $staticConditions, 'runtime' => $runtimeConditions, 'filters' => $filterConditions];
+}
+
+/**
+ * @param array $splitConditions
+ */
+function getEffectiveRuleConditionRelation(array $rule, array $splitConditions): string
+{
+    if (!empty($splitConditions['runtime'])) {
+        return 'and';
+    }
+    return normalizeConditionRelationValue($rule['condition_relation'] ?? 'and');
+}
+
+function evaluateRuleCondition(array $condition, array $priceByHour, int $hour, string $yyyymmdd, array $ctx): bool
+{
+    if (!isset($condition['field'])) {
+        return false;
+    }
+
+    $field = (string) $condition['field'];
+    if ($field === 'price') {
+        return conditionMatchesPrice($condition, $priceByHour, $hour, $ctx);
+    }
+    if ($field === 'ranking') {
+        return conditionMatchesRanking($condition, $hour, $ctx);
+    }
+    if (
+        $field === 'min_price' || $field === 'max_price' ||
+        $field === 'min_price_hour' || $field === 'max_price_hour' ||
+        $field === 'max_price_hour_am' || $field === 'max_price_hour_pm' ||
+        $field === 'spread_price' ||
+        $field === 'sunrise_hour' || $field === 'sunset_hour'
+    ) {
+        return conditionMatchesContextNumber($condition, $ctx);
+    }
+    if ($field === 'sunrise_offset_hour') {
+        return conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunrise_hour');
+    }
+    if ($field === 'sunset_offset_hour') {
+        return conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunset_hour');
+    }
+    if ($field === 'min_time') {
+        return conditionMatchesMinTime($condition, $hour);
+    }
+    if ($field === 'max_time') {
+        return conditionMatchesMaxTime($condition, $hour);
+    }
+    if ($field === 'month') {
+        return conditionMatchesMonth($condition, $yyyymmdd);
+    }
+    if ($field === 'hour') {
+        return conditionMatchesHour($condition, $hour, $ctx);
+    }
+
+    return false;
 }
 
 /**
@@ -673,40 +738,40 @@ function splitRuleConditions(array $rule): array
 function ruleConditionsMatch(array $rule, array $priceByHour, int $hour, string $yyyymmdd, array $ctx): bool
 {
     $splitConditions = splitRuleConditions($rule);
+    $filterConditions = $splitConditions['filters'];
     $conditions = $splitConditions['static'];
+    $conditionRelation = getEffectiveRuleConditionRelation($rule, $splitConditions);
+
+    foreach ($filterConditions as $condition) {
+        if (!is_array($condition) || !isset($condition['field'])) {
+            return false;
+        }
+        if (!evaluateRuleCondition($condition, $priceByHour, $hour, $yyyymmdd, $ctx)) {
+            return false;
+        }
+    }
+
+    if (empty($conditions)) {
+        return true;
+    }
+
+    if ($conditionRelation === 'or') {
+        foreach ($conditions as $condition) {
+            if (!is_array($condition) || !isset($condition['field'])) {
+                continue;
+            }
+            if (evaluateRuleCondition($condition, $priceByHour, $hour, $yyyymmdd, $ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     foreach ($conditions as $condition) {
         if (!is_array($condition) || !isset($condition['field'])) {
             return false;
         }
-        $field = (string) $condition['field'];
-        $match = false;
-        if ($field === 'price') {
-            $match = conditionMatchesPrice($condition, $priceByHour, $hour, $ctx);
-        } elseif ($field === 'ranking') {
-            $match = conditionMatchesRanking($condition, $hour, $ctx);
-        } elseif (
-            $field === 'min_price' || $field === 'max_price' ||
-            $field === 'min_price_hour' || $field === 'max_price_hour' ||
-            $field === 'max_price_hour_am' || $field === 'max_price_hour_pm' ||
-            $field === 'spread_price' ||
-            $field === 'sunrise_hour' || $field === 'sunset_hour'
-        ) {
-            $match = conditionMatchesContextNumber($condition, $ctx);
-        } elseif ($field === 'sunrise_offset_hour') {
-            $match = conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunrise_hour');
-        } elseif ($field === 'sunset_offset_hour') {
-            $match = conditionMatchesSunOffsetHour($condition, $hour, $ctx, 'sunset_hour');
-        } elseif ($field === 'min_time') {
-            $match = conditionMatchesMinTime($condition, $hour);
-        } elseif ($field === 'max_time') {
-            $match = conditionMatchesMaxTime($condition, $hour);
-        } elseif ($field === 'month') {
-            $match = conditionMatchesMonth($condition, $yyyymmdd);
-        } elseif ($field === 'hour') {
-            $match = conditionMatchesHour($condition, $hour, $ctx);
-        }
-        if (!$match) {
+        if (!evaluateRuleCondition($condition, $priceByHour, $hour, $yyyymmdd, $ctx)) {
             return false;
         }
     }
@@ -750,6 +815,10 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
     }
     if (array_key_exists('hour', $entry)) {
         $rule['hour'] = $entry['hour'];
+    }
+    if (!empty($rule['conditions'])) {
+        $splitConditions = splitRuleConditions($rule);
+        $rule['condition_relation'] = getEffectiveRuleConditionRelation($entry, $splitConditions);
     }
     if (array_key_exists('fallback_value', $entry) && isValidRuleValue($entry['fallback_value'])) {
         $rule['fallback_value'] = normalizeRuleValue($entry['fallback_value']);
