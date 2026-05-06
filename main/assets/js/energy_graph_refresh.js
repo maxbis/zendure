@@ -575,6 +575,13 @@
         return Math.max(0, Math.min(100, parsed));
     }
 
+    function formatDailyTableDateLabel(date) {
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date || '';
+        }
+        return date.slice(8, 10) + '-' + date.slice(5, 7);
+    }
+
     function getVisibleDailyTotalDates(whPerDay) {
         return Object.keys(whPerDay || {}).sort().reverse().slice(0, DAILY_TOTALS_PNL_DAY_COUNT);
     }
@@ -760,7 +767,7 @@
             var d = new Date(date + 'T12:00:00');
             var day = dayNames[d.getDay()];
             var rowClass = date === today ? ' class="row-current"' : '';
-            html += '<tr' + rowClass + '><td>' + escapeHtml(date) + '</td><td>' + escapeHtml(day) + '</td>' +
+            html += '<tr' + rowClass + '><td>' + escapeHtml(formatDailyTableDateLabel(date)) + '</td><td>' + escapeHtml(day) + '</td>' +
                 '<td class="wh-pos">+' + Math.round(pos).toLocaleString() + '</td>' +
                 '<td class="wh-neg">' + Math.round(neg).toLocaleString() + '</td>' +
                 '<td>' + pctNet + '%</td>' +

@@ -26,6 +26,8 @@ def test_mobile_energy_graph_daily_totals_use_pnl_api_column():
     assert "await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay));" in energy_graph_js
     assert '<th title="P&L (EUR, main price)">P&amp;L</th>' in energy_graph_js
     assert "pnlByDate && pnlByDate[date] ? pnlByDate[date].pnl_eur : null" in energy_graph_js
+    assert "function formatDailyTableDateLabel(date)" in energy_graph_js
+    assert "return date.slice(8, 10) + '-' + date.slice(5, 7);" in energy_graph_js
     assert "return prefix + numericValue.toFixed(2);" in energy_graph_js
     assert "if (!Number.isFinite(numericValue)) return '--';" in energy_graph_js
     assert "if (!Number.isFinite(numericValue) || numericValue === 0) return '';" in energy_graph_js
@@ -33,3 +35,4 @@ def test_mobile_energy_graph_daily_totals_use_pnl_api_column():
     assert "'<table><thead><tr><th>Time</th><th>W</th><th>Battery</th>' +" in energy_graph_js
 
     assert ".energy-graph-mobile-daily-table .col-pnl" in energy_graph_css
+    assert ".energy-graph-mobile-daily-table .col-date {\n    width: 48px;\n}" in energy_graph_css
