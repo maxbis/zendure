@@ -21,6 +21,8 @@
 // - Supports dynamic references via condition.value_ref:
 //   min_price, max_price, min_price_hour, max_price_hour,
 //   max_price_hour_am, max_price_hour_pm, spread_price
+// - When both condition.value_ref and numeric condition.value are present,
+//   condition.value is used as an additive offset
 // - Supports sun context for static conditions:
 //   sunrise_hour (floor), sunset_hour (ceil), and dynamic offset fields
 
@@ -477,10 +479,28 @@ function resolveConditionOperand(array $condition, array $ctx): ?float
         if (!array_key_exists($ref, $ctx) || $ctx[$ref] === null || !is_numeric($ctx[$ref])) {
             return null;
         }
-        return (float) $ctx[$ref];
+        $offset = 0.0;
+        if (array_key_exists('value', $condition)) {
+            $value = $condition['value'];
+            if ($value !== null) {
+                if (is_string($value)) {
+                    $value = trim($value);
+                }
+                if ($value !== '') {
+                    if (!is_numeric($value)) {
+                        return null;
+                    }
+                    $offset = (float) $value;
+                }
+            }
+        }
+        return (float) $ctx[$ref] + $offset;
     }
 
     $value = $condition['value'] ?? null;
+    if (is_string($value)) {
+        $value = trim($value);
+    }
     if (!is_numeric($value)) {
         return null;
     }

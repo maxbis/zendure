@@ -180,7 +180,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>sunrise_offset_hour</code></td><td>Compares current hour to <code>sunrise_hour + offset</code>. Provide offset as numeric <code>value</code> (e.g. <code>-2</code>, <code>+1</code>).</td></tr>
                 <tr><td><code>sunset_offset_hour</code></td><td>Compares current hour to <code>sunset_hour + offset</code>. Provide offset as numeric <code>value</code>.</td></tr>
                 <tr><td><code>month</code></td><td>Current month number check, usually with <code>in</code>.</td></tr>
-                <tr><td><code>hour</code></td><td>Current hour check, either list (<code>in</code>) or numeric compare (<code>&lt;, &gt;</code>) with <code>value_ref</code>.</td></tr>
+                <tr><td><code>hour</code></td><td>Current hour check, either list (<code>in</code>) or numeric compare (<code>&lt;, &gt;</code>) with <code>value_ref</code> and optional numeric <code>value</code> offset.</td></tr>
                 <tr><td><code>min_time</code></td><td>Equivalent to hour &gt;= bound.</td></tr>
                 <tr><td><code>max_time</code></td><td>Equivalent to hour &lt;= bound.</td></tr>
                 <tr><td><code>electricity_level</code></td><td>Battery SoC percent condition for runtime evaluation. It is stored in rules and emitted as runtime metadata in resolved output; static resolver does not evaluate this field.</td></tr>
@@ -206,6 +206,7 @@ date_default_timezone_set('Europe/Amsterdam');
         <h2>value / value_ref</h2>
         <p>A condition can use a literal <code>value</code>, a dynamic <code>value_ref</code>, or both.</p>
         <p>Supported <code>value_ref</code>: <code>min_price</code>, <code>max_price</code>, <code>spread_price</code>, <code>min_price_hour</code>, <code>max_price_hour</code>, <code>max_price_hour_am</code>, <code>max_price_hour_pm</code>, <code>sunrise_hour</code>, <code>sunset_hour</code>.</p>
+        <p>When both are present, <code>value</code> is treated as a numeric offset added to <code>value_ref</code>. Example: <code>price &gt; max_price</code> with <code>value = -1</code> means <code>price &gt; max_price - 1</code>. Likewise <code>hour &lt; min_price_hour</code> with <code>value = 1</code> means <code>hour &lt; min_price_hour + 1</code>.</p>
     </section>
 
     <section>

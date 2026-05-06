@@ -91,6 +91,7 @@ A condition can use:
 
 - `value`: literal number/string
 - `value_ref`: dynamic reference to a calculated field
+- `value` + `value_ref`: dynamic reference plus numeric offset
 
 Supported `value_ref`:
 
@@ -107,6 +108,12 @@ Supported `value_ref`:
 **Note**: `sunrise_offset_hour` and `sunset_offset_hour` cannot be used as `value_ref`. They must use literal `value` for the offset.
 
 If `value_ref` is present, it is used as the right-hand side operand in the comparison.
+
+If both `value_ref` and a numeric `value` are present, `value` is added as an offset:
+
+- `value_ref=max_price` and `value=-1` means `max_price - 1`
+- `value_ref=min_price` and `value=1` means `min_price + 1`
+- `field=hour`, `op=<`, `value_ref=min_price_hour`, `value=1` means `hour < min_price_hour + 1`
 
 ## 7. Save Behavior
 

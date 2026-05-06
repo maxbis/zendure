@@ -47,6 +47,11 @@ TEST_DESCRIPTIONS = [
     ("test_resolver_emits_signed_power_bounds_from_netzero_minus_rules", "Checks resolver includes min_power and max_power for netzero- rules."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
     ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
+    ("test_resolver_price_condition_supports_max_price_negative_offset", "Checks price conditions support value_ref with a negative numeric offset."),
+    ("test_resolver_price_condition_supports_min_price_positive_offset", "Checks price conditions support value_ref with a positive numeric offset."),
+    ("test_resolver_hour_condition_supports_value_ref_positive_offset", "Checks hour comparisons support value_ref with a numeric offset."),
+    ("test_resolver_plain_max_price_value_ref_still_works", "Checks plain value_ref comparisons keep their previous behavior."),
+    ("test_resolver_invalid_value_ref_offset_does_not_match", "Checks non-numeric offsets on value_ref conditions are treated as invalid."),
     ("test_sun_offset_condition_matches_from_dynamic_offset_field", "Checks sunset_offset_hour conditions apply using numeric offsets."),
     ("test_data_api_manual_override_wins_over_condition_if_include_conditions_enabled", "Checks manual concrete schedule entries win over condition merge when include_conditions=true."),
     ("test_runtime_condition_true_keeps_base_value", "Checks runtime condition true keeps base value."),
@@ -402,6 +407,126 @@ def test_resolver_hour_conditions_support_am_pm_max_price_value_refs(backup_and_
     assert by_time["1000"]["value"] == 111
     assert by_time["1800"]["value"] == 222
     assert sorted(by_time.keys()) == ["1000", "1800"]
+
+
+def test_resolver_price_condition_supports_max_price_negative_offset(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "near-max-price",
+                "key": "************",
+                "value": 111,
+                "conditions": [{"field": "price", "op": ">", "value_ref": "max_price", "value": -1}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["2300"]
+
+
+def test_resolver_price_condition_supports_min_price_positive_offset(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "near-min-price",
+                "key": "************",
+                "value": 222,
+                "conditions": [{"field": "price", "op": "<", "value_ref": "min_price", "value": 1}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["0000"]
+
+
+def test_resolver_hour_condition_supports_value_ref_positive_offset(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "before-min-hour-plus-one",
+                "key": "************",
+                "value": 333,
+                "conditions": [{"field": "hour", "op": "<", "value_ref": "min_price_hour", "value": 1}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["0000"]
+
+
+def test_resolver_plain_max_price_value_ref_still_works(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "at-max-price",
+                "key": "************",
+                "value": 444,
+                "conditions": [{"field": "price", "op": "==", "value_ref": "max_price"}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert [str(item.get("time")) for item in today_group.get("items", [])] == ["2300"]
+
+
+def test_resolver_invalid_value_ref_offset_does_not_match(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+    _write_json(
+        CONDITIONS_FILE,
+        [
+            {
+                "name": "invalid-offset",
+                "key": "************",
+                "value": 555,
+                "conditions": [{"field": "price", "op": ">", "value_ref": "max_price", "value": "bad"}],
+                "enabled": True,
+            }
+        ],
+    )
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    assert today_group.get("items", []) == []
 
 
 def test_resolver_am_pm_max_price_value_refs_use_first_tie_and_allow_null_half_day(backup_and_restore_price_files):

@@ -258,6 +258,17 @@ function validateCondition(array $condition): bool
     if ($hasValueRef && !in_array((string) $condition['value_ref'], $validValueRefs, true)) {
         return false;
     }
+    if ($hasValueRef && $hasValue) {
+        $value = $condition['value'];
+        if ($value !== null) {
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            if ($value !== '' && !is_numeric($value)) {
+                return false;
+            }
+        }
+    }
     return true;
 }
 

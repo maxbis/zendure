@@ -1033,9 +1033,9 @@
 
         const valueInp = document.createElement('input');
         valueInp.type = 'text';
-        valueInp.placeholder = 'value (optional)';
+        valueInp.placeholder = 'value / offset (optional)';
         valueInp.value = condition?.value !== undefined ? String(condition.value) : '';
-        valueInp.title = 'Static value to compare against. Leave empty when using value_ref.';
+        valueInp.title = 'Literal value when value_ref is empty, or numeric offset when value_ref is selected (for example -1 or +1).';
 
         const valueRefSel = document.createElement('select');
         const valueRefNone = document.createElement('option');
@@ -1049,7 +1049,7 @@
             valueRefSel.appendChild(opt);
         });
         valueRefSel.value = condition?.value_ref || '';
-        valueRefSel.title = 'Optional dynamic reference value (for example min_price or sunset_hour).';
+        valueRefSel.title = 'Optional dynamic reference value (for example min_price or sunset_hour). Combine with value to apply a numeric offset.';
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';

@@ -258,9 +258,26 @@ function formatRuleCondition(condition) {
     const op = condition.op ? String(condition.op) : '';
     const hasValueRef = condition.value_ref !== undefined && condition.value_ref !== null && String(condition.value_ref).trim() !== '';
     const hasValue = Object.prototype.hasOwnProperty.call(condition, 'value');
-    const rightSide = hasValueRef
-        ? String(condition.value_ref).trim()
-        : (hasValue ? String(condition.value) : '');
+    let rightSide = '';
+    if (hasValueRef) {
+        rightSide = String(condition.value_ref).trim();
+        if (hasValue) {
+            const rawValue = String(condition.value).trim();
+            if (rawValue !== '') {
+                const numericValue = Number(rawValue);
+                if (Number.isFinite(numericValue) && numericValue !== 0) {
+                    const formattedOffset = Number.isInteger(numericValue)
+                        ? String(Math.abs(numericValue))
+                        : String(Math.abs(numericValue));
+                    rightSide += numericValue > 0
+                        ? ` + ${formattedOffset}`
+                        : ` - ${formattedOffset}`;
+                }
+            }
+        }
+    } else if (hasValue) {
+        rightSide = String(condition.value);
+    }
     return [field, op, rightSide].filter(Boolean).join(' ');
 }
 

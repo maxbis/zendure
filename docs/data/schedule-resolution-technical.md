@@ -196,7 +196,11 @@ A condition operand can be:
 - `"value": 12` — static literal
 - `"value_ref": "max_price_hour"` — resolved dynamically from price context
 
-Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`, `max_price_hour_am`, `max_price_hour_pm`.
+- `"value_ref": "max_price", "value": -1` - resolved dynamically, then offset by `-1`
+
+When both `value_ref` and numeric `value` are present, `value` is used as an additive offset. For example, `price > max_price - 1` is stored as `"field": "price", "op": ">", "value_ref": "max_price", "value": -1`.
+
+Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`, `max_price_hour_am`, `max_price_hour_pm`, `sunrise_hour`, `sunset_hour`.
 
 ---
 
