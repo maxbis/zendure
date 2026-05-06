@@ -147,6 +147,7 @@ $priceConversionConfig = getPriceConversionConfig();
             const PRICE_API_URL = <?php echo json_encode($priceApiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const CALCULATE_SCHEDULE_API_URL = <?php echo json_encode($calculateScheduleApiUrl, JSON_UNESCAPED_SLASHES); ?>;
             const ENERGY_GRAPH_API_URL = <?php echo json_encode('api/energy_graph_proxy.php', JSON_UNESCAPED_SLASHES); ?>;
+            const DAILY_TOTALS_PNL_API_URL = <?php echo json_encode('../daily_report/api/pnl_data.php', JSON_UNESCAPED_SLASHES); ?>;
 
             // Charge status unified API (same-origin proxy) + config levels
             const CHARGE_STATUS_ALL_API_URL = <?php echo json_encode('api/charge_status_all_proxy.php', JSON_UNESCAPED_SLASHES); ?>;

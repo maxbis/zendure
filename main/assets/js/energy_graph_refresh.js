@@ -6,13 +6,17 @@
 
 (function() {
     var API_URL = typeof ENERGY_GRAPH_API_URL !== 'undefined' ? ENERGY_GRAPH_API_URL : 'api/energy_graph_api.php';
+    var DAILY_PNL_API_URL = typeof DAILY_TOTALS_PNL_API_URL !== 'undefined' ? DAILY_TOTALS_PNL_API_URL : '../daily_report/api/pnl_data.php';
     var selectedMobileDay = null;
     var latestWhPerHour = [];
     var latestWhPerDay = {};
     var latestBaseWh = 5760;
+    var latestDailyPnlByDate = {};
+    var latestDailyPnlRequestKey = '';
     var energyGraphControlsBound = false;
     // In focused-day mode, show labels every N hours on the X axis.
     var FOCUSED_TICK_INTERVAL_HOURS = 2;
+    var DAILY_TOTALS_PNL_DAY_COUNT = 4;
 
     function transformWh(v) {
         if (v === 0) return 0;
@@ -571,6 +575,77 @@
         return Math.max(0, Math.min(100, parsed));
     }
 
+    function getVisibleDailyTotalDates(whPerDay) {
+        return Object.keys(whPerDay || {}).sort().reverse().slice(0, DAILY_TOTALS_PNL_DAY_COUNT);
+    }
+
+    function toFiniteNumber(value) {
+        if (typeof value === 'number' && isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+            var parsed = Number(value);
+            return isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    }
+
+    function formatDailyPnlValue(value) {
+        var numericValue = toFiniteNumber(value);
+        if (!Number.isFinite(numericValue)) return '--';
+        var prefix = numericValue > 0 ? '+' : '';
+        return prefix + numericValue.toFixed(2);
+    }
+
+    function dailyPnlCellClass(value) {
+        var numericValue = toFiniteNumber(value);
+        if (!Number.isFinite(numericValue) || numericValue === 0) return '';
+        return numericValue > 0 ? 'wh-pos' : 'wh-neg';
+    }
+
+    async function ensureDailyPnlForDates(dates) {
+        if (!Array.isArray(dates) || dates.length === 0) {
+            latestDailyPnlByDate = {};
+            latestDailyPnlRequestKey = '';
+            return;
+        }
+        if (!DAILY_PNL_API_URL) {
+            latestDailyPnlByDate = {};
+            latestDailyPnlRequestKey = dates.join(',');
+            return;
+        }
+
+        var newestDate = dates[0];
+        var requestKey = newestDate + '|' + dates.join(',');
+        if (requestKey === latestDailyPnlRequestKey) {
+            return;
+        }
+
+        try {
+            var url = new URL(DAILY_PNL_API_URL, window.location.href);
+            url.searchParams.set('date', newestDate);
+            url.searchParams.set('n', String(DAILY_TOTALS_PNL_DAY_COUNT));
+            var response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            var payload = await response.json();
+            if (!response.ok || !payload || payload.success !== true || !Array.isArray(payload.days)) {
+                throw new Error(payload && payload.error ? payload.error : 'Failed to load daily P&L data.');
+            }
+
+            var pnlByDate = {};
+            payload.days.forEach(function(day) {
+                if (!day || typeof day.date !== 'string') return;
+                pnlByDate[day.date] = {
+                    pnl_eur: toFiniteNumber(day.pnl_eur)
+                };
+            });
+
+            latestDailyPnlByDate = pnlByDate;
+            latestDailyPnlRequestKey = requestKey;
+        } catch (error) {
+            latestDailyPnlByDate = {};
+            latestDailyPnlRequestKey = requestKey;
+            console.warn('Daily P&L refresh failed:', error);
+        }
+    }
+
     function renderMobileTotalsTable() {
         var container = document.querySelector('.energy-graph-mobile-daily-table');
         if (!container) return;
@@ -580,7 +655,7 @@
             renderMobileHourlyTable(container, rows);
         } else {
             container.classList.remove('energy-graph-mobile-totals-table--hourly');
-            renderMobileDailyTable(latestWhPerDay, latestBaseWh);
+            renderMobileDailyTable(latestWhPerDay, latestBaseWh, latestDailyPnlByDate);
         }
     }
 
@@ -657,11 +732,11 @@
         container.innerHTML = html;
     }
 
-    function renderMobileDailyTable(whPerDay, baseWh) {
+    function renderMobileDailyTable(whPerDay, baseWh, pnlByDate) {
         var container = document.querySelector('.energy-graph-mobile-daily-table');
         if (!container) return;
         baseWh = baseWh || 5760;
-        var dates = Object.keys(whPerDay || {}).sort().reverse();
+        var dates = getVisibleDailyTotalDates(whPerDay);
         if (dates.length === 0) {
             container.innerHTML = '<p class="energy-graph-mobile-no-data">No data</p>';
             return;
@@ -669,9 +744,9 @@
         var today = new Date().toISOString().slice(0, 10);
         var dayNames = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'];
         var html = '<table><colgroup><col class="col-date"><col class="col-day">' +
-            '<col class="col-wh"><col class="col-wh"><col class="col-pct"><col class="col-pct"><col class="col-pct"><col class="col-fill"></colgroup>' +
+            '<col class="col-wh"><col class="col-wh"><col class="col-pct"><col class="col-pnl"><col class="col-fill"></colgroup>' +
             '<thead><tr><th>Date</th><th>Day</th><th>Wh+</th><th>Wh-</th>' +
-            '<th title="% of ' + (baseWh / 1000).toFixed(2) + ' kWh (net)">%</th></tr></thead><tbody>';
+            '<th title="% of ' + (baseWh / 1000).toFixed(2) + ' kWh (net)">%</th><th title="P&L (EUR, main price)">P&amp;L</th></tr></thead><tbody>';
         for (var i = 0; i < dates.length; i++) {
             var date = dates[i];
             var tot = whPerDay[date];
@@ -679,13 +754,17 @@
             var neg = tot.neg != null ? Number(tot.neg) : 0;
             var net = pos + neg;
             var pctNet = ((net / baseWh) * 100).toFixed(1);
+            var pnlValue = pnlByDate && pnlByDate[date] ? pnlByDate[date].pnl_eur : null;
+            var pnlText = formatDailyPnlValue(pnlValue);
+            var pnlClass = dailyPnlCellClass(pnlValue);
             var d = new Date(date + 'T12:00:00');
             var day = dayNames[d.getDay()];
             var rowClass = date === today ? ' class="row-current"' : '';
             html += '<tr' + rowClass + '><td>' + escapeHtml(date) + '</td><td>' + escapeHtml(day) + '</td>' +
                 '<td class="wh-pos">+' + Math.round(pos).toLocaleString() + '</td>' +
                 '<td class="wh-neg">' + Math.round(neg).toLocaleString() + '</td>' +
-                '<td>' + pctNet + '%</td></tr>';
+                '<td>' + pctNet + '%</td>' +
+                '<td' + (pnlClass ? ' class="' + pnlClass + '"' : '') + ' title="' + escapeHtml(pnlText === '--' ? '--' : ('EUR ' + pnlText)) + '">' + escapeHtml(pnlText) + '</td></tr>';
         }
         html += '</tbody></table>';
         container.innerHTML = html;
@@ -715,6 +794,8 @@
                     selectedMobileDay = getDefaultMobileDay();
                 }
             }
+
+            await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay));
 
             var cdMobile = buildChartDataMobile(filterWhPerHourByDay(latestWhPerHour, selectedMobileDay));
             ensureMobileChartExists();
