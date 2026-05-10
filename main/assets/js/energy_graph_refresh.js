@@ -608,7 +608,8 @@
         return numericValue > 0 ? 'wh-pos' : 'wh-neg';
     }
 
-    async function ensureDailyPnlForDates(dates) {
+    async function ensureDailyPnlForDates(dates, options) {
+        options = options || {};
         if (!Array.isArray(dates) || dates.length === 0) {
             latestDailyPnlByDate = {};
             latestDailyPnlRequestKey = '';
@@ -622,7 +623,7 @@
 
         var newestDate = dates[0];
         var requestKey = newestDate + '|' + dates.join(',');
-        if (requestKey === latestDailyPnlRequestKey) {
+        if (!options.forceRefresh && requestKey === latestDailyPnlRequestKey) {
             return;
         }
 
@@ -630,7 +631,10 @@
             var url = new URL(DAILY_PNL_API_URL, window.location.href);
             url.searchParams.set('date', newestDate);
             url.searchParams.set('n', String(DAILY_TOTALS_PNL_DAY_COUNT));
-            var response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            var response = await fetch(url.toString(), {
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json' }
+            });
             var payload = await response.json();
             if (!response.ok || !payload || payload.success !== true || !Array.isArray(payload.days)) {
                 throw new Error(payload && payload.error ? payload.error : 'Failed to load daily P&L data.');
@@ -802,7 +806,7 @@
                 }
             }
 
-            await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay));
+            await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay), { forceRefresh: true });
 
             var cdMobile = buildChartDataMobile(filterWhPerHourByDay(latestWhPerHour, selectedMobileDay));
             ensureMobileChartExists();

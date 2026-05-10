@@ -23,7 +23,9 @@ def test_mobile_energy_graph_daily_totals_use_pnl_api_column():
     assert "var DAILY_PNL_API_URL = typeof DAILY_TOTALS_PNL_API_URL !== 'undefined'" in energy_graph_js
     assert "var DAILY_TOTALS_PNL_DAY_COUNT = 4;" in energy_graph_js
     assert "url.searchParams.set('n', String(DAILY_TOTALS_PNL_DAY_COUNT));" in energy_graph_js
-    assert "await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay));" in energy_graph_js
+    assert "await ensureDailyPnlForDates(getVisibleDailyTotalDates(latestWhPerDay), { forceRefresh: true });" in energy_graph_js
+    assert "if (!options.forceRefresh && requestKey === latestDailyPnlRequestKey)" in energy_graph_js
+    assert "cache: 'no-store'" in energy_graph_js
     assert '<th title="P&L (EUR, main price)">P&amp;L</th>' in energy_graph_js
     assert "pnlByDate && pnlByDate[date] ? pnlByDate[date].pnl_eur : null" in energy_graph_js
     assert "function formatDailyTableDateLabel(date)" in energy_graph_js
