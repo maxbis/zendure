@@ -112,7 +112,7 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                 <div class="summary-label">P&amp;L</div>
                 <div class="summary-value" data-role="pnl-total">--</div>
                 <div class="summary-secondary summary-secondary--pnl" data-role="pnl-spot-total">--</div>
-                <div class="summary-subtle">Charge costs - savings + net cost</div>
+                <div class="summary-subtle">Savings - charge costs - net cost</div>
             </article>
         </section>
 
