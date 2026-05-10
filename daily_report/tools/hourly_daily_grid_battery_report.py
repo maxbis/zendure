@@ -55,6 +55,7 @@ DEFAULT_TABLE = "status_updates"
 DEFAULT_TIMEZONE = "Europe/Amsterdam"
 EVENT_TYPE_CHANGE = "change"
 BOUNDARY_FALLBACK_MAX_SECONDS = 3600
+COUNTER_DELTA_EPSILON_WH = 1e-9
 
 # This file lives in daily_report/tools/; canonical paths for data and repo assets.
 DAILY_REPORT_TOOLS_DIR = Path(__file__).resolve().parent
@@ -334,6 +335,22 @@ def _build_samples(rows: Iterable[StatusRow], attr: str) -> list[NumericSample]:
     return [NumericSample(ts=ts, value=latest_by_ts[ts]) for ts in sorted(latest_by_ts)]
 
 
+def _normalize_monotonic_counter_samples(samples: list[NumericSample]) -> list[NumericSample]:
+    normalized: list[NumericSample] = []
+    offset = 0.0
+    last_value: float | None = None
+
+    for sample in samples:
+        adjusted_value = sample.value + offset
+        if last_value is not None and adjusted_value < last_value:
+            offset += last_value - adjusted_value
+            adjusted_value = sample.value + offset
+        normalized.append(NumericSample(ts=sample.ts, value=adjusted_value))
+        last_value = adjusted_value
+
+    return normalized
+
+
 def _find_before_after(samples: list[NumericSample], target_ts: int) -> tuple[NumericSample | None, NumericSample | None]:
     before: NumericSample | None = None
     after: NumericSample | None = None
@@ -422,6 +439,18 @@ def _integrate_power_window(
     return charged_wh, discharged_wh
 
 
+def _compute_counter_delta_wh(start_value: float | None, end_value: float | None) -> float | None:
+    if start_value is None or end_value is None:
+        return None
+
+    delta_wh = (end_value - start_value) / 100.0
+    if delta_wh < 0.0 and abs(delta_wh) <= COUNTER_DELTA_EPSILON_WH:
+        return 0.0
+    if delta_wh < 0.0:
+        return 0.0
+    return delta_wh
+
+
 def build_daily_report(
     rows: list[StatusRow],
     *,
@@ -439,8 +468,8 @@ def build_daily_report(
     is_partial_day = effective_end_ts < day_end_ts
 
     battery_samples = _build_samples(rows, "electric_level")
-    grid_from_samples = _build_samples(rows, "total_act_x100")
-    grid_to_samples = _build_samples(rows, "total_act_ret_x100")
+    grid_from_samples = _normalize_monotonic_counter_samples(_build_samples(rows, "total_act_x100"))
+    grid_to_samples = _normalize_monotonic_counter_samples(_build_samples(rows, "total_act_ret_x100"))
     power_points = _change_points(rows, effective_end_ts)
 
     hours: list[dict[str, Any]] = []
@@ -512,8 +541,7 @@ def build_daily_report(
             grid_from_end = interpolate_boundary_value(
                 grid_from_samples, effective_bucket_end_ts, fallback_seconds=fallback_seconds
             )
-            if grid_from_start is not None and grid_from_end is not None:
-                grid_from_wh = (grid_from_end - grid_from_start) / 100.0
+            grid_from_wh = _compute_counter_delta_wh(grid_from_start, grid_from_end)
 
             grid_to_start = interpolate_boundary_value(
                 grid_to_samples, bucket_start_ts, fallback_seconds=fallback_seconds
@@ -521,8 +549,7 @@ def build_daily_report(
             grid_to_end = interpolate_boundary_value(
                 grid_to_samples, effective_bucket_end_ts, fallback_seconds=fallback_seconds
             )
-            if grid_to_start is not None and grid_to_end is not None:
-                grid_to_wh = (grid_to_end - grid_to_start) / 100.0
+            grid_to_wh = _compute_counter_delta_wh(grid_to_start, grid_to_end)
 
             total_charged += charged_wh
             total_discharged += discharged_wh

@@ -82,6 +82,36 @@ def test_interpolate_boundary_value_exact_linear_and_one_sided():
     assert report.interpolate_boundary_value(samples, 260, fallback_seconds=50) is None
 
 
+def test_normalize_monotonic_counter_samples_stitches_resets():
+    samples = [
+        report.NumericSample(ts=0, value=100.0),
+        report.NumericSample(ts=1, value=110.0),
+        report.NumericSample(ts=2, value=120.0),
+        report.NumericSample(ts=3, value=0.0),
+        report.NumericSample(ts=4, value=10.0),
+        report.NumericSample(ts=5, value=20.0),
+    ]
+
+    normalized = report._normalize_monotonic_counter_samples(samples)
+
+    assert [sample.value for sample in normalized] == pytest.approx([100.0, 110.0, 120.0, 120.0, 130.0, 140.0])
+
+
+def test_normalize_monotonic_counter_samples_stitches_multiple_resets():
+    samples = [
+        report.NumericSample(ts=0, value=100.0),
+        report.NumericSample(ts=1, value=110.0),
+        report.NumericSample(ts=2, value=5.0),
+        report.NumericSample(ts=3, value=15.0),
+        report.NumericSample(ts=4, value=0.0),
+        report.NumericSample(ts=5, value=10.0),
+    ]
+
+    normalized = report._normalize_monotonic_counter_samples(samples)
+
+    assert [sample.value for sample in normalized] == pytest.approx([100.0, 110.0, 110.0, 120.0, 120.0, 130.0])
+
+
 def test_build_daily_report_full_day_metrics_and_totals():
     day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
     rows = [
@@ -347,6 +377,68 @@ def test_build_daily_report_missing_price_file_keeps_costs_null():
     assert report_data["totals"]["net_cost"] is None
     assert report_data["totals"]["savings_eur"] is None
     assert report_data["totals"]["charge_cost_eur"] is None
+
+
+def test_build_daily_report_stitches_grid_import_counter_reset():
+    day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
+    rows = [
+        _row(1, "change", _ts(2025, 1, 1, 0, 0), new_value="0", electric_level=50, total_act_x100=10000, total_act_ret_x100=5000),
+        _row(2, "Rescan", _ts(2025, 1, 1, 0, 20), electric_level=50, total_act_x100=11000, total_act_ret_x100=5000),
+        _row(3, "Rescan", _ts(2025, 1, 1, 0, 40), electric_level=50, total_act_x100=12000, total_act_ret_x100=5000),
+        _row(4, "Rescan", _ts(2025, 1, 1, 0, 45), electric_level=50, total_act_x100=0, total_act_ret_x100=5000),
+        _row(5, "Rescan", _ts(2025, 1, 1, 0, 50), electric_level=50, total_act_x100=1000, total_act_ret_x100=5000),
+        _row(6, "Rescan", _ts(2025, 1, 1, 1, 0), electric_level=50, total_act_x100=2000, total_act_ret_x100=5000),
+    ]
+
+    report_data = report.build_daily_report(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 1, 1, 0),
+        tz=TZ,
+        prices_by_hour=_price_map(**{"00": 0.25}),
+        price_file_path=Path("D:/fake/price20250101.json"),
+        price_file_found=True,
+    )
+
+    hour00 = report_data["hours"][0]
+
+    assert hour00["grid_from_wh"] == pytest.approx(40.0)
+    assert hour00["grid_from_cost"] == pytest.approx(0.01)
+    assert hour00["grid_to_wh"] == pytest.approx(0.0)
+    assert hour00["net_cost"] == pytest.approx(0.01)
+    assert report_data["totals"]["grid_from_wh"] == pytest.approx(40.0)
+    assert report_data["totals"]["net_cost"] == pytest.approx(0.01)
+
+
+def test_build_daily_report_stitches_grid_export_counter_reset():
+    day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
+    rows = [
+        _row(1, "change", _ts(2025, 1, 1, 0, 0), new_value="0", electric_level=50, total_act_x100=10000, total_act_ret_x100=5000),
+        _row(2, "Rescan", _ts(2025, 1, 1, 0, 20), electric_level=50, total_act_x100=10000, total_act_ret_x100=6000),
+        _row(3, "Rescan", _ts(2025, 1, 1, 0, 40), electric_level=50, total_act_x100=10000, total_act_ret_x100=7000),
+        _row(4, "Rescan", _ts(2025, 1, 1, 0, 45), electric_level=50, total_act_x100=10000, total_act_ret_x100=0),
+        _row(5, "Rescan", _ts(2025, 1, 1, 0, 50), electric_level=50, total_act_x100=10000, total_act_ret_x100=500),
+        _row(6, "Rescan", _ts(2025, 1, 1, 1, 0), electric_level=50, total_act_x100=10000, total_act_ret_x100=1000),
+    ]
+
+    report_data = report.build_daily_report(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 1, 1, 0),
+        tz=TZ,
+        prices_by_hour=_price_map(**{"00": 0.25}),
+        price_file_path=Path("D:/fake/price20250101.json"),
+        price_file_found=True,
+    )
+
+    hour00 = report_data["hours"][0]
+
+    assert hour00["grid_from_wh"] == pytest.approx(0.0)
+    assert hour00["grid_to_wh"] == pytest.approx(30.0)
+    assert hour00["grid_to_cost"] == pytest.approx(-0.0075)
+    assert hour00["net_cost"] == pytest.approx(-0.0075)
+    assert report_data["totals"]["grid_to_wh"] == pytest.approx(30.0)
+    assert report_data["totals"]["net_cost"] == pytest.approx(-0.0075)
 
 
 def test_build_daily_report_falls_back_to_observed_electric_level_within_hour():
