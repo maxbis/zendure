@@ -27,7 +27,7 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
         <section class="hero-card">
             <div class="hero-copy">
                 <p class="eyebrow">Prototype</p>
-                <h1>Daily Report</h1>
+                <h1><a class="hero-title-link" href="./">Daily Report</a></h1>
                 <p class="hero-text">
                     A read-only day view for battery, grid, and cost behavior. It shows saved hourly report data,
                     today-so-far by default, with one independent page and no runtime dependency on PathLab assets.
