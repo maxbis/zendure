@@ -323,11 +323,11 @@ function savePriceFile(string $dateStr, array $prices): string|false {
 }
 
 /**
- * Fetch ENTSO-E for one NL date, save to price file, return hour map.
+ * Fetch ENTSO-E for one NL date and return the available hour map.
  *
  * @return array<string, float>|null Hour "00"-"23" => consumer price, or null on failure
  */
-function fetchEntsoeForDate(string $dateStr): ?array {
+function fetchEntsoeHourPricesForDate(string $dateStr, bool $saveToFile = true, bool $requireComplete = true): ?array {
     $url = buildEntsoeUrlForDate($dateStr);
     if ($url === null) {
         return null;
@@ -344,13 +344,27 @@ function fetchEntsoeForDate(string $dateStr): ?array {
     $dateYmd = substr($dateStr, 0, 4) . '-' . substr($dateStr, 4, 2) . '-' . substr($dateStr, 6, 2);
     $hourPrices = $byDate[$dateYmd] ?? null;
     $hourPrices = normalizeSpringDstHourMap($hourPrices, $dateYmd);
-    if ($hourPrices === null || count($hourPrices) < 24) {
+    if ($hourPrices === null || empty($hourPrices)) {
         return null;
     }
-    if (savePriceFile($dateStr, $hourPrices) === false) {
+    if ($requireComplete && count($hourPrices) < 24) {
         return null;
+    }
+    if ($saveToFile && count($hourPrices) >= 24) {
+        if (savePriceFile($dateStr, $hourPrices) === false) {
+            return null;
+        }
     }
     return $hourPrices;
+}
+
+/**
+ * Fetch ENTSO-E for one NL date, save to price file, return complete hour map.
+ *
+ * @return array<string, float>|null Hour "00"-"23" => consumer price, or null on failure
+ */
+function fetchEntsoeForDate(string $dateStr): ?array {
+    return fetchEntsoeHourPricesForDate($dateStr, true, true);
 }
 
 /**
@@ -396,5 +410,12 @@ function getPriceData(): array {
     ];
 }
 
-$result = getPriceData();
-sendJsonResponse($result, 200);
+function shouldRunGetPricesV6Entrypoint(): bool {
+    $script = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    return is_string($script) && $script !== '' && realpath($script) === __FILE__;
+}
+
+if (shouldRunGetPricesV6Entrypoint()) {
+    $result = getPriceData();
+    sendJsonResponse($result, 200);
+}

@@ -109,5 +109,5 @@ function requestValue(string $key, string $requestMethod)
 
 function canRegenerateSource(string $source): bool
 {
-    return in_array($source, ['generated_on_demand', 'regenerated_today', 'regenerated_manual'], true);
+    return in_array($source, ['saved', 'generated_on_demand', 'regenerated_today', 'regenerated_manual'], true);
 }

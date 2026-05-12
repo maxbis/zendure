@@ -29,6 +29,7 @@
         gridFrom: cssColor('--accent-grid-from', '#8fb8c9'),
         gridTo: cssColor('--accent-grid-to', '#ffd166'),
         cost: cssColor('--accent-cost', '#7e89ff'),
+        batteryLevel: cssColor('--accent-battery-level', '#ffdf5d'),
         guide: cssColor('--chart-guide', 'rgba(127, 147, 139, 0.5)'),
         textSoft: cssColor('--text-soft', '#a7bbb3'),
         textMuted: cssColor('--text-muted', '#7f938b'),
@@ -485,6 +486,7 @@
         const costAxis = [];
         const sharedGuides = [];
         const costPoints = [];
+        const batteryLevelPoints = [];
         const labels = [];
         const bars = [];
         const energyScaleHeight = plotHeight / 2;
@@ -544,6 +546,12 @@
                 costPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${costY.toFixed(2)}`);
             }
 
+            const batteryLevel = toFiniteNumber(row.battery_pct_end) ?? toFiniteNumber(row.battery_pct_start);
+            if (Number.isFinite(batteryLevel)) {
+                const batteryY = margin.top + plotHeight - ((clamp(batteryLevel, 0, 100) / 100) * plotHeight);
+                batteryLevelPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${batteryY.toFixed(2)}`);
+            }
+
             labels.push(`<text x="${(xBase + groupWidth / 2).toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour)}</text>`);
         });
 
@@ -557,6 +565,9 @@
             <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
             ${bars.join('')}
             ${costPoints.length > 1 ? `<polyline points="${costPoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+            ${batteryLevelPoints.length > 1 ? `<polyline points="${batteryLevelPoints.join(' ')}" fill="none" stroke="${palette.batteryLevel}" stroke-width="1" stroke-dasharray="7 5" stroke-linecap="round" stroke-linejoin="round"><title>Electric level</title></polyline>` : ''}
+            <text x="${(margin.left + plotWidth - 8).toFixed(2)}" y="${(margin.top + 12).toFixed(2)}" fill="${palette.batteryLevel}" font-size="10" text-anchor="end">100%</text>
+            <text x="${(margin.left + plotWidth - 8).toFixed(2)}" y="${(margin.top + plotHeight - 4).toFixed(2)}" fill="${palette.batteryLevel}" font-size="10" text-anchor="end">0%</text>
             ${labels.join('')}
             <text x="${margin.left}" y="${(margin.top - 6).toFixed(2)}" fill="${palette.textSoft}" font-size="12">Above baseline: charge/import | below baseline: discharge/export</text>
             <text x="${margin.left}" y="${(height - 44).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="start">Energy scale</text>

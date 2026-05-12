@@ -230,6 +230,7 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
    - Build **price context** from price file:
      - `min_price`, `max_price`, `spread_price`, `min_price_hour`, `max_price_hour`, `max_price_hour_am`, `max_price_hour_pm`
      - `ranking_by_hour` — map `hour → rank`
+   - Note: this resolver still uses JSON price files. The daily report price path is separate and uses MariaDB `price_ticks`.
    - Build **sun context** (from `main/config/config.json` lat/lon, defaulting to Amsterdam):
      - `sunrise_hour`, `sunset_hour`, `sunrise_time`, `sunset_time`
 4. For each hour 0–23:

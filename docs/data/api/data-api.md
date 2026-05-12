@@ -11,6 +11,7 @@ The `type` parameter in the query string determines which file or logic is acces
 ### 1. Price Data (`type=price`)
 * **Filename Pattern:** `priceYYYYMMDD.json` (e.g., `price20241222.json`)
 * **Storage Location:** `main/data/price/YYYYMM/priceYYYYMMDD.json` (organized by year-month)
+* **Note:** These JSON files remain the compatibility/cache layer for the price UI and schedule resolver. Daily reports read prices from MariaDB table `price_ticks`; see `docs/prices/price-ticks.md`.
 * **Operations:**
     * `GET`: Read prices for a specific date (requires `&date=YYYYMMDD`).
     * `POST`: Write/Update prices for a specific date.

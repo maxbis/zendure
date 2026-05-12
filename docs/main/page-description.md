@@ -54,6 +54,7 @@ The Charge Schedule Manager (`charge_schedule_mobile.php`) is a comprehensive da
 - Fetched client-side by `price_overview_bar.js`
 - Price files stored in `/main/data/price/YYYYMM/priceYYYYMMDD.json` format (organized by year-month)
 - Retrieved via `main/data/api/data_api.php?type=price&date=YYYYMMDD`
+- Note: daily reports use MariaDB `price_ticks` instead of these JSON files.
 
 ---
 

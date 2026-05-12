@@ -347,6 +347,21 @@ def test_load_price_map_for_day_missing_file_returns_unavailable():
         shutil.rmtree(price_root.parent, ignore_errors=True)
 
 
+def test_price_rows_to_hour_map_keeps_missing_hours_null():
+    prices_by_hour, loaded = report._price_rows_to_hour_map([
+        {"local_hour": 0, "consumer_eur_per_kwh": "0.25"},
+        {"local_hour": "1", "consumer_eur_per_kwh": 0.30},
+        {"local_hour": 25, "consumer_eur_per_kwh": 0.40},
+        {"local_hour": 2, "consumer_eur_per_kwh": "bad"},
+    ])
+
+    assert loaded == 2
+    assert prices_by_hour["00"] == pytest.approx(0.25)
+    assert prices_by_hour["01"] == pytest.approx(0.30)
+    assert prices_by_hour["02"] is None
+    assert prices_by_hour["23"] is None
+
+
 def test_build_daily_report_missing_price_file_keeps_costs_null():
     day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
     rows = [

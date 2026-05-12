@@ -202,7 +202,7 @@ def test_price_popup_uses_shared_js_helper():
     assert page_php.index("assets/js/price_conversion.js") < page_php.index("assets/js/price_overview_bar.js")
 
 
-def test_daily_report_api_get_saved_report_disables_regenerate(tmp_path: Path):
+def test_daily_report_api_get_saved_report_enables_regenerate(tmp_path: Path):
     data_dir = tmp_path / "daily-report-data"
     report_path = data_dir / "202604" / "daily_report_20260416.json"
     _write_daily_report_fixture(report_path, "2026-04-16")
@@ -218,7 +218,7 @@ def test_daily_report_api_get_saved_report_disables_regenerate(tmp_path: Path):
     assert payload["success"] is True
     assert payload["requestedDate"] == "2026-04-16"
     assert payload["source"] == "saved"
-    assert payload["canRegenerate"] is False
+    assert payload["canRegenerate"] is True
     assert payload["savedAt"]
     assert payload["report"]["date"] == "2026-04-16"
 

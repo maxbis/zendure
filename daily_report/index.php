@@ -128,6 +128,7 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                     <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
                     <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
                     <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
+                    <span><i class="legend-swatch legend-swatch--battery-level"></i>Electric level</span>
                 </div>
             </div>
             <div class="chart-status" data-role="chart-status">Loading report...</div>

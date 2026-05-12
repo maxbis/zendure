@@ -52,6 +52,7 @@ DEFAULT_USER = os.getenv("MARIADB_USER", "root")
 DEFAULT_PASSWORD = os.getenv("MARIADB_PASSWORD", "")
 DEFAULT_DATABASE = os.getenv("MARIADB_DATABASE", "sqlite_replication")
 DEFAULT_TABLE = "status_updates"
+DEFAULT_PRICE_TABLE = "price_ticks"
 DEFAULT_TIMEZONE = "Europe/Amsterdam"
 EVENT_TYPE_CHANGE = "change"
 BOUNDARY_FALLBACK_MAX_SECONDS = 3600
@@ -109,6 +110,11 @@ def parse_args() -> argparse.Namespace:
         "--table",
         default=DEFAULT_TABLE,
         help=f"Source table (default: {DEFAULT_TABLE})",
+    )
+    parser.add_argument(
+        "--price-table",
+        default=DEFAULT_PRICE_TABLE,
+        help=f"Price tick table (default: {DEFAULT_PRICE_TABLE})",
     )
     parser.add_argument(
         "--timezone",
@@ -232,6 +238,66 @@ def load_price_map_for_day(
         hour_key = f"{hour:02d}"
         prices_by_hour[hour_key] = _parse_numeric_value(payload.get(hour_key))
     return prices_by_hour, price_path, True
+
+
+def _price_rows_to_hour_map(rows: Iterable[dict[str, Any]]) -> tuple[dict[str, float | None], int]:
+    prices_by_hour: dict[str, float | None] = {f"{hour:02d}": None for hour in range(24)}
+    loaded = 0
+    for row in rows:
+        hour = row.get("local_hour")
+        price = _parse_numeric_value(row.get("consumer_eur_per_kwh"))
+        if price is None:
+            continue
+        try:
+            hour_int = int(hour)
+        except (TypeError, ValueError):
+            continue
+        if hour_int < 0 or hour_int > 23:
+            continue
+        hour_key = f"{hour_int:02d}"
+        if prices_by_hour[hour_key] is None:
+            loaded += 1
+        prices_by_hour[hour_key] = price
+    return prices_by_hour, loaded
+
+
+def load_price_map_for_day_from_db(
+    *,
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    database: str,
+    table: str,
+    target_day_start: datetime,
+) -> tuple[dict[str, float | None] | None, bool, int]:
+    quoted_table = _quote_identifier(table)
+    local_date = target_day_start.strftime("%Y-%m-%d")
+    sql = (
+        f"SELECT local_hour, consumer_eur_per_kwh "
+        f"FROM {quoted_table} "
+        f"WHERE local_date = %s "
+        f"ORDER BY local_hour ASC"
+    )
+
+    connection = pymysql.connect(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=database,
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True,
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, (local_date,))
+            prices_by_hour, loaded = _price_rows_to_hour_map(cursor.fetchall())
+    finally:
+        connection.close()
+
+    return (prices_by_hour if loaded > 0 else None), loaded > 0, loaded
 
 
 def fetch_status_rows(
@@ -461,6 +527,7 @@ def build_daily_report(
     prices_by_hour: dict[str, float | None] | None = None,
     price_file_path: Path | None = None,
     price_file_found: bool | None = None,
+    price_source: str | None = None,
 ) -> dict[str, Any]:
     day_start_ts = _dt_to_ts(target_day_start)
     day_end_ts = _dt_to_ts(target_day_start + timedelta(days=1))
@@ -621,6 +688,7 @@ def build_daily_report(
         "is_partial_day": is_partial_day,
         "price_file_found": price_file_found,
         "price_file_path": str(price_file_path) if price_file_path is not None else None,
+        "price_source": price_source,
         "price_hours_available": price_hours_available,
         "hours": hours,
         "totals": {
@@ -649,7 +717,15 @@ def main() -> int:
     fetch_end_ts = max(analysis_end_ts, day_start_ts)
 
     try:
-        prices_by_hour, price_file_path, price_file_found = load_price_map_for_day(target_day_start)
+        prices_by_hour, price_file_found, _price_rows_loaded = load_price_map_for_day_from_db(
+            host=args.host,
+            port=args.port,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            table=args.price_table,
+            target_day_start=target_day_start,
+        )
         rows = fetch_status_rows(
             host=args.host,
             port=args.port,
@@ -667,8 +743,9 @@ def main() -> int:
             tz=tz,
             fallback_seconds=args.fallback_seconds,
             prices_by_hour=prices_by_hour,
-            price_file_path=price_file_path,
+            price_file_path=None,
             price_file_found=price_file_found,
+            price_source="db:price_ticks",
         )
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)

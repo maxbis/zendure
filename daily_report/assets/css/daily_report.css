@@ -12,6 +12,7 @@
     --accent-grid-from: #8fb8c9;
     --accent-grid-to: #ffd166;
     --accent-cost: #7e89ff;
+    --accent-battery-level: #ffdf5d;
     --badge-positive: #4bc27f;
     --badge-negative: #f77f5f;
     --badge-neutral: #8fb8c9;
@@ -393,6 +394,13 @@ body {
     height: 0;
     border-top: 3px solid var(--accent-cost);
     border-radius: 999px;
+    background: transparent;
+}
+.legend-swatch--battery-level {
+    width: 18px;
+    height: 0;
+    border-top: 3px dashed var(--accent-battery-level);
+    border-radius: 0;
     background: transparent;
 }
 

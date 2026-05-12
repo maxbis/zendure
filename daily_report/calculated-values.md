@@ -7,12 +7,15 @@ This file explains how the summary boxes in `/daily_report` are calculated.
 - The base hourly values are generated in `daily_report/tools/hourly_daily_grid_battery_report.py`.
 - The summary cards are filled in `daily_report/assets/js/daily_report.js`.
 - The second-line `Spot ...` values are not stored in the JSON report totals. They are recalculated in the frontend from the hourly rows.
+- Hourly prices are loaded from MariaDB table `price_ticks` in the `sqlite_replication` database. The daily report does not fall back to `main/data/price` JSON files.
 
 ## Price definitions
 
 ### Consumer price
 
-`price_eur_per_kwh` is the normal hourly consumer price from the daily price file.
+`price_eur_per_kwh` is the normal hourly consumer price from `price_ticks.consumer_eur_per_kwh`.
+
+If a DB row is missing for an hour, `price_eur_per_kwh` is `null` for that hour. Cost values that depend on price are also `null`.
 
 ### Spot price
 
@@ -149,3 +152,14 @@ Important: in the current implementation, `spot_pnl` still uses the normal `savi
 - Generator totals are summed using raw float values and then rounded when written to the report JSON.
 - The stored totals use 4 decimals for euro values.
 - The frontend also formats the displayed box values to 4 decimals with the `EUR` prefix.
+
+## Price maintenance
+
+The price table is maintained by:
+
+```text
+main/prices/update_price_ticks.php
+main/prices/backfill_price_ticks.php
+```
+
+See `docs/prices/price-ticks.md` for schema, cron, and backfill details.
