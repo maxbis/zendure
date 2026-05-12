@@ -27,7 +27,7 @@ The ENTSO-E API requires a security token in `main/prices/config.json`, which is
 }
 ```
 
-The price tick updater/backfill scripts also use MariaDB environment variables, defaulting to the existing daily-report database:
+The price tick updater/backfill scripts load `daily_report/.env` automatically when it exists. They use these MariaDB environment variables, defaulting to the existing daily-report database:
 
 ```text
 MARIADB_HOST=127.0.0.1

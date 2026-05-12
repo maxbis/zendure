@@ -48,7 +48,7 @@ error_text TEXT NULL
 
 ## Configuration
 
-Both scripts use the same MariaDB environment variables as the daily report generator:
+Both scripts load `daily_report/.env` automatically when it exists, then use the same MariaDB environment variables as the daily report generator:
 
 ```text
 MARIADB_HOST=127.0.0.1

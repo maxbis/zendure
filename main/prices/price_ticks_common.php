@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/price_conversion.php';
+$dailyReportEnvLoader = dirname(__DIR__, 2) . '/daily_report/load_env.php';
+if (is_readable($dailyReportEnvLoader)) {
+    require_once $dailyReportEnvLoader;
+    if (function_exists('daily_report_bootstrap_env')) {
+        daily_report_bootstrap_env();
+    }
+}
 
 const PRICE_TICKS_SOURCE_ENTSOE_V6 = 'entsoe_v6';
 const PRICE_TICKS_SOURCE_JSON = 'json';
