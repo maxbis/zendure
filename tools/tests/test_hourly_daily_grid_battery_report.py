@@ -9,6 +9,7 @@ import sqlite3
 import sys
 import shutil
 import uuid
+from types import SimpleNamespace
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -25,6 +26,7 @@ for _tools_path in (DAILY_REPORT_TOOLS_DIR, LEGACY_TOOLS_DIR):
         sys.path.insert(0, str(_tools_path))
 
 import hourly_daily_grid_battery_report as report  # type: ignore
+import update_hourly_report_inputs as hourly_inputs  # type: ignore
 import wh_per_hour_queries as whq  # type: ignore
 
 
@@ -189,6 +191,66 @@ def test_build_daily_report_full_day_metrics_and_totals():
     assert report_data["totals"]["charge_cost_eur"] == pytest.approx(0.06)
 
 
+def test_hourly_report_inputs_match_daily_report_hourly_metrics():
+    day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
+    rows = [
+        _row(1, "change", _ts(2025, 1, 1, 0, 0), new_value="600", electric_level=50, total_act_x100=100000, total_act_ret_x100=50000),
+        _row(2, "Rescan", _ts(2025, 1, 1, 1, 30), electric_level=62, total_act_x100=101500, total_act_ret_x100=50300),
+        _row(3, "change", _ts(2025, 1, 1, 0, 30), new_value="0"),
+        _row(4, "change", _ts(2025, 1, 1, 1, 15), new_value="-300"),
+        _row(5, "change", _ts(2025, 1, 1, 2, 0), new_value="0", electric_level=58, total_act_x100=102100, total_act_ret_x100=50600),
+        _row(6, "Rescan", _ts(2025, 1, 2, 0, 0), electric_level=58, total_act_x100=102100, total_act_ret_x100=50600),
+    ]
+
+    report_data = report.build_daily_report(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 2, 0, 0),
+        tz=TZ,
+    )
+    aggregate_rows = hourly_inputs.build_hourly_input_rows(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 2, 0, 0),
+        tz=TZ,
+        prices_by_hour={
+            "00": {
+                "consumer_eur_per_kwh": 0.2,
+                "spot_eur_per_kwh": 0.07,
+                "price_source": "entsoe_v6",
+            },
+            "01": {
+                "consumer_eur_per_kwh": 0.3,
+                "spot_eur_per_kwh": 0.15,
+                "price_source": "entsoe_v6",
+            },
+        },
+        computed_at=datetime(2025, 1, 2, 0, 0, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    for hour in range(3):
+        report_hour = report_data["hours"][hour]
+        aggregate_hour = aggregate_rows[hour]
+        assert aggregate_hour["charged_wh"] == pytest.approx(report_hour["charged_wh"])
+        assert aggregate_hour["discharged_wh"] == pytest.approx(report_hour["discharged_wh"])
+        assert aggregate_hour["battery_pct_start"] == pytest.approx(report_hour["battery_pct_start"])
+        assert aggregate_hour["battery_pct_end"] == pytest.approx(report_hour["battery_pct_end"])
+        assert aggregate_hour["battery_pct_delta"] == pytest.approx(report_hour["battery_pct_delta"])
+        assert aggregate_hour["grid_from_wh"] == pytest.approx(report_hour["grid_from_wh"])
+        assert aggregate_hour["grid_to_wh"] == pytest.approx(report_hour["grid_to_wh"])
+
+    assert aggregate_rows[0]["source_min_id"] == 1
+    assert aggregate_rows[0]["source_max_id"] == 3
+    assert aggregate_rows[0]["source_rows"] == 2
+    assert aggregate_rows[0]["consumer_eur_per_kwh"] == pytest.approx(0.2)
+    assert aggregate_rows[0]["spot_eur_per_kwh"] == pytest.approx(0.07)
+    assert aggregate_rows[0]["price_source"] == "entsoe_v6"
+    assert aggregate_rows[2]["consumer_eur_per_kwh"] is None
+    assert aggregate_rows[2]["spot_eur_per_kwh"] is None
+    assert aggregate_rows[2]["price_source"] is None
+    assert aggregate_rows[23]["source_rows"] == 1
+
+
 def test_build_daily_report_partial_day_future_hours_are_empty():
     day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
     rows = [
@@ -241,6 +303,32 @@ def test_build_daily_report_partial_day_future_hours_are_empty():
     assert report_data["totals"]["net_cost"] == pytest.approx(0.0012)
     assert report_data["totals"]["savings_eur"] == pytest.approx(0.0)
     assert report_data["totals"]["charge_cost_eur"] == pytest.approx(0.06)
+
+
+def test_hourly_report_inputs_partial_day_future_hours_have_null_nullable_values():
+    day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
+    rows = [
+        _row(1, "change", _ts(2025, 1, 1, 0, 0), new_value="600", electric_level=50, total_act_x100=100000, total_act_ret_x100=50000),
+        _row(2, "Rescan", _ts(2025, 1, 1, 0, 30), electric_level=55, total_act_x100=100600, total_act_ret_x100=50020),
+    ]
+
+    aggregate_rows = hourly_inputs.build_hourly_input_rows(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 1, 0, 30),
+        tz=TZ,
+    )
+
+    assert aggregate_rows[0]["charged_wh"] == pytest.approx(300.0)
+    assert aggregate_rows[0]["battery_pct_start"] == pytest.approx(50.0)
+    assert aggregate_rows[0]["battery_pct_end"] == pytest.approx(55.0)
+    assert aggregate_rows[1]["charged_wh"] == 0.0
+    assert aggregate_rows[1]["discharged_wh"] == 0.0
+    assert aggregate_rows[1]["battery_pct_start"] is None
+    assert aggregate_rows[1]["battery_pct_end"] is None
+    assert aggregate_rows[1]["grid_from_wh"] is None
+    assert aggregate_rows[1]["grid_to_wh"] is None
+    assert aggregate_rows[1]["source_rows"] == 0
 
 
 def test_charged_and_discharged_match_existing_wh_query_logic():
@@ -494,3 +582,139 @@ def test_build_saved_report_path_and_save_report_json():
         assert loaded == payload
     finally:
         shutil.rmtree(data_root, ignore_errors=True)
+
+
+class _FakeCursor:
+    def __init__(self, fetch_rows=None):
+        self.executed: list[object] = []
+        self.fetch_rows = fetch_rows or []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def executemany(self, sql, rows):
+        self.executed.append((sql, list(rows)))
+
+    def fetchall(self):
+        return self.fetch_rows
+
+
+class _FakeConnection:
+    def __init__(self, fetch_rows=None):
+        self.cursor_obj = _FakeCursor(fetch_rows)
+
+    def cursor(self):
+        return self.cursor_obj
+
+
+def test_hourly_report_inputs_ddl_contains_expected_unique_key_and_log_table():
+    connection = _FakeConnection()
+
+    hourly_inputs.ensure_tables(connection, "hourly_report_inputs", "hourly_report_inputs_update_log")
+    sql = "\n".join(statement for statement, _params in connection.cursor_obj.executed)
+
+    assert "CREATE TABLE IF NOT EXISTS `hourly_report_inputs`" in sql
+    assert "UNIQUE KEY uq_hourly_report_inputs_hour (local_date, local_hour)" in sql
+    assert "CREATE TABLE IF NOT EXISTS `hourly_report_inputs_update_log`" in sql
+    assert "ADD COLUMN IF NOT EXISTS consumer_eur_per_kwh" in sql
+    assert "ADD COLUMN IF NOT EXISTS spot_eur_per_kwh" in sql
+    assert "ADD COLUMN IF NOT EXISTS price_source" in sql
+
+
+def test_hourly_report_inputs_upsert_is_idempotent_by_date_hour():
+    connection = _FakeConnection()
+    rows = [
+        {
+            "local_date": "2025-01-01",
+            "local_hour": 0,
+            "hour_start_ts": 1,
+            "hour_end_ts": 2,
+            "charged_wh": 1.0,
+            "discharged_wh": 0.0,
+            "battery_pct_start": 50.0,
+            "battery_pct_end": 51.0,
+            "battery_pct_delta": 1.0,
+            "grid_from_wh": 2.0,
+            "grid_to_wh": 0.0,
+            "consumer_eur_per_kwh": 0.25,
+            "spot_eur_per_kwh": 0.11,
+            "price_source": "entsoe_v6",
+            "source_min_id": 10,
+            "source_max_id": 11,
+            "source_rows": 2,
+            "computed_at": "2025-01-02 00:00:00",
+        }
+    ]
+
+    upserted = hourly_inputs.upsert_hourly_rows(connection, "hourly_report_inputs", rows)
+    sql, bound_rows = connection.cursor_obj.executed[0]
+
+    assert upserted == 1
+    assert "ON DUPLICATE KEY UPDATE" in sql
+    assert "local_date, local_hour" in sql
+    assert "consumer_eur_per_kwh = VALUES(consumer_eur_per_kwh)" in sql
+    assert "spot_eur_per_kwh = VALUES(spot_eur_per_kwh)" in sql
+    assert "price_source = VALUES(price_source)" in sql
+    assert bound_rows == rows
+
+
+def test_hourly_report_inputs_loads_prices_from_price_ticks():
+    connection = _FakeConnection([
+        {
+            "local_hour": 0,
+            "consumer_eur_per_kwh": "0.250000",
+            "spot_eur_per_kwh": "0.110000",
+            "source": "entsoe_v6",
+        },
+        {
+            "local_hour": 25,
+            "consumer_eur_per_kwh": "0.990000",
+            "spot_eur_per_kwh": "0.990000",
+            "source": "bad",
+        },
+    ])
+
+    prices = hourly_inputs.load_price_ticks_for_day(
+        connection,
+        "price_ticks",
+        datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ),
+    )
+
+    assert prices == {
+        "00": {
+            "consumer_eur_per_kwh": pytest.approx(0.25),
+            "spot_eur_per_kwh": pytest.approx(0.11),
+            "price_source": "entsoe_v6",
+        }
+    }
+    sql, params = connection.cursor_obj.executed[0]
+    assert "FROM `price_ticks`" in sql
+    assert params == ("2025-01-01",)
+
+
+def test_hourly_report_inputs_default_target_days_are_yesterday_and_today():
+    args = SimpleNamespace(date=None, start_date=None, end_date=None, days_back=None)
+    days = hourly_inputs.resolve_target_days(args, TZ)
+
+    assert len(days) == 2
+    assert (days[1] - days[0]).days == 1
+
+
+def test_hourly_report_inputs_rejects_ambiguous_target_arguments():
+    args = SimpleNamespace(date="2025-01-01", start_date="2025-01-01", end_date=None, days_back=None)
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        hourly_inputs.resolve_target_days(args, TZ)
+
+
+def test_existing_daily_report_still_fetches_status_updates_directly():
+    source = (DAILY_REPORT_TOOLS_DIR / "hourly_daily_grid_battery_report.py").read_text(encoding="utf-8")
+
+    assert "fetch_status_rows(" in source
+    assert "hourly_report_inputs" not in source
