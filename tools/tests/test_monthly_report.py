@@ -23,7 +23,7 @@ MONTHLY_REPORT_PAGE_FILE = REPO_ROOT / "daily_report" / "monthly.php"
 MONTHLY_REPORT_JS_FILE = REPO_ROOT / "daily_report" / "assets" / "js" / "monthly_report.js"
 DAILY_REPORT_DATA_DIR = REPO_ROOT / "daily_report" / "data"
 TZ_NL = ZoneInfo("Europe/Amsterdam")
-NOOP_GENERATOR_FILE = REPO_ROOT / "tools" / "tests" / "support" / "noop_generator.py"
+LIVE_GENERATOR_FILE = REPO_ROOT / "tools" / "tests" / "support" / "live_report_generator.py"
 
 
 def _run_php_json(args: list[str]) -> dict:
@@ -335,6 +335,7 @@ def test_monthly_api_aggregates_saved_daily_reports_and_keeps_partial_cost_total
 
     with _temporary_reports(reports):
         php_code = (
+            f'putenv("DAILY_REPORT_SMART_FIXTURE_DIR={DAILY_REPORT_DATA_DIR.as_posix()}");'
             '$_SERVER["REQUEST_METHOD"] = "GET";'
             f'$_GET["month"] = "{month}";'
             f'require "{MONTHLY_REPORT_API_FILE.as_posix()}";'
@@ -392,8 +393,9 @@ def test_monthly_api_current_month_stops_at_today_and_regenerates_only_today():
 
     with _temporary_reports(reports):
         php_code = (
+            f'putenv("DAILY_REPORT_SMART_FIXTURE_DIR={DAILY_REPORT_DATA_DIR.as_posix()}");'
             f'putenv("PYTHON_BIN={sys.executable}");'
-            f'define("DAILY_REPORT_GENERATOR_SCRIPT", "{NOOP_GENERATOR_FILE.as_posix()}");'
+            f'define("DAILY_REPORT_GENERATOR_SCRIPT", "{LIVE_GENERATOR_FILE.as_posix()}");'
             '$_SERVER["REQUEST_METHOD"] = "GET";'
             f'$_GET["month"] = "{current_month}";'
             f'require "{MONTHLY_REPORT_API_FILE.as_posix()}";'

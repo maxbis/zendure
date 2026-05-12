@@ -142,7 +142,11 @@ def _consumer_to_spot(value: float) -> float:
 
 
 def _invoke_pnl_api(data_dir: Path, *, date: str | None, method: str = "GET", n: str | None = None) -> dict:
-    statements = [f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");', f'$_SERVER["REQUEST_METHOD"] = "{method}";']
+    statements = [
+        f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");',
+        f'putenv("DAILY_REPORT_SMART_FIXTURE_DIR={data_dir.as_posix()}");',
+        f'$_SERVER["REQUEST_METHOD"] = "{method}";',
+    ]
     if date is not None:
         statements.append(f'$_GET["date"] = "{date}";')
     if n is not None:
@@ -211,7 +215,7 @@ def test_pnl_api_returns_single_day_when_n_is_omitted():
 
     day = payload["days"][0]
     assert day["date"] == date
-    assert day["source"] == "saved"
+    assert day["source"] == "aggregate_saved"
     assert day["savedAt"]
     assert day["price_file_found"] is True
     assert day["price_hours_available"] == 24

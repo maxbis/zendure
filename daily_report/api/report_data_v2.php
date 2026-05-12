@@ -8,7 +8,7 @@ date_default_timezone_set('Europe/Amsterdam');
 header('Content-Type: application/json');
 header('Cache-Control: no-store, max-age=0');
 
-$requestMethod = requestMethod();
+$requestMethod = dailyReportV2RequestMethod();
 
 if ($requestMethod === 'OPTIONS') {
     http_response_code(200);
@@ -22,7 +22,7 @@ if ($requestMethod !== 'GET' && $requestMethod !== 'POST') {
 }
 
 try {
-    echo dailyReportJsonEncode(buildDailyReportPayload($requestMethod));
+    echo dailyReportJsonEncode(dailyReportV2BuildPayload($requestMethod));
 } catch (InvalidArgumentException $e) {
     http_response_code(400);
     echo dailyReportJsonEncode(['success' => false, 'error' => $e->getMessage()]);
@@ -31,21 +31,28 @@ try {
     echo dailyReportJsonEncode(['success' => false, 'error' => $e->getMessage()]);
 }
 
-function buildDailyReportPayload(string $requestMethod): array
+/**
+ * V2 stays aggregate-only as a comparison page while the production API uses
+ * the smart today/live plus historical/aggregate policy.
+ *
+ * @return array<string, mixed>
+ */
+function dailyReportV2BuildPayload(string $requestMethod): array
 {
     $tz = dailyReportTimezone();
-    $requestedDate = requestDate($tz, $requestMethod);
+    $requestedDate = dailyReportV2RequestDate($tz, $requestMethod);
     $isManualRegenerate = $requestMethod === 'POST';
 
     if ($isManualRegenerate) {
-        $action = requestAction();
+        $action = dailyReportV2RequestAction();
         if ($action !== 'regenerate') {
             throw new InvalidArgumentException('Invalid action. Expected regenerate.');
         }
+        dailyReportRegenerateAggregate($requestedDate);
     }
 
-    $loaded = dailyReportLoadSmart($requestedDate, $isManualRegenerate);
-    $source = (string)($loaded['source'] ?? ($loaded['generated'] ? 'generated' : 'saved'));
+    $loaded = dailyReportLoadFromAggregate(dailyReportCreatePdo(), $requestedDate, $tz);
+    $source = $isManualRegenerate ? 'aggregate_regenerated_manual' : 'aggregate_saved';
 
     return [
         'success' => true,
@@ -57,40 +64,34 @@ function buildDailyReportPayload(string $requestMethod): array
     ];
 }
 
-function requestMethod(): string
+function dailyReportV2RequestMethod(): string
 {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     return is_string($method) && $method !== '' ? strtoupper($method) : 'GET';
 }
 
-function requestDate(DateTimeZone $tz, string $requestMethod): string
+function dailyReportV2RequestDate(DateTimeZone $tz, string $requestMethod): string
 {
-    $raw = requestValue('date', $requestMethod);
+    $raw = dailyReportV2RequestValue('date', $requestMethod);
     if (!is_string($raw) || trim($raw) === '') {
         return (new DateTimeImmutable('now', $tz))->format('Y-m-d');
     }
 
     $date = trim($raw);
-    $dt = DateTimeImmutable::createFromFormat('Y-m-d', $date, $tz);
-    if ($dt === false || $dt->format('Y-m-d') !== $date) {
-        throw new InvalidArgumentException('Invalid date. Expected YYYY-MM-DD.');
-    }
+    dailyReportValidateDate($date, $tz);
     return $date;
 }
 
-function requestAction(): string
+function dailyReportV2RequestAction(): string
 {
-    $raw = requestValue('action', 'POST');
-    if (!is_string($raw)) {
-        return '';
-    }
-    return trim($raw);
+    $raw = dailyReportV2RequestValue('action', 'POST');
+    return is_string($raw) ? trim($raw) : '';
 }
 
 /**
  * @return mixed
  */
-function requestValue(string $key, string $requestMethod)
+function dailyReportV2RequestValue(string $key, string $requestMethod)
 {
     if ($requestMethod === 'POST') {
         return $_POST[$key] ?? null;

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/includes/report_api_common.php';
+require_once dirname(__DIR__) . '/includes/report_smart_common.php';
 require_once dirname(__DIR__) . '/includes/report_pnl_common.php';
 
 date_default_timezone_set('Europe/Amsterdam');
@@ -40,7 +40,6 @@ function buildDailyPnlPayload(): array
     $tz = dailyReportTimezone();
     $requestedDate = pnlRequestDate($tz);
     $requestedDayCount = pnlRequestDayCount();
-    $today = new DateTimeImmutable('now', $tz);
     $endDate = DateTimeImmutable::createFromFormat('!Y-m-d', $requestedDate, $tz);
 
     if (!$endDate instanceof DateTimeImmutable) {
@@ -52,11 +51,11 @@ function buildDailyPnlPayload(): array
 
     for ($cursor = $startDate; $cursor <= $endDate; $cursor = $cursor->modify('+1 day')) {
         $date = $cursor->format('Y-m-d');
-        $loaded = dailyReportLoadOrGenerate($date, $date === $today->format('Y-m-d'));
+        $loaded = dailyReportLoadSmart($date, false);
         $days[] = dailyReportBuildPnlDayPayload(
             $date,
             $loaded,
-            dailyReportResolveSource((bool)$loaded['generated'], $date, $today)
+            (string)($loaded['source'] ?? 'aggregate_saved')
         );
     }
 

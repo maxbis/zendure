@@ -2,11 +2,16 @@
 
 This document describes the MariaDB-backed price store used by daily reports.
 
+For the production command sequence, cron examples, and verification queries, see
+[`docs/daily-report-operations.md`](../daily-report-operations.md).
+
 ## Purpose
 
 Daily reports read prices from MariaDB table `price_ticks` in database `sqlite_replication`. This makes regenerated historical reports independent from the JSON price cache files under `main/data/price`.
 
-The JSON files still exist for compatibility with the existing price UI, schedule resolver, and as the first source for historical backfill.
+The JSON price files under `main/data/price/YYYYMM/priceYYYYMMDD.json` are still used by the main app. They remain the compatibility/cache layer for the existing price UI, schedule resolver, and `main/prices/get_prices_v6.php`. They are also used as the first source for historical price backfill into `price_ticks`.
+
+Daily, monthly, and P&L reports do not read those JSON files anymore; they use `price_ticks` for prices.
 
 ## Tables
 
@@ -124,10 +129,36 @@ Backfill never deletes rows.
 
 ## Daily Report Dependency
 
-`daily_report/tools/hourly_daily_grid_battery_report.py` now loads prices from `price_ticks` only. Missing DB rows become `null` hourly prices, so related cost values are also `null`.
+Daily reports use a hybrid data path:
+
+- today is built live from `status_updates` by `daily_report/tools/hourly_daily_grid_battery_report.py`;
+- yesterday and older days are loaded from `hourly_report_inputs`;
+- both paths use prices from MariaDB-backed price data, not the JSON price cache.
+
+`daily_report/tools/hourly_daily_grid_battery_report.py` loads prices from `price_ticks` only. Missing DB rows become `null` hourly prices, so related cost values are also `null`.
+
+Historical report rows in `hourly_report_inputs` also contain the hourly price columns copied from `price_ticks` by `daily_report/tools/update_hourly_report_inputs.py`.
 
 Relevant report metadata:
 
 - `price_source`: `db:price_ticks`
 - `price_hours_available`: count of DB price rows loaded for the date
 - `price_file_found`: retained for compatibility, true when at least one DB price row was found
+
+## Report Aggregate Maintenance
+
+For production cron, update prices first and then recompute hourly report inputs:
+
+```cron
+15 14 * * * cd /path/to/zendure && php main/prices/update_price_ticks.php >> logs/price_ticks.log 2>&1
+*/15 * * * * cd /path/to/zendure && python3 daily_report/tools/update_hourly_report_inputs.py >> logs/hourly_report_inputs.log 2>&1
+```
+
+The aggregate updater defaults to yesterday and today, which captures post-midnight interpolation corrections for yesterday. Running it more often is safe because rows are upserted by `(local_date, local_hour)`.
+
+Initial fill order:
+
+```powershell
+php main\prices\backfill_price_ticks.php --start-date 2026-02-20
+python daily_report\tools\update_hourly_report_inputs.py --start-date 2026-02-20
+```

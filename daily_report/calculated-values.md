@@ -4,10 +4,12 @@ This file explains how the summary boxes in `/daily_report` are calculated.
 
 ## Data sources
 
-- The base hourly values are generated in `daily_report/tools/hourly_daily_grid_battery_report.py`.
+- Today's base hourly values are generated live from `status_updates` by `daily_report/tools/hourly_daily_grid_battery_report.py`.
+- Yesterday and older base hourly values are read from MariaDB table `hourly_report_inputs`.
 - The summary cards are filled in `daily_report/assets/js/daily_report.js`.
-- The second-line `Spot ...` values are not stored in the JSON report totals. They are recalculated in the frontend from the hourly rows.
+- The second-line `Spot ...` values are recalculated in the frontend from the hourly rows.
 - Hourly prices are loaded from MariaDB table `price_ticks` in the `sqlite_replication` database. The daily report does not fall back to `main/data/price` JSON files.
+- Production report APIs no longer create daily report JSON files. Saved JSON reports are legacy data only.
 
 ## Price definitions
 
@@ -149,7 +151,7 @@ Important: in the current implementation, `spot_pnl` still uses the normal `savi
 
 ## Rounding
 
-- Generator totals are summed using raw float values and then rounded when written to the report JSON.
+- Report totals are summed using raw float values and then rounded in the API payload.
 - The stored totals use 4 decimals for euro values.
 - The frontend also formats the displayed box values to 4 decimals with the `EUR` prefix.
 

@@ -209,6 +209,7 @@ def test_daily_report_api_get_saved_report_enables_regenerate(tmp_path: Path):
 
     php_code = (
         f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
+        f'putenv("DAILY_REPORT_SMART_FIXTURE_DIR={data_dir.as_posix()}");'
         '$_SERVER["REQUEST_METHOD"] = "GET";'
         '$_GET["date"] = "2026-04-16";'
         f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
@@ -217,7 +218,7 @@ def test_daily_report_api_get_saved_report_enables_regenerate(tmp_path: Path):
 
     assert payload["success"] is True
     assert payload["requestedDate"] == "2026-04-16"
-    assert payload["source"] == "saved"
+    assert payload["source"] == "aggregate_saved"
     assert payload["canRegenerate"] is True
     assert payload["savedAt"]
     assert payload["report"]["date"] == "2026-04-16"
@@ -234,7 +235,7 @@ def test_daily_report_api_post_regenerate_forces_overwrite_and_enables_button(tm
             "",
             "parser = argparse.ArgumentParser()",
             "parser.add_argument('--date', required=True)",
-            "parser.add_argument('--output', required=True)",
+            "parser.add_argument('--output')",
             "args = parser.parse_args()",
             "",
             "payload = {",
@@ -244,32 +245,31 @@ def test_daily_report_api_post_regenerate_forces_overwrite_and_enables_button(tm
             "    'hours': [],",
             "    'totals': {}",
             "}",
-            "output = Path(args.output)",
-            "output.parent.mkdir(parents=True, exist_ok=True)",
-            "output.write_text(json.dumps(payload), encoding='utf-8')",
+            "print(json.dumps(payload))",
         ]),
         encoding="utf-8",
     )
+    today = datetime.now(TZ_NL).strftime("%Y-%m-%d")
 
     php_code = (
         f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
         f'putenv("PYTHON_BIN={sys.executable}");'
         f'define("DAILY_REPORT_GENERATOR_SCRIPT", "{generator_script.as_posix()}");'
         '$_SERVER["REQUEST_METHOD"] = "POST";'
-        '$_POST["date"] = "2026-04-17";'
+        f'$_POST["date"] = "{today}";'
         '$_POST["action"] = "regenerate";'
         f'require "{DAILY_REPORT_API_FILE.as_posix()}";'
     )
     payload = _run_php_json(["php", "-r", php_code])
-    saved_report = data_dir / "202604" / "daily_report_20260417.json"
+    saved_report = data_dir / today.replace("-", "")[:6] / f"daily_report_{today.replace('-', '')}.json"
 
     assert payload["success"] is True
-    assert payload["requestedDate"] == "2026-04-17"
-    assert payload["source"] == "regenerated_manual"
+    assert payload["requestedDate"] == today
+    assert payload["source"] == "live_today_regenerated"
     assert payload["canRegenerate"] is True
     assert payload["savedAt"]
-    assert payload["report"]["date"] == "2026-04-17"
-    assert saved_report.exists()
+    assert payload["report"]["date"] == today
+    assert not saved_report.exists()
 
     php_code_invalid = (
         f'putenv("DAILY_REPORT_DATA_DIR={data_dir.as_posix()}");'
