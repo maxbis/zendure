@@ -29,6 +29,7 @@
         gridFrom: cssColor('--accent-grid-from', '#8fb8c9'),
         gridTo: cssColor('--accent-grid-to', '#ffd166'),
         cost: cssColor('--accent-cost', '#7e89ff'),
+        pnlLine: cssColor('--accent-pnl-line', '#8fd8ff'),
         batteryLevel: cssColor('--accent-battery-level', '#ffdf5d'),
         guide: cssColor('--chart-guide', 'rgba(127, 147, 139, 0.5)'),
         textSoft: cssColor('--text-soft', '#a7bbb3'),
@@ -447,6 +448,26 @@
         });
     }
 
+    function computeHourlyPnl(row) {
+        const savings = toFiniteNumber(row && row.savings_eur);
+        const chargeCost = toFiniteNumber(row && row.charge_cost_eur);
+        const netCost = toFiniteNumber(row && row.net_cost);
+        if (!Number.isFinite(savings) || !Number.isFinite(chargeCost) || !Number.isFinite(netCost)) {
+            return null;
+        }
+        return savings - chargeCost - netCost;
+    }
+
+    function buildCumulativePnlValues(hours) {
+        let runningValue = 0;
+        return hours.map((row) => {
+            const value = computeHourlyPnl(row);
+            if (!Number.isFinite(value)) return null;
+            runningValue += value;
+            return runningValue;
+        });
+    }
+
     function computeNiceStep(value) {
         const safeValue = Number.isFinite(value) && value > 0 ? value : 1;
         const magnitude = 10 ** Math.floor(Math.log10(safeValue));
@@ -480,12 +501,14 @@
         const slotWidth = plotWidth / Math.max(1, hours.length);
         const fixedEnergyMax = 800;
         const cumulativeCostValues = buildCumulativeValues(hours, 'net_cost');
+        const cumulativePnlValues = buildCumulativePnlValues(hours);
         const fixedCostMax = 2;
 
         const energyAxis = [];
         const costAxis = [];
         const sharedGuides = [];
         const costPoints = [];
+        const pnlPoints = [];
         const batteryLevelPoints = [];
         const labels = [];
         const bars = [];
@@ -521,6 +544,8 @@
             const gridFrom = Number(row.grid_from_wh) || 0;
             const gridTo = Number(row.grid_to_wh) || 0;
             const cumulativeNetCost = cumulativeCostValues[index];
+            const cumulativePnl = cumulativePnlValues[index];
+            const hourlyPnl = computeHourlyPnl(row);
             const tooltipSummary = [
                 `Hour ${row.hour || '--'}`,
                 `Charged: ${formatWh(Number(row.charged_wh))}`,
@@ -529,6 +554,7 @@
                 `Grid to: ${formatWh(Number(row.grid_to_wh))}`,
                 `Price: ${formatPrice(toFiniteNumber(row.price_eur_per_kwh))}`,
                 `Net cost: ${formatEur(Number(row.net_cost))}`,
+                `P&L: ${formatEur(hourlyPnl)}`,
             ].join('\n');
 
             const chargeHeight = (clamp(charge, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
@@ -544,6 +570,11 @@
             if (Number.isFinite(cumulativeNetCost)) {
                 const costY = costZeroY - (clamp(cumulativeNetCost, -fixedCostMax, fixedCostMax) / fixedCostMax) * costScaleHeight;
                 costPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${costY.toFixed(2)}`);
+            }
+
+            if (Number.isFinite(cumulativePnl)) {
+                const pnlY = costZeroY - (clamp(cumulativePnl, -fixedCostMax, fixedCostMax) / fixedCostMax) * costScaleHeight;
+                pnlPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${pnlY.toFixed(2)}`);
             }
 
             const batteryLevel = toFiniteNumber(row.battery_pct_end) ?? toFiniteNumber(row.battery_pct_start);
@@ -565,6 +596,7 @@
             <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
             ${bars.join('')}
             ${costPoints.length > 1 ? `<polyline points="${costPoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+            ${pnlPoints.length > 1 ? `<polyline points="${pnlPoints.join(' ')}" fill="none" stroke="${palette.pnlLine}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><title>Cumulative P&L</title></polyline>` : ''}
             ${batteryLevelPoints.length > 1 ? `<polyline points="${batteryLevelPoints.join(' ')}" fill="none" stroke="${palette.batteryLevel}" stroke-width="1" stroke-dasharray="7 5" stroke-linecap="round" stroke-linejoin="round"><title>Electric level</title></polyline>` : ''}
             <text x="${(margin.left + plotWidth - 8).toFixed(2)}" y="${(margin.top + 12).toFixed(2)}" fill="${palette.batteryLevel}" font-size="10" text-anchor="end">100%</text>
             <text x="${(margin.left + plotWidth - 8).toFixed(2)}" y="${(margin.top + plotHeight - 4).toFixed(2)}" fill="${palette.batteryLevel}" font-size="10" text-anchor="end">0%</text>
@@ -602,6 +634,8 @@
         }));
         const cumulativeNetCostCents = buildCumulativeValues(hours, 'net_cost')
             .map((value) => (Number.isFinite(value) ? value * 100 : null));
+        const cumulativePnlCents = buildCumulativePnlValues(hours)
+            .map((value) => (Number.isFinite(value) ? value * 100 : null));
 
         const hasAnyValues = rows.some((row, index) => (
             Number.isFinite(row.chargeCents)
@@ -609,6 +643,7 @@
             || Number.isFinite(row.gridFromCents)
             || Number.isFinite(row.gridToCents)
             || Number.isFinite(cumulativeNetCostCents[index])
+            || Number.isFinite(cumulativePnlCents[index])
         ));
 
         if (!hasAnyValues) {
@@ -625,6 +660,7 @@
         const lineAxis = [];
         const guides = [];
         const linePoints = [];
+        const pnlLinePoints = [];
         const labels = [];
         const bars = [];
 
@@ -661,12 +697,14 @@
             const groupWidth = Math.max(8, slotWidth - 6);
             const barWidth = Math.max(2, groupWidth / 4 - 2);
             const cumulativeNetCost = cumulativeNetCostCents[index];
+            const cumulativePnl = cumulativePnlCents[index];
             const hourSummary = [
                 `Hour ${row.hour || '--'}`,
                 `Charged: ${formatTooltipCents(row.chargeCents)}`,
                 `Discharged: ${formatTooltipCents(row.dischargeCents)}`,
                 `Grid from: ${formatTooltipCents(row.gridFromCents)}`,
                 `Grid to: ${formatTooltipCents(row.gridToCents)}`,
+                `P&L: ${formatTooltipCents(toCents(computeHourlyPnl(hours[index])))}`,
             ].join('\n');
 
             pushSignedBar(xBase + 0, barWidth, row.chargeCents, palette.charge, hourSummary);
@@ -677,6 +715,11 @@
             if (Number.isFinite(cumulativeNetCost)) {
                 const lineY = baseline - ((clamp(cumulativeNetCost, -lineAxisMax, lineAxisMax) / lineAxisMax) * scaleHeight);
                 linePoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${lineY.toFixed(2)}`);
+            }
+
+            if (Number.isFinite(cumulativePnl)) {
+                const pnlY = baseline - ((clamp(cumulativePnl, -lineAxisMax, lineAxisMax) / lineAxisMax) * scaleHeight);
+                pnlLinePoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${pnlY.toFixed(2)}`);
             }
 
             labels.push(`<text x="${(xBase + groupWidth / 2).toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour || '--')}</text>`);
@@ -692,6 +735,7 @@
             <line x1="${margin.left}" y1="${baseline.toFixed(2)}" x2="${(margin.left + plotWidth).toFixed(2)}" y2="${baseline.toFixed(2)}" stroke="${palette.textMuted}" stroke-width="1.2"></line>
             ${bars.join('')}
             ${linePoints.length > 1 ? `<polyline points="${linePoints.join(' ')}" fill="none" stroke="${palette.cost}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+            ${pnlLinePoints.length > 1 ? `<polyline points="${pnlLinePoints.join(' ')}" fill="none" stroke="${palette.pnlLine}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><title>Cumulative P&L</title></polyline>` : ''}
             ${labels.join('')}
             <text x="${margin.left}" y="${(margin.top - 6).toFixed(2)}" fill="${palette.textSoft}" font-size="12">Above baseline: charge/import cost | below baseline: discharge/export value</text>
             <text x="${margin.left}" y="${(height - 44).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="start">Cents scale</text>

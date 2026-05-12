@@ -327,6 +327,26 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "`Spot ${formatEur(spotPnl)}`" in daily_report_js
 
 
+def test_daily_report_energy_chart_includes_cumulative_pnl_line():
+    page_php = DAILY_REPORT_INDEX_FILE.read_text(encoding="utf-8")
+    v2_page_php = (REPO_ROOT / "daily_report" / "daily_report_v2.php").read_text(encoding="utf-8")
+    daily_report_js = DAILY_REPORT_JS_FILE.read_text(encoding="utf-8")
+    daily_report_css = (REPO_ROOT / "daily_report" / "assets" / "css" / "daily_report.css").read_text(encoding="utf-8")
+
+    assert "Cumulative P&amp;L" in page_php
+    assert "Cumulative P&amp;L" in v2_page_php
+    assert "--accent-pnl-line" in daily_report_css
+    assert ".legend-swatch--pnl-line" in daily_report_css
+    assert "function computeHourlyPnl(row)" in daily_report_js
+    assert "return savings - chargeCost - netCost;" in daily_report_js
+    assert "const cumulativePnlValues = buildCumulativePnlValues(hours);" in daily_report_js
+    assert "const cumulativePnlCents = buildCumulativePnlValues(hours)" in daily_report_js
+    assert 'stroke="${palette.pnlLine}" stroke-width="1"' in daily_report_js
+    assert daily_report_js.count('stroke="${palette.pnlLine}" stroke-width="1"') == 2
+    assert "`P&L: ${formatEur(hourlyPnl)}`" in daily_report_js
+    assert "`P&L: ${formatTooltipCents(toCents(computeHourlyPnl(hours[index])))}`" in daily_report_js
+
+
 def test_daily_report_sample_price_variation_metrics_match_expected_day():
     payload = json.loads(DAILY_REPORT_SAMPLE_FILE.read_text(encoding="utf-8"))
     prices = [row["price_eur_per_kwh"] for row in payload["hours"] if row.get("price_eur_per_kwh") is not None]
