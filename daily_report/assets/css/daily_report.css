@@ -7,13 +7,23 @@
     --text-soft: #a7bbb3;
     --text-muted: #7f938b;
     --chart-guide: rgba(127, 147, 139, 0.5);
-    --accent-charge: #9ce365;
-    --accent-discharge: #e97560;
-    --accent-grid-from: #8fb8c9;
-    --accent-grid-to: #ffd166;
-    --accent-cost: #7e89ff;
-    --accent-pnl-line: #8fd8ff;
-    --accent-battery-level: #ffdf5d;
+
+    /* Chart series colors */
+    --chart-series-charged: #9ce365;
+    --chart-series-discharged: #e97560;
+    --chart-series-grid-from: #548093;
+    --chart-series-grid-to: #abd9ec;
+    --chart-series-net-cost: #7e89ff;
+    --chart-series-pnl: #8fd8ff;
+    --chart-series-battery-level: #ffdf5d;
+
+    --accent-charge: var(--chart-series-charged);
+    --accent-discharge: var(--chart-series-discharged);
+    --accent-grid-from: var(--chart-series-grid-from);
+    --accent-grid-to: var(--chart-series-grid-to);
+    --accent-cost: var(--chart-series-net-cost);
+    --accent-pnl-line: var(--chart-series-pnl);
+    --accent-battery-level: var(--chart-series-battery-level);
     --badge-positive: #4bc27f;
     --badge-negative: #f77f5f;
     --badge-neutral: #8fb8c9;

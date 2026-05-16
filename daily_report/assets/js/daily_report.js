@@ -24,13 +24,13 @@
     }
 
     const palette = {
-        charge: cssColor('--accent-charge', '#9ce365'),
-        discharge: cssColor('--accent-discharge', '#e97560'),
-        gridFrom: cssColor('--accent-grid-from', '#8fb8c9'),
-        gridTo: cssColor('--accent-grid-to', '#ffd166'),
-        cost: cssColor('--accent-cost', '#7e89ff'),
-        pnlLine: cssColor('--accent-pnl-line', '#8fd8ff'),
-        batteryLevel: cssColor('--accent-battery-level', '#ffdf5d'),
+        charge: cssColor('--chart-series-charged', '#9ce365'),
+        discharge: cssColor('--chart-series-discharged', '#e97560'),
+        gridFrom: cssColor('--chart-series-grid-from', '#8fb8c9'),
+        gridTo: cssColor('--chart-series-grid-to', '#ffd166'),
+        cost: cssColor('--chart-series-net-cost', '#7e89ff'),
+        pnlLine: cssColor('--chart-series-pnl', '#8fd8ff'),
+        batteryLevel: cssColor('--chart-series-battery-level', '#ffdf5d'),
         guide: cssColor('--chart-guide', 'rgba(127, 147, 139, 0.5)'),
         textSoft: cssColor('--text-soft', '#a7bbb3'),
         textMuted: cssColor('--text-muted', '#7f938b'),
@@ -397,9 +397,42 @@
             .replace(/'/g, '&#39;');
     }
 
-    function rect(x, y, width, height, fill, titleText = null) {
+    function rect(x, y, width, height, fill, roundSide, titleText = null) {
+        const safeHeight = Math.max(0, height);
         const title = titleText ? `<title>${escapeHtml(titleText)}</title>` : '';
-        return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${Math.max(0, height).toFixed(2)}" fill="${fill}" rx="3">${title}</rect>`;
+        const radius = Math.min(3, Math.max(0, width / 2), Math.max(0, safeHeight / 2));
+
+        if (radius <= 0) {
+            return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${safeHeight.toFixed(2)}" fill="${fill}">${title}</rect>`;
+        }
+
+        const right = x + width;
+        const bottom = y + safeHeight;
+        let path;
+
+        if (roundSide === 'bottom') {
+            path = [
+                `M ${x.toFixed(2)} ${y.toFixed(2)}`,
+                `H ${right.toFixed(2)}`,
+                `V ${(bottom - radius).toFixed(2)}`,
+                `Q ${right.toFixed(2)} ${bottom.toFixed(2)} ${(right - radius).toFixed(2)} ${bottom.toFixed(2)}`,
+                `H ${(x + radius).toFixed(2)}`,
+                `Q ${x.toFixed(2)} ${bottom.toFixed(2)} ${x.toFixed(2)} ${(bottom - radius).toFixed(2)}`,
+                'Z'
+            ].join(' ');
+        } else {
+            path = [
+                `M ${x.toFixed(2)} ${bottom.toFixed(2)}`,
+                `V ${(y + radius).toFixed(2)}`,
+                `Q ${x.toFixed(2)} ${y.toFixed(2)} ${(x + radius).toFixed(2)} ${y.toFixed(2)}`,
+                `H ${(right - radius).toFixed(2)}`,
+                `Q ${right.toFixed(2)} ${y.toFixed(2)} ${right.toFixed(2)} ${(y + radius).toFixed(2)}`,
+                `V ${bottom.toFixed(2)}`,
+                'Z'
+            ].join(' ');
+        }
+
+        return `<path d="${path}" fill="${fill}">${title}</path>`;
     }
 
     function formatAxisWh(value) {
@@ -536,9 +569,15 @@
         });
 
         hours.forEach((row, index) => {
-            const xBase = margin.left + (index * slotWidth);
-            const groupWidth = Math.max(8, slotWidth - 6);
-            const barWidth = Math.max(2, groupWidth / 4 - 2);
+            const slotStart = margin.left + (index * slotWidth);
+            const slotCenter = slotStart + (slotWidth / 2);
+            const fullGroupWidth = Math.max(8, slotWidth - 6);
+            const pairGap = 4;
+            const barWidth = Math.max(2, ((fullGroupWidth - pairGap) / 2) * 0.5);
+            const groupWidth = (barWidth * 2) + pairGap;
+            const xBase = slotCenter - (groupWidth / 2);
+            const chargeDischargeX = xBase;
+            const gridX = xBase + barWidth + pairGap;
             const charge = Number(row.charged_wh) || 0;
             const discharge = Number(row.discharged_wh) || 0;
             const gridFrom = Number(row.grid_from_wh) || 0;
@@ -562,28 +601,28 @@
             const fromHeight = (clamp(gridFrom, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
             const toHeight = (clamp(gridTo, 0, fixedEnergyMax) / fixedEnergyMax) * energyScaleHeight;
 
-            bars.push(rect(xBase + 0, baseline - chargeHeight, barWidth, chargeHeight, palette.charge, tooltipSummary));
-            bars.push(rect(xBase + barWidth + 2, baseline, barWidth, dischargeHeight, palette.discharge, tooltipSummary));
-            bars.push(rect(xBase + ((barWidth + 2) * 2), baseline - fromHeight, barWidth, fromHeight, palette.gridFrom, tooltipSummary));
-            bars.push(rect(xBase + ((barWidth + 2) * 3), baseline, barWidth, toHeight, palette.gridTo, tooltipSummary));
+            bars.push(rect(chargeDischargeX, baseline - chargeHeight, barWidth, chargeHeight, palette.charge, 'top', tooltipSummary));
+            bars.push(rect(chargeDischargeX, baseline, barWidth, dischargeHeight, palette.discharge, 'bottom', tooltipSummary));
+            bars.push(rect(gridX, baseline - fromHeight, barWidth, fromHeight, palette.gridFrom, 'top', tooltipSummary));
+            bars.push(rect(gridX, baseline, barWidth, toHeight, palette.gridTo, 'bottom', tooltipSummary));
 
             if (Number.isFinite(cumulativeNetCost)) {
                 const costY = costZeroY - (clamp(cumulativeNetCost, -fixedCostMax, fixedCostMax) / fixedCostMax) * costScaleHeight;
-                costPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${costY.toFixed(2)}`);
+                costPoints.push(`${slotCenter.toFixed(2)},${costY.toFixed(2)}`);
             }
 
             if (Number.isFinite(cumulativePnl)) {
                 const pnlY = costZeroY - (clamp(cumulativePnl, -fixedCostMax, fixedCostMax) / fixedCostMax) * costScaleHeight;
-                pnlPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${pnlY.toFixed(2)}`);
+                pnlPoints.push(`${slotCenter.toFixed(2)},${pnlY.toFixed(2)}`);
             }
 
             const batteryLevel = toFiniteNumber(row.battery_pct_end) ?? toFiniteNumber(row.battery_pct_start);
             if (Number.isFinite(batteryLevel)) {
                 const batteryY = margin.top + plotHeight - ((clamp(batteryLevel, 0, 100) / 100) * plotHeight);
-                batteryLevelPoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${batteryY.toFixed(2)}`);
+                batteryLevelPoints.push(`${slotCenter.toFixed(2)},${batteryY.toFixed(2)}`);
             }
 
-            labels.push(`<text x="${(xBase + groupWidth / 2).toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour)}</text>`);
+            labels.push(`<text x="${slotCenter.toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour)}</text>`);
         });
 
         chartEl.innerHTML = `
@@ -689,13 +728,20 @@
             if (!Number.isFinite(centsValue)) return;
             const heightValue = (Math.abs(clamp(centsValue, -axisMax, axisMax)) / axisMax) * scaleHeight;
             const y = centsValue >= 0 ? baseline - heightValue : baseline;
-            bars.push(rect(x, y, widthValue, heightValue, fill, titleText));
+            const roundSide = centsValue >= 0 ? 'top' : 'bottom';
+            bars.push(rect(x, y, widthValue, heightValue, fill, roundSide, titleText));
         }
 
         rows.forEach((row, index) => {
-            const xBase = margin.left + (index * slotWidth);
-            const groupWidth = Math.max(8, slotWidth - 6);
-            const barWidth = Math.max(2, groupWidth / 4 - 2);
+            const slotStart = margin.left + (index * slotWidth);
+            const slotCenter = slotStart + (slotWidth / 2);
+            const fullGroupWidth = Math.max(8, slotWidth - 6);
+            const pairGap = 4;
+            const barWidth = Math.max(2, ((fullGroupWidth - pairGap) / 2) * 0.5);
+            const groupWidth = (barWidth * 2) + pairGap;
+            const xBase = slotCenter - (groupWidth / 2);
+            const chargeDischargeX = xBase;
+            const gridX = xBase + barWidth + pairGap;
             const cumulativeNetCost = cumulativeNetCostCents[index];
             const cumulativePnl = cumulativePnlCents[index];
             const hourSummary = [
@@ -707,22 +753,22 @@
                 `P&L: ${formatTooltipCents(toCents(computeHourlyPnl(hours[index])))}`,
             ].join('\n');
 
-            pushSignedBar(xBase + 0, barWidth, row.chargeCents, palette.charge, hourSummary);
-            pushSignedBar(xBase + barWidth + 2, barWidth, row.dischargeCents !== null ? -1 * row.dischargeCents : null, palette.discharge, hourSummary);
-            pushSignedBar(xBase + ((barWidth + 2) * 2), barWidth, row.gridFromCents, palette.gridFrom, hourSummary);
-            pushSignedBar(xBase + ((barWidth + 2) * 3), barWidth, row.gridToCents, palette.gridTo, hourSummary);
+            pushSignedBar(chargeDischargeX, barWidth, row.chargeCents, palette.charge, hourSummary);
+            pushSignedBar(chargeDischargeX, barWidth, row.dischargeCents !== null ? -1 * row.dischargeCents : null, palette.discharge, hourSummary);
+            pushSignedBar(gridX, barWidth, row.gridFromCents, palette.gridFrom, hourSummary);
+            pushSignedBar(gridX, barWidth, row.gridToCents, palette.gridTo, hourSummary);
 
             if (Number.isFinite(cumulativeNetCost)) {
                 const lineY = baseline - ((clamp(cumulativeNetCost, -lineAxisMax, lineAxisMax) / lineAxisMax) * scaleHeight);
-                linePoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${lineY.toFixed(2)}`);
+                linePoints.push(`${slotCenter.toFixed(2)},${lineY.toFixed(2)}`);
             }
 
             if (Number.isFinite(cumulativePnl)) {
                 const pnlY = baseline - ((clamp(cumulativePnl, -lineAxisMax, lineAxisMax) / lineAxisMax) * scaleHeight);
-                pnlLinePoints.push(`${(xBase + groupWidth / 2).toFixed(2)},${pnlY.toFixed(2)}`);
+                pnlLinePoints.push(`${slotCenter.toFixed(2)},${pnlY.toFixed(2)}`);
             }
 
-            labels.push(`<text x="${(xBase + groupWidth / 2).toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour || '--')}</text>`);
+            labels.push(`<text x="${slotCenter.toFixed(2)}" y="${(height - 20).toFixed(2)}" fill="${palette.textMuted}" font-size="11" text-anchor="middle">${escapeHtml(row.hour || '--')}</text>`);
         });
 
         moneyChartEl.innerHTML = `

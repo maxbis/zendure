@@ -127,7 +127,7 @@ This is intentional:
 - today is useful for validation and comparison;
 - yesterday is recomputed after midnight so boundary interpolation can use the first rows of the new day.
 
-Production APIs still build today live from `status_updates`, but keeping today in `hourly_report_inputs` fresh is useful for the V2 aggregate-only page and for the moment today becomes yesterday.
+Production APIs still build today live from `status_updates`, but keeping today in `hourly_report_inputs` fresh is useful for validation and for the moment today becomes yesterday.
 
 ## Cron Example
 
@@ -189,6 +189,5 @@ The production report APIs no longer create daily report JSON files:
 - `daily_report/api/report_data.php` uses live `status_updates` for today and `hourly_report_inputs` for older dates;
 - `daily_report/api/monthly_report_data.php` uses the same per-day rule;
 - `daily_report/api/pnl_data.php` uses the same per-day rule;
-- `daily_report/daily_report_v2.php` remains an aggregate-only comparison page.
 
 Saved JSON reports under `daily_report/data` are legacy data only.
