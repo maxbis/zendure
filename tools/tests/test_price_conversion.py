@@ -287,13 +287,21 @@ def test_daily_report_api_post_regenerate_forces_overwrite_and_enables_button(tm
 def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     page_php = DAILY_REPORT_INDEX_FILE.read_text(encoding="utf-8")
     daily_report_js = DAILY_REPORT_JS_FILE.read_text(encoding="utf-8")
+    daily_report_css = (REPO_ROOT / "daily_report" / "assets" / "css" / "daily_report.css").read_text(encoding="utf-8")
 
     assert "<th>Spot Price</th>" in page_php
-    assert 'colspan="14"' in page_php
+    assert "<th>Savings</th>" in page_php
+    assert 'colspan="15"' in page_php
     assert "window.PRICE_CONVERSION_CONFIG" in page_php
     assert "../main/assets/js/price_conversion.js" in page_php
     assert page_php.index("../main/assets/js/price_conversion.js") < page_php.index("assets/js/daily_report.js")
     assert 'data-role="report-regenerate"' in page_php
+    assert 'data-role="avg-charge-price-total"' in page_php
+    assert 'data-role="avg-discharge-price-total"' in page_php
+    assert 'data-role="avg-price-diff-total"' in page_php
+    assert 'data-role="battery-savings-total"' in page_php
+    assert 'data-role="battery-charge-cost-total"' in page_php
+    assert 'data-role="battery-pnl-total"' in page_php
     assert "convertConsumerToSpotPrice" in daily_report_js
     assert "formatPrice(spotPrice)" in daily_report_js
     assert "const regenerateButtonEl = document.querySelector('[data-role=\"report-regenerate\"]');" in daily_report_js
@@ -309,22 +317,42 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert 'data-role="net-cost-spot-total"' in page_php
     assert 'data-role="charge-cost-spot-total"' in page_php
     assert 'data-role="pnl-spot-total"' in page_php
+    assert "const consumerChargeCost = Number(totals.charge_cost_eur);" in daily_report_js
+    assert "const chargeCost = Number.isFinite(spotChargeCost) ? spotChargeCost : consumerChargeCost;" in daily_report_js
+    assert "const avgChargePrice = Number.isFinite(chargeCost) && Number.isFinite(chargedKwh) && chargedKwh > 0" in daily_report_js
+    assert "const avgDischargePrice = Number.isFinite(savings) && Number.isFinite(dischargedKwh) && dischargedKwh > 0" in daily_report_js
+    assert "const avgPriceDiff = Number.isFinite(avgDischargePrice) && Number.isFinite(avgChargePrice)" in daily_report_js
+    assert "const batteryOnlyPnl = Number.isFinite(savings) && Number.isFinite(chargeCost)" in daily_report_js
+    assert "setText('avg-charge-price-total', formatPrice(avgChargePrice));" in daily_report_js
+    assert "setText('avg-discharge-price-total', formatPrice(avgDischargePrice));" in daily_report_js
+    assert "setText('avg-price-diff-total', formatPrice(avgPriceDiff));" in daily_report_js
+    assert "setText('battery-savings-total', formatEur(savings));" in daily_report_js
+    assert "setText('battery-charge-cost-total', formatEur(chargeCost));" in daily_report_js
+    assert "setText('battery-pnl-total', formatEur(batteryOnlyPnl));" in daily_report_js
     assert "computeBatteryStats(report.hours)" in daily_report_js
     assert "computePriceVariationStats(report.hours)" in daily_report_js
+    assert "renderTable(payload.report || {});" in daily_report_js
     assert "row && row.price_eur_per_kwh" in daily_report_js
+    assert "formatEur(Number(row.savings_eur))" in daily_report_js
+    assert 'class="hourly-table__total-row"' in daily_report_js
+    assert ".hourly-table__total-row" in daily_report_css
     assert "const range = max - min;" in daily_report_js
     assert "const cvPct = mean > 0 ? (stddev / mean) * 100 : null;" in daily_report_js
     assert "formatPrice(priceVariation.range)" in daily_report_js
-    assert "`Min ${formatPrice(priceVariation.min)} / Max ${formatPrice(priceVariation.max)}`" in daily_report_js
+    assert "`Min ${formatPrice(priceVariation.min)}\\nMax ${formatPrice(priceVariation.max)}`" in daily_report_js
     assert "`CV ${formatPercentNeutral(priceVariation.cvPct)}`" in daily_report_js
     assert "Math.abs(batteryStats.max - batteryStats.min)" in daily_report_js
-    assert "`Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`" in daily_report_js
+    assert "data-role=\"battery-delta-total\"" in page_php
+    assert "data-role=\"battery-delta-range\"" in page_php
+    assert "data-role=\"battery-delta-extrema\"" in page_php
+    assert "`${formatPercentNeutral(batteryStats.start)} - ${formatPercentNeutral(batteryStats.end)}`" in daily_report_js
+    assert "`${formatPercentNeutral(batteryStats.min)} - ${formatPercentNeutral(batteryStats.max)}`" in daily_report_js
     assert "computeSpotNetCost(report.hours)" in daily_report_js
     assert "`Spot ${formatEur(spotNetCost)}`" in daily_report_js
     assert "computeSpotChargeCost(report.hours)" in daily_report_js
-    assert "`Spot ${formatEur(spotChargeCost)}`" in daily_report_js
-    assert "(spotChargeCost - savings + spotNetCost) * -1" in daily_report_js
-    assert "`Spot ${formatEur(spotPnl)}`" in daily_report_js
+    assert "`Consumer ${formatEur(consumerChargeCost)}`" in daily_report_js
+    assert "(chargeCost - savings + spotNetCost) * -1" in daily_report_js
+    assert "`Consumer ${formatEur(consumerPnl)}`" in daily_report_js
 
 
 def test_daily_report_energy_chart_includes_cumulative_pnl_line():

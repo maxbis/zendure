@@ -60,30 +60,64 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
 
         <section class="status-grid status-grid--eight">
             <article class="summary-card summary-card--primary">
-                <div class="summary-label">Charged</div>
-                <div class="summary-value" data-role="charged-total">--</div>
-                <div class="summary-subtle">Total for selected day</div>
+                <div class="summary-label">Battery Throughput</div>
+                <div class="summary-split-metric">
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Charged</span>
+                        <span class="summary-value summary-value--inline" data-role="charged-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Discharged</span>
+                        <span class="summary-value summary-value--inline" data-role="discharged-total">--</span>
+                    </div>
+                </div>
             </article>
             <article class="summary-card">
-                <div class="summary-label">Discharged</div>
-                <div class="summary-value" data-role="discharged-total">--</div>
-                <div class="summary-subtle">Total for selected day</div>
+                <div class="summary-label">Battery Avg Price</div>
+                <div class="summary-split-metric">
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Charge Avg</span>
+                        <span class="summary-value summary-value--inline" data-role="avg-charge-price-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Discharge Avg</span>
+                        <span class="summary-value summary-value--inline" data-role="avg-discharge-price-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Difference</span>
+                        <span class="summary-value summary-value--inline" data-role="avg-price-diff-total">--</span>
+                    </div>
+                </div>
             </article>
             <article class="summary-card">
-                <div class="summary-label">Battery Delta</div>
-                <div class="summary-value" data-role="battery-delta-total">--</div>
-                <div class="summary-secondary" data-role="battery-delta-range">--</div>
-                <div class="summary-subtle" data-role="battery-delta-extrema">Interpolated day delta</div>
+                <div class="summary-label">Battery</div>
+                <div class="summary-split-metric">
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Delta</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-delta-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Start/End</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-delta-range">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Min/Max</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-delta-extrema">--</span>
+                    </div>
+                </div>
             </article>
             <article class="summary-card">
-                <div class="summary-label">Grid From</div>
-                <div class="summary-value" data-role="grid-from-total">--</div>
-                <div class="summary-subtle">Import energy</div>
-            </article>
-            <article class="summary-card">
-                <div class="summary-label">Grid To</div>
-                <div class="summary-value" data-role="grid-to-total">--</div>
-                <div class="summary-subtle">Export energy</div>
+                <div class="summary-label">Grid Flow</div>
+                <div class="summary-split-metric">
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Grid From</span>
+                        <span class="summary-value summary-value--inline" data-role="grid-from-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Grid To</span>
+                        <span class="summary-value summary-value--inline" data-role="grid-to-total">--</span>
+                    </div>
+                </div>
             </article>
             <article class="summary-card summary-card--price-variation">
                 <div class="summary-label">Price Variation</div>
@@ -97,16 +131,28 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                 <div class="summary-secondary summary-secondary--net-cost" data-role="net-cost-spot-total">--</div>
                 <div class="summary-badge" data-role="cost-badge">Loading</div>
             </article>
-            <article class="summary-card summary-card--savings">
-                <div class="summary-label">Savings</div>
-                <div class="summary-value" data-role="savings-total">--</div>
-                <div class="summary-subtle">Discharged kWh × hourly price</div>
-            </article>
             <article class="summary-card summary-card--charge-cost">
                 <div class="summary-label">Charge Costs</div>
                 <div class="summary-value" data-role="charge-cost-total">--</div>
                 <div class="summary-secondary summary-secondary--charge-cost" data-role="charge-cost-spot-total">--</div>
-                <div class="summary-subtle">Charged kWh × hourly price</div>
+                <div class="summary-subtle">Charged kWh × hourly spot price</div>
+            </article>
+            <article class="summary-card summary-card--savings">
+                <div class="summary-label">Battery Economics</div>
+                <div class="summary-split-metric">
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Savings</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-savings-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Charge Costs</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-charge-cost-total">--</span>
+                    </div>
+                    <div class="summary-split-item">
+                        <span class="summary-split-label">Battery P&amp;L</span>
+                        <span class="summary-value summary-value--inline" data-role="battery-pnl-total">--</span>
+                    </div>
+                </div>
             </article>
             <article class="summary-card summary-card--pnl">
                 <div class="summary-label">P&amp;L</div>
@@ -178,12 +224,13 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                                 <th>Spot Price</th>
                                 <th>Import cost</th>
                                 <th>Export cost</th>
+                                <th>Savings</th>
                                 <th>Net cost</th>
                                 <th>Partial</th>
                             </tr>
                         </thead>
                         <tbody data-role="hourly-table-body">
-                            <tr><td colspan="14" class="table-placeholder">Loading report...</td></tr>
+                            <tr><td colspan="15" class="table-placeholder">Loading report...</td></tr>
                         </tbody>
                     </table>
                 </div>

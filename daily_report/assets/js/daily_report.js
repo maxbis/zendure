@@ -273,7 +273,7 @@
 
     function applyPayload(payload) {
         renderSummary(payload);
-        renderTable(payload.report && payload.report.hours ? payload.report.hours : []);
+        renderTable(payload.report || {});
         buildEnergyChart(payload.report && payload.report.hours ? payload.report.hours : []);
         buildMoneyChart(payload.report && payload.report.hours ? payload.report.hours : []);
         setRegenerateButtonState(Boolean(payload && payload.canRegenerate), false);
@@ -290,17 +290,43 @@
         const netCost = Number(totals.net_cost);
         const spotNetCost = computeSpotNetCost(report.hours);
         const savings = Number(totals.savings_eur);
-        const chargeCost = Number(totals.charge_cost_eur);
+        const consumerChargeCost = Number(totals.charge_cost_eur);
+        const chargedWh = Number(totals.charged_wh);
+        const dischargedWh = Number(totals.discharged_wh);
+        const chargedKwh = Number.isFinite(chargedWh) ? chargedWh / 1000 : null;
+        const dischargedKwh = Number.isFinite(dischargedWh) ? dischargedWh / 1000 : null;
         const spotChargeCost = computeSpotChargeCost(report.hours);
+        const chargeCost = Number.isFinite(spotChargeCost) ? spotChargeCost : consumerChargeCost;
+        const avgChargePrice = Number.isFinite(chargeCost) && Number.isFinite(chargedKwh) && chargedKwh > 0
+            ? chargeCost / chargedKwh
+            : null;
+        const avgDischargePrice = Number.isFinite(savings) && Number.isFinite(dischargedKwh) && dischargedKwh > 0
+            ? savings / dischargedKwh
+            : null;
+        const avgPriceDiff = Number.isFinite(avgDischargePrice) && Number.isFinite(avgChargePrice)
+            ? avgDischargePrice - avgChargePrice
+            : null;
+        const batteryOnlyPnl = Number.isFinite(savings) && Number.isFinite(chargeCost)
+            ? savings - chargeCost
+            : null;
         const pnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
             ? (chargeCost - savings + netCost) * -1
             : null;
-        const spotPnl = Number.isFinite(spotNetCost) && Number.isFinite(savings) && Number.isFinite(spotChargeCost)
-            ? (spotChargeCost - savings + spotNetCost) * -1
+        const consumerPnl = Number.isFinite(netCost) && Number.isFinite(savings) && Number.isFinite(consumerChargeCost)
+            ? (consumerChargeCost - savings + netCost) * -1
+            : null;
+        const spotPnl = Number.isFinite(spotNetCost) && Number.isFinite(savings) && Number.isFinite(chargeCost)
+            ? (chargeCost - savings + spotNetCost) * -1
             : null;
 
-        setText('charged-total', formatWh(Number(totals.charged_wh)));
-        setText('discharged-total', formatWh(Number(totals.discharged_wh)));
+        setText('avg-charge-price-total', formatPrice(avgChargePrice));
+        setText('avg-discharge-price-total', formatPrice(avgDischargePrice));
+        setText('avg-price-diff-total', formatPrice(avgPriceDiff));
+        setText('charged-total', formatWh(chargedWh));
+        setText('discharged-total', formatWh(dischargedWh));
+        setText('battery-savings-total', formatEur(savings));
+        setText('battery-charge-cost-total', formatEur(chargeCost));
+        setText('battery-pnl-total', formatEur(batteryOnlyPnl));
         setText(
             'battery-delta-total',
             Number.isFinite(batteryDeltaRange)
@@ -310,14 +336,14 @@
         setText(
             'battery-delta-range',
             Number.isFinite(batteryStats.start) || Number.isFinite(batteryStats.end)
-                ? `Start ${formatPercentNeutral(batteryStats.start)} / End ${formatPercentNeutral(batteryStats.end)}`
+                ? `${formatPercentNeutral(batteryStats.start)} - ${formatPercentNeutral(batteryStats.end)}`
                 : '--'
         );
         setText(
             'battery-delta-extrema',
             Number.isFinite(batteryStats.min) || Number.isFinite(batteryStats.max)
-                ? `Min ${formatPercentNeutral(batteryStats.min)} / Max ${formatPercentNeutral(batteryStats.max)}`
-                : 'Interpolated day delta'
+                ? `${formatPercentNeutral(batteryStats.min)} - ${formatPercentNeutral(batteryStats.max)}`
+                : '--'
         );
         setText('grid-from-total', formatWh(Number(totals.grid_from_wh)));
         setText('grid-to-total', formatWh(Number(totals.grid_to_wh)));
@@ -325,7 +351,7 @@
         setText(
             'price-variation-range',
             priceVariation.hasPrices
-                ? `Min ${formatPrice(priceVariation.min)} / Max ${formatPrice(priceVariation.max)}`
+                ? `Min ${formatPrice(priceVariation.min)}\nMax ${formatPrice(priceVariation.max)}`
                 : '--'
         );
         setText(
@@ -338,9 +364,17 @@
         setText('net-cost-spot-total', Number.isFinite(spotNetCost) ? `Spot ${formatEur(spotNetCost)}` : '--');
         setText('savings-total', formatEur(savings));
         setText('charge-cost-total', formatEur(chargeCost));
-        setText('charge-cost-spot-total', Number.isFinite(spotChargeCost) ? `Spot ${formatEur(spotChargeCost)}` : '--');
+        setText(
+            'charge-cost-spot-total',
+            Number.isFinite(consumerChargeCost) ? `Consumer ${formatEur(consumerChargeCost)}` : '--'
+        );
         setText('pnl-total', formatEur(pnl));
-        setText('pnl-spot-total', Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--');
+        setText(
+            'pnl-spot-total',
+            Number.isFinite(consumerPnl)
+                ? `Consumer ${formatEur(consumerPnl)}`
+                : (Number.isFinite(spotPnl) ? `Spot ${formatEur(spotPnl)}` : '--')
+        );
         setCostBadge(netCost);
 
         setText('report-source', payload.source || '--');
@@ -356,13 +390,21 @@
         setText('meta-saved-at', formatDateTime(payload.savedAt || null));
     }
 
-    function renderTable(hours) {
+    function renderTable(report) {
         if (!tableBodyEl) return;
+        const hours = Array.isArray(report && report.hours) ? report.hours : [];
+        const totals = report && report.totals ? report.totals : {};
+        const batteryStats = computeBatteryStats(hours);
+        const batteryDeltaTotal = Number.isFinite(batteryStats.start) && Number.isFinite(batteryStats.end)
+            ? batteryStats.end - batteryStats.start
+            : Number(totals.battery_pct_delta_total);
+
         if (!Array.isArray(hours) || hours.length === 0) {
-            tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">No hourly rows available.</td></tr>';
+            tableBodyEl.innerHTML = '<tr><td colspan="15" class="table-placeholder">No hourly rows available.</td></tr>';
             return;
         }
-        tableBodyEl.innerHTML = hours.map((row) => {
+
+        const rowsHtml = hours.map((row) => {
             const netCost = Number(row.net_cost);
             const costClass = Number.isFinite(netCost) ? (netCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
             const consumerPrice = toFiniteNumber(row.price_eur_per_kwh);
@@ -381,11 +423,36 @@
                     <td>${escapeHtml(formatPrice(spotPrice))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_from_cost)))}</td>
                     <td>${escapeHtml(formatEur(Number(row.grid_to_cost)))}</td>
+                    <td>${escapeHtml(formatEur(Number(row.savings_eur)))}</td>
                     <td class="${costClass}">${escapeHtml(formatEur(netCost))}</td>
                     <td>${row.is_partial_hour ? 'Yes' : 'No'}</td>
                 </tr>
             `;
         }).join('');
+
+        const totalNetCost = Number(totals.net_cost);
+        const totalCostClass = Number.isFinite(totalNetCost) ? (totalNetCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
+        const totalRowHtml = `
+            <tr class="hourly-table__total-row">
+                <td>Total</td>
+                <td>${escapeHtml(formatWh(Number(totals.charged_wh)))}</td>
+                <td>${escapeHtml(formatWh(Number(totals.discharged_wh)))}</td>
+                <td>--</td>
+                <td>--</td>
+                <td>${escapeHtml(formatPercent(batteryDeltaTotal))}</td>
+                <td>${escapeHtml(formatWh(Number(totals.grid_from_wh)))}</td>
+                <td>${escapeHtml(formatWh(Number(totals.grid_to_wh)))}</td>
+                <td>--</td>
+                <td>--</td>
+                <td>${escapeHtml(formatEur(Number(totals.grid_from_cost)))}</td>
+                <td>${escapeHtml(formatEur(Number(totals.grid_to_cost)))}</td>
+                <td>${escapeHtml(formatEur(Number(totals.savings_eur)))}</td>
+                <td class="${totalCostClass}">${escapeHtml(formatEur(totalNetCost))}</td>
+                <td>--</td>
+            </tr>
+        `;
+
+        tableBodyEl.innerHTML = rowsHtml + totalRowHtml;
     }
 
     function escapeHtml(value) {
@@ -846,7 +913,7 @@
         if (chartWrapEl) chartWrapEl.hidden = true;
         if (moneyChartWrapEl) moneyChartWrapEl.hidden = true;
         if (tableBodyEl) {
-            tableBodyEl.innerHTML = '<tr><td colspan="14" class="table-placeholder">Failed to load report.</td></tr>';
+            tableBodyEl.innerHTML = '<tr><td colspan="15" class="table-placeholder">Failed to load report.</td></tr>';
         }
     }
 

@@ -304,6 +304,38 @@ body {
     text-overflow: ellipsis;
 }
 
+.summary-split-metric {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.summary-split-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    grid-column: 1 / -1;
+}
+
+.summary-split-item .summary-value {
+    margin-top: 0;
+    font-size: clamp(0.86rem, 1.02vw, 1.18rem);
+}
+
+.summary-value--inline {
+    white-space: nowrap;
+}
+
+.summary-split-label {
+    flex: 0 0 110px;
+    color: var(--text-soft);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .summary-secondary {
     margin-top: 5px;
     min-height: 1.05rem;
@@ -312,9 +344,7 @@ body {
     line-height: 1.15;
     letter-spacing: 0.01em;
     color: rgba(232, 240, 230, 0.52);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: pre-line;
 }
 
 .summary-secondary--charge-cost {
@@ -477,6 +507,15 @@ body {
 }
 
 .hourly-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.hourly-table__total-row {
+    background: rgba(255,255,255,0.05);
+    font-weight: 600;
+}
+
+.hourly-table__total-row td {
+    border-top: 1px solid rgba(255,255,255,0.14);
+}
+
 .table-placeholder { text-align: center !important; color: var(--text-soft); }
 
 .detail-card {
