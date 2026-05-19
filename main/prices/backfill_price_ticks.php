@@ -12,7 +12,8 @@ if (!isRunningInCLI()) {
 }
 
 function backfillPriceTicksUsage(): string {
-    return "Usage: php backfill_price_ticks.php --start-date YYYY-MM-DD [--end-date YYYY-MM-DD] [--dry-run]\n";
+    return "Usage: php backfill_price_ticks.php [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD] [--dry-run]\n"
+        . "When --start-date is omitted, the script defaults to yesterday in Europe/Amsterdam.\n";
 }
 
 function backfillPriceTicksFetchEntsoe(string $date): ?array {
@@ -21,14 +22,14 @@ function backfillPriceTicksFetchEntsoe(string $date): ?array {
 
 try {
     $options = getopt('', ['start-date:', 'end-date::', 'dry-run']);
-    $startDateRaw = $options['start-date'] ?? null;
+    $tz = new DateTimeZone(PRICE_TICKS_TIMEZONE);
+    $startDateRaw = $options['start-date'] ?? (new DateTimeImmutable('today', $tz))->modify('-1 day')->format('Y-m-d');
     if (!is_string($startDateRaw) || $startDateRaw === '') {
         fwrite(STDERR, backfillPriceTicksUsage());
         exit(2);
     }
 
     $startDate = priceTicksNormalizeDate($startDateRaw);
-    $tz = new DateTimeZone(PRICE_TICKS_TIMEZONE);
     $endDateRaw = $options['end-date'] ?? (new DateTimeImmutable('today', $tz))->format('Y-m-d');
     if (!is_string($endDateRaw) || $endDateRaw === '') {
         fwrite(STDERR, backfillPriceTicksUsage());

@@ -73,5 +73,7 @@ def test_price_tick_cli_scripts_wire_expected_behaviour():
     assert "--start-date" in backfill_source
     assert "--end-date" in backfill_source
     assert "--dry-run" in backfill_source
+    assert "defaults to yesterday" in backfill_source
+    assert "modify('-1 day')" in backfill_source
     assert "priceTicksLoadJsonPriceFile" in backfill_source
     assert "fetchEntsoeHourPricesForDate" in backfill_source

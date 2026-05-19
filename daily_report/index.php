@@ -230,9 +230,47 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                             </tr>
                         </thead>
                         <tbody data-role="hourly-table-body">
-                            <tr><td colspan="15" class="table-placeholder">Loading report...</td></tr>
+                            <tr data-role="hourly-table-message-row">
+                                <td colspan="15" class="table-placeholder" data-role="hourly-table-message-cell">Loading report...</td>
+                            </tr>
+                            <tr class="hourly-table__total-row" data-role="hourly-table-total-row" hidden>
+                                <td data-role="hourly-total-hour">Total</td>
+                                <td data-role="hourly-total-charged">--</td>
+                                <td data-role="hourly-total-discharged">--</td>
+                                <td data-role="hourly-total-battery-start">--</td>
+                                <td data-role="hourly-total-battery-end">--</td>
+                                <td data-role="hourly-total-battery-delta">--</td>
+                                <td data-role="hourly-total-grid-from">--</td>
+                                <td data-role="hourly-total-grid-to">--</td>
+                                <td data-role="hourly-total-price">--</td>
+                                <td data-role="hourly-total-spot-price">--</td>
+                                <td data-role="hourly-total-grid-from-cost">--</td>
+                                <td data-role="hourly-total-grid-to-cost">--</td>
+                                <td data-role="hourly-total-savings">--</td>
+                                <td data-role="hourly-total-net-cost">--</td>
+                                <td data-role="hourly-total-partial">--</td>
+                            </tr>
                         </tbody>
                     </table>
+                    <template data-role="hourly-table-row-template">
+                        <tr data-role="hourly-table-row">
+                            <td data-role="cell-hour">--</td>
+                            <td data-role="cell-charged">--</td>
+                            <td data-role="cell-discharged">--</td>
+                            <td data-role="cell-battery-start">--</td>
+                            <td data-role="cell-battery-end">--</td>
+                            <td data-role="cell-battery-delta">--</td>
+                            <td data-role="cell-grid-from">--</td>
+                            <td data-role="cell-grid-to">--</td>
+                            <td data-role="cell-price">--</td>
+                            <td data-role="cell-spot-price">--</td>
+                            <td data-role="cell-grid-from-cost">--</td>
+                            <td data-role="cell-grid-to-cost">--</td>
+                            <td data-role="cell-savings">--</td>
+                            <td data-role="cell-net-cost">--</td>
+                            <td data-role="cell-partial">--</td>
+                        </tr>
+                    </template>
                 </div>
             </article>
             <article class="detail-card">

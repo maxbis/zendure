@@ -107,12 +107,20 @@ Example Linux cron:
 Command:
 
 ```powershell
+php main\prices\backfill_price_ticks.php
 php main\prices\backfill_price_ticks.php --start-date 2026-02-20
+```
+
+Default behavior without arguments:
+
+```text
+Targets yesterday in Europe/Amsterdam.
 ```
 
 Optional arguments:
 
 ```powershell
+php main\prices\backfill_price_ticks.php --start-date 2026-02-20
 php main\prices\backfill_price_ticks.php --start-date 2026-02-20 --end-date 2026-05-12
 php main\prices\backfill_price_ticks.php --start-date 2026-02-20 --end-date 2026-05-12 --dry-run
 ```

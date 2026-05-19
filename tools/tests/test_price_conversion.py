@@ -292,6 +292,9 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "<th>Spot Price</th>" in page_php
     assert "<th>Savings</th>" in page_php
     assert 'colspan="15"' in page_php
+    assert 'data-role="hourly-table-message-row"' in page_php
+    assert 'data-role="hourly-table-total-row"' in page_php
+    assert 'data-role="hourly-table-row-template"' in page_php
     assert "window.PRICE_CONVERSION_CONFIG" in page_php
     assert "../main/assets/js/price_conversion.js" in page_php
     assert page_php.index("../main/assets/js/price_conversion.js") < page_php.index("assets/js/daily_report.js")
@@ -332,9 +335,15 @@ def test_daily_report_uses_shared_js_helper_for_spot_price_column():
     assert "computeBatteryStats(report.hours)" in daily_report_js
     assert "computePriceVariationStats(report.hours)" in daily_report_js
     assert "renderTable(payload.report || {});" in daily_report_js
+    assert "function resetTableState()" in daily_report_js
+    assert "function renderHourlyRows(hours)" in daily_report_js
+    assert "function renderTotalsRow(report, state)" in daily_report_js
+    assert "function showTableMessage(message)" in daily_report_js
     assert "row && row.price_eur_per_kwh" in daily_report_js
     assert "formatEur(Number(row.savings_eur))" in daily_report_js
-    assert 'class="hourly-table__total-row"' in daily_report_js
+    assert "tableRowTemplateEl.content.cloneNode(true)" in daily_report_js
+    assert "showTableMessage('No hourly rows available.');" in daily_report_js
+    assert "showTableMessage('Failed to load report.');" in daily_report_js
     assert ".hourly-table__total-row" in daily_report_css
     assert "const range = max - min;" in daily_report_js
     assert "const cvPct = mean > 0 ? (stddev / mean) * 100 : null;" in daily_report_js

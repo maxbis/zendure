@@ -54,6 +54,14 @@ Dry run:
 php main/prices/backfill_price_ticks.php --start-date 2026-04-01 --dry-run
 ```
 
+Precautionary single-day run:
+
+```bash
+php main/prices/backfill_price_ticks.php
+```
+
+Without arguments, the script targets yesterday in Europe/Amsterdam.
+
 What it does:
 
 - creates `price_ticks` and `price_fetch_log` if missing;

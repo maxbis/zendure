@@ -12,6 +12,7 @@
     const moneyChartWrapEl = document.querySelector('[data-role="money-chart-wrap"]');
     const moneyChartStatusEl = document.querySelector('[data-role="money-chart-status"]');
     const tableBodyEl = document.querySelector('[data-role="hourly-table-body"]');
+    const tableRowTemplateEl = document.querySelector('[data-role="hourly-table-row-template"]');
     const dateFormEl = document.querySelector('[data-role="date-form"]');
     const dateInputEl = document.querySelector('#report-date');
     const prevDayEl = document.querySelector('[data-role="prev-day"]');
@@ -271,6 +272,10 @@
         el.textContent = 'Balanced EUR 0.0000';
     }
 
+    function setNodeText(node, value) {
+        if (node) node.textContent = value;
+    }
+
     function applyPayload(payload) {
         renderSummary(payload);
         renderTable(payload.report || {});
@@ -390,69 +395,98 @@
         setText('meta-saved-at', formatDateTime(payload.savedAt || null));
     }
 
-    function renderTable(report) {
-        if (!tableBodyEl) return;
+    function resetTableState() {
+        if (!tableBodyEl) return null;
+        const messageRow = tableBodyEl.querySelector('[data-role="hourly-table-message-row"]');
+        const messageCell = tableBodyEl.querySelector('[data-role="hourly-table-message-cell"]');
+        const totalRow = tableBodyEl.querySelector('[data-role="hourly-table-total-row"]');
+        Array.from(tableBodyEl.querySelectorAll('[data-role="hourly-table-row"]')).forEach((row) => row.remove());
+        if (messageRow) messageRow.hidden = true;
+        if (totalRow) totalRow.hidden = true;
+        return { messageRow, messageCell, totalRow };
+    }
+
+    function showTableMessage(message) {
+        const state = resetTableState();
+        if (!state || !state.messageRow) return;
+        state.messageRow.hidden = false;
+        setNodeText(state.messageCell, message);
+    }
+
+    function renderHourlyRows(hours) {
+        if (!tableBodyEl || !tableRowTemplateEl || !Array.isArray(hours)) return;
+        hours.forEach((row) => {
+            const netCost = Number(row.net_cost);
+            const costClass = Number.isFinite(netCost) ? (netCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
+            const consumerPrice = toFiniteNumber(row.price_eur_per_kwh);
+            const spotPrice = deriveSpotPrice(consumerPrice);
+            const fragment = tableRowTemplateEl.content.cloneNode(true);
+            const rowEl = fragment.querySelector('[data-role="hourly-table-row"]');
+            setNodeText(fragment.querySelector('[data-role="cell-hour"]'), row.hour || '--');
+            setNodeText(fragment.querySelector('[data-role="cell-charged"]'), formatWh(Number(row.charged_wh)));
+            setNodeText(fragment.querySelector('[data-role="cell-discharged"]'), formatWh(Number(row.discharged_wh)));
+            setNodeText(fragment.querySelector('[data-role="cell-battery-start"]'), formatPercent(Number(row.battery_pct_start)).replace('+', ''));
+            setNodeText(fragment.querySelector('[data-role="cell-battery-end"]'), formatPercent(Number(row.battery_pct_end)).replace('+', ''));
+            setNodeText(fragment.querySelector('[data-role="cell-battery-delta"]'), formatPercent(Number(row.battery_pct_delta)));
+            setNodeText(fragment.querySelector('[data-role="cell-grid-from"]'), formatWh(Number(row.grid_from_wh)));
+            setNodeText(fragment.querySelector('[data-role="cell-grid-to"]'), formatWh(Number(row.grid_to_wh)));
+            setNodeText(fragment.querySelector('[data-role="cell-price"]'), formatPrice(consumerPrice));
+            setNodeText(fragment.querySelector('[data-role="cell-spot-price"]'), formatPrice(spotPrice));
+            setNodeText(fragment.querySelector('[data-role="cell-grid-from-cost"]'), formatEur(Number(row.grid_from_cost)));
+            setNodeText(fragment.querySelector('[data-role="cell-grid-to-cost"]'), formatEur(Number(row.grid_to_cost)));
+            setNodeText(fragment.querySelector('[data-role="cell-savings"]'), formatEur(Number(row.savings_eur)));
+            setNodeText(fragment.querySelector('[data-role="cell-net-cost"]'), formatEur(netCost));
+            setNodeText(fragment.querySelector('[data-role="cell-partial"]'), row.is_partial_hour ? 'Yes' : 'No');
+            if (rowEl) {
+                const netCostCell = rowEl.querySelector('[data-role="cell-net-cost"]');
+                if (netCostCell) netCostCell.className = costClass;
+            }
+            tableBodyEl.appendChild(fragment);
+        });
+    }
+
+    function renderTotalsRow(report, state) {
+        if (!state || !state.totalRow) return;
         const hours = Array.isArray(report && report.hours) ? report.hours : [];
         const totals = report && report.totals ? report.totals : {};
         const batteryStats = computeBatteryStats(hours);
         const batteryDeltaTotal = Number.isFinite(batteryStats.start) && Number.isFinite(batteryStats.end)
             ? batteryStats.end - batteryStats.start
             : Number(totals.battery_pct_delta_total);
-
-        if (!Array.isArray(hours) || hours.length === 0) {
-            tableBodyEl.innerHTML = '<tr><td colspan="15" class="table-placeholder">No hourly rows available.</td></tr>';
-            return;
-        }
-
-        const rowsHtml = hours.map((row) => {
-            const netCost = Number(row.net_cost);
-            const costClass = Number.isFinite(netCost) ? (netCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
-            const consumerPrice = toFiniteNumber(row.price_eur_per_kwh);
-            const spotPrice = deriveSpotPrice(consumerPrice);
-            return `
-                <tr>
-                    <td>${escapeHtml(row.hour || '--')}</td>
-                    <td>${escapeHtml(formatWh(Number(row.charged_wh)))}</td>
-                    <td>${escapeHtml(formatWh(Number(row.discharged_wh)))}</td>
-                    <td>${escapeHtml(formatPercent(Number(row.battery_pct_start)).replace('+', ''))}</td>
-                    <td>${escapeHtml(formatPercent(Number(row.battery_pct_end)).replace('+', ''))}</td>
-                    <td>${escapeHtml(formatPercent(Number(row.battery_pct_delta)))}</td>
-                    <td>${escapeHtml(formatWh(Number(row.grid_from_wh)))}</td>
-                    <td>${escapeHtml(formatWh(Number(row.grid_to_wh)))}</td>
-                    <td>${escapeHtml(formatPrice(consumerPrice))}</td>
-                    <td>${escapeHtml(formatPrice(spotPrice))}</td>
-                    <td>${escapeHtml(formatEur(Number(row.grid_from_cost)))}</td>
-                    <td>${escapeHtml(formatEur(Number(row.grid_to_cost)))}</td>
-                    <td>${escapeHtml(formatEur(Number(row.savings_eur)))}</td>
-                    <td class="${costClass}">${escapeHtml(formatEur(netCost))}</td>
-                    <td>${row.is_partial_hour ? 'Yes' : 'No'}</td>
-                </tr>
-            `;
-        }).join('');
-
         const totalNetCost = Number(totals.net_cost);
         const totalCostClass = Number.isFinite(totalNetCost) ? (totalNetCost >= 0 ? 'is-negative-text' : 'is-positive-text') : '';
-        const totalRowHtml = `
-            <tr class="hourly-table__total-row">
-                <td>Total</td>
-                <td>${escapeHtml(formatWh(Number(totals.charged_wh)))}</td>
-                <td>${escapeHtml(formatWh(Number(totals.discharged_wh)))}</td>
-                <td>--</td>
-                <td>--</td>
-                <td>${escapeHtml(formatPercent(batteryDeltaTotal))}</td>
-                <td>${escapeHtml(formatWh(Number(totals.grid_from_wh)))}</td>
-                <td>${escapeHtml(formatWh(Number(totals.grid_to_wh)))}</td>
-                <td>--</td>
-                <td>--</td>
-                <td>${escapeHtml(formatEur(Number(totals.grid_from_cost)))}</td>
-                <td>${escapeHtml(formatEur(Number(totals.grid_to_cost)))}</td>
-                <td>${escapeHtml(formatEur(Number(totals.savings_eur)))}</td>
-                <td class="${totalCostClass}">${escapeHtml(formatEur(totalNetCost))}</td>
-                <td>--</td>
-            </tr>
-        `;
 
-        tableBodyEl.innerHTML = rowsHtml + totalRowHtml;
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-hour"]'), 'Total');
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-charged"]'), formatWh(Number(totals.charged_wh)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-discharged"]'), formatWh(Number(totals.discharged_wh)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-battery-start"]'), '--');
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-battery-end"]'), '--');
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-battery-delta"]'), formatPercent(batteryDeltaTotal));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-grid-from"]'), formatWh(Number(totals.grid_from_wh)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-grid-to"]'), formatWh(Number(totals.grid_to_wh)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-price"]'), '--');
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-spot-price"]'), '--');
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-grid-from-cost"]'), formatEur(Number(totals.grid_from_cost)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-grid-to-cost"]'), formatEur(Number(totals.grid_to_cost)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-savings"]'), formatEur(Number(totals.savings_eur)));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-net-cost"]'), formatEur(totalNetCost));
+        setNodeText(state.totalRow.querySelector('[data-role="hourly-total-partial"]'), '--');
+        const totalNetCostCell = state.totalRow.querySelector('[data-role="hourly-total-net-cost"]');
+        if (totalNetCostCell) totalNetCostCell.className = totalCostClass;
+        state.totalRow.hidden = false;
+    }
+
+    function renderTable(report) {
+        if (!tableBodyEl) return;
+        const hours = Array.isArray(report && report.hours) ? report.hours : [];
+        const state = resetTableState();
+
+        if (!Array.isArray(hours) || hours.length === 0) {
+            showTableMessage('No hourly rows available.');
+            return;
+        }
+        renderHourlyRows(hours);
+        renderTotalsRow(report, state);
     }
 
     function escapeHtml(value) {
@@ -912,9 +946,7 @@
         setRegenerateButtonState(Boolean(regenerateButtonEl && !regenerateButtonEl.hidden), false);
         if (chartWrapEl) chartWrapEl.hidden = true;
         if (moneyChartWrapEl) moneyChartWrapEl.hidden = true;
-        if (tableBodyEl) {
-            tableBodyEl.innerHTML = '<tr><td colspan="15" class="table-placeholder">Failed to load report.</td></tr>';
-        }
+        showTableMessage('Failed to load report.');
     }
 
     if (dateInputEl) {
