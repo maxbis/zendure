@@ -158,26 +158,41 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
             </article>
         </section>
 
-        <section class="chart-card">
-            <div class="chart-card__header">
-                <div>
-                    <p class="chart-kicker">Daily Energy View</p>
-                    <h2 data-role="chart-title">Selected day</h2>
+        <section class="overview-grid">
+            <section class="chart-card chart-card--primary">
+                <div class="chart-card__header">
+                    <div>
+                        <p class="chart-kicker">Daily Energy View</p>
+                        <h2 data-role="chart-title">Selected day</h2>
+                    </div>
+                    <div class="chart-legend">
+                        <span><i class="legend-swatch legend-swatch--charge"></i>Charged</span>
+                        <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
+                        <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
+                        <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
+                        <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
+                        <span><i class="legend-swatch legend-swatch--pnl-line"></i>Cumulative P&amp;L</span>
+                        <span><i class="legend-swatch legend-swatch--battery-level"></i>Electric level</span>
+                    </div>
                 </div>
-                <div class="chart-legend">
-                    <span><i class="legend-swatch legend-swatch--charge"></i>Charged</span>
-                    <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
-                    <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
-                    <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
-                    <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
-                    <span><i class="legend-swatch legend-swatch--pnl-line"></i>Cumulative P&amp;L</span>
-                    <span><i class="legend-swatch legend-swatch--battery-level"></i>Electric level</span>
+                <div class="chart-status" data-role="chart-status">Loading report...</div>
+                <div class="chart-wrap" data-role="chart-wrap" hidden>
+                    <svg class="daily-report-chart" data-role="chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Daily report chart"></svg>
                 </div>
-            </div>
-            <div class="chart-status" data-role="chart-status">Loading report...</div>
-            <div class="chart-wrap" data-role="chart-wrap" hidden>
-                <svg class="daily-report-chart" data-role="chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Daily report chart"></svg>
-            </div>
+            </section>
+
+            <article class="detail-card detail-card--meta">
+                <h3>Report metadata</h3>
+                <dl class="metric-list">
+                    <div><dt>Requested date</dt><dd data-role="meta-date">--</dd></div>
+                    <div><dt>Timezone</dt><dd data-role="meta-timezone">--</dd></div>
+                    <div><dt>Partial day</dt><dd data-role="meta-partial">--</dd></div>
+                    <div><dt>Price file</dt><dd data-role="meta-price-file">--</dd></div>
+                    <div><dt>Price hours</dt><dd data-role="meta-price-hours">--</dd></div>
+                    <div><dt>Generated at</dt><dd data-role="meta-generated-at">--</dd></div>
+                    <div><dt>Saved report</dt><dd data-role="meta-saved-at">--</dd></div>
+                </dl>
+            </article>
         </section>
 
         <section class="chart-card">
@@ -268,18 +283,6 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                         </tr>
                     </template>
                 </div>
-            </article>
-            <article class="detail-card">
-                <h3>Report metadata</h3>
-                <dl class="metric-list">
-                    <div><dt>Requested date</dt><dd data-role="meta-date">--</dd></div>
-                    <div><dt>Timezone</dt><dd data-role="meta-timezone">--</dd></div>
-                    <div><dt>Partial day</dt><dd data-role="meta-partial">--</dd></div>
-                    <div><dt>Price file</dt><dd data-role="meta-price-file">--</dd></div>
-                    <div><dt>Price hours</dt><dd data-role="meta-price-hours">--</dd></div>
-                    <div><dt>Generated at</dt><dd data-role="meta-generated-at">--</dd></div>
-                    <div><dt>Saved report</dt><dd data-role="meta-saved-at">--</dd></div>
-                </dl>
             </article>
         </section>
     </main>
