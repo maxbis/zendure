@@ -26,15 +26,14 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
     <main class="daily-report-shell">
         <section class="hero-card">
             <div class="hero-copy">
-                <p class="eyebrow">Prototype</p>
                 <h1><a class="hero-title-link" href="./">Daily Report</a></h1>
-            </div>
-            <div class="hero-meta">
                 <nav class="view-switch" aria-label="Report views">
                     <span class="view-switch__current">Daily</span>
                     <span class="view-switch__sep" aria-hidden="true">·</span>
                     <a href="./monthly.php?month=<?php echo htmlspecialchars($monthForMonthlyLink, ENT_QUOTES, 'UTF-8'); ?>">Monthly</a>
                 </nav>
+            </div>
+            <div class="hero-meta">
                 <form class="nav-card" data-role="date-form">
                     <label class="meta-label" for="report-date">Report date</label>
                     <div class="nav-row">
