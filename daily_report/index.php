@@ -54,7 +54,7 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
         </section>
 
         <section class="status-grid status-grid--eight">
-            <article class="summary-card summary-card--primary">
+            <article class="summary-card">
                 <div class="summary-label">Battery Throughput</div>
                 <div class="summary-split-metric">
                     <div class="summary-split-item">
@@ -114,25 +114,25 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                     </div>
                 </div>
             </article>
-            <article class="summary-card summary-card--price-variation">
+            <article class="summary-card">
                 <div class="summary-label">Price Variation</div>
                 <div class="summary-value" data-role="price-variation-total">--</div>
-                <div class="summary-secondary summary-secondary--price-variation" data-role="price-variation-range">--</div>
+                <div class="summary-secondary" data-role="price-variation-range">--</div>
                 <div class="summary-subtle" data-role="price-variation-indicator">No hourly prices</div>
             </article>
             <article class="summary-card">
                 <div class="summary-label">Net Cost</div>
                 <div class="summary-value" data-role="net-cost-total">--</div>
-                <div class="summary-secondary summary-secondary--net-cost" data-role="net-cost-spot-total">--</div>
+                <div class="summary-secondary" data-role="net-cost-spot-total">--</div>
                 <div class="summary-badge" data-role="cost-badge">Loading</div>
             </article>
-            <article class="summary-card summary-card--charge-cost">
+            <article class="summary-card">
                 <div class="summary-label">Charge Costs</div>
                 <div class="summary-value" data-role="charge-cost-total">--</div>
-                <div class="summary-secondary summary-secondary--charge-cost" data-role="charge-cost-spot-total">--</div>
+                <div class="summary-secondary" data-role="charge-cost-spot-total">--</div>
                 <div class="summary-subtle">Charged kWh × hourly spot price</div>
             </article>
-            <article class="summary-card summary-card--savings">
+            <article class="summary-card">
                 <div class="summary-label">Battery Economics</div>
                 <div class="summary-split-metric">
                     <div class="summary-split-item">
@@ -149,49 +149,34 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
                     </div>
                 </div>
             </article>
-            <article class="summary-card summary-card--pnl">
+            <article class="summary-card">
                 <div class="summary-label">P&amp;L</div>
                 <div class="summary-value" data-role="pnl-total">--</div>
-                <div class="summary-secondary summary-secondary--pnl" data-role="pnl-spot-total">--</div>
+                <div class="summary-secondary" data-role="pnl-spot-total">--</div>
                 <div class="summary-subtle">Savings - charge costs - net cost</div>
             </article>
         </section>
 
-        <section class="overview-grid">
-            <section class="chart-card chart-card--primary">
-                <div class="chart-card__header">
-                    <div>
-                        <p class="chart-kicker">Daily Energy View</p>
-                        <h2 data-role="chart-title">Selected day</h2>
-                    </div>
-                    <div class="chart-legend">
-                        <span><i class="legend-swatch legend-swatch--charge"></i>Charged</span>
-                        <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
-                        <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
-                        <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
-                        <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
-                        <span><i class="legend-swatch legend-swatch--pnl-line"></i>Cumulative P&amp;L</span>
-                        <span><i class="legend-swatch legend-swatch--battery-level"></i>Electric level</span>
-                    </div>
+        <section class="chart-card chart-card--primary">
+            <div class="chart-card__header">
+                <div>
+                    <p class="chart-kicker">Daily Energy View</p>
+                    <h2 data-role="chart-title">Selected day</h2>
                 </div>
-                <div class="chart-status" data-role="chart-status">Loading report...</div>
-                <div class="chart-wrap" data-role="chart-wrap" hidden>
-                    <svg class="daily-report-chart" data-role="chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Daily report chart"></svg>
+                <div class="chart-legend">
+                    <span><i class="legend-swatch legend-swatch--charge"></i>Charged</span>
+                    <span><i class="legend-swatch legend-swatch--discharge"></i>Discharged</span>
+                    <span><i class="legend-swatch legend-swatch--grid-from"></i>Grid from</span>
+                    <span><i class="legend-swatch legend-swatch--grid-to"></i>Grid to</span>
+                    <span><i class="legend-swatch legend-swatch--line"></i>Cumulative net cost</span>
+                    <span><i class="legend-swatch legend-swatch--pnl-line"></i>Cumulative P&amp;L</span>
+                    <span><i class="legend-swatch legend-swatch--battery-level"></i>Electric level</span>
                 </div>
-            </section>
-
-            <article class="detail-card detail-card--meta">
-                <h3>Report metadata</h3>
-                <dl class="metric-list">
-                    <div><dt>Requested date</dt><dd data-role="meta-date">--</dd></div>
-                    <div><dt>Timezone</dt><dd data-role="meta-timezone">--</dd></div>
-                    <div><dt>Partial day</dt><dd data-role="meta-partial">--</dd></div>
-                    <div><dt>Price file</dt><dd data-role="meta-price-file">--</dd></div>
-                    <div><dt>Price hours</dt><dd data-role="meta-price-hours">--</dd></div>
-                    <div><dt>Generated at</dt><dd data-role="meta-generated-at">--</dd></div>
-                    <div><dt>Saved report</dt><dd data-role="meta-saved-at">--</dd></div>
-                </dl>
-            </article>
+            </div>
+            <div class="chart-status" data-role="chart-status">Loading report...</div>
+            <div class="chart-wrap" data-role="chart-wrap" hidden>
+                <svg class="daily-report-chart" data-role="chart" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-label="Daily report chart"></svg>
+            </div>
         </section>
 
         <section class="chart-card">
@@ -216,6 +201,19 @@ $monthForMonthlyLink = preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)
         </section>
 
         <section class="detail-grid">
+            <article class="detail-card detail-card--meta">
+                <h3>Report metadata</h3>
+                <dl class="metric-list">
+                    <div><dt>Requested date</dt><dd data-role="meta-date">--</dd></div>
+                    <div><dt>Timezone</dt><dd data-role="meta-timezone">--</dd></div>
+                    <div><dt>Partial day</dt><dd data-role="meta-partial">--</dd></div>
+                    <div><dt>Price file</dt><dd data-role="meta-price-file">--</dd></div>
+                    <div><dt>Price hours</dt><dd data-role="meta-price-hours">--</dd></div>
+                    <div><dt>Generated at</dt><dd data-role="meta-generated-at">--</dd></div>
+                    <div><dt>Saved report</dt><dd data-role="meta-saved-at">--</dd></div>
+                </dl>
+            </article>
+
             <article class="detail-card">
                 <h3>Hourly table</h3>
                 <div class="table-wrap">
