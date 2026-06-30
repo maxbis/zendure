@@ -12,6 +12,7 @@ if (is_readable($dailyReportEnvLoader)) {
 }
 
 const PRICE_TICKS_SOURCE_ENTSOE_V6 = 'entsoe_v6';
+const PRICE_TICKS_SOURCE_ENERGYZERO_V7 = 'energyzero_v7';
 const PRICE_TICKS_SOURCE_JSON = 'json';
 const PRICE_TICKS_TIMEZONE = 'Europe/Amsterdam';
 const PRICE_TICKS_EXPECTED_ROWS = 24;
@@ -267,7 +268,8 @@ function priceTicksReconcileDate(
     string $date,
     string $runType,
     callable $fetchHourMap,
-    bool $dryRun = false
+    bool $dryRun = false,
+    string $source = PRICE_TICKS_SOURCE_ENTSOE_V6
 ): array {
     $date = priceTicksNormalizeDate($date);
     $startedAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
@@ -288,42 +290,124 @@ function priceTicksReconcileDate(
     try {
         $fetched = $fetchHourMap($date);
         if (!is_array($fetched) || $fetched === []) {
-            priceTicksLogFetch($pdo, $date, $runType, PRICE_TICKS_SOURCE_ENTSOE_V6, false, 0, $existingMissing, $startedAt, 'No price rows returned', $dryRun);
+            priceTicksLogFetch($pdo, $date, $runType, $source, false, 0, $existingMissing, $startedAt, 'No price rows returned', $dryRun);
             return [
                 'date' => $date,
                 'status' => 'incomplete',
-                'source' => PRICE_TICKS_SOURCE_ENTSOE_V6,
+                'source' => $source,
                 'rows_upserted' => 0,
                 'missing_hours' => $existingMissing,
                 'success' => false,
             ];
         }
 
-        $rowsUpserted = priceTicksUpsertHourMap($pdo, $date, $fetched, PRICE_TICKS_SOURCE_ENTSOE_V6, 4, $dryRun);
+        $rowsUpserted = priceTicksUpsertHourMap($pdo, $date, $fetched, $source, 4, $dryRun);
         $combined = array_replace($existing, $fetched);
         $missing = priceTicksMissingHours($combined);
         $success = $missing === [];
-        priceTicksLogFetch($pdo, $date, $runType, PRICE_TICKS_SOURCE_ENTSOE_V6, $success, $rowsUpserted, $missing, $startedAt, $success ? null : 'Price rows still incomplete', $dryRun);
+        priceTicksLogFetch($pdo, $date, $runType, $source, $success, $rowsUpserted, $missing, $startedAt, $success ? null : 'Price rows still incomplete', $dryRun);
         return [
             'date' => $date,
             'status' => $success ? 'fetched_complete' : 'fetched_incomplete',
-            'source' => PRICE_TICKS_SOURCE_ENTSOE_V6,
+            'source' => $source,
             'rows_upserted' => $rowsUpserted,
             'missing_hours' => $missing,
             'success' => $success,
         ];
     } catch (Throwable $e) {
-        priceTicksLogFetch($pdo, $date, $runType, PRICE_TICKS_SOURCE_ENTSOE_V6, false, 0, $existingMissing, $startedAt, $e->getMessage(), $dryRun);
+        priceTicksLogFetch($pdo, $date, $runType, $source, false, 0, $existingMissing, $startedAt, $e->getMessage(), $dryRun);
         return [
             'date' => $date,
             'status' => 'failed',
-            'source' => PRICE_TICKS_SOURCE_ENTSOE_V6,
+            'source' => $source,
             'rows_upserted' => 0,
             'missing_hours' => $existingMissing,
             'success' => false,
             'error' => $e->getMessage(),
         ];
     }
+}
+
+function priceTicksFetchEntsoe(string $date): ?array {
+    return fetchEntsoeHourPricesForDate(priceTicksDateToYmd($date), false, false);
+}
+
+/**
+ * Same EnergyZero source as get_prices_v7.php (via energyzero_hour_prices.php).
+ */
+function priceTicksFetchEnergyzero(string $date): ?array {
+    static $loaded = false;
+    if (!$loaded) {
+        require_once __DIR__ . '/energyzero_hour_prices.php';
+        $loaded = true;
+    }
+
+    return fetchEnergyzeroHourPricesForDate(priceTicksDateToYmd($date), false);
+}
+
+function priceTicksDateStillIncomplete(PDO $pdo, string $date): bool {
+    return !priceTicksIsComplete(priceTicksLoadHourMapFromDb($pdo, $date));
+}
+
+/**
+ * Fill one date in price_ticks using the most reliable source available.
+ *
+ * Order:
+ * 1. Skip when DB already has 24 hours.
+ * 2. Import complete JSON cache files (main/data/price, same as the UI).
+ * 3. Fetch via get_prices_v6 / ENTSO-E (partial hours are kept).
+ * 4. If still incomplete, fetch via get_prices_v7 / EnergyZero (partial hours are kept).
+ */
+function priceTicksFillDate(PDO $pdo, string $date, string $runType, bool $dryRun = false): array {
+    $date = priceTicksNormalizeDate($date);
+    $startedAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    $existing = priceTicksLoadHourMapFromDb($pdo, $date);
+    if (priceTicksIsComplete($existing)) {
+        priceTicksLogFetch($pdo, $date, $runType, 'db', true, 0, [], $startedAt, null, $dryRun);
+        return [
+            'date' => $date,
+            'status' => 'already_complete',
+            'source' => 'db',
+            'rows_upserted' => 0,
+            'missing_hours' => [],
+            'success' => true,
+        ];
+    }
+
+    $jsonPrices = priceTicksLoadJsonPriceFile($date);
+    if (is_array($jsonPrices) && priceTicksIsComplete($jsonPrices)) {
+        $rows = priceTicksUpsertHourMap($pdo, $date, $jsonPrices, PRICE_TICKS_SOURCE_JSON, 1, $dryRun);
+        priceTicksLogFetch($pdo, $date, $runType, PRICE_TICKS_SOURCE_JSON, true, $rows, [], $startedAt, null, $dryRun);
+        return [
+            'date' => $date,
+            'status' => 'json_imported',
+            'source' => PRICE_TICKS_SOURCE_JSON,
+            'rows_upserted' => $rows,
+            'missing_hours' => [],
+            'success' => true,
+        ];
+    }
+
+    $result = priceTicksReconcileDate(
+        $pdo,
+        $date,
+        $runType,
+        'priceTicksFetchEntsoe',
+        $dryRun,
+        PRICE_TICKS_SOURCE_ENTSOE_V6
+    );
+    if (!priceTicksDateStillIncomplete($pdo, $date)) {
+        return $result;
+    }
+
+    return priceTicksReconcileDate(
+        $pdo,
+        $date,
+        $runType,
+        'priceTicksFetchEnergyzero',
+        $dryRun,
+        PRICE_TICKS_SOURCE_ENERGYZERO_V7
+    );
 }
 
 function priceTicksPrintSummary(array $results): void {

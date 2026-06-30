@@ -83,6 +83,8 @@ is used by:
 
 Those scripts call it with `saveToFile=false` and `requireComplete=false`, so partial ENTSO-E responses can be stored in `price_ticks` and retried later.
 
+When ENTSO-E still leaves a date incomplete, the updater falls back to EnergyZero via `get_prices_v7.php` (shared fetch logic in `energyzero_hour_prices.php`).
+
 See [price-ticks.md](price-ticks.md) for the DB schema, cron command, and backfill process.
 
 ## CLI

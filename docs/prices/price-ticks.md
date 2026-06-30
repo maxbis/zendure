@@ -84,8 +84,10 @@ Behavior:
 - ensures `price_ticks` and `price_fetch_log` exist;
 - checks yesterday, today, and tomorrow;
 - skips dates that already have all 24 hours;
-- fetches incomplete dates through ENTSO-E v6;
-- upserts available hours;
+- imports complete JSON cache files when present;
+- fetches incomplete dates through ENTSO-E v6 (`get_prices_v6.php`);
+- when a date is still incomplete, falls back to EnergyZero v7 (`get_prices_v7.php`);
+- upserts available hours (partial provider responses are kept and retried later);
 - logs success/incomplete/failure per date;
 - continues if one date fails.
 

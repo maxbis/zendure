@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * Daily price_ticks updater.
+ *
+ * For each target date: use JSON cache when complete, else ENTSO-E (v6),
+ * else EnergyZero (v7) when the date is still incomplete in MariaDB.
+ */
 require_once __DIR__ . '/get_prices_v6.php';
 require_once __DIR__ . '/price_ticks_common.php';
 
@@ -9,10 +15,6 @@ if (!isRunningInCLI()) {
     http_response_code(403);
     echo "This script must be run from the command line.\n";
     exit(1);
-}
-
-function updatePriceTicksFetchEntsoe(string $date): ?array {
-    return fetchEntsoeHourPricesForDate(priceTicksDateToYmd($date), false, false);
 }
 
 try {
@@ -29,7 +31,7 @@ try {
 
     $results = [];
     foreach ($dates as $date) {
-        $results[] = priceTicksReconcileDate($pdo, $date, 'daily', 'updatePriceTicksFetchEntsoe');
+        $results[] = priceTicksFillDate($pdo, $date, 'daily', false);
     }
 
     priceTicksPrintSummary($results);

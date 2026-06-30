@@ -16,10 +16,6 @@ function backfillPriceTicksUsage(): string {
         . "When --start-date is omitted, the script defaults to yesterday in Europe/Amsterdam.\n";
 }
 
-function backfillPriceTicksFetchEntsoe(string $date): ?array {
-    return fetchEntsoeHourPricesForDate(priceTicksDateToYmd($date), false, false);
-}
-
 try {
     $options = getopt('', ['start-date:', 'end-date::', 'dry-run']);
     $tz = new DateTimeZone(PRICE_TICKS_TIMEZONE);
@@ -57,47 +53,20 @@ try {
 
     while ($cursor <= $end) {
         $date = $cursor->format('Y-m-d');
-        $startedAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
-        $existing = priceTicksLoadHourMapFromDb($pdo, $date);
-        if (priceTicksIsComplete($existing)) {
-            priceTicksLogFetch($pdo, $date, 'backfill', 'db', true, 0, [], $startedAt, null, $dryRun);
-            $results[] = [
-                'date' => $date,
-                'status' => 'already_complete',
-                'source' => 'db',
-                'rows_upserted' => 0,
-                'missing_hours' => [],
-                'success' => true,
-            ];
-            $totals['already_complete']++;
-            $cursor = $cursor->modify('+1 day');
-            continue;
-        }
-
-        $jsonPrices = priceTicksLoadJsonPriceFile($date);
-        if (is_array($jsonPrices) && priceTicksIsComplete($jsonPrices)) {
-            $rows = priceTicksUpsertHourMap($pdo, $date, $jsonPrices, PRICE_TICKS_SOURCE_JSON, 1, $dryRun);
-            priceTicksLogFetch($pdo, $date, 'backfill', PRICE_TICKS_SOURCE_JSON, true, $rows, [], $startedAt, null, $dryRun);
-            $results[] = [
-                'date' => $date,
-                'status' => 'json_imported',
-                'source' => PRICE_TICKS_SOURCE_JSON,
-                'rows_upserted' => $rows,
-                'missing_hours' => [],
-                'success' => true,
-            ];
-            $totals['json_imported']++;
-            $cursor = $cursor->modify('+1 day');
-            continue;
-        }
-
-        $result = priceTicksReconcileDate($pdo, $date, 'backfill', 'backfillPriceTicksFetchEntsoe', $dryRun);
+        $result = priceTicksFillDate($pdo, $date, 'backfill', $dryRun);
         $results[] = $result;
-        if (($result['success'] ?? false) === true) {
+
+        $status = (string)($result['status'] ?? '');
+        if ($status === 'already_complete') {
+            $totals['already_complete']++;
+        } elseif ($status === 'json_imported') {
+            $totals['json_imported']++;
+        } elseif (($result['success'] ?? false) === true) {
             $totals['provider_fetched']++;
         } else {
             $totals['incomplete_or_failed']++;
         }
+
         $cursor = $cursor->modify('+1 day');
     }
 

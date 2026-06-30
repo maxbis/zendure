@@ -12,6 +12,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../includes/price_conversion.php';
+require_once __DIR__ . '/energyzero_hour_prices.php';
 
 const ENERGYZERO_BASE_URL = 'https://public.api.energyzero.nl/public/v1/prices';
 const TIMEZONE_NL = 'Europe/Amsterdam';
@@ -253,45 +254,16 @@ function savePriceFile(string $dateStr, array $prices): string|false {
 }
 
 /**
- * Fetch EnergyZero for one NL date, save to price file, return hour map.
+ * Fetch EnergyZero for one NL date, save to price file, return complete hour map.
  *
  * @return array<string, float>|null Hour "00"-"23" => consumer price, or null on failure
  */
 function fetchEnergyzeroForDate(string $dateStr): ?array {
-    $url = buildEnergyzeroUrlForDate($dateStr);
-    if ($url === null) {
+    $hourPrices = fetchEnergyzeroHourPricesForDate($dateStr, true);
+    if ($hourPrices === null) {
         return null;
     }
-    $payload = fetchJson($url);
-    if ($payload === null) {
-        return null;
-    }
-
-    $hours = parseHourlyPrices($payload);
-    if (empty($hours)) {
-        return null;
-    }
-
-    $byDate = buildPriceFilesByDate($hours);
-    $expectedDateYmd = substr($dateStr, 0, 4) . '-' . substr($dateStr, 4, 2) . '-' . substr($dateStr, 6, 2);
-    $selectedDateYmd = $expectedDateYmd;
-
-    if (!isset($byDate[$selectedDateYmd])) {
-        $dates = array_keys($byDate);
-        sort($dates);
-        $selectedDateYmd = $dates[0] ?? '';
-        if ($selectedDateYmd === '') {
-            return null;
-        }
-    }
-
-    $hourPrices = $byDate[$selectedDateYmd] ?? null;
-    if ($hourPrices === null || count($hourPrices) < 24) {
-        return null;
-    }
-
-    $selectedDateStr = str_replace('-', '', $selectedDateYmd);
-    if (savePriceFile($selectedDateStr, $hourPrices) === false) {
+    if (savePriceFile($dateStr, $hourPrices) === false) {
         return null;
     }
     return $hourPrices;
@@ -340,5 +312,12 @@ function getPriceData(): array {
     ];
 }
 
-$result = getPriceData();
-sendJsonResponse($result, 200);
+function shouldRunGetPricesV7Entrypoint(): bool {
+    $script = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    return is_string($script) && $script !== '' && realpath($script) === __FILE__;
+}
+
+if (shouldRunGetPricesV7Entrypoint()) {
+    $result = getPriceData();
+    sendJsonResponse($result, 200);
+}

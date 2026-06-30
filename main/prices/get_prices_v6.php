@@ -83,20 +83,17 @@ function buildEntsoeUrlForDate(string $dateStr): ?string {
     $d = substr($dateStr, 6, 2);
 
     try {
-        // Always treat delivery date as UTC midnight
-        $startUtc = new DateTimeImmutable(
-            $y . '-' . $m . '-' . $d . ' 00:00:00',
-            new DateTimeZone('UTC')
-        );
-
-        $endUtc = $startUtc->modify('+1 day');
-
+        $tzNl = new DateTimeZone(TIMEZONE_NL);
+        $startNl = new DateTimeImmutable($y . '-' . $m . '-' . $d . ' 00:00:00', $tzNl);
+        $endNl = $startNl->modify('+1 day');
+        $startUtc = $startNl->setTimezone(new DateTimeZone('UTC'));
+        $endUtc = $endNl->setTimezone(new DateTimeZone('UTC'));
     } catch (Exception $e) {
         return null;
     }
 
-    $periodStart = $startUtc->format('YmdHi'); // e.g. 202602280000
-    $periodEnd   = $endUtc->format('YmdHi');   // e.g. 202603010000
+    $periodStart = $startUtc->format('YmdHi');
+    $periodEnd = $endUtc->format('YmdHi');
 
     // echo 'periodStart: ' . $periodStart . ', periodEnd: ' . $periodEnd . ', securityToken: ' . getEntsoeSecurityToken();
     // echo '<br>';

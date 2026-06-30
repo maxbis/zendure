@@ -64,16 +64,23 @@ def test_price_ticks_json_import_helper_reads_valid_hours(tmp_path: Path):
 def test_price_tick_cli_scripts_wire_expected_behaviour():
     update_source = UPDATE_PRICE_TICKS.read_text(encoding="utf-8")
     backfill_source = BACKFILL_PRICE_TICKS.read_text(encoding="utf-8")
+    common_source = PRICE_TICKS_COMMON.read_text(encoding="utf-8")
 
-    assert "priceTicksReconcileDate" in update_source
+    assert "priceTicksFillDate" in update_source
     assert "modify('-1 day')" in update_source
     assert "modify('+1 day')" in update_source
-    assert "fetchEntsoeHourPricesForDate" in update_source
+    assert "get_prices_v6.php" in update_source
 
+    assert "priceTicksFillDate" in backfill_source
     assert "--start-date" in backfill_source
     assert "--end-date" in backfill_source
     assert "--dry-run" in backfill_source
     assert "defaults to yesterday" in backfill_source
     assert "modify('-1 day')" in backfill_source
-    assert "priceTicksLoadJsonPriceFile" in backfill_source
-    assert "fetchEntsoeHourPricesForDate" in backfill_source
+
+    assert "priceTicksLoadJsonPriceFile" in common_source
+    assert "priceTicksFetchEntsoe" in common_source
+    assert "priceTicksFetchEnergyzero" in common_source
+    assert "fetchEntsoeHourPricesForDate" in common_source
+    assert "fetchEnergyzeroHourPricesForDate" in common_source
+    assert "get_prices_v7" in common_source
