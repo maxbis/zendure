@@ -1105,6 +1105,16 @@ class AutomateController(BaseDeviceController):
         if isinstance(schedule_entry, dict):
             slot_key = schedule_entry.get('key')
             slot_time = schedule_entry.get('time')
+            if schedule_entry.get('runtime_fallback_active') is True:
+                fallback_value = schedule_entry.get('runtime_fallback_value')
+                self.log(
+                    'info',
+                    f"Runtime fallback active for {mode} slot {slot_time or '?'} ({slot_key or 'no-key'}): "
+                    f"using fallback={fallback_value}; ignoring primary power limits "
+                    f"min={schedule_entry.get('min_power')} max={schedule_entry.get('max_power')}",
+                    message_key='runtime_fallback_ignores_power_limits',
+                )
+                return power_value
 
         try:
             min_power = self._normalize_schedule_bound(schedule_entry, 'min_power')

@@ -232,6 +232,74 @@ def test_netzero_schedule_bounds_force_export_from_charge_request():
     assert target_power == 115
 
 
+def test_netzero_minus_runtime_fallback_ignores_primary_power_bounds():
+    device_controller = _import_device_controller_module()
+    controller = _make_scenario_controller(device_controller)
+    controller.previous_power = None
+
+    target_power = device_controller.AutomateController._resolve_power_target(
+        controller,
+        "netzero-",
+        p1_data={"total_power": 0},
+        schedule_entry={
+            "time": "2100",
+            "key": "********1800",
+            "min_power": -1600,
+            "max_power": -1000,
+            "runtime_fallback_active": True,
+            "runtime_fallback_value": "netzero-",
+        },
+        zendure_data={
+            "properties": {
+                "inputLimit": 0,
+                "outputLimit": 0,
+                "electricLevel": 52,
+            }
+        },
+        p1_source="mqtt",
+    )
+
+    runtime_context = controller._get_dynamic_power_context()
+
+    assert runtime_context["raw_power"] == 0
+    assert runtime_context["bounded_power"] == 0
+    assert runtime_context["final_power"] == 0
+    assert target_power == 0
+
+
+def test_netzero_minus_primary_value_still_applies_power_bounds():
+    device_controller = _import_device_controller_module()
+    controller = _make_scenario_controller(device_controller)
+    controller.previous_power = None
+
+    target_power = device_controller.AutomateController._resolve_power_target(
+        controller,
+        "netzero-",
+        p1_data={"total_power": 0},
+        schedule_entry={
+            "time": "2100",
+            "key": "********1800",
+            "min_power": -1600,
+            "max_power": -1000,
+        },
+        zendure_data={
+            "properties": {
+                "inputLimit": 0,
+                "outputLimit": 0,
+                "electricLevel": 52,
+            }
+        },
+        p1_source="mqtt",
+    )
+
+    runtime_context = controller._get_dynamic_power_context()
+
+    assert runtime_context["raw_power"] == 0
+    assert runtime_context["bounded_power"] == -1000
+    assert runtime_context["final_power"] == -1000
+    assert target_power == -1000
+
+
 def test_set_power_resends_when_snapshot_contradicts_previous_power(monkeypatch):
     device_controller = _import_device_controller_module()
     controller = _make_scenario_controller(device_controller)

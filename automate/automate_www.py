@@ -698,6 +698,8 @@ class AutomationApp:
             self._last_runtime_decision_signature = None
             return desired_power
 
+        schedule_entry["runtime_fallback_active"] = False
+        schedule_entry["runtime_fallback_value"] = None
         runtime_conditions = schedule_entry.get("runtime_conditions")
         if not isinstance(runtime_conditions, list) or len(runtime_conditions) == 0:
             self._last_runtime_decision_signature = None
@@ -779,8 +781,10 @@ class AutomationApp:
             return desired_power
 
         fallback_value = self._normalize_fallback_value(schedule_entry.get("fallback_value"))
+        schedule_entry["runtime_fallback_active"] = True
         if fallback_value is None:
             fallback_value = 0
+            schedule_entry["runtime_fallback_value"] = fallback_value
             signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
             if self._last_runtime_decision_signature != signature:
                 self._warn_runtime_condition_once(
@@ -792,6 +796,7 @@ class AutomationApp:
 
         min_power = schedule_entry.get("min_power")
         max_power = schedule_entry.get("max_power")
+        schedule_entry["runtime_fallback_value"] = fallback_value
 
         signature = f"{slot_time}|{desired_power}|fallback:{fallback_value}|{electricity_level}"
         if self._last_runtime_decision_signature != signature:
