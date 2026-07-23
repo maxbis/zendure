@@ -1,6 +1,6 @@
-## Netzero / Netzero+ pipeline and reversal guard
+## Netzero / Netzero+ / Netzero- pipeline and reversal guard
 
-This document explains how the automation loop decides battery power in `netzero` and `netzero+` modes, and where `ReversalRampGuard` fits in the current pipeline.
+This document explains how the automation loop decides battery power in `netzero`, `netzero+`, and `netzero-` modes, and where `ReversalRampGuard` fits in the current pipeline.
 
 ---
 
@@ -15,6 +15,7 @@ This document explains how the automation loop decides battery power in `netzero
 - Modes
   - `netzero`: discharge-only when `NETZERO_BI_DIRECTIONAL=false`; charge and discharge are both possible when `true`
   - `netzero+`: charge-only, never actively discharges
+  - `netzero-`: discharge-only net-zero correction, never actively charges
 
 Relevant code:
 
@@ -27,7 +28,7 @@ Relevant code:
 
 ### 2. Current control order
 
-For a dynamic command (`netzero`, `netzero+`, or `None`), the controller resolves power in this order:
+For a dynamic command (`netzero`, `netzero+`, `netzero-`, or `None`), the controller resolves power in this order:
 
 1. Read P1 meter data from the app/runtime layer.
 2. Shift the P1 reading toward the configured target with `adjusted_p1_power = p1_power - NETZERO_TARGET_W`.
@@ -35,13 +36,17 @@ For a dynamic command (`netzero`, `netzero+`, or `None`), the controller resolve
 4. `_calculate_new_settings()` computes `(new_input, new_output)` from current state and adjusted P1 power.
 5. `calculate_netzero_power()` converts that into a raw signed target:
    - `netzero+`: positive charge or `0`
+   - `netzero-`: negative discharge or `0`
    - `netzero`: negative discharge or `0`, unless `NETZERO_BI_DIRECTIONAL=true`, in which case it may be positive or negative
-6. `_apply_schedule_power_bounds()` clamps the raw target into signed `min_power` / `max_power`.
-7. `ReversalRampGuard` compares `previous_power` to the bounded target and ramps only if the bounded target reverses sign.
-8. `_apply_power_feed_max_delta()` limits the step size.
-9. `_send_power_feed()` reapplies battery protection and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` before sending the final command to the device.
+6. `_apply_schedule_power_bounds()` clamps the raw target into signed `min_power` / `max_power` for primary rule values.
+7. Runtime fallback values skip primary rule bounds.
+8. `ReversalRampGuard` compares `previous_power` to the bounded target and ramps only if the bounded target reverses sign.
+9. `_apply_power_feed_max_delta()` limits the step size.
+10. `_send_power_feed()` reapplies battery protection and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` before sending the final command to the device.
 
 The important detail is that signed schedule bounds are now evaluated before reversal handling.
+
+Runtime fallback is the exception: when a runtime condition fails and `fallback_value` is used, the primary rule's signed schedule bounds are ignored. A fallback of `netzero-` remains a normal discharge-only net-zero correction and can resolve to `0 W`.
 
 ---
 
@@ -84,7 +89,27 @@ This avoids the old oscillation pattern where a positive raw target could trigge
 
 ---
 
-### 5. When reversal still happens
+### 5. Runtime fallback values
+
+Fallback values are selected by the automation loop when runtime-only conditions, such as `electricity_level`, do not match.
+
+- Primary rule values use signed schedule bounds.
+- Fallback values do not use signed schedule bounds.
+- Fallback values do not inherit `min_power` or `max_power` from the primary rule.
+- If fallback is `netzero-`, the controller only discharges enough to approach net zero; it does not force the primary rule's minimum discharge.
+
+Example:
+
+- primary value = `netzero-`
+- primary bounds = `min_power=-1600`, `max_power=-1000`
+- fallback value = `netzero-`
+- raw fallback target = `0`
+
+The fallback target remains `0`; it is not clamped to `-1000`.
+
+---
+
+### 6. When reversal still happens
 
 `ReversalRampGuard` still applies when the bounded target truly crosses sign relative to `previous_power`.
 
@@ -100,10 +125,11 @@ With the default divisor-based guard, that becomes `-100` for the next command.
 
 ---
 
-### 6. Summary
+### 7. Summary
 
 - `calculate_netzero_power()` first shifts the P1 reading toward `NETZERO_TARGET_W`, then produces the raw dynamic intent.
 - Signed slot bounds (`min_power` / `max_power`) are hard constraints on that raw result.
+- Signed slot bounds apply only to primary rule values, not fallback values.
 - `ReversalRampGuard` smooths only the bounded target.
 - `power_feed_max_delta` then limits the step size.
 - Final battery/device safety checks and `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` are applied again before the device write.

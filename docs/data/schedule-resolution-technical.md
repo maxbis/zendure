@@ -150,16 +150,16 @@ This file is read and written atomically by `writeScheduleAtomic()` / `writeData
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Human-readable label |
-| `value` | int / `"netzero"` / `"netzero+"` | Output action when rule fires |
+| `value` | int / `"netzero"` / `"netzero+"` / `"netzero-"` | Output action when rule fires |
 | `enabled` | bool | `false` disables the rule (default: `true`) |
 | `key` | string | Optional 12-char key pattern (default: `************`) |
 | `month` | string | Comma-separated months, e.g. `"10,11,12,1,2,3"` |
 | `hour` | string | Comma-separated hours (0–23), e.g. `"17,18,19"` |
 | `min_time` | int/string | Inclusive lower hour bound |
 | `max_time` | int/string | Inclusive upper hour bound |
-| `min_power` | int/null | Optional lower signed watt bound for `netzero` / `netzero+` |
-| `max_power` | int/null | Optional upper signed watt bound for `netzero` / `netzero+` |
-| `fallback_value` | int/string | Used at runtime if `electricity_level` condition can't be evaluated |
+| `min_power` | int/null | Optional lower signed watt bound for primary `netzero` / `netzero+` / `netzero-` values |
+| `max_power` | int/null | Optional upper signed watt bound for primary `netzero` / `netzero+` / `netzero-` values |
+| `fallback_value` | int/string | Used at runtime if `electricity_level` condition is false or cannot be evaluated |
 | `conditions` | array | Static condition rows are combined by `condition_relation` |
 | `condition_relation` | string | Optional relation for static `conditions[]` rows: `and` or `or` (default: `and`) |
 
@@ -358,18 +358,22 @@ When `false` (or absent), the conditions system is entirely bypassed and only th
 
 ## 9. Runtime Bound Enforcement — `device_controller.py`
 
-Resolved `min_power` and `max_power` metadata is consumed at runtime by `automate/device_controller.py` when the active slot value is `netzero` or `netzero+`.
+Resolved `min_power` and `max_power` metadata is consumed at runtime by `automate/device_controller.py` when the active primary slot value is `netzero`, `netzero+`, or `netzero-`.
 
 ### Runtime Order
 
 1. Calculate raw dynamic result
-2. Apply `ReversalRampGuard`
-3. Apply `min_power` / `max_power` as a signed clamp if reversal protection did not override the result
-4. Apply battery SoC and hardware/device caps
+2. If runtime conditions failed and `fallback_value` is active, skip primary rule bounds
+3. Apply `min_power` / `max_power` as a signed clamp for primary rule values
+4. Apply `ReversalRampGuard` to the bounded target
+5. Apply max-delta limiting
+6. Apply battery SoC and hardware/device caps before writing to the device
 
 ### Bound Semantics
 
 - Bounds are applied directly as signed power limits
+- Bounds apply only to the primary slot value, not to `fallback_value`
+- Fallback values do not inherit primary rule bounds
 - Missing or `null` bounds mean "leave the old behavior unchanged"
 - Invalid bounds are ignored for that cycle
 - If both are present and `min_power > max_power`, both are ignored for that cycle

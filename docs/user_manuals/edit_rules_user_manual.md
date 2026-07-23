@@ -40,22 +40,23 @@ Each rule has:
   - integer (e.g. `800`, `-800`)
   - `netzero`
   - `netzero+`
+  - `netzero-`
 - optional top-level filters:
   - `month` (e.g. `10,11,12,1,2,3`)
   - `hour` (e.g. `1,2,17,18`)
   - `min_time` (inclusive lower hour)
   - `max_time` (inclusive upper hour)
-  - `min_power` (optional minimum signed watt bound for `netzero` / `netzero+`)
-  - `max_power` (optional maximum signed watt bound for `netzero` / `netzero+`)
+  - `min_power` (optional minimum signed watt bound for `netzero` / `netzero+` / `netzero-`)
+  - `max_power` (optional maximum signed watt bound for `netzero` / `netzero+` / `netzero-`)
   - `conditions`: condition rows combined with rule relation (`AND` by default, `OR` for static-only rules)
   - `condition_relation`: optional per-rule relation for `conditions[]` rows (`and` or `or`)
-- `fallback_value` (optional): fallback power value used by runtime integrations when runtime conditions fail (integer watts, `netzero`, or `netzero+`)
+- `fallback_value` (optional): fallback power value used by runtime integrations when runtime conditions fail (integer watts, `netzero`, `netzero+`, or `netzero-`)
 
 Notes:
 
-- `min_power` and `max_power` are only used for rules whose `value` is `netzero` or `netzero+`
+- `min_power` and `max_power` are only used for rules whose primary `value` is `netzero`, `netzero+`, or `netzero-`
 - they default to `null`
-- they do not apply to `fallback_value`
+- they do not apply to `fallback_value`, and fallback values do not inherit primary rule limits
 - the editor uses `100 W` steps for these inputs
 - `fallback_value` is optional and independent of `value` type
 
