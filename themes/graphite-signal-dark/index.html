@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0d0f12">
+    <title>Graphite Signal Dark — Theme Showcase</title>
+    <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/demo.css">
+    <script src="assets/js/graphite-controls.js" defer></script>
+    <script src="assets/js/demo.js" defer></script>
+</head>
+<body data-theme="graphite-signal-dark">
+    <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
+
+    <main class="demo-shell">
+        <header class="demo-header">
+            <div class="demo-brand">
+                <span class="demo-brand__mark" aria-hidden="true">
+                    <svg class="gsd-icon"><use href="assets/icons/sprite.svg#bolt"></use></svg>
+                </span>
+                <div>
+                    <h1 class="demo-brand__title">Graphite Signal Dark</h1>
+                    <p class="demo-brand__subtitle">Mobile-first operational interface theme</p>
+                </div>
+            </div>
+            <span class="gsd-badge gsd-badge--positive">System online</span>
+        </header>
+
+        <section class="demo-grid demo-grid--dashboard" aria-label="Energy dashboard example">
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">
+                        <svg class="gsd-icon gsd-positive" aria-hidden="true">
+                            <use href="assets/icons/sprite.svg#battery"></use>
+                        </svg>
+                        Charge / Discharge
+                    </h2>
+                    <span class="gsd-badge gsd-badge--positive">Charging</span>
+                </header>
+                <div class="gsd-card__body">
+                    <div class="demo-stat-grid">
+                        <section class="gsd-inset demo-stat">
+                            <span class="gsd-label">Status</span>
+                            <div class="demo-status">
+                                <span class="demo-status__orb" aria-hidden="true"></span>
+                                Charging
+                            </div>
+                        </section>
+                        <section class="gsd-inset demo-stat">
+                            <span class="gsd-label">Power</span>
+                            <p class="gsd-metric gsd-positive">
+                                +604 W
+                                <span class="gsd-metric__detail">(1:54 left)</span>
+                            </p>
+                            <div class="demo-meter" aria-label="Charging at 604 watts on a scale from minus 1600 to 1600 watts">
+                                <span class="demo-meter__signal"></span>
+                            </div>
+                            <div class="demo-meter__labels" aria-hidden="true">
+                                <span>−1600 W</span><span>0</span><span>+1600 W</span>
+                            </div>
+                        </section>
+                        <section class="gsd-inset demo-stat demo-stat--wide">
+                            <div class="demo-stat__row">
+                                <span class="gsd-label">Battery</span>
+                                <strong class="gsd-tabular">74% · 3.40 kWh</strong>
+                            </div>
+                            <div class="gsd-progress" role="progressbar" aria-label="Battery charge" aria-valuenow="74" aria-valuemin="0" aria-valuemax="100">
+                                <span class="gsd-progress__fill" style="--gsd-progress: 74%"></span>
+                                <span class="gsd-progress__marker" style="--gsd-marker: 20%" aria-hidden="true"></span>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </article>
+
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">
+                        <svg class="gsd-icon gsd-warning" aria-hidden="true">
+                            <use href="assets/icons/sprite.svg#bolt"></use>
+                        </svg>
+                        Grid
+                    </h2>
+                </header>
+                <div class="gsd-card__body demo-stack">
+                    <section class="gsd-inset">
+                        <span class="gsd-label">Grid exchange</span>
+                        <p class="gsd-metric">−3 W <span class="gsd-metric__detail">near zero</span></p>
+                        <div class="demo-meter" aria-label="Grid exchange is minus 3 watts, near zero">
+                            <span class="demo-meter__signal" style="left: 49.5%; width: 1.5%; background: var(--gsd-accent)"></span>
+                        </div>
+                    </section>
+                    <button class="gsd-btn gsd-btn--primary" type="button" data-open-dialog="energy-slot-dialog">
+                        Inspect 16:00–17:00
+                    </button>
+                </div>
+            </article>
+        </section>
+
+        <section class="demo-grid demo-grid--dashboard" aria-label="Price chart example">
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">Today’s prices</h2>
+                    <span class="gsd-price gsd-tabular">€0.260 now</span>
+                </header>
+                <div class="gsd-card__body">
+                    <div class="demo-price-chart" aria-label="Hourly energy prices from 12:00 to 23:00">
+                        <span class="demo-price-bar" style="--bar-height: 24%; --bar-color: var(--gsd-positive)" data-hour="12"></span>
+                        <span class="demo-price-bar" style="--bar-height: 28%; --bar-color: var(--gsd-positive)" data-hour="13"></span>
+                        <span class="demo-price-bar is-current" style="--bar-height: 45%; --bar-color: var(--gsd-price)" data-hour="14"></span>
+                        <span class="demo-price-bar" style="--bar-height: 48%; --bar-color: #a39c43" data-hour="15"></span>
+                        <span class="demo-price-bar" style="--bar-height: 58%; --bar-color: #aa7e3e" data-hour="16"></span>
+                        <span class="demo-price-bar" style="--bar-height: 65%; --bar-color: #b16b3e" data-hour="17"></span>
+                        <span class="demo-price-bar" style="--bar-height: 76%; --bar-color: var(--gsd-warning)" data-hour="18"></span>
+                        <span class="demo-price-bar" style="--bar-height: 86%; --bar-color: #e36d43" data-hour="19"></span>
+                        <span class="demo-price-bar" style="--bar-height: 94%; --bar-color: var(--gsd-negative)" data-hour="20"></span>
+                        <span class="demo-price-bar" style="--bar-height: 91%; --bar-color: var(--gsd-negative)" data-hour="21"></span>
+                        <span class="demo-price-bar" style="--bar-height: 84%; --bar-color: #e36d43" data-hour="22"></span>
+                        <span class="demo-price-bar" style="--bar-height: 74%; --bar-color: var(--gsd-warning)" data-hour="23"></span>
+                    </div>
+                    <div class="demo-price-legend" aria-label="Price chart legend">
+                        <span class="demo-legend-item" style="--legend-color: var(--gsd-positive)">Low</span>
+                        <span class="demo-legend-item" style="--legend-color: var(--gsd-price)">Current</span>
+                        <span class="demo-legend-item" style="--legend-color: var(--gsd-warning)">Elevated</span>
+                        <span class="demo-legend-item" style="--legend-color: var(--gsd-negative)">High</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">Semantic signals</h2>
+                </header>
+                <div class="gsd-card__body">
+                    <div class="demo-token-grid">
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-accent)"></span><span class="demo-token__name">Accent / net-zero</span></div>
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-positive)"></span><span class="demo-token__name">Charge / success</span></div>
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-negative)"></span><span class="demo-token__name">Discharge / error</span></div>
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-warning)"></span><span class="demo-token__name">Warning / pending</span></div>
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-price)"></span><span class="demo-token__name">Price / optimization</span></div>
+                        <div class="demo-token"><span class="demo-token__swatch" style="--swatch: var(--gsd-surface-3)"></span><span class="demo-token__name">Interactive surface</span></div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="demo-grid demo-grid--components" aria-label="Component showcase">
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">Controls</h2>
+                </header>
+                <div class="gsd-card__body demo-stack">
+                    <div class="demo-control-row">
+                        <button class="gsd-btn gsd-btn--primary" type="button">Primary</button>
+                        <button class="gsd-btn gsd-btn--secondary" type="button">Secondary</button>
+                        <button class="gsd-btn gsd-btn--quiet" type="button">Quiet</button>
+                        <button class="gsd-btn gsd-btn--primary" type="button" disabled>Disabled</button>
+                    </div>
+                    <div class="demo-form-grid">
+                        <label class="gsd-field">
+                            <span class="gsd-field__label">Schedule name</span>
+                            <input class="gsd-input" type="text" value="Afternoon charge">
+                        </label>
+                        <label class="gsd-field">
+                            <span class="gsd-field__label">Operating mode</span>
+                            <select class="gsd-select">
+                                <option>Automatic</option>
+                                <option>Charge</option>
+                                <option>Discharge</option>
+                                <option>Net zero</option>
+                            </select>
+                        </label>
+                        <label class="gsd-switch">
+                            <input type="checkbox" checked>
+                            <span class="gsd-switch__track" aria-hidden="true"></span>
+                            Automation enabled
+                        </label>
+                    </div>
+                </div>
+            </article>
+
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">Standard dialogs</h2>
+                </header>
+                <div class="gsd-card__body demo-stack">
+                    <p class="demo-section-note">Native dialogs with focus management, Escape, backdrop dismissal, and focus return.</p>
+                    <div class="demo-control-row">
+                        <button class="gsd-btn gsd-btn--primary" type="button" data-open-dialog="energy-slot-dialog">Energy detail</button>
+                        <button class="gsd-btn gsd-btn--secondary" type="button" data-open-dialog="edit-dialog">Edit form</button>
+                        <button class="gsd-btn gsd-btn--quiet" type="button" data-open-dialog="info-dialog">Information</button>
+                        <button class="gsd-btn gsd-btn--danger" type="button" data-open-dialog="delete-dialog">Delete</button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="gsd-card">
+                <header class="gsd-card__header">
+                    <h2 class="gsd-card__title">Flash messages</h2>
+                </header>
+                <div class="gsd-card__body demo-stack">
+                    <p class="demo-section-note">Messages use icons and text as well as color. Errors remain visible until dismissed.</p>
+                    <div class="demo-control-row">
+                        <button class="gsd-btn gsd-btn--secondary" type="button" data-flash="success">Success</button>
+                        <button class="gsd-btn gsd-btn--secondary" type="button" data-flash="info">Info</button>
+                        <button class="gsd-btn gsd-btn--secondary" type="button" data-flash="warning">Warning</button>
+                        <button class="gsd-btn gsd-btn--secondary" type="button" data-flash="error">Error</button>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <dialog class="gsd-dialog" id="energy-slot-dialog" aria-labelledby="energy-slot-title">
+        <header class="gsd-dialog__header">
+            <button class="gsd-icon-btn" type="button" aria-label="Previous hour">
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#chevron-left"></use></svg>
+            </button>
+            <h2 class="gsd-dialog__title" id="energy-slot-title">16:00–17:00</h2>
+            <div class="gsd-dialog__nav">
+                <button class="gsd-icon-btn" type="button" aria-label="Next hour">
+                    <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#chevron-right"></use></svg>
+                </button>
+                <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </div>
+        </header>
+        <div class="gsd-dialog__body">
+            <p class="gsd-dialog__hero">€0.260</p>
+            <p class="gsd-dialog__lead">Spot price: <strong>€0.103</strong></p>
+            <p class="gsd-dialog__lead">Schedule: <strong>netzero (+7.7%)</strong></p>
+            <section class="gsd-dialog__summary" aria-labelledby="battery-estimate-title">
+                <h3 class="gsd-dialog__summary-title" id="battery-estimate-title">Estimated battery level</h3>
+                <p class="gsd-dialog__summary-value">Start: 84.9%</p>
+                <p class="gsd-dialog__summary-value">End: 92.6%</p>
+                <p class="gsd-dialog__summary-value gsd-positive">Δ +7.7%</p>
+                <p class="gsd-dialog__summary-value">@ +400 W</p>
+                <p class="gsd-dialog__summary-value">Full-hour estimate</p>
+            </section>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--secondary" type="button" data-gsd-dialog-close="auto">
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#reset"></use></svg>
+                Auto
+            </button>
+            <button class="gsd-btn gsd-btn--primary" type="button" data-dialog-flash>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#edit"></use></svg>
+                Edit schedule
+            </button>
+        </footer>
+    </dialog>
+
+    <dialog class="gsd-dialog" id="edit-dialog" aria-labelledby="edit-dialog-title">
+        <header class="gsd-dialog__header gsd-dialog__header--simple">
+            <h2 class="gsd-dialog__title" id="edit-dialog-title">Edit schedule</h2>
+            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#close"></use></svg>
+            </button>
+        </header>
+        <div class="gsd-dialog__body">
+            <form class="demo-form-grid" id="demo-edit-form">
+                <label class="gsd-field">
+                    <span class="gsd-field__label">Schedule name</span>
+                    <input class="gsd-input" type="text" value="Afternoon charge" data-gsd-initial-focus>
+                </label>
+                <label class="gsd-field">
+                    <span class="gsd-field__label">Start time</span>
+                    <input class="gsd-input" type="time" value="16:00">
+                </label>
+                <label class="gsd-field">
+                    <span class="gsd-field__label">Mode</span>
+                    <select class="gsd-select">
+                        <option>Net zero</option>
+                        <option>Charge</option>
+                        <option>Discharge</option>
+                    </select>
+                </label>
+            </form>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--secondary" type="button" data-gsd-dialog-close="cancel">Cancel</button>
+            <button class="gsd-btn gsd-btn--primary" type="button" data-dialog-flash>Save changes</button>
+        </footer>
+    </dialog>
+
+    <dialog class="gsd-dialog" id="info-dialog" aria-labelledby="info-dialog-title">
+        <header class="gsd-dialog__header gsd-dialog__header--simple">
+            <h2 class="gsd-dialog__title" id="info-dialog-title">Battery estimate</h2>
+            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#close"></use></svg>
+            </button>
+        </header>
+        <div class="gsd-dialog__body">
+            <p class="demo-dialog-copy">Estimates combine the latest measured battery capacity with the scheduled power for this hour. Actual results may vary with household consumption.</p>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--primary" type="button" data-gsd-dialog-close="acknowledged" data-gsd-initial-focus>Got it</button>
+        </footer>
+    </dialog>
+
+    <dialog class="gsd-dialog" id="delete-dialog" aria-labelledby="delete-dialog-title" role="alertdialog">
+        <header class="gsd-dialog__header gsd-dialog__header--simple">
+            <h2 class="gsd-dialog__title" id="delete-dialog-title">Delete automation?</h2>
+            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#close"></use></svg>
+            </button>
+        </header>
+        <div class="gsd-dialog__body">
+            <p class="demo-danger-copy">“Afternoon charge” will be permanently removed. Existing device settings will remain active until the next schedule refresh.</p>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--secondary" type="button" data-gsd-dialog-close="cancel" data-gsd-initial-focus>Cancel</button>
+            <button class="gsd-btn gsd-btn--danger" type="button" data-confirm-delete>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#trash"></use></svg>
+                Delete
+            </button>
+        </footer>
+    </dialog>
+</body>
+</html>

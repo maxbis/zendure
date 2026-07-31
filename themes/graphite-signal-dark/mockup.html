@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0d0f12">
+    <title>Zendure Energy Manager — Graphite Signal Dark Mockup</title>
+    <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/mockup.css">
+    <script src="assets/js/graphite-controls.js" defer></script>
+    <script src="assets/js/mockup.js" defer></script>
+</head>
+<body data-theme="graphite-signal-dark">
+    <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
+
+    <main class="mock-page">
+        <header class="mock-topbar">
+            <div class="mock-brand">
+                <span class="mock-brand__mark" aria-hidden="true">
+                    <svg class="gsd-icon"><use href="assets/icons/sprite.svg#bolt"></use></svg>
+                </span>
+                <div class="mock-brand__copy">
+                    <h1 class="mock-brand__title">Zendure Energy Manager</h1>
+                    <p class="mock-brand__meta">Thursday, 30 July · 14:12 · Home</p>
+                </div>
+            </div>
+            <div class="mock-topbar__actions">
+                <span class="gsd-badge gsd-badge--positive mock-live">Live</span>
+                <button class="gsd-icon-btn" type="button" aria-label="Refresh preview" data-mock-refresh>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#refresh"></use></svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="mock-layout">
+            <section class="gsd-card mock-energy" aria-labelledby="energy-now-title">
+                <div class="mock-energy__body">
+                    <article class="mock-power-hero">
+                        <div class="mock-eyebrow">
+                            <span class="mock-eyebrow__dot" aria-hidden="true"></span>
+                            Charging now
+                        </div>
+                        <h2 class="gsd-sr-only" id="energy-now-title">Current energy status</h2>
+                        <p class="mock-power-value">+604 <span class="mock-power-value__unit">W</span></p>
+                        <p class="mock-power-copy">Battery reaches <strong>90%</strong> in approximately <strong>1h 54m</strong></p>
+                        <div class="mock-flow-scale" aria-label="Charging at 604 watts on a scale from minus 1600 to plus 1600 watts">
+                            <span class="mock-flow-scale__line"></span>
+                            <span class="mock-flow-scale__zero">0 W</span>
+                            <span class="mock-flow-scale__line mock-flow-scale__line--active"></span>
+                        </div>
+                    </article>
+
+                    <div class="mock-energy__aside">
+                        <article class="mock-compact-stat">
+                            <div class="mock-compact-stat__top">
+                                <div>
+                                    <span class="mock-compact-stat__label">
+                                        <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#battery"></use></svg>
+                                        Battery
+                                    </span>
+                                    <p class="mock-compact-stat__value">74%</p>
+                                    <span class="mock-compact-stat__hint">3.40 of 4.60 kWh</span>
+                                </div>
+                                <span class="gsd-badge gsd-badge--positive">+7.7%</span>
+                            </div>
+                            <div class="mock-battery-progress" role="progressbar" aria-label="Battery charge" aria-valuenow="74" aria-valuemin="0" aria-valuemax="100">
+                                <span class="mock-battery-progress__fill"></span>
+                                <span class="mock-battery-progress__limit" aria-hidden="true"></span>
+                            </div>
+                        </article>
+
+                        <article class="mock-compact-stat">
+                            <div class="mock-compact-stat__top">
+                                <div>
+                                    <span class="mock-compact-stat__label">
+                                        <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#grid"></use></svg>
+                                        Grid exchange
+                                    </span>
+                                    <p class="mock-compact-stat__value">−3 W</p>
+                                    <span class="mock-compact-stat__hint">Balanced near zero</span>
+                                </div>
+                                <span class="gsd-badge">Stable</span>
+                            </div>
+                            <div class="mock-grid-zero" aria-label="Grid exchange is near zero">
+                                <span class="mock-grid-zero__track">
+                                    <span class="mock-grid-zero__signal"></span>
+                                </span>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="gsd-card mock-price-card" aria-labelledby="today-prices-title">
+                <header class="mock-section-heading">
+                    <h2 id="today-prices-title">
+                        <svg class="gsd-icon gsd-warning" aria-hidden="true"><use href="assets/icons/sprite.svg#calendar"></use></svg>
+                        Today’s prices
+                    </h2>
+                    <span class="mock-section-heading__meta">Tap an hour for details</span>
+                </header>
+
+                <div class="mock-price-summary">
+                    <div class="mock-price-kpi">
+                        <span class="mock-price-kpi__label">Current</span>
+                        <strong class="mock-price-kpi__value gsd-price">€0.260</strong>
+                    </div>
+                    <div class="mock-price-kpi">
+                        <span class="mock-price-kpi__label">Daily low</span>
+                        <strong class="mock-price-kpi__value gsd-positive">€0.160</strong>
+                    </div>
+                    <div class="mock-price-kpi">
+                        <span class="mock-price-kpi__label">Daily high</span>
+                        <strong class="mock-price-kpi__value gsd-negative">€0.380</strong>
+                    </div>
+                </div>
+
+                <div class="mock-chart-scroll">
+                    <div class="mock-hourly" aria-label="Hourly electricity prices for today">
+                        <button class="mock-hour" type="button" style="--height:68%;--color:#d86c40" data-mock-hour data-hour="00" data-price="€0.320" data-spot="€0.156" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:66%;--color:#d86c40" data-mock-hour data-hour="01" data-price="€0.310" data-spot="€0.148" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:64%;--color:#d86c40" data-mock-hour data-hour="02" data-price="€0.300" data-spot="€0.139" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:62%;--color:#cf7a43" data-mock-hour data-hour="03" data-price="€0.290" data-spot="€0.130" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:64%;--color:#d47a43" data-mock-hour data-hour="04" data-price="€0.300" data-spot="€0.139" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:66%;--color:#d86c40" data-mock-hour data-hour="05" data-price="€0.310" data-spot="€0.148" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:67%;--color:#d86c40" data-mock-hour data-hour="06" data-price="€0.310" data-spot="€0.148" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:67%;--color:#d86c40" data-mock-hour data-hour="07" data-price="€0.310" data-spot="€0.148" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:61%;--color:#c78a49" data-mock-hour data-hour="08" data-price="€0.280" data-spot="€0.121" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:50%;--color:#9d9148" data-mock-hour data-hour="09" data-price="€0.240" data-spot="€0.085" data-schedule="Net zero"></button>
+                        <button class="mock-hour" type="button" style="--height:36%;--color:#6cab57" data-mock-hour data-hour="10" data-price="€0.180" data-spot="€0.031" data-schedule="Charge"></button>
+                        <button class="mock-hour" type="button" style="--height:30%;--color:#62b871" data-mock-hour data-hour="11" data-price="€0.160" data-spot="€0.013" data-schedule="Charge"></button>
+                        <button class="mock-hour" type="button" style="--height:31%;--color:#62b871" data-mock-hour data-hour="12" data-price="€0.160" data-spot="€0.013" data-schedule="Charge"></button>
+                        <button class="mock-hour" type="button" style="--height:36%;--color:#70ad57" data-mock-hour data-hour="13" data-price="€0.180" data-spot="€0.031" data-schedule="Charge"></button>
+                        <button class="mock-hour is-current" type="button" style="--height:50%;--color:var(--gsd-price)" data-mock-hour data-hour="14" data-price="€0.260" data-spot="€0.103" data-schedule="Net zero (+7.7%)"></button>
+                        <button class="mock-hour" type="button" style="--height:57%;--color:#a99b48" data-mock-hour data-hour="15" data-price="€0.230" data-spot="€0.076" data-schedule="Net zero"></button>
+                        <button class="mock-hour" type="button" style="--height:61%;--color:#ba8e48" data-mock-hour data-hour="16" data-price="€0.260" data-spot="€0.103" data-schedule="Net zero"></button>
+                        <button class="mock-hour" type="button" style="--height:68%;--color:#d07b43" data-mock-hour data-hour="17" data-price="€0.290" data-spot="€0.130" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:75%;--color:#e26c43" data-mock-hour data-hour="18" data-price="€0.310" data-spot="€0.148" data-schedule="Discharge"></button>
+                        <button class="mock-hour" type="button" style="--height:84%;--color:var(--gsd-negative)" data-mock-hour data-hour="19" data-price="€0.350" data-spot="€0.184" data-schedule="Discharge"></button>
+                        <button class="mock-hour" type="button" style="--height:90%;--color:var(--gsd-negative)" data-mock-hour data-hour="20" data-price="€0.370" data-spot="€0.202" data-schedule="Discharge"></button>
+                        <button class="mock-hour" type="button" style="--height:93%;--color:var(--gsd-negative)" data-mock-hour data-hour="21" data-price="€0.380" data-spot="€0.211" data-schedule="Discharge"></button>
+                        <button class="mock-hour" type="button" style="--height:90%;--color:var(--gsd-negative)" data-mock-hour data-hour="22" data-price="€0.370" data-spot="€0.202" data-schedule="Auto"></button>
+                        <button class="mock-hour" type="button" style="--height:81%;--color:#e26c43" data-mock-hour data-hour="23" data-price="€0.340" data-spot="€0.175" data-schedule="Auto"></button>
+                    </div>
+                </div>
+
+                <div class="mock-price-legend" aria-label="Price chart legend">
+                    <span style="--key:var(--gsd-positive)">Low price</span>
+                    <span style="--key:var(--gsd-price)">Current hour</span>
+                    <span style="--key:var(--gsd-warning)">Elevated</span>
+                    <span style="--key:var(--gsd-negative)">High price</span>
+                </div>
+            </section>
+
+            <section class="gsd-card mock-chart-card" aria-labelledby="energy-chart-title">
+                <header class="mock-section-heading">
+                    <h2 id="energy-chart-title">
+                        <svg class="gsd-icon gsd-positive" aria-hidden="true"><use href="assets/icons/sprite.svg#chart"></use></svg>
+                        Energy per hour
+                    </h2>
+                    <span class="mock-section-heading__meta">Wh</span>
+                </header>
+                <div class="mock-tabs" role="tablist" aria-label="Energy chart view">
+                    <button class="mock-tab" type="button" role="tab" aria-selected="true">Graph</button>
+                    <button class="mock-tab" type="button" role="tab" aria-selected="false">Daily totals</button>
+                </div>
+                <div class="mock-chart-scroll">
+                    <div class="mock-energy-chart" aria-label="Battery energy per hour">
+                        <div class="mock-energy-column" data-hour="04"><span class="mock-energy-column__positive" style="--positive:38%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="05"><span class="mock-energy-column__positive" style="--positive:52%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="06"><span class="mock-energy-column__positive" style="--positive:61%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="07"><span class="mock-energy-column__positive" style="--positive:47%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="08"><span class="mock-energy-column__positive" style="--positive:20%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="09"><span class="mock-energy-column__positive" style="--positive:8%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="10"><span class="mock-energy-column__positive" style="--positive:0%"></span><span class="mock-energy-column__negative" style="--negative:12%"></span></div>
+                        <div class="mock-energy-column" data-hour="11"><span class="mock-energy-column__positive" style="--positive:0%"></span><span class="mock-energy-column__negative" style="--negative:28%"></span></div>
+                        <div class="mock-energy-column" data-hour="12"><span class="mock-energy-column__positive" style="--positive:18%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="13"><span class="mock-energy-column__positive" style="--positive:34%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="14"><span class="mock-energy-column__positive" style="--positive:44%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                        <div class="mock-energy-column" data-hour="15"><span class="mock-energy-column__positive" style="--positive:26%"></span><span class="mock-energy-column__negative" style="--negative:0%"></span></div>
+                    </div>
+                </div>
+                <div class="mock-chart-summary">
+                    <div class="mock-chart-summary__item"><span>Charged</span><strong class="gsd-positive">2.84 kWh</strong></div>
+                    <div class="mock-chart-summary__item"><span>Discharged</span><strong class="gsd-negative">0.72 kWh</strong></div>
+                    <div class="mock-chart-summary__item"><span>Net</span><strong>+2.12 kWh</strong></div>
+                </div>
+            </section>
+
+            <aside class="mock-side-stack" aria-label="Supporting information">
+                <section class="gsd-card mock-side-card mock-tomorrow-card" aria-labelledby="tomorrow-title">
+                    <header class="mock-section-heading">
+                        <h2 id="tomorrow-title">
+                            <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#calendar"></use></svg>
+                            Tomorrow
+                        </h2>
+                        <span class="gsd-badge">Pending</span>
+                    </header>
+                    <div class="mock-tomorrow">
+                        <div class="mock-empty-state">
+                            <span class="mock-empty-state__icon" aria-hidden="true">
+                                <svg class="gsd-icon"><use href="assets/icons/sprite.svg#clock"></use></svg>
+                            </span>
+                            <div>
+                                <strong>Prices expected after 13:00</strong>
+                                <p>The chart will fill automatically when published.</p>
+                            </div>
+                        </div>
+                        <div class="mock-skeleton-bars" aria-hidden="true">
+                            <span style="--height:62%"></span><span style="--height:78%"></span><span style="--height:68%"></span><span style="--height:86%"></span><span style="--height:74%"></span><span style="--height:91%"></span><span style="--height:69%"></span><span style="--height:82%"></span><span style="--height:65%"></span><span style="--height:76%"></span><span style="--height:60%"></span><span style="--height:72%"></span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="gsd-card mock-side-card mock-automation-card" aria-labelledby="automation-title">
+                    <header class="mock-section-heading">
+                        <h2 id="automation-title">
+                            <svg class="gsd-icon gsd-positive" aria-hidden="true"><use href="assets/icons/sprite.svg#activity"></use></svg>
+                            Automation
+                        </h2>
+                        <span class="gsd-badge gsd-badge--positive">Healthy</span>
+                    </header>
+                    <div class="mock-activity-list">
+                        <div class="mock-activity">
+                            <span class="mock-activity__icon"><svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#check"></use></svg></span>
+                            <div class="mock-activity__copy"><strong>Last cycle completed</strong><span>All controls acknowledged</span></div>
+                            <span class="mock-activity__value">14:10</span>
+                        </div>
+                        <div class="mock-activity">
+                            <span class="mock-activity__icon"><svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#clock"></use></svg></span>
+                            <div class="mock-activity__copy"><strong>Next evaluation</strong><span>Schedule and grid balance</span></div>
+                            <span class="mock-activity__value">2 min</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="gsd-card mock-side-card mock-schedule-card" aria-labelledby="schedule-title">
+                    <header class="mock-section-heading">
+                        <h2 id="schedule-title">
+                            <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#clock"></use></svg>
+                            Coming up
+                        </h2>
+                        <button class="gsd-icon-btn" type="button" aria-label="Schedule settings">
+                            <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#settings"></use></svg>
+                        </button>
+                    </header>
+                    <div class="mock-schedule-list">
+                        <div class="mock-schedule">
+                            <span class="mock-schedule__time">15:00</span>
+                            <div class="mock-schedule__copy"><strong>Net zero</strong><span>Balance household load</span></div>
+                            <span class="mock-schedule__value">±0 W</span>
+                        </div>
+                        <div class="mock-schedule">
+                            <span class="mock-schedule__time">16:00</span>
+                            <div class="mock-schedule__copy"><strong>Charge</strong><span>Target battery 90%</span></div>
+                            <span class="mock-schedule__value gsd-positive">+400 W</span>
+                        </div>
+                        <div class="mock-schedule">
+                            <span class="mock-schedule__time">19:00</span>
+                            <div class="mock-schedule__copy"><strong>Discharge</strong><span>High-price window</span></div>
+                            <span class="mock-schedule__value gsd-negative">−600 W</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+
+        <p class="mock-footer-note">Static Graphite Signal Dark concept · Representative data only</p>
+    </main>
+
+    <dialog class="gsd-dialog" id="mock-price-dialog" aria-labelledby="mock-price-dialog-title">
+        <header class="gsd-dialog__header">
+            <button class="gsd-icon-btn" type="button" aria-label="Previous hour">
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#chevron-left"></use></svg>
+            </button>
+            <h2 class="gsd-dialog__title" id="mock-price-dialog-title" data-mock-slot-title>14:00–15:00</h2>
+            <div class="gsd-dialog__nav">
+                <button class="gsd-icon-btn" type="button" aria-label="Next hour">
+                    <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#chevron-right"></use></svg>
+                </button>
+                <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </div>
+        </header>
+        <div class="gsd-dialog__body">
+            <p class="gsd-dialog__hero" data-mock-consumer-price>€0.260</p>
+            <p class="gsd-dialog__lead">Spot price: <strong data-mock-spot-price>€0.103</strong></p>
+            <p class="gsd-dialog__lead">Schedule: <strong data-mock-schedule>Net zero (+7.7%)</strong></p>
+            <section class="gsd-dialog__summary" aria-labelledby="mock-battery-estimate-title">
+                <h3 class="gsd-dialog__summary-title" id="mock-battery-estimate-title">Estimated battery level</h3>
+                <p class="gsd-dialog__summary-value">Start: 84.9%</p>
+                <p class="gsd-dialog__summary-value">End: 92.6%</p>
+                <p class="gsd-dialog__summary-value gsd-positive">Δ +7.7%</p>
+                <p class="gsd-dialog__summary-value">@ +400 W</p>
+                <p class="gsd-dialog__summary-value">Full-hour estimate</p>
+            </section>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--secondary" type="button" data-mock-auto>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#reset"></use></svg>
+                Auto
+            </button>
+            <button class="gsd-btn gsd-btn--primary" type="button" data-mock-edit>
+                <svg class="gsd-icon" aria-hidden="true"><use href="assets/icons/sprite.svg#edit"></use></svg>
+                Edit schedule
+            </button>
+        </footer>
+    </dialog>
+</body>
+</html>

@@ -1,0 +1,168 @@
+/*
+ * Graphite Signal Dark
+ * Semantic tokens and base primitives.
+ */
+
+:root,
+[data-theme="graphite-signal-dark"] {
+    color-scheme: dark;
+
+    --gsd-page: #0d0f12;
+    --gsd-page-deep: #080a0c;
+    --gsd-surface-1: #15181c;
+    --gsd-surface-2: #1c2025;
+    --gsd-surface-3: #252a30;
+    --gsd-surface-hover: #2d333a;
+    --gsd-surface-selected: #25394d;
+    --gsd-backdrop: rgba(3, 5, 7, 0.82);
+
+    --gsd-border-subtle: #292e34;
+    --gsd-border: #363c44;
+    --gsd-border-strong: #4a525c;
+
+    --gsd-text: #f2f4f5;
+    --gsd-text-secondary: #b9bec5;
+    --gsd-text-muted: #90979f;
+    --gsd-text-disabled: #686f77;
+    --gsd-text-on-signal: #07111a;
+
+    --gsd-accent: #65a9e8;
+    --gsd-accent-hover: #7db9ee;
+    --gsd-accent-active: #4d91d0;
+    --gsd-accent-soft: #1c354d;
+    --gsd-focus-ring: rgba(101, 169, 232, 0.34);
+
+    --gsd-positive: #79d484;
+    --gsd-positive-soft: #173720;
+    --gsd-negative: #ff7b73;
+    --gsd-negative-soft: #42201f;
+    --gsd-warning: #ffb45e;
+    --gsd-warning-soft: #412f19;
+    --gsd-info: #74b6f0;
+    --gsd-info-soft: #1a3349;
+    --gsd-price: #c7e500;
+    --gsd-price-soft: #303914;
+    --gsd-neutral: #9aa1a9;
+
+    --gsd-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.18);
+    --gsd-shadow-floating: 0 28px 70px rgba(0, 0, 0, 0.62);
+
+    --gsd-radius-sm: 8px;
+    --gsd-radius-md: 10px;
+    --gsd-radius-card: 14px;
+    --gsd-radius-dialog: 18px;
+
+    --gsd-space-1: 4px;
+    --gsd-space-2: 8px;
+    --gsd-space-3: 12px;
+    --gsd-space-4: 16px;
+    --gsd-space-5: 20px;
+    --gsd-space-6: 24px;
+    --gsd-space-8: 32px;
+
+    --gsd-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    --gsd-duration-fast: 150ms;
+    --gsd-duration-medium: 220ms;
+}
+
+[data-theme="graphite-signal-dark"],
+[data-theme="graphite-signal-dark"] *,
+[data-theme="graphite-signal-dark"] *::before,
+[data-theme="graphite-signal-dark"] *::after {
+    box-sizing: border-box;
+}
+
+html {
+    background: var(--gsd-page);
+}
+
+body[data-theme="graphite-signal-dark"] {
+    min-width: 320px;
+    min-height: 100dvh;
+    margin: 0;
+    background:
+        radial-gradient(circle at 50% -20%, rgba(101, 169, 232, 0.08), transparent 32rem),
+        var(--gsd-page);
+    color: var(--gsd-text);
+    font-family: var(--gsd-font-sans);
+    font-size: 16px;
+    line-height: 1.45;
+    text-rendering: optimizeLegibility;
+}
+
+[data-theme="graphite-signal-dark"] h1,
+[data-theme="graphite-signal-dark"] h2,
+[data-theme="graphite-signal-dark"] h3,
+[data-theme="graphite-signal-dark"] p {
+    margin-top: 0;
+}
+
+[data-theme="graphite-signal-dark"] button,
+[data-theme="graphite-signal-dark"] input,
+[data-theme="graphite-signal-dark"] select,
+[data-theme="graphite-signal-dark"] textarea {
+    font: inherit;
+}
+
+[data-theme="graphite-signal-dark"] button {
+    color: inherit;
+}
+
+[data-theme="graphite-signal-dark"] a {
+    color: var(--gsd-accent);
+}
+
+[data-theme="graphite-signal-dark"] ::selection {
+    background: var(--gsd-accent);
+    color: var(--gsd-text-on-signal);
+}
+
+[data-theme="graphite-signal-dark"] :focus-visible {
+    outline: 3px solid var(--gsd-focus-ring);
+    outline-offset: 2px;
+}
+
+.gsd-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.gsd-tabular {
+    font-variant-numeric: tabular-nums;
+}
+
+.gsd-positive {
+    color: var(--gsd-positive);
+}
+
+.gsd-negative {
+    color: var(--gsd-negative);
+}
+
+.gsd-warning {
+    color: var(--gsd-warning);
+}
+
+.gsd-price {
+    color: var(--gsd-price);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme="graphite-signal-dark"] *,
+    [data-theme="graphite-signal-dark"] *::before,
+    [data-theme="graphite-signal-dark"] *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
