@@ -65,6 +65,70 @@ function appEnergyHistoryFetchRows(PDO $pdo, string $startDate, string $endDate)
     return $stmt->fetchAll();
 }
 
+/** @return array<int, array<string, mixed>> */
+function appEnergyHistoryFetchPriceRows(PDO $pdo, string $date): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT local_hour, consumer_eur_per_kwh, spot_eur_per_kwh
+         FROM price_ticks
+         WHERE local_date = :local_date
+         ORDER BY local_hour ASC'
+    );
+    $stmt->execute(['local_date' => $date]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Convert the canonical live daily-report output to the same row shape as
+ * hourly_report_inputs so current-day and historical rows share aggregation.
+ *
+ * @param array<string, mixed> $report
+ * @param array<int, array<string, mixed>> $priceRows
+ * @return array<int, array<string, mixed>>
+ */
+function appEnergyHistoryMapLiveReportRows(array $report, array $priceRows, string $date): array
+{
+    $pricesByHour = [];
+    foreach ($priceRows as $priceRow) {
+        $hour = (int)($priceRow['local_hour'] ?? -1);
+        if ($hour < 0 || $hour > 23) {
+            continue;
+        }
+        $pricesByHour[$hour] = [
+            'consumer_eur_per_kwh' => appEnergyHistoryFloat($priceRow['consumer_eur_per_kwh'] ?? null),
+            'spot_eur_per_kwh' => appEnergyHistoryFloat($priceRow['spot_eur_per_kwh'] ?? null),
+        ];
+    }
+
+    $mapped = [];
+    $hours = is_array($report['hours'] ?? null) ? $report['hours'] : [];
+    foreach ($hours as $hourRow) {
+        if (!is_array($hourRow)) {
+            continue;
+        }
+        $hourValue = $hourRow['hour'] ?? null;
+        if ((!is_string($hourValue) && !is_int($hourValue)) || !preg_match('/^\d{1,2}$/', (string)$hourValue)) {
+            continue;
+        }
+        $hour = (int)$hourValue;
+        if ($hour < 0 || $hour > 23) {
+            continue;
+        }
+        $price = $pricesByHour[$hour] ?? [];
+        $mapped[] = [
+            'local_date' => $date,
+            'local_hour' => $hour,
+            'charged_wh' => $hourRow['charged_wh'] ?? 0,
+            'discharged_wh' => $hourRow['discharged_wh'] ?? 0,
+            'battery_pct_start' => $hourRow['battery_pct_start'] ?? null,
+            'battery_pct_end' => $hourRow['battery_pct_end'] ?? null,
+            'consumer_eur_per_kwh' => $price['consumer_eur_per_kwh'] ?? null,
+            'spot_eur_per_kwh' => $price['spot_eur_per_kwh'] ?? null,
+        ];
+    }
+    return $mapped;
+}
+
 function appEnergyHistoryFloat(mixed $value): ?float
 {
     if ($value === null || is_bool($value) || !is_numeric($value)) {
@@ -95,7 +159,12 @@ function appEnergyHistoryFinishMoneyMetric(array $metric): array
  * @param array<int, array<string, mixed>> $rows
  * @return array<string, mixed>
  */
-function appEnergyHistoryBuildPayload(array $rows, int $requestedDays): array
+function appEnergyHistoryBuildPayload(
+    array $rows,
+    int $requestedDays,
+    string $todaySource = 'sqlite_replication.status_updates',
+    bool $isStale = false
+): array
 {
     $whPerHour = [];
     $days = [];
@@ -196,10 +265,12 @@ function appEnergyHistoryBuildPayload(array $rows, int $requestedDays): array
         'whPerHour' => $whPerHour,
         'whPerDay' => $whPerDay,
         'cacheInfo' => [
-            'source' => 'sqlite_replication.hourly_report_inputs',
+            'source' => 'hybrid',
+            'todaySource' => $todaySource,
+            'historySource' => 'sqlite_replication.hourly_report_inputs',
+            'priceSource' => 'sqlite_replication.price_ticks',
             'days' => $requestedDays,
-            'isStale' => false,
+            'isStale' => $isStale,
         ],
     ];
 }
-

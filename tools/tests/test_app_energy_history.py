@@ -29,6 +29,21 @@ def _build_payload(rows: list[dict[str, object]]) -> dict[str, object]:
     return json.loads(proc.stdout)
 
 
+def _map_live_rows(
+    report: dict[str, object], price_rows: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    php = (
+        f'require {json.dumps(str(HELPER_FILE))};'
+        f'$report=json_decode({json.dumps(json.dumps(report))},true);'
+        f'$prices=json_decode({json.dumps(json.dumps(price_rows))},true);'
+        'echo json_encode(appEnergyHistoryMapLiveReportRows($report,$prices,"2026-08-01"));'
+    )
+    proc = subprocess.run(["php", "-r", php], capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip())
+    return json.loads(proc.stdout)
+
+
 def _row(
     hour: int,
     *,
@@ -96,6 +111,43 @@ def test_missing_price_on_zero_flow_hour_does_not_invalidate_totals() -> None:
     assert totals["spot"]["net"]["eur"] == pytest.approx(0.10)
 
 
+def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
+    rows = _map_live_rows(
+        {
+            "hours": [
+                {
+                    "hour": "13",
+                    "charged_wh": 725.5,
+                    "discharged_wh": 110.25,
+                    "battery_pct_start": 32,
+                    "battery_pct_end": 40,
+                    "price_eur_per_kwh": 9.99,
+                }
+            ]
+        },
+        [
+            {
+                "local_hour": 13,
+                "consumer_eur_per_kwh": 0.28,
+                "spot_eur_per_kwh": 0.12,
+            }
+        ],
+    )
+
+    assert rows == [
+        {
+            "local_date": "2026-08-01",
+            "local_hour": 13,
+            "charged_wh": 725.5,
+            "discharged_wh": 110.25,
+            "battery_pct_start": 32,
+            "battery_pct_end": 40,
+            "consumer_eur_per_kwh": 0.28,
+            "spot_eur_per_kwh": 0.12,
+        }
+    ]
+
+
 def test_app_wires_sql_endpoint_and_all_six_price_values() -> None:
     app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
@@ -113,8 +165,13 @@ def test_app_wires_sql_endpoint_and_all_six_price_values() -> None:
         assert f'data-role="{role}"' in app_index
         assert role in energy_js
 
-    assert "appEnergyHistoryFetchRows" in endpoint
-    assert "hourly_report_inputs" in HELPER_FILE.read_text(encoding="utf-8")
+    helper = HELPER_FILE.read_text(encoding="utf-8")
+    assert "dailyReportGenerateLive($today)" in endpoint
+    assert "appEnergyHistoryFetchPriceRows($pdo, $today)" in endpoint
+    assert "appEnergyHistoryMapLiveReportRows" in endpoint
+    assert "hourly_report_inputs_fallback" in endpoint
+    assert "hourly_report_inputs" in helper
+    assert "FROM price_ticks" in helper
+    assert "'todaySource' => $todaySource" in helper
     assert "source.complete !== true" in energy_js
     assert 'return "—"' in energy_js
-

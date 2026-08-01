@@ -709,8 +709,6 @@
 .app-price-hour__price,
 .app-price-hour__time {
     overflow: hidden;
-    color: var(--gsd-text-muted);
-    font-size: 0.55rem;
     line-height: 1;
     text-align: center;
     text-overflow: clip;
@@ -720,13 +718,26 @@
 
 .app-price-hour__price {
     align-self: end;
-    color: var(--gsd-text-secondary);
+    color: var(--gsd-text);
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
 }
 
-.app-price-hour[data-current="true"] .app-price-hour__time,
+.app-price-hour__time {
+    color: var(--gsd-text-muted);
+    font-size: 0.6rem;
+    font-weight: 450;
+}
+
 .app-price-hour[data-current="true"] .app-price-hour__price {
     color: var(--gsd-price);
     font-weight: 750;
+}
+
+.app-price-hour[data-current="true"] .app-price-hour__time {
+    color: color-mix(in srgb, var(--gsd-price) 64%, var(--gsd-text-muted));
+    font-weight: 600;
 }
 
 .app-price-hour__action {
