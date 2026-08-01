@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/app_energy_history.php';
+require_once __DIR__ . '/../includes/config_loader.php';
+
+date_default_timezone_set(APP_ENERGY_HISTORY_TIMEZONE);
+
+header('Content-Type: application/json');
+header('Cache-Control: no-store, max-age=0');
+
+if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Method not allowed. Use GET.']);
+    exit();
+}
+
+try {
+    $requestedDays = appEnergyHistoryResolveDays($_GET['days'] ?? null);
+    $timezone = new DateTimeZone(APP_ENERGY_HISTORY_TIMEZONE);
+    $endDate = new DateTimeImmutable('today', $timezone);
+    $startDate = $endDate->modify('-' . $requestedDays . ' days');
+    $rows = appEnergyHistoryFetchRows(
+        appEnergyHistoryCreatePdo(),
+        $startDate->format('Y-m-d'),
+        $endDate->format('Y-m-d')
+    );
+    $payload = appEnergyHistoryBuildPayload($rows, $requestedDays);
+    $payload['baseWh'] = (int)ConfigLoader::get('baseWh', 5760);
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+} catch (Throwable $error) {
+    error_log('App energy history API: ' . $error->getMessage());
+    http_response_code(500);
+    echo json_encode(['error' => 'Hourly battery energy could not be loaded from the database.']);
+}
+

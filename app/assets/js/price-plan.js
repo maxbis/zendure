@@ -506,6 +506,7 @@
 
         const limit = closestPowerLimit(slot);
         if (limit !== null) {
+            element.dataset.limitValue = "true";
             element.textContent = formatBadgePower(limit);
             return;
         }

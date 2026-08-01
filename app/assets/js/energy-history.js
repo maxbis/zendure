@@ -2,7 +2,7 @@
     "use strict";
 
     const config = Object.freeze({
-        energyHistoryUrl: "../main/api/energy_graph_proxy.php?days=3",
+        energyHistoryUrl: "../main/api/app_energy_history.php?days=3",
         ...(window.GRAPHITE_APP_CONFIG || {})
     });
 
@@ -31,6 +31,12 @@
         charged: component.querySelector('[data-role="energy-total-charged"]'),
         discharged: component.querySelector('[data-role="energy-total-discharged"]'),
         net: component.querySelector('[data-role="energy-total-net"]'),
+        chargedConsumer: component.querySelector('[data-role="energy-charged-consumer"]'),
+        chargedSpot: component.querySelector('[data-role="energy-charged-spot"]'),
+        dischargedConsumer: component.querySelector('[data-role="energy-discharged-consumer"]'),
+        dischargedSpot: component.querySelector('[data-role="energy-discharged-spot"]'),
+        netConsumer: component.querySelector('[data-role="energy-net-consumer"]'),
+        netSpot: component.querySelector('[data-role="energy-net-spot"]'),
         status: component.querySelector('[data-role="energy-history-status"]')
     };
 
@@ -96,6 +102,19 @@
             ? `${(absolute / 1000).toFixed(decimals).replace(/\.00$/, "")} kWh`
             : `${Math.round(absolute).toLocaleString()} Wh`;
 
+        if (!signed || number === 0) return formatted;
+        return `${number > 0 ? "+" : "−"}${formatted}`;
+    }
+
+    function formatMoney(value, signed = false) {
+        const number = finiteNumber(value);
+        if (number === null) return "—";
+        const formatted = new Intl.NumberFormat([], {
+            style: "currency",
+            currency: "EUR",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(Math.abs(number));
         if (!signed || number === 0) return formatted;
         return `${number > 0 ? "+" : "−"}${formatted}`;
     }
@@ -373,13 +392,78 @@
         }, { charged: 0, discharged: 0 });
     }
 
+    function moneyTotalsForDays(days) {
+        const totals = {};
+        ["consumer", "spot"].forEach((priceType) => {
+            totals[priceType] = {};
+            ["charged", "discharged"].forEach((direction) => {
+                totals[priceType][direction] = { eur: 0, complete: true, missingHours: [] };
+            });
+        });
+
+        days.forEach((day) => {
+            const priceTotals = payload?.whPerDay?.[day]?.priceTotals;
+            ["consumer", "spot"].forEach((priceType) => {
+                ["charged", "discharged"].forEach((direction) => {
+                    const target = totals[priceType][direction];
+                    const source = priceTotals?.[priceType]?.[direction];
+                    if (!source || source.complete !== true || finiteNumber(source.eur) === null) {
+                        target.complete = false;
+                    } else {
+                        target.eur += finiteNumber(source.eur, 0);
+                    }
+                    if (Array.isArray(source?.missingHours)) {
+                        target.missingHours.push(...source.missingHours);
+                    }
+                });
+            });
+        });
+
+        ["consumer", "spot"].forEach((priceType) => {
+            const charged = totals[priceType].charged;
+            const discharged = totals[priceType].discharged;
+            charged.eur = charged.complete ? charged.eur : null;
+            discharged.eur = discharged.complete ? discharged.eur : null;
+            totals[priceType].net = {
+                eur: charged.complete && discharged.complete ? charged.eur - discharged.eur : null,
+                complete: charged.complete && discharged.complete,
+                missingHours: [...new Set([...charged.missingHours, ...discharged.missingHours])]
+            };
+        });
+
+        return totals;
+    }
+
+    function priceWarning(totals) {
+        const missingHours = [...new Set([
+            ...totals.consumer.net.missingHours,
+            ...totals.spot.net.missingHours
+        ])];
+        if (!missingHours.length) return "";
+        const shown = missingHours.slice(0, 3).map((hour) => hour.replace(" ", " · ")).join(", ");
+        const remainder = missingHours.length > 3 ? ` and ${missingHours.length - 3} more` : "";
+        return `Some price totals are unavailable because price data is missing for ${shown}${remainder}.`;
+    }
+
     function renderSummary(days) {
         const totals = totalsForDays(days);
+        const money = moneyTotalsForDays(days);
         const net = totals.charged - totals.discharged;
         elements.charged.textContent = formatEnergy(totals.charged);
         elements.discharged.textContent = formatEnergy(totals.discharged);
         elements.net.textContent = formatEnergy(net, true);
         elements.net.dataset.direction = net > 0 ? "charged" : net < 0 ? "discharged" : "idle";
+        elements.chargedConsumer.textContent = formatMoney(money.consumer.charged.eur);
+        elements.chargedSpot.textContent = formatMoney(money.spot.charged.eur);
+        elements.dischargedConsumer.textContent = formatMoney(money.consumer.discharged.eur);
+        elements.dischargedSpot.textContent = formatMoney(money.spot.discharged.eur);
+        elements.netConsumer.textContent = formatMoney(money.consumer.net.eur, true);
+        elements.netSpot.textContent = formatMoney(money.spot.net.eur, true);
+        [elements.netConsumer, elements.netSpot].forEach((element, index) => {
+            const value = index === 0 ? money.consumer.net.eur : money.spot.net.eur;
+            element.dataset.direction = value > 0 ? "charged" : value < 0 ? "discharged" : "idle";
+        });
+        return priceWarning(money);
     }
 
     function resetDetail() {
@@ -390,19 +474,23 @@
         elements.detail.hidden = true;
     }
 
-    function renderStatus() {
+    function renderStatus(priceMessage = "") {
         const cache = payload?.cacheInfo || {};
-        if (!cache.isStale) {
+        const messages = [];
+        if (priceMessage) messages.push(priceMessage);
+        if (cache.isStale) {
+            const timestamp = finiteNumber(cache.cachedAt);
+            const updated = timestamp
+                ? new Date(timestamp * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                : null;
+            messages.push(updated ? `Showing cached data from ${updated}.` : "Showing cached battery data.");
+        }
+        if (!messages.length) {
             elements.status.hidden = true;
             elements.status.textContent = "";
             return;
         }
-
-        const timestamp = finiteNumber(cache.cachedAt);
-        const updated = timestamp
-            ? new Date(timestamp * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-            : null;
-        elements.status.textContent = updated ? `Showing cached data from ${updated}.` : "Showing cached battery data.";
+        elements.status.textContent = messages.join(" ");
         elements.status.hidden = false;
     }
 
@@ -421,8 +509,8 @@
             button.setAttribute("aria-selected", button.dataset.range === range ? "true" : "false");
         });
         renderChart(rows);
-        renderSummary(visibleDays);
-        renderStatus();
+        const priceMessage = renderSummary(visibleDays);
+        renderStatus(priceMessage);
         resetDetail();
     }
 

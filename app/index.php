@@ -30,7 +30,7 @@ $appConfig = [
     'rulesUrl' => '../main/edit_rules.php?api=1',
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),
     'priceConversion' => $priceConversionConfig,
-    'energyHistoryUrl' => '../main/api/energy_graph_proxy.php?days=3',
+    'energyHistoryUrl' => '../main/api/app_energy_history.php?days=3',
 ];
 ?>
 <!doctype html>
@@ -310,7 +310,7 @@ $appConfig = [
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--current"></i>Current hour</span>
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--high"></i>High price</span>
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--plan"></i>Scheduled action</span>
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--limited"></i>Power-limited</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--limited" aria-hidden="true"></i>Limit value</span>
                 </div>
 
             </div>
@@ -377,10 +377,31 @@ $appConfig = [
                     <span data-role="energy-detail-battery">Battery level appears when available</span>
                 </div>
 
-                <div class="app-energy-history__summary" aria-label="Energy totals for the selected range">
-                    <div><span>Charged</span><strong class="gsd-positive" data-role="energy-total-charged">—</strong></div>
-                    <div><span>Discharged</span><strong class="gsd-negative" data-role="energy-total-discharged">—</strong></div>
-                    <div><span>Net</span><strong data-role="energy-total-net">—</strong></div>
+                <div class="app-energy-history__summary" aria-label="Energy and price totals for the selected range">
+                    <div>
+                        <span class="app-energy-history__summary-title">Charged</span>
+                        <strong class="gsd-positive" data-role="energy-total-charged">—</strong>
+                        <div class="app-energy-history__prices">
+                            <p><span>Consumer</span><strong data-role="energy-charged-consumer">—</strong></p>
+                            <p><span>Spot</span><strong data-role="energy-charged-spot">—</strong></p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="app-energy-history__summary-title">Discharged</span>
+                        <strong class="gsd-negative" data-role="energy-total-discharged">—</strong>
+                        <div class="app-energy-history__prices">
+                            <p><span>Consumer</span><strong data-role="energy-discharged-consumer">—</strong></p>
+                            <p><span>Spot</span><strong data-role="energy-discharged-spot">—</strong></p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="app-energy-history__summary-title">Net</span>
+                        <strong data-role="energy-total-net">—</strong>
+                        <div class="app-energy-history__prices">
+                            <p><span>Consumer</span><strong data-role="energy-net-consumer">—</strong></p>
+                            <p><span>Spot</span><strong data-role="energy-net-spot">—</strong></p>
+                        </div>
+                    </div>
                 </div>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>

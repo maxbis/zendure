@@ -754,21 +754,13 @@
     height: 14px;
 }
 
-.app-price-hour__action[data-limited="true"]::before {
-    content: "";
-    position: absolute;
-    z-index: 2;
-    top: 0;
-    right: 0;
-    width: 11px;
-    height: 11px;
-    background: linear-gradient(
-        225deg,
-        var(--gsd-neutral) 0 52%,
-        var(--gsd-page-deep) 53% 62%,
-        transparent 63% 100%
-    );
-    pointer-events: none;
+.app-price-hour__action[data-limit-value="true"],
+.app-schedule-tooltip__badge[data-limit-value="true"] {
+    font-style: italic;
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
 }
 
 .app-netzero-token {
@@ -1029,7 +1021,20 @@
 .app-price-legend__swatch--high { background: var(--gsd-negative); }
 .app-price-legend__swatch--plan { background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%); }
 .app-price-legend__swatch--limited {
-    background: linear-gradient(135deg, transparent 0 48%, var(--gsd-neutral) 49% 100%);
+    width: auto;
+    height: auto;
+    background: none;
+    border-radius: 0;
+    color: var(--gsd-text-secondary);
+    font-style: italic;
+    font-weight: 750;
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.app-price-legend__swatch--limited::before {
+    content: "123";
 }
 
 .app-hour-details {
@@ -2014,6 +2019,40 @@
     white-space: nowrap;
 }
 
+.app-energy-history__summary .app-energy-history__summary-title {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.app-energy-history__prices {
+    display: grid;
+    gap: 3px;
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid var(--gsd-border-subtle);
+}
+
+.app-energy-history__prices p {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+}
+
+.app-energy-history__prices p span,
+.app-energy-history__prices p strong {
+    display: inline;
+    margin: 0;
+}
+
+.app-energy-history__prices p strong {
+    flex: 0 1 auto;
+    color: var(--gsd-text-secondary);
+    font-size: 0.7rem;
+}
+
 .app-energy-history__summary strong[data-direction="charged"] { color: var(--gsd-positive); }
 .app-energy-history__summary strong[data-direction="discharged"] { color: var(--gsd-negative); }
 .app-energy-history__summary .gsd-positive { color: var(--gsd-positive); }
@@ -2220,6 +2259,16 @@
 
     .app-energy-history__summary strong {
         font-size: 0.74rem;
+    }
+
+    .app-energy-history__prices p {
+        display: grid;
+        justify-items: center;
+        gap: 0;
+    }
+
+    .app-energy-history__prices p strong {
+        font-size: 0.66rem;
     }
 
     .app-energy-history__loading,
