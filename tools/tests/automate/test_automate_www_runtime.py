@@ -43,6 +43,10 @@ TEST_DESCRIPTIONS = [
     ("test_base_schedule_resolution_propagates_signed_power_bounds", "Checks raw schedule netzero entries expose min_power and max_power in resolved slots."),
     ("test_base_schedule_resolution_propagates_signed_power_bounds_for_netzero_minus", "Checks raw schedule netzero- entries expose min_power and max_power in resolved slots."),
     ("test_base_schedule_resolution_rejects_non_integer_bounds", "Checks raw schedule min_power/max_power reject non-integer values."),
+    ("test_hour_override_adds_auto_boundary", "Checks a dated whole-hour override adds an Auto boundary at the next hour."),
+    ("test_hour_override_preserves_explicit_next_hour", "Checks an existing next-hour entry is not overwritten."),
+    ("test_hour_override_preserves_matching_wildcard_next_hour", "Checks a matching wildcard next-hour entry prevents a redundant Auto boundary."),
+    ("test_hour_override_at_2300_needs_no_boundary", "Checks a dated 23:00 override does not create a next-day boundary."),
     ("test_resolver_wildcard_and_specific_rule_precedence", "Checks wildcard base rule and specific-hour override precedence."),
     ("test_resolver_emits_signed_power_bounds_from_netzero_minus_rules", "Checks resolver includes min_power and max_power for netzero- rules."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
@@ -266,6 +270,77 @@ def test_base_schedule_resolution_rejects_non_integer_bounds():
 
     assert payload["ok"] is False
     assert "min_power" in payload["error"]
+
+
+def _run_add_next_hour_boundary(schedule: dict, key: str, entry: dict) -> dict:
+    functions_file = REPO_ROOT / "main" / "api" / "charge_schedule_functions.php"
+    php_code = (
+        f'require "{functions_file.as_posix()}"; '
+        f'$schedule=json_decode({json.dumps(json.dumps(schedule))}, true); '
+        f'$entry=json_decode({json.dumps(json.dumps(entry))}, true); '
+        f'echo json_encode(addNextHourAutoBoundary($schedule, {json.dumps(key)}, $entry));'
+    )
+    return _run_php_json(["php", "-r", php_code])
+
+
+def test_hour_override_adds_auto_boundary():
+    schedule = {
+        "********0000": {"value": "netzero"},
+        "202607310200": {"value": 500},
+    }
+    result = _run_add_next_hour_boundary(
+        schedule,
+        "202607310200",
+        {"value": 500},
+    )
+
+    assert result["boundary_key"] == "202607310300"
+    assert result["schedule"]["202607310300"] == {"value": "auto"}
+
+    functions_file = REPO_ROOT / "main" / "api" / "charge_schedule_functions.php"
+    php_code = (
+        f'require "{functions_file.as_posix()}"; '
+        f'$schedule=json_decode({json.dumps(json.dumps(result["schedule"]))}, true); '
+        'echo json_encode(resolveScheduleForDate($schedule, "20260731"));'
+    )
+    resolved = _run_php_json(["php", "-r", php_code])
+    by_time = {str(item["time"]): item for item in resolved}
+    assert by_time["0200"]["value"] == 500
+    assert by_time["0300"]["value"] == "netzero"
+    assert by_time["2300"]["value"] == "netzero"
+
+
+def test_hour_override_preserves_explicit_next_hour():
+    result = _run_add_next_hour_boundary(
+        {"202607310300": {"value": -250}},
+        "202607310200",
+        {"value": 500},
+    )
+
+    assert result["boundary_key"] is None
+    assert result["schedule"]["202607310300"] == {"value": -250}
+
+
+def test_hour_override_preserves_matching_wildcard_next_hour():
+    result = _run_add_next_hour_boundary(
+        {"********0300": {"value": "netzero+"}},
+        "202607310200",
+        {"value": 500},
+    )
+
+    assert result["boundary_key"] is None
+    assert "202607310300" not in result["schedule"]
+
+
+def test_hour_override_at_2300_needs_no_boundary():
+    result = _run_add_next_hour_boundary(
+        {},
+        "202607312300",
+        {"value": 500},
+    )
+
+    assert result["boundary_key"] is None
+    assert not result["schedule"]
 
 
 def test_resolver_emits_signed_power_bounds_from_rules(backup_and_restore_price_files):

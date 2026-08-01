@@ -408,6 +408,8 @@ function applyScheduleEntryAndWrite($filePath, $key, $entry, $orig, $input) {
         unset($schedule[$orig]);
     }
     $schedule[$key] = $normalizedEntry;
+    $boundaryResult = addNextHourAutoBoundary($schedule, $key, $normalizedEntry);
+    $schedule = $boundaryResult['schedule'];
     if (!function_exists('cleanOutdatedScheduleEntries') && file_exists(SCHEDULE_FUNCTIONS_PATH)) {
         require_once SCHEDULE_FUNCTIONS_PATH;
     }
@@ -420,7 +422,8 @@ function applyScheduleEntryAndWrite($filePath, $key, $entry, $orig, $input) {
     return [
         'success' => true,
         'message' => 'Schedule entry saved successfully',
-        'file' => basename($filePath)
+        'file' => basename($filePath),
+        'auto_boundary_added' => $boundaryResult['boundary_key']
     ];
 }
 

@@ -112,11 +112,17 @@ try {
             // Set the new entry (or update existing one)
             $schedule[$key] = $normalizedEntry;
 
+            $boundaryResult = addNextHourAutoBoundary($schedule, $key, $normalizedEntry);
+            $schedule = $boundaryResult['schedule'];
+
             // Automatically drop outdated concrete-date entries on save
             $schedule = cleanOutdatedScheduleEntries($schedule);
 
             if (writeScheduleAtomic($dataFile, $schedule)) {
-                $response = ['success' => true];
+                $response = [
+                    'success' => true,
+                    'auto_boundary_added' => $boundaryResult['boundary_key']
+                ];
             } else {
                 throw new Exception(buildScheduleWriteFailureMessage('charge_schedule_api PUT/POST', $dataFile));
             }

@@ -10,8 +10,10 @@ date_default_timezone_set('Europe/Amsterdam');
 
 require_once __DIR__ . '/../login/validate.php';
 require_once __DIR__ . '/../main/includes/config_loader.php';
+require_once __DIR__ . '/../main/includes/price_conversion.php';
 
 $configLoadError = ConfigLoader::getLoadError();
+$priceConversionConfig = getPriceConversionConfig();
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'refreshIntervalMs' => 20000,
@@ -21,6 +23,14 @@ $appConfig = [
     'capacityWh' => (float) ConfigLoader::get('baseWh', 5760),
     'powerMinW' => (float) ConfigLoader::get('minGridPower', -1200),
     'powerMaxW' => (float) ConfigLoader::get('maxGridPower', 1200),
+    'scheduleUrl' => ConfigLoader::get(
+        'scheduleApiUrl',
+        '../main/api/charge_schedule_api.php'
+    ),
+    'rulesUrl' => '../main/edit_rules.php?api=1',
+    'priceUrls' => ConfigLoader::get('priceApiUrl', []),
+    'priceConversion' => $priceConversionConfig,
+    'energyHistoryUrl' => '../main/api/energy_graph_proxy.php?days=3',
 ];
 ?>
 <!doctype html>
@@ -47,6 +57,8 @@ $appConfig = [
     <script src="assets/js/battery-color-scale.js" defer></script>
     <script src="assets/js/grid-exchange-color-scale.js" defer></script>
     <script src="assets/js/current-energy-status.js" defer></script>
+    <script src="assets/js/price-plan.js" defer></script>
+    <script src="assets/js/energy-history.js" defer></script>
 </head>
 <body data-theme="graphite-signal-dark">
     <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
@@ -237,14 +249,259 @@ $appConfig = [
             </section>
         <?php endif; ?>
 
+        <section
+            class="gsd-card app-price-plan"
+            data-component="price-plan"
+            data-state="loading"
+            aria-labelledby="price-plan-title"
+            aria-busy="true"
+        >
+            <header class="app-section-heading">
+                <div>
+                    <h2 id="price-plan-title">Prices &amp; energy plan</h2>
+                    <p data-role="price-plan-date">Loading today’s prices and schedule</p>
+                </div>
+                <div class="app-section-heading__actions">
+                    <div class="app-day-switch" role="tablist" aria-label="Price and schedule day">
+                        <button type="button" role="tab" aria-selected="true" data-role="price-day" data-day="today">Today</button>
+                        <button type="button" role="tab" aria-selected="false" aria-label="Tomorrow, checking price availability" data-role="price-day" data-day="tomorrow">
+                            Tomorrow
+                            <span class="app-day-availability" data-role="tomorrow-availability" data-availability="loading" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                    <button class="gsd-icon-btn app-price-refresh" type="button" aria-label="Refresh prices and energy plan" data-role="price-refresh">
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="app-price-plan__loading" data-role="price-loading" role="status">
+                <span class="app-loading-orb" aria-hidden="true"></span>
+                <span>Loading prices and resolved schedule</span>
+            </div>
+
+            <div class="app-price-plan__error" data-role="price-error" role="alert" hidden>
+                <span data-role="price-error-message">Price and schedule data could not be loaded.</span>
+                <button class="gsd-btn gsd-btn--secondary" type="button" data-role="price-retry">Try again</button>
+            </div>
+
+            <div class="app-price-plan__content" data-role="price-content" hidden>
+                <div class="app-price-summary" aria-label="Daily price summary">
+                    <div class="app-price-kpi">
+                        <span data-role="price-current-label">Current</span>
+                        <strong data-role="price-current">—</strong>
+                    </div>
+                    <div class="app-price-kpi">
+                        <span>Daily low</span>
+                        <strong class="app-price-kpi--low" data-role="price-low">—</strong>
+                    </div>
+                    <div class="app-price-kpi">
+                        <span>Daily high</span>
+                        <strong class="app-price-kpi--high" data-role="price-high">—</strong>
+                    </div>
+                </div>
+
+                <div class="app-price-timeline-scroll" data-role="price-scroll" tabindex="0" aria-label="Scrollable hourly price and schedule timeline">
+                    <div class="app-price-timeline" data-role="price-timeline"></div>
+                </div>
+
+                <div class="app-price-legend" aria-label="Timeline legend">
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--low"></i>Low price</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--current"></i>Current hour</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--high"></i>High price</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--plan"></i>Scheduled action</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--limited"></i>Power-limited</span>
+                </div>
+
+            </div>
+        </section>
+
+        <section
+            class="gsd-card app-energy-history"
+            data-component="energy-history"
+            data-state="loading"
+            aria-labelledby="energy-history-title"
+            aria-busy="true"
+        >
+            <header class="app-section-heading app-energy-history__heading">
+                <div>
+                    <h2 id="energy-history-title">Hourly battery energy</h2>
+                    <p data-role="energy-history-date">Loading recent battery activity</p>
+                </div>
+                <div class="app-section-heading__actions">
+                    <div class="app-day-switch" role="tablist" aria-label="Energy history range">
+                        <button type="button" role="tab" aria-selected="true" data-role="energy-range" data-range="day">Day</button>
+                        <button type="button" role="tab" aria-selected="false" data-role="energy-range" data-range="four-days">4 days</button>
+                    </div>
+                    <button class="gsd-icon-btn app-energy-history__refresh" type="button" aria-label="Refresh battery energy history" data-role="energy-history-refresh">
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="app-energy-history__loading" data-role="energy-history-loading" role="status">
+                <span class="app-loading-orb" aria-hidden="true"></span>
+                <span>Loading hourly battery energy</span>
+            </div>
+
+            <div class="app-energy-history__error" data-role="energy-history-error" role="alert" hidden>
+                <span data-role="energy-history-error-message">Battery energy history could not be loaded.</span>
+                <button class="gsd-btn gsd-btn--secondary" type="button" data-role="energy-history-retry">Try again</button>
+            </div>
+
+            <div class="app-energy-history__content" data-role="energy-history-content" hidden>
+                <div class="app-energy-history__day-nav" data-role="energy-day-nav">
+                    <button class="gsd-icon-btn" type="button" aria-label="Previous day" data-role="energy-day-previous">
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-left"></use></svg>
+                    </button>
+                    <strong data-role="energy-day-label">Today</strong>
+                    <button class="gsd-icon-btn" type="button" aria-label="Next day" data-role="energy-day-next">
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-right"></use></svg>
+                    </button>
+                </div>
+
+                <div class="app-energy-history__legend" aria-label="Energy chart legend">
+                    <span><i class="app-energy-history__key app-energy-history__key--charged" aria-hidden="true"></i>Charged</span>
+                    <span><i class="app-energy-history__key app-energy-history__key--discharged" aria-hidden="true"></i>Discharged</span>
+                    <span><i class="app-energy-history__key app-energy-history__key--battery" aria-hidden="true"></i>Battery level</span>
+                    <span><i class="app-energy-history__key app-energy-history__key--now" aria-hidden="true"></i>Now</span>
+                </div>
+
+                <div class="app-energy-history__chart-scroll" data-role="energy-chart-scroll" tabindex="0" aria-label="Scrollable hourly battery energy chart">
+                    <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level"></div>
+                </div>
+
+                <div class="app-energy-history__detail" data-role="energy-hour-detail" aria-live="polite" hidden>
+                    <span data-role="energy-detail-time">Select an hour</span>
+                    <strong data-role="energy-detail-flow">Explore the chart for exact values</strong>
+                    <span data-role="energy-detail-battery">Battery level appears when available</span>
+                </div>
+
+                <div class="app-energy-history__summary" aria-label="Energy totals for the selected range">
+                    <div><span>Charged</span><strong class="gsd-positive" data-role="energy-total-charged">—</strong></div>
+                    <div><span>Discharged</span><strong class="gsd-negative" data-role="energy-total-discharged">—</strong></div>
+                    <div><span>Net</span><strong data-role="energy-total-net">—</strong></div>
+                </div>
+
+                <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>
+            </div>
+        </section>
+
         <section class="app-next-step" aria-label="Implementation status">
             <span>Graphite Signal Dark migration</span>
-            <strong>Step 1 · Live energy status</strong>
-            <p>Prices, energy graphs, automation, and scheduling remain in the legacy application for now.</p>
+            <strong>Step 3 · Energy history</strong>
+            <p>Automation remains in the legacy application for now.</p>
             <a class="gsd-btn gsd-btn--quiet" href="../main/charge_schedule_mobile.php">
                 Open legacy application
             </a>
         </section>
     </main>
+
+    <dialog class="gsd-dialog app-hour-dialog" id="app-hour-dialog" aria-labelledby="app-hour-dialog-title">
+        <header class="gsd-dialog__header gsd-dialog__header--simple">
+            <h2 class="gsd-dialog__title" id="app-hour-dialog-title" data-role="hour-dialog-title">Hour details</h2>
+            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
+                <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+            </button>
+        </header>
+        <div class="gsd-dialog__body">
+            <p class="gsd-dialog__hero" data-role="hour-dialog-price">—</p>
+            <dl class="app-hour-details">
+                <div><dt>Spot price</dt><dd data-role="hour-dialog-spot">—</dd></div>
+                <div><dt>Scheduled action</dt><dd data-role="hour-dialog-action">—</dd></div>
+                <div><dt>Scheduled power</dt><dd data-role="hour-dialog-power">—</dd></div>
+                <div><dt>Allowed power</dt><dd data-role="hour-dialog-limits">—</dd></div>
+                <div><dt>Source</dt><dd data-role="hour-dialog-source">—</dd></div>
+                <div><dt>Estimated battery change</dt><dd data-role="hour-dialog-estimate">—</dd></div>
+            </dl>
+        </div>
+        <footer class="gsd-dialog__footer">
+            <button class="gsd-btn gsd-btn--secondary" type="button" data-gsd-dialog-close>Close</button>
+            <button class="gsd-btn gsd-btn--primary" type="button" data-role="hour-dialog-edit">Edit schedule</button>
+        </footer>
+    </dialog>
+
+    <dialog class="gsd-dialog app-schedule-edit-dialog" id="app-schedule-edit-dialog" aria-labelledby="app-schedule-edit-title">
+        <header class="gsd-dialog__header gsd-dialog__header--simple">
+            <h2 class="gsd-dialog__title" id="app-schedule-edit-title" data-role="schedule-edit-title">Edit schedule</h2>
+            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" title="Close without saving changes" data-gsd-dialog-close>
+                <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+            </button>
+        </header>
+        <form data-role="schedule-edit-form">
+            <div class="gsd-dialog__body">
+                <div class="app-edit-context">
+                    <strong data-role="schedule-edit-time">Selected hour</strong>
+                    <span data-role="schedule-edit-context">Creates an override for this hour.</span>
+                </div>
+
+                <fieldset class="app-edit-fieldset">
+                    <legend>Battery action</legend>
+                    <div class="app-mode-options">
+                        <label title="Balance household load using battery discharge only"><input type="radio" name="schedule-mode" value="netzero-"><span><span class="app-mode-option__heading"><svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#bolt"></use></svg><b class="app-netzero-token">NZ<span class="app-netzero-sign">−</span></b></span>Discharge-only</span></label>
+                        <label title="Balance household load using battery charging or discharging"><input type="radio" name="schedule-mode" value="netzero"><span><span class="app-mode-option__heading"><svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#bidirectional"></use></svg><b class="app-netzero-token">NZ<span class="app-netzero-sign">±</span></b></span>Bidirectional</span></label>
+                        <label title="Balance household load using battery charging only"><input type="radio" name="schedule-mode" value="netzero+"><span><span class="app-mode-option__heading"><svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#sun"></use></svg><b class="app-netzero-token">NZ<span class="app-netzero-sign">+</span></b></span>Charge-only</span></label>
+                        <label title="Set a constant battery power value for this hour"><input type="radio" name="schedule-mode" value="fixed"><span><span class="app-mode-option__heading"><svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#battery"></use></svg><b>W</b></span>Fixed power</span></label>
+                        <label title="Let the controller choose the battery action automatically"><input type="radio" name="schedule-mode" value="auto"><span><span class="app-mode-option__heading"><svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg><b>A</b></span>Automatic</span></label>
+                    </div>
+                </fieldset>
+
+                <div class="gsd-field" data-role="schedule-fixed-field" hidden>
+                    <label class="gsd-field__label" for="schedule-edit-watts">Fixed power</label>
+                    <div class="app-input-with-unit">
+                        <input class="gsd-input" id="schedule-edit-watts" name="watts" type="number" step="100" inputmode="numeric">
+                        <span>W</span>
+                    </div>
+                    <small>Positive charges the battery; negative discharges it.</small>
+                    <div class="app-fixed-power-panel">
+                        <div class="app-limit-value app-fixed-power-value">
+                            <span>Value</span>
+                            <strong data-role="schedule-fixed-display">0 W</strong>
+                        </div>
+                        <div class="app-fixed-slider" data-role="schedule-fixed-slider">
+                            <span class="app-fixed-slider__track" aria-hidden="true"></span>
+                            <span class="app-fixed-slider__selection" data-role="schedule-fixed-selection" aria-hidden="true"></span>
+                            <input type="range" step="100" data-role="schedule-fixed-range" aria-label="Fixed power value">
+                        </div>
+                        <p class="app-fixed-power-summary" data-role="schedule-fixed-summary">Idle: 0 W</p>
+                    </div>
+                </div>
+
+                <div class="app-limit-editor" data-role="schedule-limit-editor">
+                    <div class="app-limit-toggle" role="group" aria-label="Apply explicit power limits">
+                        <label title="Do not apply explicit minimum or maximum power limits"><input type="radio" name="limits-enabled" value="off" data-role="schedule-limits-disabled"><span>Off</span></label>
+                        <label title="Apply the selected minimum and maximum power limits"><input type="radio" name="limits-enabled" value="on" data-role="schedule-limits-enabled"><span>On</span></label>
+                    </div>
+                    <div class="app-limit-editor__fields" data-role="schedule-limit-fields" hidden>
+                        <input name="minimum-power" type="hidden">
+                        <input name="maximum-power" type="hidden">
+                        <div class="app-limit-values">
+                            <div class="app-limit-value">
+                                <span>Min</span>
+                                <strong data-role="schedule-limit-min-display">—</strong>
+                            </div>
+                            <div class="app-limit-value">
+                                <span>Max</span>
+                                <strong data-role="schedule-limit-max-display">—</strong>
+                            </div>
+                        </div>
+                        <div class="app-limit-slider" data-role="schedule-limit-slider">
+                            <span class="app-limit-slider__track" aria-hidden="true"></span>
+                            <span class="app-limit-slider__selection" data-role="schedule-limit-selection" aria-hidden="true"></span>
+                            <input type="range" step="100" data-role="schedule-limit-min-range" aria-label="Minimum power limit">
+                            <input type="range" step="100" data-role="schedule-limit-max-range" aria-label="Maximum power limit">
+                        </div>
+                    </div>
+                    <p class="app-limit-editor__summary" data-role="schedule-limit-summary"></p>
+                </div>
+
+                <p class="app-edit-error" data-role="schedule-edit-error" role="alert" hidden></p>
+            </div>
+            <footer class="gsd-dialog__footer">
+                <button class="gsd-btn gsd-btn--secondary" type="button" title="Close without saving changes" data-gsd-dialog-close>Cancel</button>
+                <button class="gsd-btn gsd-btn--primary" type="submit" title="Save this hourly override" data-role="schedule-edit-save">Save schedule</button>
+            </footer>
+        </form>
+    </dialog>
 </body>
 </html>

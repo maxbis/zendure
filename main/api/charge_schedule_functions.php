@@ -144,6 +144,53 @@ function normalizeScheduleWritePayload($key, $entry, $context = '')
     return [$keyStr, normalizeRawScheduleEntry($entry)];
 }
 
+/**
+ * Add an automatic boundary after a concrete, whole-hour manual override.
+ *
+ * Schedule values normally carry forward until a later entry takes over. UI
+ * edits of a dated hourly slot are intended to affect only that hour, so an
+ * `auto` entry is inserted at N+1 unless a matching explicit entry already
+ * exists there. The final hour of the day needs no boundary because a dated
+ * entry no longer matches on the following day.
+ *
+ * Wildcard and partial-date keys retain their existing change-point semantics.
+ *
+ * @return array{schedule: array, boundary_key: ?string}
+ */
+function addNextHourAutoBoundary(array $schedule, string $key, array $entry): array
+{
+    if (($entry['value'] ?? null) === 'auto' || !preg_match('/^\d{12}$/', $key)) {
+        return ['schedule' => $schedule, 'boundary_key' => null];
+    }
+
+    $datePart = substr($key, 0, 8);
+    $hour = (int) substr($key, 8, 2);
+    $minute = substr($key, 10, 2);
+    if ($minute !== '00' || $hour < 0 || $hour >= 23) {
+        return ['schedule' => $schedule, 'boundary_key' => null];
+    }
+
+    $nextTime = sprintf('%02d00', $hour + 1);
+    $nextDateTime = $datePart . $nextTime;
+
+    // Preserve any explicit N+1 entry that applies to this date, including a
+    // wildcard-date entry such as ********0300.
+    foreach ($schedule as $candidateKey => $_candidateEntry) {
+        $candidateKey = (string) $candidateKey;
+        if (extractTimeFromKey($candidateKey) !== $nextTime) {
+            continue;
+        }
+        if (matchesAndBeforeTime($candidateKey, $nextDateTime, $nextTime)) {
+            return ['schedule' => $schedule, 'boundary_key' => null];
+        }
+    }
+
+    $boundaryKey = $datePart . $nextTime;
+    $schedule[$boundaryKey] = ['value' => 'auto'];
+
+    return ['schedule' => $schedule, 'boundary_key' => $boundaryKey];
+}
+
 function getScheduleEntryValue($entry)
 {
     if (!is_array($entry) || !array_key_exists('value', $entry)) {
