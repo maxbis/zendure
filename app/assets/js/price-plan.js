@@ -488,10 +488,25 @@
         return `${thousands}K${hundreds || ""}`;
     }
 
+    function closestPowerLimit(slot) {
+        const { minimum, maximum } = powerLimits(slot);
+        return [minimum, maximum]
+            .filter((value) => value !== null)
+            .reduce((closest, value) => (
+                closest === null || Math.abs(value) < Math.abs(closest) ? value : closest
+            ), null);
+    }
+
     function setActionBadgeContent(element, slot, action) {
         const fixedPower = numericValue(slot?.value);
         if (fixedPower !== null) {
             element.textContent = formatBadgePower(fixedPower);
+            return;
+        }
+
+        const limit = closestPowerLimit(slot);
+        if (limit !== null) {
+            element.textContent = formatBadgePower(limit);
             return;
         }
 
