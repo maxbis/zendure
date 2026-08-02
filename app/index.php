@@ -6,7 +6,14 @@
  * while keeping the new presentation independent from the legacy /main UI.
  */
 
-date_default_timezone_set('Europe/Amsterdam');
+const APP_SOLAR_LOCATION = [
+    'name' => 'Amsterdam',
+    'latitude' => 52.3676,
+    'longitude' => 4.9041,
+    'timezone' => 'Europe/Amsterdam',
+];
+
+date_default_timezone_set(APP_SOLAR_LOCATION['timezone']);
 
 require_once __DIR__ . '/../login/validate.php';
 require_once __DIR__ . '/../main/includes/config_loader.php';
@@ -14,6 +21,49 @@ require_once __DIR__ . '/../main/includes/price_conversion.php';
 
 $configLoadError = ConfigLoader::getLoadError();
 $priceConversionConfig = getPriceConversionConfig();
+
+/**
+ * Build exact local sunrise and sunset times for the dates the timeline can show.
+ * An extra day keeps the values available if an open page crosses midnight.
+ */
+function buildAppSolarEvents(array $location): array
+{
+    $timezone = new DateTimeZone($location['timezone']);
+    $today = new DateTimeImmutable('today', $timezone);
+    $dates = [];
+
+    for ($offset = 0; $offset <= 2; $offset++) {
+        $date = $today->modify('+' . $offset . ' days');
+        $sunInfo = date_sun_info(
+            $date->setTime(12, 0)->getTimestamp(),
+            (float) $location['latitude'],
+            (float) $location['longitude']
+        );
+        if (!is_array($sunInfo)) {
+            continue;
+        }
+
+        $events = [];
+        foreach (['sunrise', 'sunset'] as $eventName) {
+            $timestamp = $sunInfo[$eventName] ?? null;
+            if (!is_int($timestamp) || $timestamp <= 0) {
+                continue;
+            }
+            $eventDate = (new DateTimeImmutable('@' . $timestamp))->setTimezone($timezone);
+            $events[$eventName] = [
+                'time' => $eventDate->format('H:i'),
+                'minuteOfDay' => (((int) $eventDate->format('H')) * 60) + (int) $eventDate->format('i'),
+            ];
+        }
+
+        if ($events !== []) {
+            $dates[$date->format('Ymd')] = $events;
+        }
+    }
+
+    return $dates;
+}
+
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'refreshIntervalMs' => 20000,
@@ -31,6 +81,8 @@ $appConfig = [
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),
     'priceConversion' => $priceConversionConfig,
     'energyHistoryUrl' => '../main/api/app_energy_history.php?days=3',
+    'solarLocation' => APP_SOLAR_LOCATION,
+    'solarEvents' => buildAppSolarEvents(APP_SOLAR_LOCATION),
 ];
 ?>
 <!doctype html>

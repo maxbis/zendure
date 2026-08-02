@@ -1,5 +1,7 @@
 # Schedule page layout (`/zendure/main/charge_schedule_mobile.php`)
 
+> **GUI terminology:** This document describes the **old GUI**. See the [old and new GUI overview](../app/gui-overview.md) for the current names and feature boundary.
+
 This document describes **all page sections**, in **top-to-bottom render order**, and lists each section’s **dependencies**:
 
 - **PHP dependencies**: required files + included partials

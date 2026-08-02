@@ -78,8 +78,54 @@
         controller: null
     };
 
+    const DAY_PARTS = [
+        { key: "night", label: "Night", start: 0, end: 6 },
+        { key: "morning", label: "Morning", start: 6, end: 12 },
+        { key: "afternoon", label: "Afternoon", start: 12, end: 18 },
+        { key: "evening", label: "Evening", start: 18, end: 24 }
+    ];
+
     function pad(value) {
         return String(value).padStart(2, "0");
+    }
+
+    function dayPartForHour(hour) {
+        return DAY_PARTS.find((dayPart) => hour >= dayPart.start && hour < dayPart.end) || DAY_PARTS[0];
+    }
+
+    function appendSolarMarkers(fragment, date) {
+        const events = config.solarEvents?.[date];
+        if (!events) return;
+
+        ["sunrise", "sunset"].forEach((eventName) => {
+            const event = events[eventName];
+            const minuteOfDay = Number(event?.minuteOfDay);
+            if (!Number.isFinite(minuteOfDay) || minuteOfDay < 0 || minuteOfDay >= 1440 || !event?.time) return;
+
+            const marker = document.createElement("span");
+            const readableName = eventName === "sunrise" ? "Sunrise" : "Sunset";
+            const locationName = config.solarLocation?.name || "configured location";
+            marker.className = "app-price-solar-marker";
+            marker.dataset.event = eventName;
+            marker.style.setProperty("--app-solar-position", `${(minuteOfDay / 1440) * 100}%`);
+            marker.setAttribute("role", "img");
+            marker.setAttribute("aria-label", `${readableName} in ${locationName} at ${event.time}`);
+            marker.title = `${readableName} in ${locationName} · ${event.time}`;
+
+            const badge = document.createElement("span");
+            badge.className = "app-price-solar-marker__badge";
+            badge.setAttribute("aria-hidden", "true");
+            const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+            icon.classList.add("gsd-icon");
+            use.setAttribute("href", "../themes/graphite-signal-dark/assets/icons/sprite.svg#sun");
+            icon.appendChild(use);
+            const time = document.createElement("span");
+            time.textContent = event.time;
+            badge.append(icon, time);
+            marker.appendChild(badge);
+            fragment.appendChild(marker);
+        });
     }
 
     function dateKey(date) {
@@ -763,13 +809,28 @@
         elements.high.textContent = formatPrice(available.length ? Math.max(...available) : null);
     }
 
-    function renderTimeline(values, slots) {
+    function renderTimeline(values, slots, date) {
         const available = values.filter(Number.isFinite);
         const minimum = available.length ? Math.min(...available) : 0;
         const maximum = available.length ? Math.max(...available) : 1;
         const span = Math.max(0.0001, maximum - minimum);
         const currentHour = new Date().getHours();
         const fragment = document.createDocumentFragment();
+
+        DAY_PARTS.forEach((dayPart) => {
+            const band = document.createElement("span");
+            band.className = "app-price-daypart";
+            band.dataset.daypart = dayPart.key;
+            band.style.setProperty("--app-daypart-start", String(dayPart.start + 1));
+            band.style.setProperty("--app-daypart-end", String(dayPart.end + 1));
+            const label = document.createElement("span");
+            label.className = "app-price-daypart__label";
+            label.textContent = dayPart.label;
+            band.appendChild(label);
+            band.setAttribute("aria-hidden", "true");
+            fragment.appendChild(band);
+        });
+        appendSolarMarkers(fragment, date);
 
         for (let hour = 0; hour < 24; hour += 1) {
             const price = values[hour];
@@ -779,12 +840,15 @@
             const position = Number.isFinite(price) ? (price - minimum) / span : 0;
             const button = document.createElement("button");
             const isCurrent = state.day === "today" && hour === currentHour;
+            const dayPart = dayPartForHour(hour);
             button.type = "button";
             button.className = "app-price-hour";
             button.dataset.current = isCurrent ? "true" : "false";
+            button.dataset.daypart = dayPart.key;
+            button.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
             button.setAttribute(
                 "aria-label",
-                `${pad(hour)}:00, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}, ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}`
+                `${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}, ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}`
             );
 
             const barZone = document.createElement("span");
@@ -874,7 +938,7 @@
 
         elements.date.textContent = `${formatDate(date)}${hasPrices ? "" : " · Prices not available yet"}`;
         renderSummary(values);
-        renderTimeline(values, slots);
+        renderTimeline(values, slots, date);
         const tomorrowHasPrices = priceValues(state.prices.tomorrow).some(Number.isFinite);
         const tomorrowButton = elements.dayButtons.find((button) => button.dataset.day === "tomorrow");
         if (elements.tomorrowAvailability) {

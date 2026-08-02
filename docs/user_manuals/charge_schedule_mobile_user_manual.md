@@ -1,12 +1,14 @@
-# Charge Schedule Mobile User Manual
+# Old GUI user manual
 
-This manual explains how to use the mobile app:
+This manual explains how to use the **old GUI**:
 
 - `http://localhost/zendure/main/charge_schedule_mobile.php`
 
+For the distinction between the old and new interfaces, see the [old and new GUI overview](../app/gui-overview.md).
+
 ## 1. What This Page Does
 
-The mobile page is the main operational dashboard for:
+The old GUI is the operational dashboard for:
 
 - battery charge/discharge status
 - current grid/system metrics

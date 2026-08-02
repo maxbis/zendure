@@ -655,15 +655,114 @@
 }
 
 .app-price-timeline {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(24, minmax(32px, 1fr));
+    grid-template-rows: 20px auto;
+    row-gap: 4px;
     min-width: 792px;
-    min-height: 170px;
+    min-height: 194px;
     align-items: stretch;
+}
+
+.app-price-daypart {
+    grid-row: 1;
+    grid-column: var(--app-daypart-start) / var(--app-daypart-end);
+    display: flex;
+    align-items: center;
+    padding-inline: 7px;
+    background: color-mix(in srgb, var(--app-daypart-color) 27%, var(--gsd-surface-2));
+    border-block: 1px solid color-mix(in srgb, var(--gsd-border-subtle) 72%, transparent);
+    color: var(--gsd-text-muted);
+    font-size: 0.55rem;
+    font-weight: 650;
+    letter-spacing: 0.045em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.app-price-daypart:first-child {
+    border-radius: 5px 0 0 5px;
+}
+
+.app-price-daypart:not(:first-child) {
+    border-inline-start: 1px solid var(--gsd-border);
+}
+
+.app-price-daypart:nth-child(4) {
+    border-radius: 0 5px 5px 0;
+}
+
+.app-price-daypart__label {
+    position: sticky;
+    inset-inline-start: 7px;
+    color: var(--gsd-text-secondary);
+    font-weight: 700;
+}
+
+.app-price-daypart[data-daypart="night"] {
+    --app-daypart-color: #47657d;
+}
+
+.app-price-daypart[data-daypart="morning"] {
+    --app-daypart-color: #846b3d;
+}
+
+.app-price-daypart[data-daypart="afternoon"] {
+    --app-daypart-color: #73744d;
+}
+
+.app-price-daypart[data-daypart="evening"] {
+    --app-daypart-color: #705365;
+}
+
+.app-price-solar-marker {
+    position: absolute;
+    z-index: 2;
+    top: 20px;
+    bottom: 4px;
+    left: var(--app-solar-position);
+    width: 0;
+    border-inline-start: 1px dashed color-mix(in srgb, var(--gsd-warning) 58%, transparent);
+    pointer-events: none;
+}
+
+.app-price-solar-marker__badge {
+    position: absolute;
+    top: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 17px;
+    padding: 1px 4px;
+    background: color-mix(in srgb, var(--gsd-surface-1) 94%, transparent);
+    border: 1px solid color-mix(in srgb, var(--gsd-warning) 54%, var(--gsd-border));
+    border-radius: 999px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.51rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.app-price-solar-marker[data-event="sunrise"] .app-price-solar-marker__badge {
+    left: 4px;
+}
+
+.app-price-solar-marker[data-event="sunset"] .app-price-solar-marker__badge {
+    right: 4px;
+}
+
+.app-price-solar-marker__badge .gsd-icon {
+    width: 10px;
+    height: 10px;
+    color: var(--gsd-warning);
 }
 
 .app-price-hour {
     position: relative;
+    grid-row: 2;
     display: grid;
     grid-template-rows: 92px 15px 18px 29px;
     min-width: 0;
@@ -676,6 +775,10 @@
     font: inherit;
     cursor: pointer;
     scroll-snap-align: center;
+}
+
+.app-price-hour[data-daypart-start="true"] {
+    border-inline-start: 1px solid color-mix(in srgb, var(--gsd-border) 76%, transparent);
 }
 
 .app-price-hour:hover,
@@ -2203,7 +2306,7 @@
     }
 
     .app-price-timeline {
-        min-height: 142px;
+        min-height: 166px;
     }
 
     .app-price-hour {

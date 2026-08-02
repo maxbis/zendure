@@ -1,5 +1,7 @@
 # Charge Schedule Manager
 
+> **GUI terminology:** This document describes schedule behavior in the **old GUI**. See the [old and new GUI overview](../app/gui-overview.md) for the current names and feature boundary.
+
 A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The active entrypoint in this repository is `main/charge_schedule_mobile.php`, which uses the shared schedule JS modules.
 
 **Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).

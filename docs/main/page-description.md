@@ -1,5 +1,7 @@
 # Charge Schedule Manager - Page Description
 
+> **GUI terminology:** This document describes the **old GUI** at `/main/charge_schedule_mobile.php`. See the [old and new GUI overview](../app/gui-overview.md) for the current names and feature boundary.
+
 ## Overview
 
 The Charge Schedule Manager (`charge_schedule_mobile.php`) is a comprehensive dashboard for managing and monitoring the Zendure battery system. It provides real-time visualization of charge/discharge schedules, electricity prices, automation status, battery state, and grid usage.
