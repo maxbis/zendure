@@ -17,17 +17,14 @@
         date: component.querySelector('[data-role="energy-history-date"]'),
         refresh: component.querySelector('[data-role="energy-history-refresh"]'),
         retry: component.querySelector('[data-role="energy-history-retry"]'),
-        rangeButtons: [...component.querySelectorAll('[data-role="energy-range"]')],
-        dayNav: component.querySelector('[data-role="energy-day-nav"]'),
-        previous: component.querySelector('[data-role="energy-day-previous"]'),
-        next: component.querySelector('[data-role="energy-day-next"]'),
-        dayLabel: component.querySelector('[data-role="energy-day-label"]'),
         chartScroll: component.querySelector('[data-role="energy-chart-scroll"]'),
         chart: component.querySelector('[data-role="energy-chart"]'),
         detail: component.querySelector('[data-role="energy-hour-detail"]'),
         detailTime: component.querySelector('[data-role="energy-detail-time"]'),
         detailFlow: component.querySelector('[data-role="energy-detail-flow"]'),
         detailBattery: component.querySelector('[data-role="energy-detail-battery"]'),
+        summary: component.querySelector('[data-role="energy-summary"]'),
+        summaryPeriod: component.querySelector('[data-role="energy-summary-period"]'),
         charged: component.querySelector('[data-role="energy-total-charged"]'),
         discharged: component.querySelector('[data-role="energy-total-discharged"]'),
         net: component.querySelector('[data-role="energy-total-net"]'),
@@ -49,7 +46,6 @@
     let payload = null;
     let availableDays = [];
     let selectedDay = null;
-    let range = "day";
     let activeController = null;
 
     function localDateKey(date = new Date()) {
@@ -92,6 +88,34 @@
             month: "short",
             ...(includeYear ? { year: "numeric" } : {})
         });
+    }
+
+    function formatDateRange(days) {
+        if (!days.length) return "Recent activity";
+        if (days.length === 1) return formatDay(days[0], true);
+
+        const first = parseDateKey(days[0]);
+        const last = parseDateKey(days[days.length - 1]);
+        const formatter = new Intl.DateTimeFormat([], {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        });
+        if (typeof formatter.formatRange === "function") {
+            return formatter.formatRange(first, last);
+        }
+
+        const sameYear = first.getFullYear() === last.getFullYear();
+        const sameMonth = sameYear && first.getMonth() === last.getMonth();
+        const firstLabel = first.toLocaleDateString([], sameMonth
+            ? { day: "numeric" }
+            : { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+        const lastLabel = last.toLocaleDateString([], {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        });
+        return `${firstLabel}–${lastLabel}`;
     }
 
     function formatEnergy(value, signed = false) {
@@ -154,11 +178,6 @@
             .sort((a, b) => a.hourLabel.localeCompare(b.hourLabel));
     }
 
-    function rowsForRange() {
-        const rows = normalizedRows();
-        return range === "day" ? rows.filter((row) => row.day === selectedDay) : rows;
-    }
-
     function createSvgElement(name, attributes = {}, text = "") {
         const element = document.createElementNS(SVG_NS, name);
         Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
@@ -206,7 +225,7 @@
             : previousBattery === null
                 ? `Battery ${Math.round(row.battery)} percent.`
                 : `Battery ${Math.round(previousBattery)} to ${Math.round(row.battery)} percent.`;
-        return `${formatDay(row.day)}, ${String(row.hour).padStart(2, "0")}:00 to ${String((row.hour + 1) % 24).padStart(2, "0")}:00, ${direction}${energy}. ${battery}`;
+        return `${formatDay(row.day)}, ${String(row.hour).padStart(2, "0")}:00 to ${String((row.hour + 1) % 24).padStart(2, "0")}:00, ${direction}${energy}. ${battery} Activate to show totals for this day.`;
     }
 
     function showHourDetail(row, previousBattery, target) {
@@ -238,18 +257,15 @@
     function renderChart(rows) {
         elements.chart.replaceChildren();
         if (!rows.length) {
-            elements.chart.innerHTML = '<p class="app-energy-history__empty">No hourly battery data is available for this range.</p>';
+            elements.chart.innerHTML = '<p class="app-energy-history__empty">No hourly battery data is available for the last four days.</p>';
             return;
         }
 
         const layout = compactChartMedia.matches ? CHART_LAYOUTS.compact : CHART_LAYOUTS.standard;
         const chartHeight = layout.height;
         const margin = layout.margin;
-        const slotWidth = range === "day" ? 29 : 14;
-        const chartWidth = Math.max(
-            range === "day" ? 760 : 1320,
-            margin.left + margin.right + (rows.length * slotWidth)
-        );
+        const slotWidth = 14;
+        const chartWidth = Math.max(1320, margin.left + margin.right + (rows.length * slotWidth));
         const plotWidth = chartWidth - margin.left - margin.right;
         const plotHeight = chartHeight - margin.top - margin.bottom;
         const baseline = margin.top + (plotHeight / 2);
@@ -330,15 +346,44 @@
             appendText(svg, nowX, margin.top - 6, "Now", "app-energy-chart__now-label", "middle");
         }
 
+        for (let startIndex = 0; startIndex < rows.length;) {
+            const day = rows[startIndex].day;
+            let endIndex = startIndex + 1;
+            while (endIndex < rows.length && rows[endIndex].day === day) endIndex += 1;
+
+            const daySelect = createSvgElement("rect", {
+                x: margin.left + (startIndex * actualSlotWidth),
+                y: chartHeight - margin.bottom + 7,
+                width: (endIndex - startIndex) * actualSlotWidth,
+                height: margin.bottom - 7,
+                rx: 3,
+                class: "app-energy-chart__day-select",
+                "data-day": day,
+                tabindex: "0",
+                role: "button",
+                "aria-label": `Show totals for ${formatDay(day, true)}`,
+                "aria-pressed": "false"
+            });
+            daySelect.addEventListener("click", () => selectSummaryDay(day));
+            daySelect.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                selectSummaryDay(day);
+            });
+            svg.append(daySelect);
+            startIndex = endIndex;
+        }
+
         rows.forEach((row, index) => {
             const x = xForIndex(index);
             const isDayStart = index === 0 || row.day !== rows[index - 1].day;
-            const showTime = range === "day" ? row.hour % 3 === 0 : row.hour % 6 === 0;
+            const showTime = row.hour % 6 === 0;
             if (showTime) {
                 appendText(svg, x, chartHeight - 12, `${String(row.hour).padStart(2, "0")}:00`, "app-energy-chart__x-label", "middle");
             }
-            if (range !== "day" && isDayStart) {
-                appendText(svg, x + 3, chartHeight - 1, formatDay(row.day), "app-energy-chart__day-label");
+            if (isDayStart) {
+                const dayLabel = appendText(svg, x + 3, chartHeight - 1, formatDay(row.day), "app-energy-chart__day-label");
+                dayLabel.setAttribute("data-day", row.day);
             }
 
             const previousBattery = index > 0 && rows[index - 1].day === row.day ? rows[index - 1].battery : null;
@@ -348,30 +393,32 @@
                 width: actualSlotWidth,
                 height: plotHeight,
                 class: "app-energy-chart__hit",
+                "data-day": row.day,
                 tabindex: "0",
                 role: "button",
                 "aria-label": hourAriaLabel(row, previousBattery)
             });
             hit.append(createSvgElement("title", {}, hourAriaLabel(row, previousBattery)));
-            ["focus", "click"].forEach((eventName) => {
-                hit.addEventListener(eventName, () => showHourDetail(row, previousBattery, hit));
+            hit.addEventListener("focus", () => showHourDetail(row, previousBattery, hit));
+            hit.addEventListener("click", () => {
+                showHourDetail(row, previousBattery, hit);
+                selectSummaryDay(row.day);
+            });
+            hit.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                showHourDetail(row, previousBattery, hit);
+                selectSummaryDay(row.day);
             });
             svg.append(hit);
         });
 
         elements.chart.append(svg);
         elements.chart.style.width = `${chartWidth}px`;
-        elements.chart.setAttribute("aria-label", `${range === "day" ? formatDay(selectedDay) : "Four-day"} battery energy chart. Scale from minus ${formatEnergy(energyMax)} to plus ${formatEnergy(energyMax)}.`);
+        elements.chart.setAttribute("aria-label", `Four-day battery energy chart. Scale from minus ${formatEnergy(energyMax)} to plus ${formatEnergy(energyMax)}.`);
 
         requestAnimationFrame(() => {
-            if (range === "four-days") {
-                elements.chartScroll.scrollLeft = elements.chartScroll.scrollWidth - elements.chartScroll.clientWidth;
-            } else if (selectedDay === today && todayIndex !== -1) {
-                const currentX = margin.left + ((todayIndex + (now.getMinutes() / 60)) * actualSlotWidth);
-                elements.chartScroll.scrollLeft = Math.max(0, currentX - (elements.chartScroll.clientWidth / 2));
-            } else {
-                elements.chartScroll.scrollLeft = 0;
-            }
+            elements.chartScroll.scrollLeft = elements.chartScroll.scrollWidth - elements.chartScroll.clientWidth;
         });
     }
 
@@ -466,6 +513,33 @@
         return priceWarning(money);
     }
 
+    function summaryPeriodLabel(day) {
+        return day === localDateKey()
+            ? "Today totals · through now"
+            : `${formatDay(day, true)} totals`;
+    }
+
+    function selectSummaryDay(day) {
+        if (!availableDays.includes(day)) return;
+        selectedDay = day;
+        elements.summaryPeriod.textContent = summaryPeriodLabel(day);
+        elements.summary.setAttribute("aria-label", `Energy and price totals for ${formatDay(day, true)}`);
+
+        elements.chart.querySelectorAll(".app-energy-chart__hit[data-day]").forEach((hit) => {
+            hit.classList.toggle("is-selected-day", hit.dataset.day === day);
+        });
+        elements.chart.querySelectorAll(".app-energy-chart__day-label[data-day]").forEach((label) => {
+            label.classList.toggle("is-selected-day", label.dataset.day === day);
+        });
+        elements.chart.querySelectorAll(".app-energy-chart__day-select[data-day]").forEach((control) => {
+            const isSelected = control.dataset.day === day;
+            control.classList.toggle("is-selected-day", isSelected);
+            control.setAttribute("aria-pressed", isSelected ? "true" : "false");
+        });
+
+        renderStatus(renderSummary([day]));
+    }
+
     function resetDetail() {
         elements.detailTime.textContent = "Select an hour";
         elements.detailFlow.textContent = "Explore the chart for exact values";
@@ -495,22 +569,10 @@
     }
 
     function render() {
-        const rows = rowsForRange();
-        const visibleDays = range === "day" ? [selectedDay] : availableDays;
-        const dayIndex = availableDays.indexOf(selectedDay);
-        elements.dayNav.hidden = range !== "day";
-        elements.previous.disabled = dayIndex <= 0;
-        elements.next.disabled = dayIndex === -1 || dayIndex >= availableDays.length - 1;
-        elements.dayLabel.textContent = formatDay(selectedDay, true);
-        elements.date.textContent = range === "day"
-            ? `${formatDay(selectedDay, true)} · energy flow and battery level`
-            : `${availableDays.length} days · energy flow and battery level`;
-        elements.rangeButtons.forEach((button) => {
-            button.setAttribute("aria-selected", button.dataset.range === range ? "true" : "false");
-        });
+        const rows = normalizedRows();
+        elements.date.textContent = `${formatDateRange(availableDays)} · energy flow and battery level`;
         renderChart(rows);
-        const priceMessage = renderSummary(visibleDays);
-        renderStatus(priceMessage);
+        selectSummaryDay(selectedDay);
         resetDetail();
     }
 
@@ -555,26 +617,6 @@
         }
     }
 
-    elements.rangeButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-            range = button.dataset.range === "four-days" ? "four-days" : "day";
-            render();
-        });
-    });
-    elements.previous.addEventListener("click", () => {
-        const index = availableDays.indexOf(selectedDay);
-        if (index > 0) {
-            selectedDay = availableDays[index - 1];
-            render();
-        }
-    });
-    elements.next.addEventListener("click", () => {
-        const index = availableDays.indexOf(selectedDay);
-        if (index >= 0 && index < availableDays.length - 1) {
-            selectedDay = availableDays[index + 1];
-            render();
-        }
-    });
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
     compactChartMedia.addEventListener?.("change", () => {

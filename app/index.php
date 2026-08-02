@@ -169,13 +169,24 @@ $appConfig = [
                             aria-valuemax="1600"
                             aria-valuenow="0"
                         >
-                            <span class="app-flow__track app-flow__track--negative"></span>
-                            <span class="app-flow__zero">0 W</span>
-                            <span class="app-flow__track app-flow__track--positive"></span>
-                            <span class="app-flow__fill" data-role="power-flow-fill" aria-hidden="true"></span>
+                            <span class="app-flow__track app-flow__track--negative">
+                                <span
+                                    class="app-flow__fill app-flow__fill--negative"
+                                    data-role="power-flow-fill-negative"
+                                    aria-hidden="true"
+                                ></span>
+                            </span>
+                            <span class="app-flow__track app-flow__track--positive">
+                                <span
+                                    class="app-flow__fill app-flow__fill--positive"
+                                    data-role="power-flow-fill-positive"
+                                    aria-hidden="true"
+                                ></span>
+                            </span>
                         </div>
                         <div class="app-flow__labels" aria-hidden="true">
                             <span data-role="power-min-label">−1600 W</span>
+                            <span class="app-flow__label-zero">0</span>
                             <span data-role="power-max-label">+1600 W</span>
                         </div>
                     </article>
@@ -188,7 +199,7 @@ $appConfig = [
                                     </svg>
                                     Battery
                                 </span>
-                                <span class="app-target-label" data-role="battery-target">Target --%</span>
+                                <span class="app-target-label" data-role="battery-target">Estimating</span>
                             </div>
                             <div class="app-compact-stat__reading">
                                 <p class="app-compact-stat__value" data-role="battery-percent">--%</p>
@@ -325,14 +336,10 @@ $appConfig = [
         >
             <header class="app-section-heading app-energy-history__heading">
                 <div>
-                    <h2 id="energy-history-title">Hourly battery energy</h2>
+                    <h2 id="energy-history-title">Battery energy</h2>
                     <p data-role="energy-history-date">Loading recent battery activity</p>
                 </div>
                 <div class="app-section-heading__actions">
-                    <div class="app-day-switch" role="tablist" aria-label="Energy history range">
-                        <button type="button" role="tab" aria-selected="true" data-role="energy-range" data-range="day">Day</button>
-                        <button type="button" role="tab" aria-selected="false" data-role="energy-range" data-range="four-days">4 days</button>
-                    </div>
                     <button class="gsd-icon-btn app-energy-history__refresh" type="button" aria-label="Refresh battery energy history" data-role="energy-history-refresh">
                         <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
                     </button>
@@ -350,16 +357,6 @@ $appConfig = [
             </div>
 
             <div class="app-energy-history__content" data-role="energy-history-content" hidden>
-                <div class="app-energy-history__day-nav" data-role="energy-day-nav">
-                    <button class="gsd-icon-btn" type="button" aria-label="Previous day" data-role="energy-day-previous">
-                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-left"></use></svg>
-                    </button>
-                    <strong data-role="energy-day-label">Today</strong>
-                    <button class="gsd-icon-btn" type="button" aria-label="Next day" data-role="energy-day-next">
-                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-right"></use></svg>
-                    </button>
-                </div>
-
                 <div class="app-energy-history__legend" aria-label="Energy chart legend">
                     <span><i class="app-energy-history__key app-energy-history__key--charged" aria-hidden="true"></i>Charged</span>
                     <span><i class="app-energy-history__key app-energy-history__key--discharged" aria-hidden="true"></i>Discharged</span>
@@ -367,8 +364,8 @@ $appConfig = [
                     <span><i class="app-energy-history__key app-energy-history__key--now" aria-hidden="true"></i>Now</span>
                 </div>
 
-                <div class="app-energy-history__chart-scroll" data-role="energy-chart-scroll" tabindex="0" aria-label="Scrollable hourly battery energy chart">
-                    <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level"></div>
+                <div class="app-energy-history__chart-scroll" data-role="energy-chart-scroll" tabindex="0" aria-label="Scrollable hourly battery energy chart for the last four days">
+                    <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level for the last four days"></div>
                 </div>
 
                 <div class="app-energy-history__detail" data-role="energy-hour-detail" aria-live="polite" hidden>
@@ -377,7 +374,8 @@ $appConfig = [
                     <span data-role="energy-detail-battery">Battery level appears when available</span>
                 </div>
 
-                <div class="app-energy-history__summary" aria-label="Energy and price totals for the selected range">
+                <p class="app-energy-history__summary-period" data-role="energy-summary-period" aria-live="polite">Today totals · through now</p>
+                <div class="app-energy-history__summary" data-role="energy-summary" aria-label="Energy and price totals for today">
                     <div>
                         <span class="app-energy-history__summary-title">Charged</span>
                         <strong class="gsd-positive" data-role="energy-total-charged">—</strong>

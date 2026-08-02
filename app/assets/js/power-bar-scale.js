@@ -13,9 +13,12 @@
     const POWER_BAR_SCALE_ANCHORS = Object.freeze([
         Object.freeze({ actualPercent: 0, displayPercent: 0 }),
         Object.freeze({ actualPercent: 1, displayPercent: 10 }),
-        Object.freeze({ actualPercent: 10, displayPercent: 20 }),
-        Object.freeze({ actualPercent: 20, displayPercent: 25 }),
-        Object.freeze({ actualPercent: 30, displayPercent: 30 }),
+        Object.freeze({ actualPercent: 5, displayPercent: 20 }),
+        Object.freeze({ actualPercent: 10, displayPercent: 25 }),
+        Object.freeze({ actualPercent: 20, displayPercent: 30 }),
+        Object.freeze({ actualPercent: 30, displayPercent: 40 }),
+        Object.freeze({ actualPercent: 50, displayPercent: 50 }),
+        Object.freeze({ actualPercent: 75, displayPercent: 75 }),
         Object.freeze({ actualPercent: 100, displayPercent: 100 })
     ]);
 

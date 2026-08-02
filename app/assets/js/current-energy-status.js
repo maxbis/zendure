@@ -33,7 +33,8 @@
         powerDescription: component.querySelector('[data-role="power-description"]'),
         freshnessLabel: component.querySelector('[data-role="freshness-label"]'),
         powerFlow: component.querySelector('[data-role="power-flow"]'),
-        powerFlowFill: component.querySelector('[data-role="power-flow-fill"]'),
+        powerFlowNegativeFill: component.querySelector('[data-role="power-flow-fill-negative"]'),
+        powerFlowPositiveFill: component.querySelector('[data-role="power-flow-fill-positive"]'),
         powerMinLabel: component.querySelector('[data-role="power-min-label"]'),
         powerMaxLabel: component.querySelector('[data-role="power-max-label"]'),
         batteryPercent: component.querySelector('[data-role="battery-percent"]'),
@@ -79,7 +80,7 @@
             actualPercent,
             displayPercent,
             // Each direction occupies one half of the complete bidirectional bar.
-            cssWidthPercent: displayPercent / 2
+            fullBarWidthPercent: displayPercent / 2
         };
     }
 
@@ -103,16 +104,13 @@
 
     function formatDuration(hours) {
         if (!Number.isFinite(hours) || hours <= 0) return null;
-        if (hours < 1 / 60) return "< 1m";
-        if (hours < 1) return `${Math.round(hours * 60)}m`;
+        const totalMinutes = Math.round(hours * 60);
+        if (totalMinutes < 1) return "<1m";
+        if (totalMinutes < 60) return `${totalMinutes}m`;
 
-        let wholeHours = Math.floor(hours);
-        let minutes = Math.round((hours - wholeHours) * 60);
-        if (minutes === 60) {
-            wholeHours += 1;
-            minutes = 0;
-        }
-        return `${wholeHours}h ${String(minutes).padStart(2, "0")}m`;
+        const wholeHours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return minutes > 0 ? `${wholeHours}h${minutes}m` : `${wholeHours}h`;
     }
 
     function formatRelativeTime(timestampMs) {
@@ -221,6 +219,43 @@
         };
     }
 
+    function batteryCountdownCopy(model) {
+        if (model.mode === "charging") {
+            if (model.batteryPercent !== null && model.batteryPercent >= model.maximumPercent) {
+                return {
+                    label: "At maximum",
+                    description: `Battery is at the ${model.maximumPercent}% maximum`
+                };
+            }
+            return {
+                label: model.remainingTime || "Estimating",
+                description: model.remainingTime
+                    ? `${model.remainingTime} until the ${model.maximumPercent}% maximum at the current charging rate`
+                    : `Time to the ${model.maximumPercent}% maximum is unavailable`
+            };
+        }
+
+        if (model.mode === "discharging") {
+            if (model.batteryPercent !== null && model.batteryPercent <= model.minimumPercent) {
+                return {
+                    label: "At minimum",
+                    description: `Battery is at the ${model.minimumPercent}% minimum`
+                };
+            }
+            return {
+                label: model.remainingTime || "Estimating",
+                description: model.remainingTime
+                    ? `${model.remainingTime} until the ${model.minimumPercent}% minimum at the current discharging rate`
+                    : `Time to the ${model.minimumPercent}% minimum is unavailable`
+            };
+        }
+
+        return {
+            label: "At rest",
+            description: "Battery is not currently charging or discharging"
+        };
+    }
+
     function gridCopy(gridPowerW) {
         if (gridPowerW === null) {
             return { label: "Unknown", description: "P1 reading unavailable", direction: "balanced" };
@@ -257,10 +292,17 @@
         const maxPower = Math.max(1, finiteNumber(config.powerMaxW, 1200));
         const axisLimit = model.powerW >= 0 ? maxPower : Math.abs(minPower);
         const powerScale = calculateVisualBarScale(model.powerW, axisLimit);
-        elements.powerFlowFill.style.setProperty("--app-flow-width", `${powerScale.cssWidthPercent}%`);
-        elements.powerFlowFill.dataset.actualPercent = powerScale.actualPercent.toFixed(2);
-        elements.powerFlowFill.dataset.displayPercent = powerScale.displayPercent.toFixed(2);
-        elements.powerFlowFill.dataset.direction = model.powerW < 0 ? "negative" : "positive";
+        elements.powerFlowNegativeFill.style.setProperty(
+            "--app-flow-width",
+            model.powerW < 0 ? `${powerScale.displayPercent}%` : "0%"
+        );
+        elements.powerFlowPositiveFill.style.setProperty(
+            "--app-flow-width",
+            model.powerW > 0 ? `${powerScale.displayPercent}%` : "0%"
+        );
+        elements.powerFlow.dataset.actualPercent = powerScale.actualPercent.toFixed(2);
+        elements.powerFlow.dataset.displayPercent = powerScale.displayPercent.toFixed(2);
+        elements.powerFlow.dataset.direction = model.powerW < 0 ? "negative" : "positive";
         elements.powerFlow.setAttribute("aria-valuemin", String(minPower));
         elements.powerFlow.setAttribute("aria-valuemax", String(maxPower));
         elements.powerFlow.setAttribute("aria-valuenow", String(Math.round(model.powerW)));
@@ -296,13 +338,10 @@
             elements.batteryProgressFill.style.setProperty("--app-battery-level", `${model.batteryPercent}%`);
         }
 
-        if (model.mode === "charging") {
-            elements.batteryTarget.textContent = `Target ${model.maximumPercent}%`;
-        } else if (model.mode === "discharging") {
-            elements.batteryTarget.textContent = `Reserve ${model.minimumPercent}%`;
-        } else {
-            elements.batteryTarget.textContent = `Range ${model.minimumPercent}–${model.maximumPercent}%`;
-        }
+        const batteryCountdown = batteryCountdownCopy(model);
+        elements.batteryTarget.textContent = batteryCountdown.label;
+        elements.batteryTarget.setAttribute("aria-label", batteryCountdown.description);
+        elements.batteryTarget.title = batteryCountdown.description;
         elements.batteryTarget.dataset.mode = model.mode;
         elements.batteryMinMarker.style.setProperty("--app-marker", `${model.minimumPercent}%`);
         elements.batteryTargetMarker.style.setProperty("--app-marker", `${model.maximumPercent}%`);
@@ -329,7 +368,7 @@
         elements.gridFlowFill.dataset.direction = grid.direction;
         const gridAxis = gridValue >= 0 ? maxPower : Math.abs(minPower);
         const gridScale = calculateVisualBarScale(gridValue, gridAxis);
-        const gridWidth = grid.direction === "balanced" ? 0 : gridScale.cssWidthPercent;
+        const gridWidth = grid.direction === "balanced" ? 0 : gridScale.fullBarWidthPercent;
         elements.gridFlowFill.style.setProperty("--app-grid-width", `${gridWidth}%`);
         elements.gridFlowFill.dataset.actualPercent = gridScale.actualPercent.toFixed(2);
         elements.gridFlowFill.dataset.displayPercent = grid.direction === "balanced"

@@ -200,6 +200,10 @@
     white-space: nowrap;
 }
 
+.app-target-label {
+    cursor: default;
+}
+
 .app-target-label[data-mode="charging"] {
     background: var(--gsd-positive-soft);
     border-color: color-mix(in srgb, var(--gsd-positive) 38%, transparent);
@@ -263,13 +267,14 @@
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
-    gap: 10px;
+    gap: 0;
     margin-top: 28px;
 }
 
 .app-flow__track {
+    position: relative;
     height: 8px;
     overflow: hidden;
     background: var(--gsd-page-deep);
@@ -278,40 +283,33 @@
 
 .app-flow__track--negative {
     background: var(--gsd-negative-soft);
+    border-radius: 999px 0 0 999px;
 }
 
 .app-flow__track--positive {
     background: var(--gsd-positive-soft);
-}
-
-.app-flow__zero {
-    position: relative;
-    z-index: 2;
-    padding-inline: 3px;
-    background: var(--gsd-surface-2);
-    border-radius: 4px;
-    color: var(--gsd-text-muted);
-    font-size: 0.68rem;
+    border-radius: 0 999px 999px 0;
 }
 
 .app-flow__fill {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 0;
+    bottom: 0;
     width: var(--app-flow-width, 0%);
-    height: 8px;
+    height: 100%;
     background: var(--app-mode-color, var(--gsd-neutral));
     border-radius: 999px;
-    transform: translateY(-50%);
     transition:
-        left var(--gsd-duration-medium) ease,
         width var(--gsd-duration-medium) ease,
         background-color var(--gsd-duration-medium) ease;
 }
 
-.app-flow__fill[data-direction="negative"] {
-    right: 50%;
-    left: auto;
+.app-flow__fill--negative {
+    right: 0;
+}
+
+.app-flow__fill--positive {
+    left: 0;
 }
 
 .app-flow__labels,
@@ -324,6 +322,19 @@
     color: var(--gsd-text-muted);
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
+}
+
+.app-flow__labels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-flow__label-zero {
+    text-align: center;
+}
+
+.app-flow__labels [data-role="power-max-label"] {
+    text-align: right;
 }
 
 .app-compact-stat {
@@ -1766,26 +1777,6 @@
     padding: 10px 14px 12px;
 }
 
-.app-energy-history__day-nav {
-    display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
-    align-items: center;
-    width: min(100%, 360px);
-    margin: 0 auto 6px;
-}
-
-.app-energy-history__day-nav .gsd-icon-btn {
-    width: 36px;
-    min-height: 36px;
-    justify-self: center;
-}
-
-.app-energy-history__day-nav strong {
-    color: var(--gsd-text-secondary);
-    font-size: 0.75rem;
-    text-align: center;
-}
-
 .app-energy-history__legend {
     display: flex;
     flex-wrap: wrap;
@@ -1909,12 +1900,36 @@
 
 .app-energy-chart__x-label {
     font-size: 9px;
+    pointer-events: none;
 }
 
 .app-energy-chart__day-label {
     fill: var(--gsd-text-secondary);
     font-size: 9px;
     font-weight: 700;
+    pointer-events: none;
+}
+
+.app-energy-chart__day-label.is-selected-day {
+    fill: var(--gsd-accent);
+}
+
+.app-energy-chart__day-select {
+    fill: transparent;
+    cursor: pointer;
+}
+
+.app-energy-chart__day-select:hover,
+.app-energy-chart__day-select:focus,
+.app-energy-chart__day-select.is-selected-day {
+    fill: color-mix(in srgb, var(--gsd-accent) 7%, transparent);
+    outline: none;
+}
+
+.app-energy-chart__day-select:focus-visible {
+    stroke: var(--gsd-accent);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
 }
 
 .app-energy-chart__bar {
@@ -1953,6 +1968,10 @@
 .app-energy-chart__hit {
     fill: transparent;
     cursor: crosshair;
+}
+
+.app-energy-chart__hit.is-selected-day {
+    fill: color-mix(in srgb, var(--gsd-accent) 5%, transparent);
 }
 
 .app-energy-chart__hit:hover,
@@ -1994,11 +2013,19 @@
 .app-energy-history__detail strong[data-direction="charged"] { color: var(--gsd-positive); }
 .app-energy-history__detail strong[data-direction="discharged"] { color: var(--gsd-negative); }
 
+.app-energy-history__content > .app-energy-history__summary-period {
+    margin: 10px 2px 4px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
 .app-energy-history__summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px;
-    margin-top: 6px;
+    margin-top: 0;
 }
 
 .app-energy-history__summary > div {
@@ -2079,11 +2106,9 @@
 }
 
 .app-flow {
-    gap: 6px;
     margin-top: 14px;
 }
 
-.app-flow,
 .app-flow__track,
 .app-flow__fill,
 .app-battery-progress,
@@ -2264,6 +2289,11 @@
         padding: 4px 5px;
     }
 
+    .app-energy-history__content > .app-energy-history__summary-period {
+        margin-top: 8px;
+        font-size: 0.62rem;
+    }
+
     .app-energy-history__summary span {
         font-size: 0.56rem;
     }
@@ -2322,33 +2352,12 @@
         display: contents;
     }
 
-    .app-energy-history__heading .app-day-switch {
-        width: 100%;
-        grid-column: 1 / -1;
-        grid-row: 2;
-    }
-
-    .app-energy-history__heading .app-day-switch button {
-        min-height: 32px;
-        padding-block: 2px;
-    }
-
     .app-energy-history__refresh {
         width: 40px;
         height: 40px;
         min-height: 40px;
         grid-column: 2;
         grid-row: 1;
-    }
-
-    .app-energy-history__day-nav {
-        grid-template-columns: 36px minmax(0, 1fr) 36px;
-        margin-bottom: 4px;
-    }
-
-    .app-energy-history__day-nav .gsd-icon-btn {
-        width: 34px;
-        min-height: 34px;
     }
 
     .app-section-heading__actions {
