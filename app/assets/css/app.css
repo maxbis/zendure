@@ -239,6 +239,76 @@
     cursor: default;
 }
 
+.app-battery-card .app-battery-dialog-trigger {
+    appearance: none;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.app-battery-dialog-trigger:not(:disabled) {
+    cursor: pointer;
+}
+
+.app-battery-dialog-trigger:disabled {
+    opacity: 1;
+}
+
+.app-battery-dialog-trigger:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: 2px;
+}
+
+.app-battery-popover {
+    position: fixed;
+    z-index: 1200;
+    width: min(310px, calc(100vw - 24px));
+    overflow: hidden;
+    background: color-mix(in srgb, var(--gsd-surface-3) 96%, var(--gsd-page-deep));
+    border: 1px solid var(--gsd-border-strong);
+    border-radius: 10px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+    color: var(--gsd-text);
+    pointer-events: none;
+}
+
+.app-battery-popover[hidden] {
+    display: none;
+}
+
+.app-battery-popover__header {
+    padding: 9px 11px;
+    background: var(--gsd-surface-2);
+    border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.app-battery-popover__header strong {
+    font-size: 0.75rem;
+}
+
+.app-battery-popover__details {
+    display: grid;
+    gap: 7px;
+    padding: 10px 11px 11px;
+}
+
+.app-battery-popover__details p {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.68rem;
+}
+
+.app-battery-popover__details strong {
+    flex: 0 0 auto;
+    color: var(--gsd-text);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .app-target-label[data-mode="charging"] {
     background: var(--gsd-positive-soft);
     border-color: color-mix(in srgb, var(--gsd-positive) 38%, transparent);
@@ -405,6 +475,15 @@
     font-weight: 650;
 }
 
+.app-title-view-toggle {
+    appearance: none;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    text-align: left;
+}
+
 .app-compact-stat__value {
     margin: 0;
     color: var(--gsd-text);
@@ -506,17 +585,13 @@
     cursor: pointer;
 }
 
-.app-battery-view-toggle--progress {
+.app-battery-progress-display {
     display: block;
     width: 100%;
     margin: 14px 0 0;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 999px;
 }
 
-.app-battery-view-toggle--progress .app-battery-progress {
+.app-battery-progress-display .app-battery-progress {
     display: block;
     margin-top: 0;
 }
@@ -546,11 +621,19 @@
     width: 100%;
 }
 
-.app-battery-simple__percent {
+.app-battery-card .app-battery-simple__percent {
+    appearance: none;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
     font-size: 2.2rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
     line-height: 1;
+    text-align: left;
 }
 
 .app-simple-value__unit {
@@ -564,11 +647,16 @@
 .app-battery-icon {
     position: relative;
     display: block;
+    width: 100%;
     min-width: 0;
     height: 48px;
+    appearance: none;
     padding: 6px;
+    background: transparent;
     border: 3px solid var(--gsd-text-secondary);
     border-radius: 7px;
+    color: inherit;
+    font: inherit;
 }
 
 .app-battery-icon::after {
@@ -652,17 +740,13 @@
     cursor: pointer;
 }
 
-.app-power-view-toggle--flow {
+.app-power-flow-display {
     display: block;
     width: 100%;
     margin: 14px 0 0;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 999px;
 }
 
-.app-power-view-toggle--flow .app-flow {
+.app-power-flow-display .app-flow {
     margin-top: 0;
 }
 
@@ -835,17 +919,13 @@
     cursor: pointer;
 }
 
-.app-grid-view-toggle--flow {
+.app-grid-flow-display {
     display: block;
     width: 100%;
     margin: 14px 0 0;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 999px;
 }
 
-.app-grid-view-toggle--flow .app-grid-flow {
+.app-grid-flow-display .app-grid-flow {
     display: block;
     margin-top: 0;
 }
@@ -1132,21 +1212,29 @@
 
 .app-price-kpi {
     min-width: 0;
+    appearance: none;
     padding: 8px 10px;
     background: var(--gsd-surface-2);
     border: 1px solid var(--gsd-border-subtle);
     border-radius: 9px;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
 }
 
-.app-price-kpi[tabindex] {
-    cursor: help;
+.app-price-kpi:not(:disabled) {
+    cursor: pointer;
 }
 
-.app-price-kpi[tabindex]:hover {
+.app-price-kpi:disabled {
+    opacity: 1;
+}
+
+.app-price-kpi:not(:disabled):hover {
     border-color: var(--gsd-border-strong);
 }
 
-.app-price-kpi[tabindex]:focus-visible {
+.app-price-kpi:focus-visible {
     outline: 2px solid var(--gsd-accent);
     outline-offset: 2px;
 }
@@ -1177,6 +1265,28 @@
 
 .app-price-kpi .app-price-kpi--high {
     color: var(--gsd-negative);
+}
+
+.app-price-summary-tooltip__prices {
+    display: grid;
+    gap: 7px;
+    padding: 10px 11px 11px;
+}
+
+.app-price-summary-tooltip__prices p {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.68rem;
+}
+
+.app-price-summary-tooltip__prices strong {
+    color: var(--gsd-text);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .app-price-timeline-scroll {
@@ -1601,28 +1711,6 @@
     display: grid;
     gap: 7px;
     padding: 10px 11px 11px;
-}
-
-.app-price-summary-tooltip__prices {
-    display: grid;
-    gap: 7px;
-    padding: 10px 11px 11px;
-}
-
-.app-price-summary-tooltip__prices p {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 18px;
-    margin: 0;
-    color: var(--gsd-text-muted);
-    font-size: 0.68rem;
-}
-
-.app-price-summary-tooltip__prices strong {
-    color: var(--gsd-text);
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
 }
 
 .app-schedule-tooltip__section-label {

@@ -4,13 +4,16 @@
 
 `system.json` is the future canonical, non-secret source for installation facts that must eventually agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
 
-Phase 3 only introduces the file and its schema. No runtime consumer loads it yet, so adding it does not change current application or controller behaviour.
+Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers, but no runtime consumer loads them yet, so current application and controller behaviour remains unchanged.
 
 ## Location
 
 - Configuration: [`common/config/system.json`](../../../common/config/system.json)
 - JSON Schema: [`common/config/system.schema.json`](../../../common/config/system.schema.json)
 - Direct Apache access restriction: [`common/config/.htaccess`](../../../common/config/.htaccess)
+- PHP loader: [`common/php/system_config.php`](../../../common/php/system_config.php)
+- Python loader: [`common/python/system_config.py`](../../../common/python/system_config.py)
+- Cross-language tests: [`tools/tests/test_system_config_loaders.py`](../../../tools/tests/test_system_config_loaders.py)
 - Phase 1 baseline: [`configuration-baseline.md`](../../configuration-baseline.md)
 - Phase 2 decisions: [`configuration-target-values.md`](../../configuration-target-values.md)
 
@@ -36,9 +39,11 @@ The configuration contains:
 - Consumer precision: 4 decimal places.
 - Spot precision: 6 decimal places.
 
-### Intended future output
+### Loader output
 
-Future PHP and Python loaders will return a validated configuration object. Phase 3 does not provide those loaders and does not inject this file into browser JavaScript.
+The PHP `loadSystemConfig()` function and Python `load_system_config()` function return the same validated, normalized configuration structure. Both accept an optional file path for tests and otherwise locate `common/config/system.json` relative to their own source file.
+
+Neither loader caches the result. Neither loader injects configuration into browser JavaScript or changes an existing consumer.
 
 ## Contract
 
@@ -61,7 +66,7 @@ Required properties:
 - `minChargePercent`: integer from 0 through 99.
 - `maxChargePercent`: integer from 1 through 100.
 
-The portable JSON Schema validates each range independently. The future loaders must additionally enforce `minChargePercent < maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare two sibling numeric properties.
+The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare two sibling numeric properties.
 
 ### Installation
 
@@ -72,7 +77,7 @@ Required properties:
 - `longitude`: number from -180 through 180.
 - `timezone`: non-empty IANA timezone string.
 
-The schema verifies that timezone is non-empty. Future loaders must verify that the named timezone is supported by the host runtime.
+The schema verifies that timezone is non-empty. The PHP loader checks `DateTimeZone::listIdentifiers()`, and the Python loader checks `zoneinfo.ZoneInfo`.
 
 ### Price conversion
 
@@ -88,20 +93,21 @@ Unknown properties are rejected inside every section.
 
 ## Flow and behaviour
 
-Current Phase 3 flow:
+Current Phase 4 flow:
 
 1. `system.json` records the approved Phase 2 values.
 2. `system.schema.json` defines its structural contract.
 3. Existing PHP code continues loading `main/config/config.json`.
 4. Existing automation continues loading `automate/config/config.jsonc`.
 5. Existing hard-coded and fallback values remain active.
+6. The PHP and Python loaders can independently read and validate the common file.
+7. Parity tests confirm both languages return the same normalized values and reject the same invalid categories.
 
-Planned Phase 4 flow:
+Run the focused Phase 4 tests with:
 
-1. A PHP loader reads and validates `system.json` without replacing current consumers.
-2. A Python loader reads and validates the same file without replacing automation's current configuration.
-3. Both loaders enforce semantic checks not expressible in portable JSON Schema.
-4. Parity tests confirm both languages return the same normalized values and errors.
+```sh
+python -m pytest -q tools/tests/test_system_config_loaders.py
+```
 
 ## Security boundary
 
@@ -116,8 +122,8 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When `schemaVersion` is not 1, then a conforming future loader must reject the file.
 - When a required property is absent, then schema validation fails.
 - When an unknown property is present, then schema validation fails rather than silently ignoring a likely typo.
-- When minimum is equal to or greater than maximum, then schema ranges alone may pass; future loader semantic validation must reject it.
-- When the timezone is non-empty but invalid, then schema validation may pass; future runtime validation must reject it.
+- When minimum is equal to or greater than maximum, then schema ranges alone may pass, but both loaders reject it.
+- When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.
 - When the synchronized file is stale on one host, then valid JSON does not prove both hosts use the same version.
 - When direct web access is not blocked by the active web server, then the current non-secret file could be downloadable; secrets must never be added.
 - When a consumer switches to this file prematurely, then the automation maximum changes from its current persistent 93% to the intended 91%.
@@ -132,6 +138,18 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - Existing interfaces and automation retain their current configuration sources.
 - Direct Apache access to the new directory is denied without blocking filesystem reads.
 
+## Phase 4 acceptance criteria
+
+- PHP and Python locate the canonical file relative to their own source directories.
+- Both return the approved configuration with matching keys and values.
+- Both reject missing files and invalid JSON.
+- Both reject missing and unknown properties.
+- Both reject unsupported schema versions and invalid primitive ranges.
+- Both reject minimum state of charge greater than or equal to maximum.
+- Both reject an unrecognized timezone.
+- Neither silently applies a fallback value.
+- No production consumer imports or requires either loader yet.
+
 ## Related files
 
 - [`main/includes/config_loader.php`](../../../main/includes/config_loader.php): current PHP configuration loader.
@@ -140,3 +158,5 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - [`automate/config/config.jsonc`](../../../automate/config/config.jsonc): current automation source.
 - [`main/includes/price_conversion.php`](../../../main/includes/price_conversion.php): current price-conversion consumer.
 - [`app/index.php`](../../../app/index.php): current new-interface configuration injection.
+- [`common/php/system_config.php`](../../../common/php/system_config.php): strict PHP reader.
+- [`common/python/system_config.py`](../../../common/python/system_config.py): strict Python reader.

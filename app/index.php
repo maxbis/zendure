@@ -211,10 +211,16 @@ $appConfig = [
                         <div class="app-power-card__inner">
                             <div class="app-power-card__face app-power-card__face--front" data-role="power-front">
                         <div class="app-compact-stat__top">
-                            <span class="app-compact-stat__label">
+                            <button
+                                class="app-compact-stat__label app-title-view-toggle app-power-view-toggle"
+                                type="button"
+                                data-role="power-view-toggle"
+                                aria-label="Show simplified charging status view"
+                                aria-pressed="false"
+                            >
                                 <span class="app-eyebrow__dot" data-role="mode-dot" aria-hidden="true"></span>
                                 <span data-role="mode-label">Standby</span>
-                            </span>
+                            </button>
                             <span class="app-state-pill" data-role="freshness-label">Live</span>
                         </div>
 
@@ -224,13 +230,7 @@ $appConfig = [
                             </p>
                         </div>
 
-                        <button
-                            class="app-power-view-toggle app-power-view-toggle--flow"
-                            type="button"
-                            data-role="power-view-toggle"
-                            aria-label="Show simplified charging status view"
-                            aria-pressed="false"
-                        >
+                        <div class="app-power-flow-display">
                             <span
                                 class="app-flow"
                                 data-role="power-flow"
@@ -255,7 +255,7 @@ $appConfig = [
                                     ></span>
                                 </span>
                             </span>
-                        </button>
+                        </div>
                         <div class="app-flow__labels" aria-hidden="true">
                             <span data-role="power-min-label">−1600 W</span>
                             <span class="app-flow__label-zero">0</span>
@@ -263,20 +263,19 @@ $appConfig = [
                         </div>
                             </div>
 
-                            <button
-                                class="app-power-card__face app-power-card__face--back app-power-view-toggle"
-                                type="button"
-                                data-role="power-view-toggle"
-                                aria-label="Show detailed charging status view"
-                                aria-pressed="false"
-                                inert
-                                tabindex="-1"
-                            >
+                            <div class="app-power-card__face app-power-card__face--back" inert>
                                 <span class="app-power-simple__top">
-                                    <span class="app-compact-stat__label">
+                                    <button
+                                        class="app-compact-stat__label app-title-view-toggle app-power-view-toggle"
+                                        type="button"
+                                        data-role="power-view-toggle"
+                                        aria-label="Show detailed charging status view"
+                                        aria-pressed="false"
+                                        tabindex="-1"
+                                    >
                                         <span class="app-eyebrow__dot" aria-hidden="true"></span>
                                         <span data-role="power-simple-mode">Standby</span>
-                                    </span>
+                                    </button>
                                     <span class="app-state-pill" data-role="power-simple-freshness">Live</span>
                                 </span>
                                 <span class="app-power-simple__content">
@@ -303,7 +302,7 @@ $appConfig = [
                                     </span>
                                 </span>
                                 <span class="app-power-simple__caption" data-role="power-simple-caption">No active battery power flow</span>
-                            </button>
+                            </div>
                         </div>
                     </article>
 
@@ -311,25 +310,25 @@ $appConfig = [
                         <div class="app-battery-card__inner">
                             <div class="app-battery-card__face app-battery-card__face--front" data-role="battery-front">
                             <div class="app-compact-stat__top">
-                                <span class="app-compact-stat__label">
+                                <button
+                                    class="app-compact-stat__label app-title-view-toggle app-battery-view-toggle"
+                                    type="button"
+                                    data-role="battery-view-toggle"
+                                    aria-label="Show simplified battery view"
+                                    aria-pressed="false"
+                                >
                                     <svg class="gsd-icon" aria-hidden="true">
                                         <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#battery"></use>
                                     </svg>
                                     Battery
-                                </span>
-                                <span class="app-target-label" data-role="battery-target">Estimating</span>
+                                </button>
+                                <button class="app-target-label app-battery-dialog-trigger" type="button" data-role="battery-target" disabled>Estimating</button>
                             </div>
                             <div class="app-compact-stat__reading">
                                 <p class="app-compact-stat__value" data-role="battery-percent">--%</p>
                                 <span class="app-compact-stat__hint" data-role="battery-energy">Capacity unavailable</span>
                             </div>
-                            <button
-                                class="app-battery-view-toggle app-battery-view-toggle--progress"
-                                type="button"
-                                data-role="battery-view-toggle"
-                                aria-label="Show simplified battery view"
-                                aria-pressed="false"
-                            >
+                            <div class="app-battery-progress-display">
                                 <span
                                     class="app-battery-progress"
                                     data-role="battery-progress"
@@ -343,45 +342,48 @@ $appConfig = [
                                     <span class="app-battery-progress__min" data-role="battery-min-marker" aria-hidden="true"></span>
                                     <span class="app-battery-progress__target" data-role="battery-target-marker" aria-hidden="true"></span>
                                 </span>
-                            </button>
+                            </div>
                             <div class="app-battery-progress__labels">
                                 <span data-role="battery-min-label">Minimum --%</span>
                                 <span data-role="battery-target-label">Maximum --%</span>
                             </div>
                             </div>
 
-                            <button
-                                class="app-battery-card__face app-battery-card__face--back app-battery-view-toggle"
-                                type="button"
-                                data-role="battery-view-toggle"
-                                aria-label="Show detailed battery view"
-                                aria-pressed="false"
+                            <div
+                                class="app-battery-card__face app-battery-card__face--back"
+                                data-role="battery-back"
                                 inert
-                                tabindex="-1"
                             >
                                 <span class="app-battery-simple__top">
-                                    <span class="app-compact-stat__label app-battery-simple__label">
+                                    <button
+                                        class="app-compact-stat__label app-battery-simple__label app-title-view-toggle app-battery-view-toggle"
+                                        type="button"
+                                        data-role="battery-view-toggle"
+                                        aria-label="Show detailed battery view"
+                                        aria-pressed="false"
+                                        tabindex="-1"
+                                    >
                                         <svg class="gsd-icon" aria-hidden="true">
                                             <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#battery"></use>
                                         </svg>
                                         Battery
-                                    </span>
-                                    <span class="app-target-label" data-role="battery-simple-target">Estimating</span>
+                                    </button>
+                                    <button class="app-target-label app-battery-dialog-trigger" type="button" data-role="battery-simple-target" disabled>Estimating</button>
                                 </span>
                                 <span class="app-battery-simple__content">
-                                    <strong class="app-battery-simple__percent" data-role="battery-simple-percent">--<span class="app-simple-value__unit">%</span></strong>
-                                    <span class="app-battery-icon" data-role="battery-icon" aria-hidden="true">
+                                    <strong class="app-battery-simple__percent" data-battery-simple-percent>--<span class="app-simple-value__unit">%</span></strong>
+                                    <button class="app-battery-icon app-battery-dialog-trigger" type="button" data-role="battery-icon" aria-label="Show battery energy details" disabled>
                                         <span class="app-battery-icon__segments">
                                             <?php for ($segment = 1; $segment <= 10; $segment++): ?>
                                                 <span class="app-battery-icon__segment" data-battery-segment="<?= $segment; ?>"></span>
                                             <?php endfor; ?>
                                         </span>
-                                    </span>
+                                    </button>
                                 </span>
                                 <span class="app-battery-simple__range" data-role="battery-simple-range">
                                     Operating range --%–--%
                                 </span>
-                            </button>
+                            </div>
                         </div>
                     </article>
 
@@ -389,25 +391,25 @@ $appConfig = [
                         <div class="app-grid-card__inner">
                             <div class="app-grid-card__face app-grid-card__face--front" data-role="grid-front">
                             <div class="app-compact-stat__top">
-                                <span class="app-compact-stat__label">
+                                <button
+                                    class="app-compact-stat__label app-title-view-toggle app-grid-view-toggle"
+                                    type="button"
+                                    data-role="grid-view-toggle"
+                                    aria-label="Show simplified grid exchange view"
+                                    aria-pressed="false"
+                                >
                                     <svg class="gsd-icon" aria-hidden="true">
                                         <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid-pylon"></use>
                                     </svg>
                                     Grid exchange
-                                </span>
+                                </button>
                                 <span class="app-state-pill" data-role="grid-state">Unknown</span>
                             </div>
                             <div class="app-compact-stat__reading">
                                 <p class="app-compact-stat__value" data-role="grid-power">-- W</p>
                                 <span class="app-compact-stat__hint" data-role="grid-description">Waiting for P1 data</span>
                             </div>
-                            <button
-                                class="app-grid-view-toggle app-grid-view-toggle--flow"
-                                type="button"
-                                data-role="grid-view-toggle"
-                                aria-label="Show simplified grid exchange view"
-                                aria-pressed="false"
-                            >
+                            <div class="app-grid-flow-display">
                                 <span
                                     class="app-grid-flow"
                                     data-role="grid-flow"
@@ -420,7 +422,7 @@ $appConfig = [
                                     <span class="app-grid-flow__center" aria-hidden="true"></span>
                                     <span class="app-grid-flow__fill" data-role="grid-flow-fill" aria-hidden="true"></span>
                                 </span>
-                            </button>
+                            </div>
                             <div class="app-grid-flow__labels" aria-hidden="true">
                                 <span data-role="grid-min-label">−1600 W</span>
                                 <span>0</span>
@@ -428,22 +430,21 @@ $appConfig = [
                             </div>
                             </div>
 
-                            <button
-                                class="app-grid-card__face app-grid-card__face--back app-grid-view-toggle"
-                                type="button"
-                                data-role="grid-view-toggle"
-                                aria-label="Show detailed grid exchange view"
-                                aria-pressed="false"
-                                inert
-                                tabindex="-1"
-                            >
+                            <div class="app-grid-card__face app-grid-card__face--back" inert>
                                 <span class="app-grid-simple__top">
-                                    <span class="app-compact-stat__label">
+                                    <button
+                                        class="app-compact-stat__label app-title-view-toggle app-grid-view-toggle"
+                                        type="button"
+                                        data-role="grid-view-toggle"
+                                        aria-label="Show detailed grid exchange view"
+                                        aria-pressed="false"
+                                        tabindex="-1"
+                                    >
                                         <svg class="gsd-icon" aria-hidden="true">
                                             <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid-pylon"></use>
                                         </svg>
                                         Grid exchange
-                                    </span>
+                                    </button>
                                     <span class="app-state-pill" data-role="grid-simple-state">Unknown</span>
                                 </span>
                                 <span class="app-grid-simple__content">
@@ -470,7 +471,7 @@ $appConfig = [
                                     </span>
                                 </span>
                                 <span class="app-grid-simple__caption" data-role="grid-simple-caption">Waiting for P1 data</span>
-                            </button>
+                            </div>
                         </div>
                     </article>
                 </div>
@@ -512,18 +513,18 @@ $appConfig = [
 
             <div class="app-price-plan__content" data-role="price-content" hidden>
                 <div class="app-price-summary" aria-label="Price summary for the visible planning horizon">
-                    <div class="app-price-kpi" data-role="price-current-kpi" tabindex="0">
+                    <button class="app-price-kpi" type="button" data-role="price-current-kpi" disabled>
                         <span data-role="price-current-label">Current</span>
                         <strong data-role="price-current">—</strong>
-                    </div>
-                    <div class="app-price-kpi" data-role="price-low-kpi" tabindex="0">
+                    </button>
+                    <button class="app-price-kpi" type="button" data-role="price-low-kpi" disabled>
                         <span>Horizon low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
-                    </div>
-                    <div class="app-price-kpi" data-role="price-high-kpi" tabindex="0">
+                    </button>
+                    <button class="app-price-kpi" type="button" data-role="price-high-kpi" disabled>
                         <span>Horizon high</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>
-                    </div>
+                    </button>
                 </div>
 
                 <div class="app-price-timeline-scroll" data-role="price-scroll" tabindex="0" aria-label="Scrollable hourly price and schedule timeline">

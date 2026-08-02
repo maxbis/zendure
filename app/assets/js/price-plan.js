@@ -437,7 +437,12 @@
 
     function hidePriceTooltip(trigger = null) {
         if (trigger && trigger !== activeTooltipTrigger) return;
-        if (activeTooltipTrigger) activeTooltipTrigger.removeAttribute("aria-describedby");
+        if (activeTooltipTrigger) {
+            activeTooltipTrigger.removeAttribute("aria-describedby");
+            if (activeTooltipTrigger.matches(".app-price-kpi")) {
+                activeTooltipTrigger.setAttribute("aria-expanded", "false");
+            }
+        }
         activeTooltipTrigger = null;
         priceTooltip.hidden = true;
         priceTooltip.style.removeProperty("left");
@@ -556,6 +561,7 @@
         hidePriceTooltip();
         activeTooltipTrigger = trigger;
         trigger.setAttribute("aria-describedby", priceTooltip.id);
+        trigger.setAttribute("aria-expanded", "true");
 
         const header = document.createElement("div");
         header.className = "app-schedule-tooltip__header";
@@ -584,22 +590,25 @@
     function setSummaryTooltip(card, label, detail) {
         if (!card) return;
         summaryTooltipDetails.set(card, detail);
+        card.disabled = !detail;
+        card.setAttribute("aria-expanded", "false");
         const dateAndTime = detail
             ? `${formatDate(detail.date)}, ${pad(detail.hour)}:00 to ${pad((detail.hour + 1) % 24)}:00`
             : "time unavailable";
         const consumer = detail ? formatPrice(detail.price) : "unavailable";
         const spot = detail ? formatPrice(spotPrice(detail.price)) : "unavailable";
-        card.setAttribute("aria-label", `${label}. ${dateAndTime}. Consumer price ${consumer}. Spot price ${spot}.`);
+        card.setAttribute("aria-label", `${label}. ${dateAndTime}. Consumer price ${consumer}. Spot price ${spot}. Show price details.`);
     }
 
     function bindSummaryTooltip(card) {
         if (!card) return;
-        card.addEventListener("mouseenter", () => showSummaryPriceTooltip(summaryTooltipDetails.get(card), card));
-        card.addEventListener("mouseleave", () => {
-            if (document.activeElement !== card) hidePriceTooltip(card);
+        card.addEventListener("click", () => {
+            if (activeTooltipTrigger === card && !priceTooltip.hidden) {
+                hidePriceTooltip(card);
+                return;
+            }
+            showSummaryPriceTooltip(summaryTooltipDetails.get(card), card);
         });
-        card.addEventListener("focus", () => showSummaryPriceTooltip(summaryTooltipDetails.get(card), card));
-        card.addEventListener("blur", () => hidePriceTooltip(card));
     }
 
     function actionTone(action) {
@@ -699,7 +708,8 @@
         if (!dialog || !dialogElements) return;
         state.selectedHour = detail;
         const action = actionFor(detail.slot);
-        dialogElements.title.textContent = `${detail.day === "tomorrow" ? "Tomorrow · " : "Today · "}${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        const dayLabel = detail.day === "tomorrow" ? "Tomorrow" : "Today";
+        dialogElements.title.textContent = `${dayLabel} · ${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
         dialogElements.price.textContent = formatPrice(detail.price);
         dialogElements.spot.textContent = formatPrice(spotPrice(detail.price));
         dialogElements.action.dataset.action = action.type;
@@ -1231,6 +1241,16 @@
     });
     window.addEventListener("resize", () => hidePriceTooltip());
     window.addEventListener("scroll", () => hidePriceTooltip(), true);
+    document.addEventListener("pointerdown", (event) => {
+        if (!activeTooltipTrigger?.matches(".app-price-kpi")) return;
+        if (!activeTooltipTrigger.contains(event.target)) hidePriceTooltip(activeTooltipTrigger);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !activeTooltipTrigger?.matches(".app-price-kpi")) return;
+        const trigger = activeTooltipTrigger;
+        hidePriceTooltip(trigger);
+        trigger.focus({ preventScroll: true });
+    });
 
     load();
 })();
