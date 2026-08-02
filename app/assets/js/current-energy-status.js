@@ -795,7 +795,50 @@
         }
     }
 
-    elements.refresh.addEventListener("click", () => refresh({ manual: true }));
+    const FULL_RELOAD_HOLD_MS = 900;
+    let fullReloadTimer = null;
+    let suppressRefreshClick = false;
+
+    function cancelFullReloadHold() {
+        if (fullReloadTimer !== null) {
+            window.clearTimeout(fullReloadTimer);
+            fullReloadTimer = null;
+        }
+        delete elements.refresh.dataset.longPress;
+    }
+
+    function startFullReloadHold(event) {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (elements.refresh.disabled || elements.refresh.hasAttribute("aria-busy")) return;
+
+        cancelFullReloadHold();
+        suppressRefreshClick = false;
+        elements.refresh.dataset.longPress = "true";
+        fullReloadTimer = window.setTimeout(() => {
+            fullReloadTimer = null;
+            suppressRefreshClick = true;
+            elements.refresh.dataset.longPress = "complete";
+            elements.refresh.setAttribute("aria-label", "Reloading app and styles");
+            if (navigator.vibrate) navigator.vibrate(35);
+
+            const reloadUrl = new URL(window.location.href);
+            reloadUrl.searchParams.set("_reload", String(Date.now()));
+            window.location.assign(reloadUrl.href);
+        }, FULL_RELOAD_HOLD_MS);
+    }
+
+    elements.refresh.addEventListener("pointerdown", startFullReloadHold);
+    elements.refresh.addEventListener("pointerup", cancelFullReloadHold);
+    elements.refresh.addEventListener("pointercancel", cancelFullReloadHold);
+    elements.refresh.addEventListener("pointerleave", cancelFullReloadHold);
+    elements.refresh.addEventListener("contextmenu", (event) => event.preventDefault());
+    elements.refresh.addEventListener("click", () => {
+        if (suppressRefreshClick) {
+            suppressRefreshClick = false;
+            return;
+        }
+        refresh({ manual: true });
+    });
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
     document.addEventListener("graphite:current-price", (event) => {
         currentPriceEurPerKwh = finiteNumber(event.detail?.eurPerKwh);

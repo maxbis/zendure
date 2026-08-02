@@ -17,8 +17,11 @@
         tomorrowStatus: component.querySelector('[data-role="tomorrow-status"]'),
         tomorrowStatusLabel: component.querySelector('[data-role="tomorrow-status-label"]'),
         currentLabel: component.querySelector('[data-role="price-current-label"]'),
+        currentKpi: component.querySelector('[data-role="price-current-kpi"]'),
         current: component.querySelector('[data-role="price-current"]'),
+        lowKpi: component.querySelector('[data-role="price-low-kpi"]'),
         low: component.querySelector('[data-role="price-low"]'),
+        highKpi: component.querySelector('[data-role="price-high-kpi"]'),
         high: component.querySelector('[data-role="price-high"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
         timeline: component.querySelector('[data-role="price-timeline"]')
@@ -67,6 +70,7 @@
     } : null;
     const priceTooltip = ensurePriceTooltip();
     let activeTooltipTrigger = null;
+    const summaryTooltipDetails = new Map();
 
     const state = {
         prices: { today: null, tomorrow: null },
@@ -253,6 +257,23 @@
             throw new Error(payload?.error || "Invalid schedule response");
         }
         return payload;
+    }
+
+    async function refreshAutomationSchedule() {
+        if (!config.scheduleRefreshUrl) throw new Error("No automation refresh endpoint is configured.");
+
+        const response = await fetch(new URL(config.scheduleRefreshUrl, document.baseURI).href, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const result = contentType.includes("application/json") ? await response.json() : null;
+        if (!response.ok || result?.ok !== true) {
+            throw new Error(result?.error || `Automation refresh failed with HTTP ${response.status}.`);
+        }
+        return result;
     }
 
     function normalizeRuleColor(value) {
@@ -528,6 +549,57 @@
         priceTooltip.hidden = false;
         priceTooltip.style.visibility = "hidden";
         positionPriceTooltip(anchor);
+    }
+
+    function showSummaryPriceTooltip(detail, trigger) {
+        if (!detail) return;
+        hidePriceTooltip();
+        activeTooltipTrigger = trigger;
+        trigger.setAttribute("aria-describedby", priceTooltip.id);
+
+        const header = document.createElement("div");
+        header.className = "app-schedule-tooltip__header";
+        const period = document.createElement("strong");
+        period.textContent = `${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        header.appendChild(period);
+
+        const prices = document.createElement("div");
+        prices.className = "app-price-summary-tooltip__prices";
+        [["Consumer price", detail.price], ["Spot price", spotPrice(detail.price)]].forEach(([label, value]) => {
+            const row = document.createElement("p");
+            const name = document.createElement("span");
+            const amount = document.createElement("strong");
+            name.textContent = label;
+            amount.textContent = formatPrice(value);
+            row.append(name, amount);
+            prices.appendChild(row);
+        });
+
+        priceTooltip.replaceChildren(header, prices);
+        priceTooltip.hidden = false;
+        priceTooltip.style.visibility = "hidden";
+        positionPriceTooltip(trigger);
+    }
+
+    function setSummaryTooltip(card, label, detail) {
+        if (!card) return;
+        summaryTooltipDetails.set(card, detail);
+        const dateAndTime = detail
+            ? `${formatDate(detail.date)}, ${pad(detail.hour)}:00 to ${pad((detail.hour + 1) % 24)}:00`
+            : "time unavailable";
+        const consumer = detail ? formatPrice(detail.price) : "unavailable";
+        const spot = detail ? formatPrice(spotPrice(detail.price)) : "unavailable";
+        card.setAttribute("aria-label", `${label}. ${dateAndTime}. Consumer price ${consumer}. Spot price ${spot}.`);
+    }
+
+    function bindSummaryTooltip(card) {
+        if (!card) return;
+        card.addEventListener("mouseenter", () => showSummaryPriceTooltip(summaryTooltipDetails.get(card), card));
+        card.addEventListener("mouseleave", () => {
+            if (document.activeElement !== card) hidePriceTooltip(card);
+        });
+        card.addEventListener("focus", () => showSummaryPriceTooltip(summaryTooltipDetails.get(card), card));
+        card.addEventListener("blur", () => hidePriceTooltip(card));
     }
 
     function actionTone(action) {
@@ -815,13 +887,25 @@
         window.setTimeout(() => window.GraphiteDialog?.open(editDialog, { trigger: dialogElements.edit }), 0);
     }
 
-    function renderSummary(values) {
-        const available = values.filter(Number.isFinite);
+    function renderSummary(days) {
+        const entries = days.flatMap((day) => day.values.map((price, hour) => ({
+            date: day.date,
+            day: day.key,
+            hour,
+            price
+        })));
+        const available = entries.filter((entry) => Number.isFinite(entry.price));
         const hour = new Date().getHours();
+        const current = entries.find((entry) => entry.day === "today" && entry.hour === hour) || null;
+        const low = available.reduce((lowest, entry) => !lowest || entry.price < lowest.price ? entry : lowest, null);
+        const high = available.reduce((highest, entry) => !highest || entry.price > highest.price ? entry : highest, null);
         elements.currentLabel.textContent = "Current";
-        setDimmedToken(elements.current, formatPrice(values[hour]), "€");
-        setDimmedToken(elements.low, formatPrice(available.length ? Math.min(...available) : null), "€");
-        setDimmedToken(elements.high, formatPrice(available.length ? Math.max(...available) : null), "€");
+        setDimmedToken(elements.current, formatPrice(current?.price), "€");
+        setDimmedToken(elements.low, formatPrice(low?.price), "€");
+        setDimmedToken(elements.high, formatPrice(high?.price), "€");
+        setSummaryTooltip(elements.currentKpi, "Current price", current);
+        setSummaryTooltip(elements.lowKpi, "Horizon low", low);
+        setSummaryTooltip(elements.highKpi, "Horizon high", high);
     }
 
     function publishCurrentPrice() {
@@ -975,11 +1059,12 @@
         const tomorrowValues = priceValues(state.prices.tomorrow);
         const tomorrowHasPrices = priceValues(state.prices.tomorrow).some(Number.isFinite);
         elements.date.textContent = `Today through tomorrow · swipe or scroll for all 48 hours`;
-        renderSummary([...todayValues, ...tomorrowValues]);
-        renderTimeline([
+        const days = [
             { key: "today", label: "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
             { key: "tomorrow", label: "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
-        ]);
+        ];
+        renderSummary(days);
+        renderTimeline(days);
         if (elements.tomorrowAvailability) {
             elements.tomorrowAvailability.dataset.availability = tomorrowHasPrices ? "available" : "unavailable";
         }
@@ -1052,8 +1137,9 @@
         if (!editElements || !config.scheduleUrl) return;
         setEditError();
 
+        let payload;
         try {
-            const payload = scheduleEditPayload();
+            payload = scheduleEditPayload();
             editElements.save.disabled = true;
             editElements.save.setAttribute("aria-busy", "true");
             const response = await fetch(new URL(config.scheduleUrl, document.baseURI).href, {
@@ -1066,9 +1152,24 @@
             if (!response.ok || !result?.success) {
                 throw new Error(result?.error || `Schedule save failed with HTTP ${response.status}.`);
             }
-            window.GraphiteDialog?.close(editDialog, "saved");
-            window.GraphiteFlash?.success(`Schedule updated for ${payload.key.slice(8, 10)}:00.`);
+
+            let refreshError = null;
+            try {
+                await refreshAutomationSchedule();
+            } catch (error) {
+                refreshError = error;
+                console.error("Schedule saved, but the automation refresh failed:", error);
+            }
+
             await load();
+            window.GraphiteDialog?.close(editDialog, "saved");
+            if (refreshError) {
+                window.GraphiteFlash?.warning(
+                    "Schedule saved, but automation could not be refreshed immediately. It will be picked up during the next scheduled refresh."
+                );
+            } else {
+                window.GraphiteFlash?.success(`Schedule updated for ${payload.key.slice(8, 10)}:00 and automation refreshed.`);
+            }
         } catch (error) {
             setEditError(error.message || "The schedule could not be saved.");
         } finally {
@@ -1115,6 +1216,7 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
+    [elements.currentKpi, elements.lowKpi, elements.highKpi].forEach(bindSummaryTooltip);
     dialogElements?.edit?.addEventListener("click", openEditDialog);
     editElements?.form?.addEventListener("submit", saveScheduleEdit);
     editElements?.modeInputs.forEach((input) => input.addEventListener("change", () => updateEditFields({ resetLimits: true })));

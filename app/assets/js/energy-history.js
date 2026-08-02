@@ -330,9 +330,9 @@
                 const x = margin.left + (index * actualSlotWidth);
                 svg.append(createSvgElement("line", {
                     x1: x,
-                    y1: margin.top,
+                    y1: 0,
                     x2: x,
-                    y2: chartHeight - margin.bottom + 6,
+                    y2: chartHeight,
                     class: "app-energy-chart__day-separator"
                 }));
             }
@@ -405,10 +405,10 @@
             const isDayStart = index === 0 || row.day !== rows[index - 1].day;
             const showTime = row.hour % 6 === 0;
             if (showTime) {
-                appendText(svg, x, chartHeight - 12, `${String(row.hour).padStart(2, "0")}:00`, "app-energy-chart__x-label", "middle");
+                appendText(svg, x, chartHeight - 5, `${String(row.hour).padStart(2, "0")}:00`, "app-energy-chart__x-label", "middle");
             }
             if (isDayStart) {
-                const dayLabel = appendText(svg, x + 3, chartHeight - 1, formatDay(row.day), "app-energy-chart__day-label");
+                const dayLabel = appendText(svg, x + 3, chartHeight - 18, formatDay(row.day), "app-energy-chart__day-label");
                 dayLabel.setAttribute("data-day", row.day);
             }
 

@@ -21,6 +21,18 @@ require_once __DIR__ . '/../main/includes/price_conversion.php';
 
 $configLoadError = ConfigLoader::getLoadError();
 $priceConversionConfig = getPriceConversionConfig();
+$reloadToken = isset($_GET['_reload']) && preg_match('/^\d{10,16}$/', (string) $_GET['_reload'])
+    ? (string) $_GET['_reload']
+    : null;
+
+function appAssetUrl(string $path, ?string $reloadToken): string
+{
+    if ($reloadToken === null) {
+        return $path;
+    }
+
+    return $path . (str_contains($path, '?') ? '&' : '?') . 'reload=' . rawurlencode($reloadToken);
+}
 
 /**
  * Build exact local sunrise and sunset times for the dates the timeline can show.
@@ -77,6 +89,7 @@ $appConfig = [
         'scheduleApiUrl',
         '../main/api/charge_schedule_api.php'
     ),
+    'scheduleRefreshUrl' => '../main/api/refresh_schedule_proxy.php',
     'rulesUrl' => '../main/edit_rules.php?api=1',
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),
     'priceConversion' => $priceConversionConfig,
@@ -95,22 +108,22 @@ $appConfig = [
     <title>Zendure Energy Manager</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../main/favicon-32x32.png">
     <link rel="apple-touch-icon" href="../main/apple-touch-icon.png">
-    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
-    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/components.css">
-    <link rel="stylesheet" href="assets/css/app.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/theme.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/components.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('assets/css/app.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <script>
         window.GRAPHITE_APP_CONFIG = <?= json_encode(
             $appConfig,
             JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
         ); ?>;
     </script>
-    <script src="../themes/graphite-signal-dark/assets/js/graphite-controls.js" defer></script>
-    <script src="assets/js/power-bar-scale.js" defer></script>
-    <script src="assets/js/battery-color-scale.js" defer></script>
-    <script src="assets/js/grid-exchange-color-scale.js" defer></script>
-    <script src="assets/js/current-energy-status.js" defer></script>
-    <script src="assets/js/price-plan.js" defer></script>
-    <script src="assets/js/energy-history.js" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/js/graphite-controls.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/power-bar-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/battery-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/grid-exchange-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body data-theme="graphite-signal-dark">
     <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
@@ -140,7 +153,7 @@ $appConfig = [
                 <button
                     class="gsd-icon-btn app-refresh"
                     type="button"
-                    aria-label="Refresh energy status"
+                    aria-label="Refresh energy status. Press and hold to reload the app and styles"
                     data-role="refresh"
                 >
                     <svg class="gsd-icon" aria-hidden="true">
@@ -499,15 +512,15 @@ $appConfig = [
 
             <div class="app-price-plan__content" data-role="price-content" hidden>
                 <div class="app-price-summary" aria-label="Price summary for the visible planning horizon">
-                    <div class="app-price-kpi">
+                    <div class="app-price-kpi" data-role="price-current-kpi" tabindex="0">
                         <span data-role="price-current-label">Current</span>
                         <strong data-role="price-current">—</strong>
                     </div>
-                    <div class="app-price-kpi">
+                    <div class="app-price-kpi" data-role="price-low-kpi" tabindex="0">
                         <span>Horizon low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
                     </div>
-                    <div class="app-price-kpi">
+                    <div class="app-price-kpi" data-role="price-high-kpi" tabindex="0">
                         <span>Horizon high</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>
                     </div>
