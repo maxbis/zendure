@@ -30,13 +30,21 @@
         powerHero: component.querySelector(".app-power-hero"),
         modeLabel: component.querySelector('[data-role="mode-label"]'),
         powerValue: component.querySelector('[data-role="power-value"]'),
-        powerDescription: component.querySelector('[data-role="power-description"]'),
         freshnessLabel: component.querySelector('[data-role="freshness-label"]'),
         powerFlow: component.querySelector('[data-role="power-flow"]'),
         powerFlowNegativeFill: component.querySelector('[data-role="power-flow-fill-negative"]'),
         powerFlowPositiveFill: component.querySelector('[data-role="power-flow-fill-positive"]'),
         powerMinLabel: component.querySelector('[data-role="power-min-label"]'),
         powerMaxLabel: component.querySelector('[data-role="power-max-label"]'),
+        powerCard: component.querySelector(".app-power-card"),
+        powerFront: component.querySelector('[data-role="power-front"]'),
+        powerViewToggles: component.querySelectorAll('[data-role="power-view-toggle"]'),
+        powerSimpleMode: component.querySelector('[data-role="power-simple-mode"]'),
+        powerSimpleFreshness: component.querySelector('[data-role="power-simple-freshness"]'),
+        powerSimpleValue: component.querySelector('[data-role="power-simple-value"]'),
+        powerSimpleFlow: component.querySelector('[data-role="power-simple-flow"]'),
+        powerSimpleCaption: component.querySelector('[data-role="power-simple-caption"]'),
+        powerSegments: component.querySelectorAll('[data-power-segment]'),
         batteryPercent: component.querySelector('[data-role="battery-percent"]'),
         batteryEnergy: component.querySelector('[data-role="battery-energy"]'),
         batteryTarget: component.querySelector('[data-role="battery-target"]'),
@@ -46,18 +54,37 @@
         batteryTargetMarker: component.querySelector('[data-role="battery-target-marker"]'),
         batteryMinLabel: component.querySelector('[data-role="battery-min-label"]'),
         batteryTargetLabel: component.querySelector('[data-role="battery-target-label"]'),
+        batteryCard: component.querySelector(".app-battery-card"),
+        batteryFront: component.querySelector('[data-role="battery-front"]'),
+        batteryViewToggles: component.querySelectorAll('[data-role="battery-view-toggle"]'),
+        batterySimplePercent: component.querySelector('[data-role="battery-simple-percent"]'),
+        batterySimpleTarget: component.querySelector('[data-role="battery-simple-target"]'),
+        batterySimpleRange: component.querySelector('[data-role="battery-simple-range"]'),
+        batteryIcon: component.querySelector('[data-role="battery-icon"]'),
+        batterySegments: component.querySelectorAll('[data-battery-segment]'),
         gridPower: component.querySelector('[data-role="grid-power"]'),
         gridDescription: component.querySelector('[data-role="grid-description"]'),
         gridState: component.querySelector('[data-role="grid-state"]'),
         gridFlow: component.querySelector('[data-role="grid-flow"]'),
         gridFlowFill: component.querySelector('[data-role="grid-flow-fill"]'),
         gridMinLabel: component.querySelector('[data-role="grid-min-label"]'),
-        gridMaxLabel: component.querySelector('[data-role="grid-max-label"]')
+        gridMaxLabel: component.querySelector('[data-role="grid-max-label"]'),
+        gridCard: component.querySelector(".app-grid-card"),
+        gridFront: component.querySelector('[data-role="grid-front"]'),
+        gridViewToggles: component.querySelectorAll('[data-role="grid-view-toggle"]'),
+        gridSimpleState: component.querySelector('[data-role="grid-simple-state"]'),
+        gridSimpleValue: component.querySelector('[data-role="grid-simple-value"]'),
+        gridSimpleFlow: component.querySelector('[data-role="grid-simple-flow"]'),
+        gridSimpleCaption: component.querySelector('[data-role="grid-simple-caption"]'),
+        gridSegments: component.querySelectorAll('[data-grid-segment]')
     };
 
     let refreshTimer = null;
     let activeController = null;
     let hasRenderedData = false;
+    const batteryViewCookie = "zendure_battery_view";
+    const powerViewCookie = "zendure_power_view";
+    const gridViewCookie = "zendure_grid_view";
 
     function finiteNumber(value, fallback = null) {
         if (value === null || value === undefined || value === "") return fallback;
@@ -67,6 +94,81 @@
 
     function clamp(value, minimum, maximum) {
         return Math.min(maximum, Math.max(minimum, value));
+    }
+
+    function batterySegmentsInRange(percent, minimum, maximum) {
+        if (!Number.isFinite(percent) || maximum <= minimum) return 0;
+        const rangeProgress = clamp((percent - minimum) / (maximum - minimum), 0, 1);
+        return Math.round(rangeProgress * 10);
+    }
+
+    function storedBatteryViewIsSimple() {
+        return document.cookie
+            .split(";")
+            .map((cookie) => cookie.trim())
+            .some((cookie) => cookie === `${batteryViewCookie}=simple`);
+    }
+
+    function rememberBatteryView(flipped) {
+        const oneYearInSeconds = 60 * 60 * 24 * 365;
+        document.cookie = `${batteryViewCookie}=${flipped ? "simple" : "detailed"}; Max-Age=${oneYearInSeconds}; Path=/; SameSite=Lax`;
+    }
+
+    function storedPowerViewIsSimple() {
+        return document.cookie
+            .split(";")
+            .map((cookie) => cookie.trim())
+            .some((cookie) => cookie === `${powerViewCookie}=simple`);
+    }
+
+    function rememberPowerView(flipped) {
+        const oneYearInSeconds = 60 * 60 * 24 * 365;
+        document.cookie = `${powerViewCookie}=${flipped ? "simple" : "detailed"}; Max-Age=${oneYearInSeconds}; Path=/; SameSite=Lax`;
+    }
+
+    function setPowerView(flipped) {
+        elements.powerCard.dataset.flipped = String(flipped);
+        elements.powerViewToggles.forEach((toggle) => {
+            toggle.setAttribute("aria-pressed", String(flipped));
+        });
+        elements.powerFront.setAttribute("aria-hidden", String(flipped));
+        elements.powerViewToggles[0].tabIndex = flipped ? -1 : 0;
+        elements.powerViewToggles[1].setAttribute("aria-hidden", String(!flipped));
+        elements.powerViewToggles[1].tabIndex = flipped ? 0 : -1;
+    }
+
+    function storedGridViewIsSimple() {
+        return document.cookie
+            .split(";")
+            .map((cookie) => cookie.trim())
+            .some((cookie) => cookie === `${gridViewCookie}=simple`);
+    }
+
+    function rememberGridView(flipped) {
+        const oneYearInSeconds = 60 * 60 * 24 * 365;
+        document.cookie = `${gridViewCookie}=${flipped ? "simple" : "detailed"}; Max-Age=${oneYearInSeconds}; Path=/; SameSite=Lax`;
+    }
+
+    function setGridView(flipped) {
+        elements.gridCard.dataset.flipped = String(flipped);
+        elements.gridViewToggles.forEach((toggle) => {
+            toggle.setAttribute("aria-pressed", String(flipped));
+        });
+        elements.gridFront.setAttribute("aria-hidden", String(flipped));
+        elements.gridViewToggles[0].tabIndex = flipped ? -1 : 0;
+        elements.gridViewToggles[1].setAttribute("aria-hidden", String(!flipped));
+        elements.gridViewToggles[1].tabIndex = flipped ? 0 : -1;
+    }
+
+    function setBatteryView(flipped) {
+        elements.batteryCard.dataset.flipped = String(flipped);
+        elements.batteryViewToggles.forEach((toggle) => {
+            toggle.setAttribute("aria-pressed", String(flipped));
+        });
+        elements.batteryFront.setAttribute("aria-hidden", String(flipped));
+        elements.batteryViewToggles[0].tabIndex = flipped ? -1 : 0;
+        elements.batteryViewToggles[1].setAttribute("aria-hidden", String(!flipped));
+        elements.batteryViewToggles[1].tabIndex = flipped ? 0 : -1;
     }
 
     function calculateVisualBarScale(value, axisLimit) {
@@ -96,6 +198,17 @@
         return `${sign}${Math.abs(rounded).toLocaleString()} W`;
     }
 
+    function formatAbsoluteWatts(value) {
+        return `${Math.abs(Math.round(value)).toLocaleString()} W`;
+    }
+
+    function powerValueSize(value) {
+        const absoluteValue = Math.abs(Math.round(value));
+        if (absoluteValue >= 1000) return "wide";
+        if (absoluteValue >= 100) return "medium";
+        return "compact";
+    }
+
     function formatAxisWatts(value) {
         const rounded = Math.round(value);
         const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "";
@@ -123,9 +236,10 @@
         return `Updated ${Math.floor(minutes / 60)}h ago`;
     }
 
-    function determineMode(acMode, powerW) {
-        if (acMode === 1 || powerW > 0) return "charging";
-        if (acMode === 2 || powerW < 0) return "discharging";
+    function determineMode(powerW) {
+        const roundedPower = Math.round(powerW);
+        if (roundedPower > 0) return "charging";
+        if (roundedPower < 0) return "discharging";
         return "standby";
     }
 
@@ -160,11 +274,10 @@
         const properties = readings.properties;
         const p1Readings = payload?.p1?.readings || payload?.p1?.data || null;
         const powerW = calculateBatteryPower(properties);
-        const acMode = finiteNumber(properties.acMode, 0);
         const batteryPercent = finiteNumber(properties.electricLevel);
         const gridPowerW = p1Readings ? finiteNumber(p1Readings.total_power) : null;
         const timestampMs = timestampToMs(zendure.timestamp);
-        const mode = determineMode(acMode, powerW);
+        const mode = determineMode(powerW);
         const capacityWh = Math.max(0, finiteNumber(config.capacityWh, 5760));
         const minimumPercent = clamp(finiteNumber(config.minChargePercent, 20), 0, 100);
         const maximumPercent = clamp(
@@ -196,27 +309,14 @@
 
     function modeCopy(model) {
         if (model.mode === "charging") {
-            return {
-                label: "Charging now",
-                description: model.remainingTime
-                    ? `To <strong>${model.maximumPercent}%</strong> in ~<strong>${model.remainingTime}</strong>`
-                    : `Charging toward the <strong>${model.maximumPercent}%</strong> target`
-            };
+            return { label: "Charging now" };
         }
 
         if (model.mode === "discharging") {
-            return {
-                label: "Discharging now",
-                description: model.remainingTime
-                    ? `To <strong>${model.minimumPercent}%</strong> in ~<strong>${model.remainingTime}</strong>`
-                    : `Powering the home above the <strong>${model.minimumPercent}%</strong> reserve`
-            };
+            return { label: "Discharging now" };
         }
 
-        return {
-            label: "Standby",
-            description: "No active battery power flow"
-        };
+        return { label: "Standby" };
     }
 
     function batteryCountdownCopy(model) {
@@ -283,15 +383,36 @@
         elements.content.hidden = false;
 
         const copy = modeCopy(model);
+        const batteryCountdown = batteryCountdownCopy(model);
         elements.powerHero.dataset.mode = model.mode;
         elements.modeLabel.textContent = copy.label;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
-        elements.powerDescription.innerHTML = copy.description;
+        elements.powerSimpleMode.textContent = copy.label;
+        elements.powerSimpleValue.textContent = formatAbsoluteWatts(model.powerW);
+        elements.powerSimpleFlow.dataset.direction = model.mode;
+        elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
+        elements.powerSimpleCaption.textContent = model.mode === "charging"
+            ? "Energy flowing into the battery"
+            : model.mode === "discharging"
+                ? "Energy flowing from the battery"
+                : "No active battery power flow";
 
         const minPower = Math.min(-1, finiteNumber(config.powerMinW, -1200));
         const maxPower = Math.max(1, finiteNumber(config.powerMaxW, 1200));
         const axisLimit = model.powerW >= 0 ? maxPower : Math.abs(minPower);
         const powerScale = calculateVisualBarScale(model.powerW, axisLimit);
+        const activePowerSegments = Math.round(powerScale.actualPercent / 10);
+        elements.powerSegments.forEach((segment, index) => {
+            segment.dataset.active = String(index < activePowerSegments);
+        });
+        elements.powerViewToggles[0].setAttribute(
+            "aria-label",
+            `${copy.label}, ${formatSignedWatts(model.powerW)}. Show simplified charging status view`
+        );
+        elements.powerViewToggles[1].setAttribute(
+            "aria-label",
+            `${copy.label}, ${formatAbsoluteWatts(model.powerW)}, ${activePowerSegments} of 10 power segments. Show detailed charging status view`
+        );
         elements.powerFlowNegativeFill.style.setProperty(
             "--app-flow-width",
             model.powerW < 0 ? `${powerScale.displayPercent}%` : "0%"
@@ -318,6 +439,20 @@
             elements.batteryProgress.setAttribute("aria-valuenow", "0");
             elements.batteryProgress.removeAttribute("aria-valuetext");
             elements.batteryProgressFill.style.setProperty("--app-battery-level", "0%");
+            elements.batterySimplePercent.textContent = "--%";
+            elements.batterySimplePercent.style.removeProperty("color");
+            elements.batteryIcon.style.removeProperty("--app-battery-color");
+            elements.batterySegments.forEach((segment) => {
+                segment.dataset.active = "false";
+            });
+            elements.batteryViewToggles[0].setAttribute(
+                "aria-label",
+                "Battery level unavailable. Show simplified battery view"
+            );
+            elements.batteryViewToggles[1].setAttribute(
+                "aria-label",
+                "Battery level unavailable. Show detailed battery view"
+            );
         } else {
             const storedKwh = (model.batteryPercent / 100) * (model.capacityWh / 1000);
             const capacityKwh = model.capacityWh / 1000;
@@ -336,19 +471,47 @@
             elements.batteryProgress.setAttribute("aria-valuenow", String(model.batteryPercent));
             elements.batteryProgress.setAttribute("aria-valuetext", `${Math.round(model.batteryPercent)} percent`);
             elements.batteryProgressFill.style.setProperty("--app-battery-level", `${model.batteryPercent}%`);
+            elements.batterySimplePercent.textContent = `${Math.round(model.batteryPercent)}%`;
+            if (batteryColor) {
+                elements.batterySimplePercent.style.color = batteryColor;
+                elements.batteryIcon.style.setProperty("--app-battery-color", batteryColor);
+            } else {
+                elements.batterySimplePercent.style.removeProperty("color");
+                elements.batteryIcon.style.removeProperty("--app-battery-color");
+            }
+            const activeSegments = batterySegmentsInRange(
+                model.batteryPercent,
+                model.minimumPercent,
+                model.maximumPercent
+            );
+            elements.batterySegments.forEach((segment, index) => {
+                segment.dataset.active = String(index < activeSegments);
+            });
+            elements.batteryViewToggles[0].setAttribute(
+                "aria-label",
+                `Battery ${Math.round(model.batteryPercent)} percent. Show simplified battery view`
+            );
+            elements.batteryViewToggles[1].setAttribute(
+                "aria-label",
+                `Battery ${Math.round(model.batteryPercent)} percent, ${activeSegments} of 10 segments within the operating range. Show detailed battery view`
+            );
         }
 
-        const batteryCountdown = batteryCountdownCopy(model);
         elements.batteryTarget.textContent = batteryCountdown.label;
         elements.batteryTarget.setAttribute("aria-label", batteryCountdown.description);
         elements.batteryTarget.title = batteryCountdown.description;
         elements.batteryTarget.dataset.mode = model.mode;
+        elements.batterySimpleTarget.textContent = batteryCountdown.label;
+        elements.batterySimpleTarget.setAttribute("aria-label", batteryCountdown.description);
+        elements.batterySimpleTarget.title = batteryCountdown.description;
+        elements.batterySimpleTarget.dataset.mode = model.mode;
         elements.batteryMinMarker.style.setProperty("--app-marker", `${model.minimumPercent}%`);
         elements.batteryTargetMarker.style.setProperty("--app-marker", `${model.maximumPercent}%`);
         elements.batteryMinMarker.dataset.active = model.mode === "discharging" ? "true" : "false";
         elements.batteryTargetMarker.dataset.active = model.mode === "charging" ? "true" : "false";
         elements.batteryMinLabel.textContent = `Minimum ${model.minimumPercent}%`;
         elements.batteryTargetLabel.textContent = `Maximum ${model.maximumPercent}%`;
+        elements.batterySimpleRange.textContent = `Operating range ${model.minimumPercent}%–${model.maximumPercent}%`;
 
         const grid = gridCopy(model.gridPowerW);
         const gridValue = model.gridPowerW ?? 0;
@@ -368,6 +531,26 @@
         elements.gridFlowFill.dataset.direction = grid.direction;
         const gridAxis = gridValue >= 0 ? maxPower : Math.abs(minPower);
         const gridScale = calculateVisualBarScale(gridValue, gridAxis);
+        const activeGridSegments = grid.direction === "balanced"
+            ? 0
+            : Math.round(gridScale.actualPercent / 10);
+        elements.gridCard.style.setProperty("--app-grid-color", gridValueColor || "var(--gsd-neutral)");
+        elements.gridSimpleState.textContent = grid.label;
+        elements.gridSimpleValue.textContent = model.gridPowerW === null ? "-- W" : formatAbsoluteWatts(gridValue);
+        elements.gridSimpleFlow.dataset.direction = grid.direction;
+        elements.gridSimpleFlow.dataset.valueSize = powerValueSize(gridValue);
+        elements.gridSimpleCaption.textContent = grid.description;
+        elements.gridSegments.forEach((segment, index) => {
+            segment.dataset.active = String(index < activeGridSegments);
+        });
+        elements.gridViewToggles[0].setAttribute(
+            "aria-label",
+            `${grid.label}, ${model.gridPowerW === null ? "grid reading unavailable" : formatSignedWatts(gridValue)}. Show simplified grid exchange view`
+        );
+        elements.gridViewToggles[1].setAttribute(
+            "aria-label",
+            `${grid.label}, ${model.gridPowerW === null ? "grid reading unavailable" : formatAbsoluteWatts(gridValue)}, ${activeGridSegments} of 10 exchange segments. Show detailed grid exchange view`
+        );
         const gridWidth = grid.direction === "balanced" ? 0 : gridScale.fullBarWidthPercent;
         elements.gridFlowFill.style.setProperty("--app-grid-width", `${gridWidth}%`);
         elements.gridFlowFill.dataset.actualPercent = gridScale.actualPercent.toFixed(2);
@@ -387,6 +570,8 @@
         const freshness = model.stale ? "Stale data" : "Live";
         elements.freshnessLabel.textContent = freshness;
         elements.freshnessLabel.dataset.state = model.stale ? "stale" : "live";
+        elements.powerSimpleFreshness.textContent = freshness;
+        elements.powerSimpleFreshness.dataset.state = model.stale ? "stale" : "live";
         elements.lastUpdate.textContent = formatRelativeTime(model.timestampMs);
         setConnectionState(model.stale ? "stale" : "online", model.stale ? "Stale" : "Live");
     }
@@ -498,6 +683,27 @@
 
     elements.refresh.addEventListener("click", () => refresh({ manual: true }));
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
+    elements.powerViewToggles.forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+            const flipped = elements.powerCard.dataset.flipped !== "true";
+            setPowerView(flipped);
+            rememberPowerView(flipped);
+        });
+    });
+    elements.batteryViewToggles.forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+            const flipped = elements.batteryCard.dataset.flipped !== "true";
+            setBatteryView(flipped);
+            rememberBatteryView(flipped);
+        });
+    });
+    elements.gridViewToggles.forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+            const flipped = elements.gridCard.dataset.flipped !== "true";
+            setGridView(flipped);
+            rememberGridView(flipped);
+        });
+    });
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
             stopRefreshTimer();
@@ -507,6 +713,9 @@
         startRefreshTimer();
     });
 
+    setPowerView(storedPowerViewIsSimple());
+    setBatteryView(storedBatteryViewIsSimple());
+    setGridView(storedGridViewIsSimple());
     renderLoading();
     refresh();
     startRefreshTimer();
