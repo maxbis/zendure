@@ -143,6 +143,32 @@
         return `${number > 0 ? "+" : "−"}${formatted}`;
     }
 
+    function setDimmedToken(element, formattedValue, token) {
+        const tokenIndex = formattedValue.indexOf(token);
+        if (tokenIndex < 0) {
+            element.textContent = formattedValue;
+            return;
+        }
+
+        const affix = document.createElement("span");
+        affix.className = "app-value-affix";
+        affix.textContent = token;
+        element.replaceChildren(
+            document.createTextNode(formattedValue.slice(0, tokenIndex)),
+            affix,
+            document.createTextNode(formattedValue.slice(tokenIndex + token.length))
+        );
+    }
+
+    function setEnergySummaryValue(element, value, signed = false) {
+        const formatted = formatEnergy(value, signed);
+        setDimmedToken(element, formatted, formatted.includes("kWh") ? "kWh" : "Wh");
+    }
+
+    function setMoneySummaryValue(element, value, signed = false) {
+        setDimmedToken(element, formatMoney(value, signed), "€");
+    }
+
     function formatAxisEnergy(value) {
         const absolute = Math.abs(value);
         const sign = value < 0 ? "−" : "";
@@ -496,16 +522,16 @@
         const totals = totalsForDays(days);
         const money = moneyTotalsForDays(days);
         const net = totals.charged - totals.discharged;
-        elements.charged.textContent = formatEnergy(totals.charged);
-        elements.discharged.textContent = formatEnergy(totals.discharged);
-        elements.net.textContent = formatEnergy(net, true);
+        setEnergySummaryValue(elements.charged, totals.charged);
+        setEnergySummaryValue(elements.discharged, totals.discharged);
+        setEnergySummaryValue(elements.net, net, true);
         elements.net.dataset.direction = net > 0 ? "charged" : net < 0 ? "discharged" : "idle";
-        elements.chargedConsumer.textContent = formatMoney(money.consumer.charged.eur);
-        elements.chargedSpot.textContent = formatMoney(money.spot.charged.eur);
-        elements.dischargedConsumer.textContent = formatMoney(money.consumer.discharged.eur);
-        elements.dischargedSpot.textContent = formatMoney(money.spot.discharged.eur);
-        elements.netConsumer.textContent = formatMoney(money.consumer.net.eur, true);
-        elements.netSpot.textContent = formatMoney(money.spot.net.eur, true);
+        setMoneySummaryValue(elements.chargedConsumer, money.consumer.charged.eur);
+        setMoneySummaryValue(elements.chargedSpot, money.spot.charged.eur);
+        setMoneySummaryValue(elements.dischargedConsumer, money.consumer.discharged.eur);
+        setMoneySummaryValue(elements.dischargedSpot, money.spot.discharged.eur);
+        setMoneySummaryValue(elements.netConsumer, money.consumer.net.eur, true);
+        setMoneySummaryValue(elements.netSpot, money.spot.net.eur, true);
         [elements.netConsumer, elements.netSpot].forEach((element, index) => {
             const value = index === 0 ? money.consumer.net.eur : money.spot.net.eur;
             element.dataset.direction = value > 0 ? "charged" : value < 0 ? "discharged" : "idle";

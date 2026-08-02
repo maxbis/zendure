@@ -507,7 +507,7 @@
     display: grid;
     grid-template-columns: minmax(0, auto) minmax(150px, 1fr);
     align-items: center;
-    gap: 18px;
+    gap: 24px;
     width: 100%;
 }
 
@@ -516,6 +516,14 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
     line-height: 1;
+}
+
+.app-simple-value__unit {
+    opacity: 0.6;
+}
+
+.app-value-affix {
+    opacity: 0.6;
 }
 
 .app-battery-icon {
@@ -918,6 +926,10 @@
     text-align: center;
 }
 
+.app-grid-simple__caption-value {
+    color: var(--gsd-text-secondary);
+}
+
 .app-grid-flow {
     position: relative;
     height: 9px;
@@ -1013,30 +1025,17 @@
     gap: 8px;
 }
 
-.app-day-switch {
-    display: inline-grid;
-    grid-template-columns: repeat(2, 1fr);
-    padding: 3px;
+.app-tomorrow-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 9px;
     background: var(--gsd-page-deep);
     border: 1px solid var(--gsd-border);
     border-radius: 999px;
-}
-
-.app-day-switch button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 30px;
-    padding: 4px 10px;
-    background: transparent;
-    border: 0;
-    border-radius: 999px;
     color: var(--gsd-text-muted);
-    font: inherit;
     font-size: 0.68rem;
     font-weight: 700;
-    cursor: pointer;
 }
 
 .app-day-availability {
@@ -1053,13 +1052,7 @@
 }
 
 .app-day-availability[data-availability="unavailable"] {
-    display: none;
-}
-
-.app-day-switch button[aria-selected="true"] {
-    background: var(--gsd-surface-3);
-    box-shadow: inset 0 0 0 1px var(--gsd-border-strong);
-    color: var(--gsd-text);
+    background: var(--gsd-warning);
 }
 
 .app-price-refresh {
@@ -1123,6 +1116,13 @@
     font-variant-numeric: tabular-nums;
 }
 
+.app-price-kpi strong .app-value-affix {
+    display: inline;
+    margin: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
 .app-price-kpi .app-price-kpi--low {
     color: var(--gsd-positive);
 }
@@ -1149,16 +1149,53 @@
 .app-price-timeline {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(24, minmax(32px, 1fr));
-    grid-template-rows: 20px auto;
+    grid-template-columns: repeat(48, minmax(32px, 1fr));
+    grid-template-rows: 22px 20px auto;
     row-gap: 4px;
-    min-width: 792px;
-    min-height: 194px;
+    min-width: 1584px;
+    min-height: 220px;
     align-items: stretch;
+    background: linear-gradient(
+        to right,
+        transparent 0 50%,
+        color-mix(in srgb, var(--gsd-surface-2) 20%, transparent) 50% 100%
+    );
+}
+
+.app-price-timeline::after {
+    position: absolute;
+    z-index: 3;
+    inset-block: 0;
+    inset-inline-start: calc(50% - 1px);
+    width: 2px;
+    background: color-mix(in srgb, var(--gsd-text-muted) 58%, var(--gsd-border-strong));
+    box-shadow: 0 0 8px color-mix(in srgb, var(--gsd-text-muted) 12%, transparent);
+    content: "";
+    pointer-events: none;
+}
+
+.app-price-day-heading {
+    grid-row: 1;
+    grid-column: var(--app-day-start) / var(--app-day-end);
+    display: flex;
+    align-items: center;
+    padding-inline: 7px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.65rem;
+    font-weight: 750;
+}
+
+.app-price-day-heading[data-day="tomorrow"] {
+    padding-inline-start: 12px;
+    background: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--gsd-surface-3) 56%, transparent),
+        transparent 38%
+    );
 }
 
 .app-price-daypart {
-    grid-row: 1;
+    grid-row: 2;
     grid-column: var(--app-daypart-start) / var(--app-daypart-end);
     display: flex;
     align-items: center;
@@ -1173,16 +1210,20 @@
     text-transform: uppercase;
 }
 
-.app-price-daypart:first-child {
+.app-price-daypart[data-daypart="night"] {
     border-radius: 5px 0 0 5px;
 }
 
-.app-price-daypart:not(:first-child) {
+.app-price-daypart:not([data-daypart="night"]) {
     border-inline-start: 1px solid var(--gsd-border);
 }
 
-.app-price-daypart:nth-child(4) {
+.app-price-daypart[data-daypart="evening"] {
     border-radius: 0 5px 5px 0;
+}
+
+.app-price-daypart[data-day="tomorrow"][data-daypart="night"] {
+    border-radius: 0;
 }
 
 .app-price-daypart__label {
@@ -1211,7 +1252,7 @@
 .app-price-solar-marker {
     position: absolute;
     z-index: 2;
-    top: 20px;
+    top: 42px;
     bottom: 4px;
     left: var(--app-solar-position);
     width: 0;
@@ -1254,7 +1295,7 @@
 
 .app-price-hour {
     position: relative;
-    grid-row: 2;
+    grid-row: 3;
     display: grid;
     grid-template-rows: 92px 15px 18px 29px;
     min-width: 0;
@@ -2418,6 +2459,7 @@
     max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
+    padding-bottom: 14px;
     background: color-mix(in srgb, var(--gsd-surface-2) 74%, var(--gsd-page-deep));
     border: 1px solid var(--gsd-border-subtle);
     border-radius: 10px;
@@ -2652,6 +2694,13 @@
     white-space: nowrap;
 }
 
+.app-energy-history__summary strong .app-value-affix {
+    display: inline;
+    margin: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
 .app-energy-history__summary .app-energy-history__summary-title {
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -2798,7 +2847,7 @@
     }
 
     .app-price-timeline {
-        min-height: 166px;
+        min-height: 192px;
     }
 
     .app-price-hour {
@@ -2957,10 +3006,6 @@
 
     .app-section-heading__actions {
         justify-content: space-between;
-    }
-
-    .app-day-switch {
-        flex: 1;
     }
 
     .app-price-plan__content {

@@ -13,8 +13,9 @@
         retry: component.querySelector('[data-role="price-retry"]'),
         content: component.querySelector('[data-role="price-content"]'),
         refresh: component.querySelector('[data-role="price-refresh"]'),
-        dayButtons: Array.from(component.querySelectorAll('[data-role="price-day"]')),
         tomorrowAvailability: component.querySelector('[data-role="tomorrow-availability"]'),
+        tomorrowStatus: component.querySelector('[data-role="tomorrow-status"]'),
+        tomorrowStatusLabel: component.querySelector('[data-role="tomorrow-status-label"]'),
         currentLabel: component.querySelector('[data-role="price-current-label"]'),
         current: component.querySelector('[data-role="price-current"]'),
         low: component.querySelector('[data-role="price-low"]'),
@@ -68,7 +69,6 @@
     let activeTooltipTrigger = null;
 
     const state = {
-        day: "today",
         prices: { today: null, tomorrow: null },
         dates: { today: null, tomorrow: null },
         schedules: { today: [], tomorrow: [] },
@@ -93,7 +93,7 @@
         return DAY_PARTS.find((dayPart) => hour >= dayPart.start && hour < dayPart.end) || DAY_PARTS[0];
     }
 
-    function appendSolarMarkers(fragment, date) {
+    function appendSolarMarkers(fragment, date, dayOffset = 0, totalHours = 24) {
         const events = config.solarEvents?.[date];
         if (!events) return;
 
@@ -107,7 +107,7 @@
             const locationName = config.solarLocation?.name || "configured location";
             marker.className = "app-price-solar-marker";
             marker.dataset.event = eventName;
-            marker.style.setProperty("--app-solar-position", `${(minuteOfDay / 1440) * 100}%`);
+            marker.style.setProperty("--app-solar-position", `${((dayOffset * 24 + minuteOfDay / 60) / totalHours) * 100}%`);
             marker.setAttribute("role", "img");
             marker.setAttribute("aria-label", `${readableName} in ${locationName} at ${event.time}`);
             marker.title = `${readableName} in ${locationName} · ${event.time}`;
@@ -156,6 +156,23 @@
 
     function formatPrice(value) {
         return Number.isFinite(value) ? `€${value.toFixed(3)}` : "—";
+    }
+
+    function setDimmedToken(element, formattedValue, token) {
+        const tokenIndex = formattedValue.indexOf(token);
+        if (tokenIndex < 0) {
+            element.textContent = formattedValue;
+            return;
+        }
+
+        const affix = document.createElement("span");
+        affix.className = "app-value-affix";
+        affix.textContent = token;
+        element.replaceChildren(
+            document.createTextNode(formattedValue.slice(0, tokenIndex)),
+            affix,
+            document.createTextNode(formattedValue.slice(tokenIndex + token.length))
+        );
     }
 
     function formatWatts(value) {
@@ -610,7 +627,7 @@
         if (!dialog || !dialogElements) return;
         state.selectedHour = detail;
         const action = actionFor(detail.slot);
-        dialogElements.title.textContent = `${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        dialogElements.title.textContent = `${detail.day === "tomorrow" ? "Tomorrow · " : "Today · "}${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
         dialogElements.price.textContent = formatPrice(detail.price);
         dialogElements.spot.textContent = formatPrice(spotPrice(detail.price));
         dialogElements.action.dataset.action = action.type;
@@ -635,8 +652,8 @@
         return editElements?.modeInputs.find((input) => input.checked)?.value || "netzero";
     }
 
-    function exactEntryFor(key) {
-        return (state.entries[state.day] || []).find((item) => item?.key === key) || null;
+    function exactEntryFor(key, day) {
+        return (state.entries[day] || []).find((item) => item?.key === key) || null;
     }
 
     function setEditError(message = "") {
@@ -765,9 +782,9 @@
     function openEditDialog() {
         if (!editDialog || !editElements || !state.selectedHour) return;
         const detail = state.selectedHour;
-        const date = state.dates[state.day] || localDates()[state.day];
+        const date = detail.date || state.dates[detail.day] || localDates()[detail.day];
         const key = `${date}${pad(detail.hour)}00`;
-        const exact = exactEntryFor(key);
+        const exact = exactEntryFor(key, detail.day);
         const entry = exact?.entry || detail.slot || { value: "netzero" };
         const action = actionFor(entry);
         const rawNumeric = numericValue(entry.value);
@@ -800,16 +817,23 @@
 
     function renderSummary(values) {
         const available = values.filter(Number.isFinite);
-        const isToday = state.day === "today";
         const hour = new Date().getHours();
-        const average = available.length ? available.reduce((sum, value) => sum + value, 0) / available.length : null;
-        elements.currentLabel.textContent = isToday ? "Current" : "Daily average";
-        elements.current.textContent = formatPrice(isToday ? values[hour] : average);
-        elements.low.textContent = formatPrice(available.length ? Math.min(...available) : null);
-        elements.high.textContent = formatPrice(available.length ? Math.max(...available) : null);
+        elements.currentLabel.textContent = "Current";
+        setDimmedToken(elements.current, formatPrice(values[hour]), "€");
+        setDimmedToken(elements.low, formatPrice(available.length ? Math.min(...available) : null), "€");
+        setDimmedToken(elements.high, formatPrice(available.length ? Math.max(...available) : null), "€");
     }
 
-    function renderTimeline(values, slots, date) {
+    function publishCurrentPrice() {
+        const currentHour = new Date().getHours();
+        const currentPrice = priceValues(state.prices.today)[currentHour];
+        document.dispatchEvent(new CustomEvent("graphite:current-price", {
+            detail: { eurPerKwh: Number.isFinite(currentPrice) ? currentPrice : null }
+        }));
+    }
+
+    function renderTimeline(days) {
+        const values = days.flatMap((day) => day.values);
         const available = values.filter(Number.isFinite);
         const minimum = available.length ? Math.min(...available) : 0;
         const maximum = available.length ? Math.max(...available) : 1;
@@ -817,39 +841,52 @@
         const currentHour = new Date().getHours();
         const fragment = document.createDocumentFragment();
 
-        DAY_PARTS.forEach((dayPart) => {
-            const band = document.createElement("span");
-            band.className = "app-price-daypart";
-            band.dataset.daypart = dayPart.key;
-            band.style.setProperty("--app-daypart-start", String(dayPart.start + 1));
-            band.style.setProperty("--app-daypart-end", String(dayPart.end + 1));
-            const label = document.createElement("span");
-            label.className = "app-price-daypart__label";
-            label.textContent = dayPart.label;
-            band.appendChild(label);
-            band.setAttribute("aria-hidden", "true");
-            fragment.appendChild(band);
-        });
-        appendSolarMarkers(fragment, date);
+        days.forEach((day, dayIndex) => {
+            const dayHeading = document.createElement("span");
+            dayHeading.className = "app-price-day-heading";
+            dayHeading.dataset.day = day.key;
+            dayHeading.style.setProperty("--app-day-start", String(dayIndex * 24 + 1));
+            dayHeading.style.setProperty("--app-day-end", String((dayIndex + 1) * 24 + 1));
+            dayHeading.textContent = `${day.label} · ${formatDate(day.date)}`;
+            fragment.appendChild(dayHeading);
 
-        for (let hour = 0; hour < 24; hour += 1) {
-            const price = values[hour];
-            const slot = slots[hour];
-            const action = actionFor(slot);
-            const limited = hasPowerLimits(slot);
-            const position = Number.isFinite(price) ? (price - minimum) / span : 0;
-            const button = document.createElement("button");
-            const isCurrent = state.day === "today" && hour === currentHour;
-            const dayPart = dayPartForHour(hour);
-            button.type = "button";
-            button.className = "app-price-hour";
-            button.dataset.current = isCurrent ? "true" : "false";
-            button.dataset.daypart = dayPart.key;
-            button.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
-            button.setAttribute(
-                "aria-label",
-                `${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}, ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}`
-            );
+            DAY_PARTS.forEach((dayPart) => {
+                const band = document.createElement("span");
+                band.className = "app-price-daypart";
+                band.dataset.daypart = dayPart.key;
+                band.dataset.day = day.key;
+                band.style.setProperty("--app-daypart-start", String(dayIndex * 24 + dayPart.start + 1));
+                band.style.setProperty("--app-daypart-end", String(dayIndex * 24 + dayPart.end + 1));
+                const label = document.createElement("span");
+                label.className = "app-price-daypart__label";
+                label.textContent = dayPart.label;
+                band.appendChild(label);
+                band.setAttribute("aria-hidden", "true");
+                fragment.appendChild(band);
+            });
+            appendSolarMarkers(fragment, day.date, dayIndex, 48);
+
+            for (let hour = 0; hour < 24; hour += 1) {
+                const price = day.values[hour];
+                const slot = day.slots[hour];
+                const action = actionFor(slot);
+                const limited = hasPowerLimits(slot);
+                const position = Number.isFinite(price) ? (price - minimum) / span : 0;
+                const button = document.createElement("button");
+                const isCurrent = day.key === "today" && hour === currentHour;
+                const dayPart = dayPartForHour(hour);
+                button.type = "button";
+                button.className = "app-price-hour";
+                button.dataset.current = isCurrent ? "true" : "false";
+                button.dataset.daypart = dayPart.key;
+                button.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
+                button.dataset.dayStart = hour === 0 ? "true" : "false";
+                button.dataset.day = day.key;
+                button.style.gridColumn = String(dayIndex * 24 + hour + 1);
+                button.setAttribute(
+                    "aria-label",
+                    `${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}, ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}`
+                );
 
             const barZone = document.createElement("span");
             barZone.className = "app-price-hour__bar-zone";
@@ -892,10 +929,11 @@
             button.append(barZone, priceLabel, time, actionElement);
             button.addEventListener("click", () => {
                 hidePriceTooltip(button);
-                openHourDialog({ hour, price, slot }, button);
+                openHourDialog({ hour, price, slot, day: day.key, date: day.date }, button);
             });
             fragment.appendChild(button);
-        }
+            }
+        });
 
         elements.timeline.replaceChildren(fragment);
     }
@@ -930,30 +968,25 @@
 
     function render() {
         hidePriceTooltip();
-        const dayPrices = state.prices[state.day];
-        const values = priceValues(dayPrices);
-        const slots = scheduleMap(state.schedules[state.day]);
-        const date = state.dates[state.day] || localDates()[state.day];
-        const hasPrices = values.some(Number.isFinite);
-
-        elements.date.textContent = `${formatDate(date)}${hasPrices ? "" : " · Prices not available yet"}`;
-        renderSummary(values);
-        renderTimeline(values, slots, date);
+        const dates = localDates();
+        const todayDate = state.dates.today || dates.today;
+        const tomorrowDate = state.dates.tomorrow || dates.tomorrow;
+        const todayValues = priceValues(state.prices.today);
+        const tomorrowValues = priceValues(state.prices.tomorrow);
         const tomorrowHasPrices = priceValues(state.prices.tomorrow).some(Number.isFinite);
-        const tomorrowButton = elements.dayButtons.find((button) => button.dataset.day === "tomorrow");
+        elements.date.textContent = `Today through tomorrow · swipe or scroll for all 48 hours`;
+        renderSummary([...todayValues, ...tomorrowValues]);
+        renderTimeline([
+            { key: "today", label: "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
+            { key: "tomorrow", label: "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
+        ]);
         if (elements.tomorrowAvailability) {
             elements.tomorrowAvailability.dataset.availability = tomorrowHasPrices ? "available" : "unavailable";
         }
-        if (tomorrowButton) {
-            const availabilityLabel = tomorrowHasPrices ? "prices available" : "prices not available yet";
-            tomorrowButton.setAttribute("aria-label", `Tomorrow, ${availabilityLabel}`);
-            tomorrowButton.title = availabilityLabel.charAt(0).toUpperCase() + availabilityLabel.slice(1);
+        if (elements.tomorrowStatusLabel) {
+            elements.tomorrowStatusLabel.textContent = tomorrowHasPrices ? "Tomorrow ready" : "Tomorrow pending";
         }
-        elements.dayButtons.forEach((button) => {
-            const selected = button.dataset.day === state.day;
-            button.setAttribute("aria-selected", selected ? "true" : "false");
-            button.tabIndex = selected ? 0 : -1;
-        });
+        elements.tomorrowStatus?.setAttribute("aria-label", tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet");
         scrollTimelineToCurrentHour();
     }
 
@@ -1071,6 +1104,7 @@
             state.entries.today = results[1].status === "fulfilled" ? results[1].value.entries || [] : [];
             state.entries.tomorrow = results[2].status === "fulfilled" ? results[2].value.entries || [] : [];
             state.ruleColors = results[3].status === "fulfilled" ? results[3].value : {};
+            publishCurrentPrice();
             render();
             setView("ready");
         } catch (error) {
@@ -1079,12 +1113,6 @@
         }
     }
 
-    elements.dayButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-            state.day = button.dataset.day === "tomorrow" ? "tomorrow" : "today";
-            render();
-        });
-    });
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
     dialogElements?.edit?.addEventListener("click", openEditDialog);

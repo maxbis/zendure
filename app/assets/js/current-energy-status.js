@@ -82,6 +82,8 @@
     let refreshTimer = null;
     let activeController = null;
     let hasRenderedData = false;
+    let latestModel = null;
+    let currentPriceEurPerKwh = null;
     const batteryViewCookie = "zendure_battery_view";
     const powerViewCookie = "zendure_power_view";
     const gridViewCookie = "zendure_grid_view";
@@ -96,10 +98,13 @@
         return Math.min(maximum, Math.max(minimum, value));
     }
 
-    function batterySegmentsInRange(percent, minimum, maximum) {
+    function usableBatteryPercent(percent, minimum, maximum) {
         if (!Number.isFinite(percent) || maximum <= minimum) return 0;
-        const rangeProgress = clamp((percent - minimum) / (maximum - minimum), 0, 1);
-        return Math.round(rangeProgress * 10);
+        return clamp(((percent - minimum) / (maximum - minimum)) * 100, 0, 100);
+    }
+
+    function batterySegmentsInRange(percent, minimum, maximum) {
+        return Math.round(usableBatteryPercent(percent, minimum, maximum) / 10);
     }
 
     function storedBatteryViewIsSimple() {
@@ -126,17 +131,6 @@
         document.cookie = `${powerViewCookie}=${flipped ? "simple" : "detailed"}; Max-Age=${oneYearInSeconds}; Path=/; SameSite=Lax`;
     }
 
-    function setPowerView(flipped) {
-        elements.powerCard.dataset.flipped = String(flipped);
-        elements.powerViewToggles.forEach((toggle) => {
-            toggle.setAttribute("aria-pressed", String(flipped));
-        });
-        elements.powerFront.setAttribute("aria-hidden", String(flipped));
-        elements.powerViewToggles[0].tabIndex = flipped ? -1 : 0;
-        elements.powerViewToggles[1].setAttribute("aria-hidden", String(!flipped));
-        elements.powerViewToggles[1].tabIndex = flipped ? 0 : -1;
-    }
-
     function storedGridViewIsSimple() {
         return document.cookie
             .split(";")
@@ -149,26 +143,68 @@
         document.cookie = `${gridViewCookie}=${flipped ? "simple" : "detailed"}; Max-Age=${oneYearInSeconds}; Path=/; SameSite=Lax`;
     }
 
-    function setGridView(flipped) {
-        elements.gridCard.dataset.flipped = String(flipped);
-        elements.gridViewToggles.forEach((toggle) => {
+    function setFlippedView(card, front, toggles, flipped, transferFocus = false) {
+        const frontToggle = toggles[0];
+        const backToggle = toggles[1];
+        const incomingFace = flipped ? backToggle : front;
+        const outgoingFace = flipped ? front : backToggle;
+        const incomingToggle = flipped ? backToggle : frontToggle;
+        const outgoingToggle = flipped ? frontToggle : backToggle;
+        const focusIsLeaving = outgoingFace.contains(document.activeElement);
+
+        incomingFace.inert = false;
+        incomingToggle.tabIndex = 0;
+        card.dataset.flipped = String(flipped);
+
+        if (focusIsLeaving) {
+            outgoingToggle.blur();
+        }
+
+        outgoingToggle.tabIndex = -1;
+        outgoingFace.inert = true;
+
+        if (focusIsLeaving && transferFocus) {
+            window.setTimeout(() => {
+                const viewIsStillCurrent = card.dataset.flipped === String(flipped);
+                if (viewIsStillCurrent && !incomingFace.inert) {
+                    incomingToggle.focus({ preventScroll: true });
+                }
+            }, 100);
+        }
+
+        toggles.forEach((toggle) => {
             toggle.setAttribute("aria-pressed", String(flipped));
         });
-        elements.gridFront.setAttribute("aria-hidden", String(flipped));
-        elements.gridViewToggles[0].tabIndex = flipped ? -1 : 0;
-        elements.gridViewToggles[1].setAttribute("aria-hidden", String(!flipped));
-        elements.gridViewToggles[1].tabIndex = flipped ? 0 : -1;
     }
 
-    function setBatteryView(flipped) {
-        elements.batteryCard.dataset.flipped = String(flipped);
-        elements.batteryViewToggles.forEach((toggle) => {
-            toggle.setAttribute("aria-pressed", String(flipped));
-        });
-        elements.batteryFront.setAttribute("aria-hidden", String(flipped));
-        elements.batteryViewToggles[0].tabIndex = flipped ? -1 : 0;
-        elements.batteryViewToggles[1].setAttribute("aria-hidden", String(!flipped));
-        elements.batteryViewToggles[1].tabIndex = flipped ? 0 : -1;
+    function setPowerView(flipped, transferFocus = false) {
+        setFlippedView(
+            elements.powerCard,
+            elements.powerFront,
+            elements.powerViewToggles,
+            flipped,
+            transferFocus
+        );
+    }
+
+    function setGridView(flipped, transferFocus = false) {
+        setFlippedView(
+            elements.gridCard,
+            elements.gridFront,
+            elements.gridViewToggles,
+            flipped,
+            transferFocus
+        );
+    }
+
+    function setBatteryView(flipped, transferFocus = false) {
+        setFlippedView(
+            elements.batteryCard,
+            elements.batteryFront,
+            elements.batteryViewToggles,
+            flipped,
+            transferFocus
+        );
     }
 
     function calculateVisualBarScale(value, axisLimit) {
@@ -200,6 +236,16 @@
 
     function formatAbsoluteWatts(value) {
         return `${Math.abs(Math.round(value)).toLocaleString()} W`;
+    }
+
+    function setSimpleValue(element, value, unit, spaceBeforeUnit = false) {
+        const unitElement = document.createElement("span");
+        unitElement.className = "app-simple-value__unit";
+        unitElement.textContent = unit;
+        element.replaceChildren(
+            document.createTextNode(`${value}${spaceBeforeUnit ? " " : ""}`),
+            unitElement
+        );
     }
 
     function powerValueSize(value) {
@@ -369,12 +415,62 @@
         return { label: "Exporting", description: "Sending power to the grid", direction: "export" };
     }
 
+    function formatCents(value) {
+        const absoluteValue = Math.abs(value);
+        if (absoluteValue > 0 && absoluteValue < 0.1) return "<0.1";
+        return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
+            .format(value)
+            .replace("-", "−");
+    }
+
+    function gridFinancialCopy(gridPowerW) {
+        if (gridPowerW === null || currentPriceEurPerKwh === null) return null;
+
+        const priceCentsPerKwh = currentPriceEurPerKwh * 100;
+        const hourlyValueCents = -(gridPowerW / 1000) * currentPriceEurPerKwh * 100;
+        const priceLabel = `At ${formatCents(priceCentsPerKwh)} ct/kWh`;
+
+        if (hourlyValueCents === 0) {
+            return {
+                priceLabel,
+                valueLabel: "0 ct/h",
+                ariaLabel: `At ${formatCents(priceCentsPerKwh)} cents per kilowatt-hour, zero cents per hour`
+            };
+        }
+
+        const outcome = hourlyValueCents > 0 ? "earning" : "costing";
+        const value = formatCents(Math.abs(hourlyValueCents));
+        return {
+            priceLabel,
+            valueLabel: `${outcome} ${value} ct/h`,
+            ariaLabel: `At ${formatCents(priceCentsPerKwh)} cents per kilowatt-hour, ${outcome} ${value} cents per hour`
+        };
+    }
+
+    function renderGridSimpleCaption(grid, gridPowerW) {
+        const financialCopy = gridFinancialCopy(gridPowerW);
+        if (!financialCopy) {
+            elements.gridSimpleCaption.textContent = grid.description;
+            return null;
+        }
+
+        const value = document.createElement("span");
+        value.className = "app-grid-simple__caption-value";
+        value.textContent = financialCopy.valueLabel;
+        elements.gridSimpleCaption.replaceChildren(
+            document.createTextNode(`${financialCopy.priceLabel} · `),
+            value
+        );
+        return financialCopy;
+    }
+
     function setConnectionState(state, label) {
         elements.connectionBadge.dataset.state = state;
         elements.connectionBadge.textContent = label;
     }
 
     function renderModel(model) {
+        latestModel = model;
         hasRenderedData = true;
         component.dataset.state = model.stale ? "stale" : "ready";
         component.setAttribute("aria-busy", "false");
@@ -388,7 +484,12 @@
         elements.modeLabel.textContent = copy.label;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
         elements.powerSimpleMode.textContent = copy.label;
-        elements.powerSimpleValue.textContent = formatAbsoluteWatts(model.powerW);
+        setSimpleValue(
+            elements.powerSimpleValue,
+            Math.abs(Math.round(model.powerW)).toLocaleString(),
+            "W",
+            true
+        );
         elements.powerSimpleFlow.dataset.direction = model.mode;
         elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
         elements.powerSimpleCaption.textContent = model.mode === "charging"
@@ -439,7 +540,7 @@
             elements.batteryProgress.setAttribute("aria-valuenow", "0");
             elements.batteryProgress.removeAttribute("aria-valuetext");
             elements.batteryProgressFill.style.setProperty("--app-battery-level", "0%");
-            elements.batterySimplePercent.textContent = "--%";
+            setSimpleValue(elements.batterySimplePercent, "--", "%");
             elements.batterySimplePercent.style.removeProperty("color");
             elements.batteryIcon.style.removeProperty("--app-battery-color");
             elements.batterySegments.forEach((segment) => {
@@ -456,8 +557,16 @@
         } else {
             const storedKwh = (model.batteryPercent / 100) * (model.capacityWh / 1000);
             const capacityKwh = model.capacityWh / 1000;
+            const usablePercent = usableBatteryPercent(
+                model.batteryPercent,
+                model.minimumPercent,
+                model.maximumPercent
+            );
             const batteryColor = window.GraphiteBatteryColorScale
                 ? window.GraphiteBatteryColorScale.colorFor(model.batteryPercent)
+                : null;
+            const usableBatteryColor = window.GraphiteBatteryColorScale
+                ? window.GraphiteBatteryColorScale.colorFor(usablePercent)
                 : null;
             elements.batteryPercent.textContent = `${Math.round(model.batteryPercent)}%`;
             if (batteryColor) {
@@ -471,10 +580,10 @@
             elements.batteryProgress.setAttribute("aria-valuenow", String(model.batteryPercent));
             elements.batteryProgress.setAttribute("aria-valuetext", `${Math.round(model.batteryPercent)} percent`);
             elements.batteryProgressFill.style.setProperty("--app-battery-level", `${model.batteryPercent}%`);
-            elements.batterySimplePercent.textContent = `${Math.round(model.batteryPercent)}%`;
-            if (batteryColor) {
-                elements.batterySimplePercent.style.color = batteryColor;
-                elements.batteryIcon.style.setProperty("--app-battery-color", batteryColor);
+            setSimpleValue(elements.batterySimplePercent, Math.round(usablePercent), "%");
+            if (usableBatteryColor) {
+                elements.batterySimplePercent.style.color = usableBatteryColor;
+                elements.batteryIcon.style.setProperty("--app-battery-color", usableBatteryColor);
             } else {
                 elements.batterySimplePercent.style.removeProperty("color");
                 elements.batteryIcon.style.removeProperty("--app-battery-color");
@@ -493,7 +602,7 @@
             );
             elements.batteryViewToggles[1].setAttribute(
                 "aria-label",
-                `Battery ${Math.round(model.batteryPercent)} percent, ${activeSegments} of 10 segments within the operating range. Show detailed battery view`
+                `Usable battery ${Math.round(usablePercent)} percent, based on a real battery level of ${Math.round(model.batteryPercent)} percent within the ${model.minimumPercent} to ${model.maximumPercent} percent operating range. Show detailed battery view`
             );
         }
 
@@ -536,10 +645,15 @@
             : Math.round(gridScale.actualPercent / 10);
         elements.gridCard.style.setProperty("--app-grid-color", gridValueColor || "var(--gsd-neutral)");
         elements.gridSimpleState.textContent = grid.label;
-        elements.gridSimpleValue.textContent = model.gridPowerW === null ? "-- W" : formatAbsoluteWatts(gridValue);
+        setSimpleValue(
+            elements.gridSimpleValue,
+            model.gridPowerW === null ? "--" : Math.abs(Math.round(gridValue)).toLocaleString(),
+            "W",
+            true
+        );
         elements.gridSimpleFlow.dataset.direction = grid.direction;
         elements.gridSimpleFlow.dataset.valueSize = powerValueSize(gridValue);
-        elements.gridSimpleCaption.textContent = grid.description;
+        const gridFinancial = renderGridSimpleCaption(grid, model.gridPowerW);
         elements.gridSegments.forEach((segment, index) => {
             segment.dataset.active = String(index < activeGridSegments);
         });
@@ -549,7 +663,7 @@
         );
         elements.gridViewToggles[1].setAttribute(
             "aria-label",
-            `${grid.label}, ${model.gridPowerW === null ? "grid reading unavailable" : formatAbsoluteWatts(gridValue)}, ${activeGridSegments} of 10 exchange segments. Show detailed grid exchange view`
+            `${grid.label}, ${model.gridPowerW === null ? "grid reading unavailable" : formatAbsoluteWatts(gridValue)}, ${activeGridSegments} of 10 exchange segments${gridFinancial ? `, ${gridFinancial.ariaLabel}` : ""}. Show detailed grid exchange view`
         );
         const gridWidth = grid.direction === "balanced" ? 0 : gridScale.fullBarWidthPercent;
         elements.gridFlowFill.style.setProperty("--app-grid-width", `${gridWidth}%`);
@@ -683,24 +797,28 @@
 
     elements.refresh.addEventListener("click", () => refresh({ manual: true }));
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
+    document.addEventListener("graphite:current-price", (event) => {
+        currentPriceEurPerKwh = finiteNumber(event.detail?.eurPerKwh);
+        if (latestModel) renderModel(latestModel);
+    });
     elements.powerViewToggles.forEach((toggle) => {
-        toggle.addEventListener("click", () => {
+        toggle.addEventListener("click", (event) => {
             const flipped = elements.powerCard.dataset.flipped !== "true";
-            setPowerView(flipped);
+            setPowerView(flipped, event.detail === 0);
             rememberPowerView(flipped);
         });
     });
     elements.batteryViewToggles.forEach((toggle) => {
-        toggle.addEventListener("click", () => {
+        toggle.addEventListener("click", (event) => {
             const flipped = elements.batteryCard.dataset.flipped !== "true";
-            setBatteryView(flipped);
+            setBatteryView(flipped, event.detail === 0);
             rememberBatteryView(flipped);
         });
     });
     elements.gridViewToggles.forEach((toggle) => {
-        toggle.addEventListener("click", () => {
+        toggle.addEventListener("click", (event) => {
             const flipped = elements.gridCard.dataset.flipped !== "true";
-            setGridView(flipped);
+            setGridView(flipped, event.detail === 0);
             rememberGridView(flipped);
         });
     });

@@ -50,6 +50,9 @@
   <symbol id="grid" viewBox="0 0 24 24">
     <path d="M4 20h16M6 20V9M10 20V9M14 20V9M18 20V9M3 9h18L12 3 3 9Z"/>
   </symbol>
+  <symbol id="grid-pylon" viewBox="0 0 24 24">
+    <path d="M12 2 6.5 22M12 2l5.5 20M7 22h10M8 17h8M9 13h6M8 6h8M8 6 5 10h14l-3-4M5 10l-2 4h18l-2-4"/>
+  </symbol>
   <symbol id="chart" viewBox="0 0 24 24">
     <path d="M4 19V5M4 19h16M7 15l4-4 3 2 5-7"/>
   </symbol>

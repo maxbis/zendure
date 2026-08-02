@@ -256,7 +256,7 @@ $appConfig = [
                                 data-role="power-view-toggle"
                                 aria-label="Show detailed charging status view"
                                 aria-pressed="false"
-                                aria-hidden="true"
+                                inert
                                 tabindex="-1"
                             >
                                 <span class="app-power-simple__top">
@@ -267,7 +267,7 @@ $appConfig = [
                                     <span class="app-state-pill" data-role="power-simple-freshness">Live</span>
                                 </span>
                                 <span class="app-power-simple__content">
-                                    <strong class="app-power-simple__value" data-role="power-simple-value">0 W</strong>
+                                    <strong class="app-power-simple__value" data-role="power-simple-value">0 <span class="app-simple-value__unit">W</span></strong>
                                     <span class="app-power-flow-icon" data-role="power-simple-flow" data-direction="standby" aria-hidden="true">
                                         <span class="app-power-flow-icon__segments">
                                             <?php for ($segment = 1; $segment <= 10; $segment++): ?>
@@ -343,7 +343,7 @@ $appConfig = [
                                 data-role="battery-view-toggle"
                                 aria-label="Show detailed battery view"
                                 aria-pressed="false"
-                                aria-hidden="true"
+                                inert
                                 tabindex="-1"
                             >
                                 <span class="app-battery-simple__top">
@@ -356,7 +356,7 @@ $appConfig = [
                                     <span class="app-target-label" data-role="battery-simple-target">Estimating</span>
                                 </span>
                                 <span class="app-battery-simple__content">
-                                    <strong class="app-battery-simple__percent" data-role="battery-simple-percent">--%</strong>
+                                    <strong class="app-battery-simple__percent" data-role="battery-simple-percent">--<span class="app-simple-value__unit">%</span></strong>
                                     <span class="app-battery-icon" data-role="battery-icon" aria-hidden="true">
                                         <span class="app-battery-icon__segments">
                                             <?php for ($segment = 1; $segment <= 10; $segment++): ?>
@@ -378,7 +378,7 @@ $appConfig = [
                             <div class="app-compact-stat__top">
                                 <span class="app-compact-stat__label">
                                     <svg class="gsd-icon" aria-hidden="true">
-                                        <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid"></use>
+                                        <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid-pylon"></use>
                                     </svg>
                                     Grid exchange
                                 </span>
@@ -421,20 +421,20 @@ $appConfig = [
                                 data-role="grid-view-toggle"
                                 aria-label="Show detailed grid exchange view"
                                 aria-pressed="false"
-                                aria-hidden="true"
+                                inert
                                 tabindex="-1"
                             >
                                 <span class="app-grid-simple__top">
                                     <span class="app-compact-stat__label">
                                         <svg class="gsd-icon" aria-hidden="true">
-                                            <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid"></use>
+                                            <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid-pylon"></use>
                                         </svg>
                                         Grid exchange
                                     </span>
                                     <span class="app-state-pill" data-role="grid-simple-state">Unknown</span>
                                 </span>
                                 <span class="app-grid-simple__content">
-                                    <strong class="app-grid-simple__value" data-role="grid-simple-value">-- W</strong>
+                                    <strong class="app-grid-simple__value" data-role="grid-simple-value">-- <span class="app-simple-value__unit">W</span></strong>
                                     <span class="app-grid-flow-icon" data-role="grid-simple-flow" data-direction="balanced" aria-hidden="true">
                                         <span class="app-grid-flow-icon__segments">
                                             <?php for ($segment = 1; $segment <= 10; $segment++): ?>
@@ -451,7 +451,7 @@ $appConfig = [
                                         </span>
                                         <span class="app-grid-flow-icon__grid">
                                             <svg class="gsd-icon">
-                                                <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid"></use>
+                                                <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#grid-pylon"></use>
                                             </svg>
                                         </span>
                                     </span>
@@ -474,16 +474,13 @@ $appConfig = [
             <header class="app-section-heading">
                 <div>
                     <h2 id="price-plan-title">Prices &amp; energy plan</h2>
-                    <p data-role="price-plan-date">Loading today’s prices and schedule</p>
+                    <p data-role="price-plan-date">Loading today and tomorrow</p>
                 </div>
                 <div class="app-section-heading__actions">
-                    <div class="app-day-switch" role="tablist" aria-label="Price and schedule day">
-                        <button type="button" role="tab" aria-selected="true" data-role="price-day" data-day="today">Today</button>
-                        <button type="button" role="tab" aria-selected="false" aria-label="Tomorrow, checking price availability" data-role="price-day" data-day="tomorrow">
-                            Tomorrow
-                            <span class="app-day-availability" data-role="tomorrow-availability" data-availability="loading" aria-hidden="true"></span>
-                        </button>
-                    </div>
+                    <span class="app-tomorrow-status" data-role="tomorrow-status">
+                        <span class="app-day-availability" data-role="tomorrow-availability" data-availability="loading" aria-hidden="true"></span>
+                        <span data-role="tomorrow-status-label">Checking tomorrow</span>
+                    </span>
                     <button class="gsd-icon-btn app-price-refresh" type="button" aria-label="Refresh prices and energy plan" data-role="price-refresh">
                         <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
                     </button>
@@ -501,17 +498,17 @@ $appConfig = [
             </div>
 
             <div class="app-price-plan__content" data-role="price-content" hidden>
-                <div class="app-price-summary" aria-label="Daily price summary">
+                <div class="app-price-summary" aria-label="Price summary for the visible planning horizon">
                     <div class="app-price-kpi">
                         <span data-role="price-current-label">Current</span>
                         <strong data-role="price-current">—</strong>
                     </div>
                     <div class="app-price-kpi">
-                        <span>Daily low</span>
+                        <span>Horizon low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
                     </div>
                     <div class="app-price-kpi">
-                        <span>Daily high</span>
+                        <span>Horizon high</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>
                     </div>
                 </div>
