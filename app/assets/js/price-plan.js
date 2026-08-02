@@ -26,24 +26,11 @@
         scroll: component.querySelector('[data-role="price-scroll"]'),
         timeline: component.querySelector('[data-role="price-timeline"]')
     };
-    const dialog = document.getElementById("app-hour-dialog");
-    const dialogElements = dialog ? {
-        title: dialog.querySelector('[data-role="hour-dialog-title"]'),
-        price: dialog.querySelector('[data-role="hour-dialog-price"]'),
-        spot: dialog.querySelector('[data-role="hour-dialog-spot"]'),
-        action: dialog.querySelector('[data-role="hour-dialog-action"]'),
-        power: dialog.querySelector('[data-role="hour-dialog-power"]'),
-        limits: dialog.querySelector('[data-role="hour-dialog-limits"]'),
-        source: dialog.querySelector('[data-role="hour-dialog-source"]'),
-        estimate: dialog.querySelector('[data-role="hour-dialog-estimate"]'),
-        edit: dialog.querySelector('[data-role="hour-dialog-edit"]')
-    } : null;
     const editDialog = document.getElementById("app-schedule-edit-dialog");
     const editElements = editDialog ? {
         form: editDialog.querySelector('[data-role="schedule-edit-form"]'),
         title: editDialog.querySelector('[data-role="schedule-edit-title"]'),
-        time: editDialog.querySelector('[data-role="schedule-edit-time"]'),
-        context: editDialog.querySelector('[data-role="schedule-edit-context"]'),
+        priceSummary: editDialog.querySelector('[data-role="schedule-edit-price-summary"]'),
         modeInputs: Array.from(editDialog.querySelectorAll('input[name="schedule-mode"]')),
         fixedField: editDialog.querySelector('[data-role="schedule-fixed-field"]'),
         watts: editDialog.querySelector('input[name="watts"]'),
@@ -70,6 +57,7 @@
     } : null;
     const priceTooltip = ensurePriceTooltip();
     let activeTooltipTrigger = null;
+    let pinnedTooltipTrigger = null;
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -78,7 +66,6 @@
         schedules: { today: [], tomorrow: [] },
         entries: { today: [], tomorrow: [] },
         ruleColors: {},
-        selectedHour: null,
         controller: null
     };
 
@@ -160,6 +147,10 @@
 
     function formatPrice(value) {
         return Number.isFinite(value) ? `€${value.toFixed(3)}` : "—";
+    }
+
+    function formatPriceCents(value) {
+        return Number.isFinite(value) ? `${Math.round(value * 100)} ct` : "—";
     }
 
     function setDimmedToken(element, formattedValue, token) {
@@ -439,9 +430,12 @@
         if (trigger && trigger !== activeTooltipTrigger) return;
         if (activeTooltipTrigger) {
             activeTooltipTrigger.removeAttribute("aria-describedby");
-            if (activeTooltipTrigger.matches(".app-price-kpi")) {
+            if (activeTooltipTrigger.matches(".app-price-kpi, .app-price-hour__action")) {
                 activeTooltipTrigger.setAttribute("aria-expanded", "false");
             }
+        }
+        if (!trigger || pinnedTooltipTrigger === trigger || pinnedTooltipTrigger === activeTooltipTrigger) {
+            pinnedTooltipTrigger = null;
         }
         activeTooltipTrigger = null;
         priceTooltip.hidden = true;
@@ -510,6 +504,7 @@
         hidePriceTooltip();
         activeTooltipTrigger = trigger;
         trigger.setAttribute("aria-describedby", priceTooltip.id);
+        if (trigger.matches(".app-price-hour__action")) trigger.setAttribute("aria-expanded", "true");
 
         const nextHour = (hour + 1) % 24;
         const header = document.createElement("div");
@@ -668,33 +663,6 @@
         element.replaceChildren(svg);
     }
 
-    function setNetzeroText(element, prefix, direction) {
-        const sign = direction === "plus" ? "+" : direction === "minus" ? "−" : "±";
-        const token = document.createElement("span");
-        token.className = "app-netzero-token";
-        const signElement = document.createElement("span");
-        signElement.className = "app-netzero-sign";
-        signElement.textContent = sign;
-        token.append(document.createTextNode(prefix), signElement);
-        element.replaceChildren(token);
-    }
-
-    function estimateFor(action) {
-        if (Number.isFinite(action.powerW)) {
-            if (action.powerW === 0) return "No scheduled change";
-            const capacityWh = Math.max(1, Number(config.capacityWh) || 5760);
-            const percentage = (action.powerW / capacityWh) * 100;
-            const sign = percentage > 0 ? "+" : "−";
-            return `${sign}${Math.abs(percentage).toFixed(1)}% for a full hour`;
-        }
-        if (action.type === "netzero") {
-            if (action.direction === "plus") return "Charge-only balancing; load dependent";
-            if (action.direction === "minus") return "Discharge-only balancing; load dependent";
-            return "Bidirectional balancing; load dependent";
-        }
-        return "Resolved automatically";
-    }
-
     function spotPrice(consumerPrice) {
         if (!Number.isFinite(consumerPrice)) return null;
         const conversion = config.priceConversion || {};
@@ -702,32 +670,6 @@
         const markup = Number(conversion.supplierMarkupEurPerKwh) || 0;
         const tax = Number(conversion.energyTaxEurPerKwh) || 0;
         return (consumerPrice / vat) - markup - tax;
-    }
-
-    function openHourDialog(detail, trigger) {
-        if (!dialog || !dialogElements) return;
-        state.selectedHour = detail;
-        const action = actionFor(detail.slot);
-        const dayLabel = detail.day === "tomorrow" ? "Tomorrow" : "Today";
-        dialogElements.title.textContent = `${dayLabel} · ${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
-        dialogElements.price.textContent = formatPrice(detail.price);
-        dialogElements.spot.textContent = formatPrice(spotPrice(detail.price));
-        dialogElements.action.dataset.action = action.type;
-        if (action.type === "netzero") {
-            dialogElements.action.dataset.netzeroDirection = action.direction;
-        } else {
-            delete dialogElements.action.dataset.netzeroDirection;
-        }
-        if (action.type === "netzero") {
-            setNetzeroText(dialogElements.action, "Net zero", action.direction);
-        } else {
-            dialogElements.action.textContent = action.label;
-        }
-        dialogElements.power.textContent = Number.isFinite(action.powerW) ? formatWatts(action.powerW) : "Load dependent";
-        dialogElements.limits.textContent = formatPowerLimits(detail.slot);
-        dialogElements.source.textContent = sourceFor(detail.slot);
-        dialogElements.estimate.textContent = estimateFor(action);
-        window.GraphiteDialog?.open(dialog, { trigger });
     }
 
     function selectedMode() {
@@ -861,9 +803,8 @@
         setEditError();
     }
 
-    function openEditDialog() {
-        if (!editDialog || !editElements || !state.selectedHour) return;
-        const detail = state.selectedHour;
+    function openEditDialog(detail, trigger) {
+        if (!editDialog || !editElements || !detail) return;
         const date = detail.date || state.dates[detail.day] || localDates()[detail.day];
         const key = `${date}${pad(detail.hour)}00`;
         const exact = exactEntryFor(key, detail.day);
@@ -879,11 +820,8 @@
 
         editDialog.dataset.scheduleKey = key;
         editDialog.dataset.originalKey = exact?.key || "";
-        editElements.title.textContent = exact ? "Edit hourly override" : "Create hourly override";
-        editElements.time.textContent = `${formatDate(date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
-        editElements.context.textContent = exact
-            ? "Updates the existing override for this exact hour."
-            : `Creates an override for this exact hour. Current source: ${sourceFor(detail.slot)}.`;
+        editElements.title.textContent = `Edit ${formatDate(date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        editElements.priceSummary.textContent = `Price (${formatPriceCents(detail.price)} / ${formatPriceCents(spotPrice(detail.price))})`;
         editElements.modeInputs.forEach((input) => { input.checked = input.value === mode; });
         editElements.watts.value = rawNumeric !== null ? String(rawNumeric) : "0";
         editElements.minimum.value = limits.minimum ?? "";
@@ -893,8 +831,7 @@
         setEditError();
         updateEditFields();
 
-        window.GraphiteDialog?.close(dialog, "edit");
-        window.setTimeout(() => window.GraphiteDialog?.open(editDialog, { trigger: dialogElements.edit }), 0);
+        window.GraphiteDialog?.open(editDialog, { trigger });
     }
 
     function renderSummary(days) {
@@ -966,20 +903,22 @@
                 const action = actionFor(slot);
                 const limited = hasPowerLimits(slot);
                 const position = Number.isFinite(price) ? (price - minimum) / span : 0;
-                const button = document.createElement("button");
+                const hourColumn = document.createElement("div");
+                const editButton = document.createElement("button");
                 const isCurrent = day.key === "today" && hour === currentHour;
                 const dayPart = dayPartForHour(hour);
-                button.type = "button";
-                button.className = "app-price-hour";
-                button.dataset.current = isCurrent ? "true" : "false";
-                button.dataset.daypart = dayPart.key;
-                button.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
-                button.dataset.dayStart = hour === 0 ? "true" : "false";
-                button.dataset.day = day.key;
-                button.style.gridColumn = String(dayIndex * 24 + hour + 1);
-                button.setAttribute(
+                hourColumn.className = "app-price-hour";
+                hourColumn.dataset.current = isCurrent ? "true" : "false";
+                hourColumn.dataset.daypart = dayPart.key;
+                hourColumn.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
+                hourColumn.dataset.dayStart = hour === 0 ? "true" : "false";
+                hourColumn.dataset.day = day.key;
+                hourColumn.style.gridColumn = String(dayIndex * 24 + hour + 1);
+                editButton.type = "button";
+                editButton.className = "app-price-hour__edit";
+                editButton.setAttribute(
                     "aria-label",
-                    `${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}, ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}`
+                    `Create or edit hourly override for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
                 );
 
             const barZone = document.createElement("span");
@@ -996,7 +935,8 @@
             const time = document.createElement("span");
             time.className = "app-price-hour__time";
             time.textContent = pad(hour);
-            const actionElement = document.createElement("span");
+            const actionElement = document.createElement("button");
+            actionElement.type = "button";
             actionElement.className = "app-price-hour__action";
             actionElement.dataset.action = action.type;
             actionElement.dataset.tone = actionTone(action);
@@ -1013,19 +953,38 @@
             if (action.type === "netzero") actionElement.dataset.netzeroDirection = action.direction;
             setActionBadgeContent(actionElement, slot, action);
             const tooltipDetail = { hour, slot, action, limited };
-            actionElement.addEventListener("mouseenter", () => showPriceTooltip(tooltipDetail, button, actionElement));
+            actionElement.setAttribute("aria-expanded", "false");
+            actionElement.setAttribute(
+                "aria-label",
+                `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}. Show schedule details.`
+            );
+            actionElement.addEventListener("mouseenter", () => {
+                if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, actionElement, actionElement);
+            });
             actionElement.addEventListener("mouseleave", () => {
-                if (document.activeElement !== button) hidePriceTooltip(button);
+                if (pinnedTooltipTrigger !== actionElement && document.activeElement !== actionElement) {
+                    hidePriceTooltip(actionElement);
+                }
             });
-            button.addEventListener("focus", () => showPriceTooltip(tooltipDetail, button, actionElement));
-            button.addEventListener("blur", () => hidePriceTooltip(button));
+            actionElement.addEventListener("focus", () => showPriceTooltip(tooltipDetail, actionElement, actionElement));
+            actionElement.addEventListener("blur", () => hidePriceTooltip(actionElement));
+            actionElement.addEventListener("click", () => {
+                if (pinnedTooltipTrigger === actionElement && activeTooltipTrigger === actionElement && !priceTooltip.hidden) {
+                    hidePriceTooltip(actionElement);
+                    return;
+                }
+                pinnedTooltipTrigger = actionElement;
+                showPriceTooltip(tooltipDetail, actionElement, actionElement);
+                pinnedTooltipTrigger = actionElement;
+            });
 
-            button.append(barZone, priceLabel, time, actionElement);
-            button.addEventListener("click", () => {
-                hidePriceTooltip(button);
-                openHourDialog({ hour, price, slot, day: day.key, date: day.date }, button);
+            editButton.append(barZone, priceLabel, time);
+            editButton.addEventListener("click", () => {
+                hidePriceTooltip();
+                openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
             });
-            fragment.appendChild(button);
+            hourColumn.append(editButton, actionElement);
+            fragment.appendChild(hourColumn);
             }
         });
 
@@ -1227,7 +1186,6 @@
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
     [elements.currentKpi, elements.lowKpi, elements.highKpi].forEach(bindSummaryTooltip);
-    dialogElements?.edit?.addEventListener("click", openEditDialog);
     editElements?.form?.addEventListener("submit", saveScheduleEdit);
     editElements?.modeInputs.forEach((input) => input.addEventListener("change", () => updateEditFields({ resetLimits: true })));
     editElements?.limitsEnabled?.addEventListener("change", () => updateEditFields({ resetLimits: editElements.limitsEnabled.checked }));
@@ -1242,11 +1200,11 @@
     window.addEventListener("resize", () => hidePriceTooltip());
     window.addEventListener("scroll", () => hidePriceTooltip(), true);
     document.addEventListener("pointerdown", (event) => {
-        if (!activeTooltipTrigger?.matches(".app-price-kpi")) return;
+        if (!activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
         if (!activeTooltipTrigger.contains(event.target)) hidePriceTooltip(activeTooltipTrigger);
     });
     document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape" || !activeTooltipTrigger?.matches(".app-price-kpi")) return;
+        if (event.key !== "Escape" || !activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
         const trigger = activeTooltipTrigger;
         hidePriceTooltip(trigger);
         trigger.focus({ preventScroll: true });

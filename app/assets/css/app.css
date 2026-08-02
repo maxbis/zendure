@@ -1452,19 +1452,23 @@
 }
 
 .app-price-hour {
+    --app-price-bar-row: 92px;
+    --app-price-label-row: 15px;
+    --app-price-time-row: 18px;
+    --app-price-action-row: 29px;
     position: relative;
     grid-row: 3;
     display: grid;
-    grid-template-rows: 92px 15px 18px 29px;
+    grid-template-rows:
+        var(--app-price-bar-row)
+        var(--app-price-label-row)
+        var(--app-price-time-row)
+        var(--app-price-action-row);
     min-width: 0;
     padding: 0 2px 4px;
     overflow: hidden;
-    background: transparent;
-    border: 0;
     border-radius: 6px;
     color: inherit;
-    font: inherit;
-    cursor: pointer;
     scroll-snap-align: center;
 }
 
@@ -1472,12 +1476,29 @@
     border-inline-start: 1px solid color-mix(in srgb, var(--gsd-border) 76%, transparent);
 }
 
-.app-price-hour:hover,
-.app-price-hour:focus-visible {
+.app-price-hour__edit {
+    display: grid;
+    grid-row: 1 / 4;
+    grid-template-rows:
+        var(--app-price-bar-row)
+        var(--app-price-label-row)
+        var(--app-price-time-row);
+    min-width: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 6px 6px 2px 2px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.app-price-hour__edit:hover,
+.app-price-hour__edit:focus-visible {
     background: color-mix(in srgb, var(--gsd-surface-3) 74%, transparent);
 }
 
-.app-price-hour:focus-visible {
+.app-price-hour__edit:focus-visible {
     z-index: 2;
     outline: 2px solid var(--gsd-accent);
     outline-offset: -2px;
@@ -1547,10 +1568,14 @@
 
 .app-price-hour__action {
     position: relative;
+    grid-row: 4;
     align-self: end;
     display: grid;
+    width: 100%;
+    height: 24px;
     place-items: center;
-    min-height: 24px;
+    min-height: 0;
+    appearance: none;
     padding: 2px;
     box-sizing: border-box;
     overflow: hidden;
@@ -1559,15 +1584,36 @@
     border-radius: 4px;
     color: var(--gsd-text-muted);
     font-size: 0.58rem;
+    font-family: inherit;
     font-weight: 750;
     letter-spacing: 0.025em;
+    line-height: 1;
     text-overflow: clip;
     white-space: nowrap;
+    cursor: pointer;
+}
+
+.app-price-hour .app-price-hour__action {
+    font-size: 0.58rem;
+    font-weight: 750;
+    line-height: 1;
+}
+
+.app-price-hour__action:hover {
+    border-color: color-mix(in srgb, currentColor 58%, var(--gsd-border-strong));
+    filter: brightness(1.06);
+}
+
+.app-price-hour__action:focus-visible {
+    z-index: 2;
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: -2px;
 }
 
 .app-price-hour__action > .gsd-icon {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
+    stroke-width: 2.4;
 }
 
 .app-price-hour__action[data-limit-value="true"],
@@ -1853,30 +1899,6 @@
     content: "123";
 }
 
-.app-hour-details {
-    display: grid;
-    gap: 1px;
-    margin: 0;
-    overflow: hidden;
-    background: var(--gsd-border-subtle);
-    border: 1px solid var(--gsd-border-subtle);
-    border-radius: 10px;
-}
-
-.app-hour-details div {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-    padding: 10px 12px;
-    background: var(--gsd-surface-2);
-}
-
-.app-hour-details dt,
-.app-hour-details dd {
-    margin: 0;
-    font-size: 0.75rem;
-}
-
 .gsd-dialog__footer .gsd-btn--primary {
     color: var(--gsd-text-on-signal);
 }
@@ -1888,24 +1910,31 @@
     overflow: hidden;
 }
 
-.app-edit-context {
+.app-schedule-edit-dialog[open] {
+    --app-schedule-dialog-top: clamp(20px, 4dvh, 32px);
+    margin: var(--app-schedule-dialog-top) auto auto;
+    max-height: calc(100dvh - var(--app-schedule-dialog-top) - 16px);
+}
+
+.app-schedule-edit-dialog__heading {
     display: grid;
-    gap: 3px;
-    margin-bottom: 18px;
-    padding: 12px;
-    background: var(--gsd-accent-soft);
-    border: 1px solid color-mix(in srgb, var(--gsd-accent) 34%, var(--gsd-border));
-    border-radius: 10px;
+    min-width: 0;
+    gap: 2px;
+    padding-left: 4px;
 }
 
-.app-edit-context strong {
-    color: var(--gsd-text);
-    font-size: 0.82rem;
+.app-schedule-edit-dialog__heading .gsd-dialog__title {
+    padding-left: 0;
+    line-height: 1.2;
+    white-space: normal;
 }
 
-.app-edit-context span {
+.app-schedule-edit-dialog__price {
+    margin: 0;
     color: var(--gsd-text-secondary);
-    font-size: 0.68rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
 }
 
 .app-edit-fieldset {
@@ -1967,8 +1996,8 @@
 }
 
 .app-mode-option__heading .gsd-icon {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     stroke-width: 1.8;
 }
 
@@ -1976,7 +2005,7 @@
     display: inline-flex;
     align-items: baseline;
     justify-content: center;
-    font-size: 0.78rem;
+    font-size: 0.875rem;
     line-height: 1;
     white-space: nowrap;
 }
@@ -2467,33 +2496,6 @@
     font-size: 0.68rem;
 }
 
-.app-hour-details dt { color: var(--gsd-text-muted); }
-.app-hour-details dd {
-    color: var(--gsd-text);
-    font-weight: 650;
-    text-align: right;
-}
-
-.app-hour-details dd[data-action="charge"] {
-    color: var(--gsd-positive);
-}
-
-.app-hour-details dd[data-action="discharge"] {
-    color: var(--gsd-negative);
-}
-
-.app-hour-details dd[data-action="netzero"] {
-    color: var(--gsd-accent);
-}
-
-.app-hour-details dd[data-netzero-direction="plus"] {
-    color: color-mix(in srgb, var(--gsd-positive) 72%, var(--gsd-accent));
-}
-
-.app-hour-details dd[data-netzero-direction="minus"] {
-    color: color-mix(in srgb, var(--gsd-negative) 72%, var(--gsd-accent));
-}
-
 /* Keep all three live-status cards structurally and visually equivalent. */
 .app-power-hero {
     min-height: 0;
@@ -2978,6 +2980,17 @@
 }
 
 @media (max-width: 600px) {
+    .app-schedule-edit-dialog[open] {
+        --app-schedule-dialog-top: 12px;
+        max-height: calc(100dvh - 24px);
+    }
+
+    .app-mode-options > label > span {
+        gap: 1px;
+        min-height: 52px;
+        padding: 5px 4px;
+    }
+
     .app-section-heading {
         gap: 8px;
         padding: 10px 12px;
@@ -3009,7 +3022,10 @@
     }
 
     .app-price-hour {
-        grid-template-rows: 66px 14px 17px 28px;
+        --app-price-bar-row: 66px;
+        --app-price-label-row: 14px;
+        --app-price-time-row: 17px;
+        --app-price-action-row: 28px;
     }
 
     .app-price-timeline-scroll {

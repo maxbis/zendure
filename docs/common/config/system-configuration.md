@@ -4,7 +4,7 @@
 
 `system.json` is the future canonical, non-secret source for installation facts that must eventually agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
 
-Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers, but no runtime consumer loads them yet, so current application and controller behaviour remains unchanged.
+Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers. The new GUI is now the first runtime consumer through the PHP reader; the old GUI and automation still use their existing configuration sources.
 
 ## Location
 
@@ -43,7 +43,7 @@ The configuration contains:
 
 The PHP `loadSystemConfig()` function and Python `load_system_config()` function return the same validated, normalized configuration structure. Both accept an optional file path for tests and otherwise locate `common/config/system.json` relative to their own source file.
 
-Neither loader caches the result. Neither loader injects configuration into browser JavaScript or changes an existing consumer.
+Neither loader caches the result. The new GUI now uses the PHP loader and injects its validated shared values into browser JavaScript. The Python loader remains unused by production automation.
 
 ## Contract
 
@@ -93,14 +93,14 @@ Unknown properties are rejected inside every section.
 
 ## Flow and behaviour
 
-Current Phase 4 flow:
+Current flow after new-GUI integration:
 
 1. `system.json` records the approved Phase 2 values.
 2. `system.schema.json` defines its structural contract.
-3. Existing PHP code continues loading `main/config/config.json`.
+3. The new GUI loads shared system values through the common PHP loader.
 4. Existing automation continues loading `automate/config/config.jsonc`.
-5. Existing hard-coded and fallback values remain active.
-6. The PHP and Python loaders can independently read and validate the common file.
+5. The old GUI and shared PHP backend calculations continue loading `main/config/config.json`.
+6. The Python loader remains available but unused by automation.
 7. Parity tests confirm both languages return the same normalized values and reject the same invalid categories.
 
 Run the focused Phase 4 tests with:
@@ -148,7 +148,7 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - Both reject minimum state of charge greater than or equal to maximum.
 - Both reject an unrecognized timezone.
 - Neither silently applies a fallback value.
-- No production consumer imports or requires either loader yet.
+- The new GUI may use the PHP loader, while the old GUI and automation remain on their existing sources until their own migration phases.
 
 ## Related files
 
@@ -160,3 +160,4 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - [`app/index.php`](../../../app/index.php): current new-interface configuration injection.
 - [`common/php/system_config.php`](../../../common/php/system_config.php): strict PHP reader.
 - [`common/python/system_config.py`](../../../common/python/system_config.py): strict Python reader.
+- [`app/shared-system-configuration.md`](../../app/shared-system-configuration.md): new-GUI integration and ownership boundary.

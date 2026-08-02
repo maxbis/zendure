@@ -6,21 +6,29 @@
  * while keeping the new presentation independent from the legacy /main UI.
  */
 
-const APP_SOLAR_LOCATION = [
-    'name' => 'Amsterdam',
-    'latitude' => 52.3676,
-    'longitude' => 4.9041,
-    'timezone' => 'Europe/Amsterdam',
-];
-
-date_default_timezone_set(APP_SOLAR_LOCATION['timezone']);
-
 require_once __DIR__ . '/../login/validate.php';
+require_once __DIR__ . '/../common/php/system_config.php';
 require_once __DIR__ . '/../main/includes/config_loader.php';
-require_once __DIR__ . '/../main/includes/price_conversion.php';
 
-$configLoadError = ConfigLoader::getLoadError();
-$priceConversionConfig = getPriceConversionConfig();
+$systemConfig = null;
+$systemConfigLoadError = null;
+try {
+    $systemConfig = loadSystemConfig();
+} catch (SystemConfigException $error) {
+    $systemConfigLoadError = $error->getMessage();
+}
+
+date_default_timezone_set($systemConfig['installation']['timezone'] ?? 'UTC');
+
+$configurationErrors = [];
+if ($systemConfigLoadError !== null) {
+    $configurationErrors[] = 'Shared system configuration: ' . $systemConfigLoadError;
+}
+$webConfigLoadError = ConfigLoader::getLoadError();
+if ($webConfigLoadError !== null) {
+    $configurationErrors[] = 'Web configuration: ' . $webConfigLoadError;
+}
+$configLoadError = $configurationErrors === [] ? null : implode(' ', $configurationErrors);
 $reloadToken = isset($_GET['_reload']) && preg_match('/^\d{10,16}$/', (string) $_GET['_reload'])
     ? (string) $_GET['_reload']
     : null;
@@ -80,9 +88,9 @@ $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'refreshIntervalMs' => 20000,
     'staleAfterMs' => 90000,
-    'minChargePercent' => (float) ConfigLoader::get('MIN_CHARGE_LEVEL', 20),
-    'maxChargePercent' => (float) ConfigLoader::get('MAX_CHARGE_LEVEL', 90),
-    'capacityWh' => (float) ConfigLoader::get('baseWh', 5760),
+    'minChargePercent' => $systemConfig['battery']['minChargePercent'] ?? null,
+    'maxChargePercent' => $systemConfig['battery']['maxChargePercent'] ?? null,
+    'capacityWh' => $systemConfig['battery']['capacityWh'] ?? null,
     'powerMinW' => (float) ConfigLoader::get('minGridPower', -1200),
     'powerMaxW' => (float) ConfigLoader::get('maxGridPower', 1200),
     'scheduleUrl' => ConfigLoader::get(
@@ -92,10 +100,10 @@ $appConfig = [
     'scheduleRefreshUrl' => '../main/api/refresh_schedule_proxy.php',
     'rulesUrl' => '../main/edit_rules.php?api=1',
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),
-    'priceConversion' => $priceConversionConfig,
+    'priceConversion' => $systemConfig['priceConversion'] ?? null,
     'energyHistoryUrl' => '../main/api/app_energy_history.php?days=3',
-    'solarLocation' => APP_SOLAR_LOCATION,
-    'solarEvents' => buildAppSolarEvents(APP_SOLAR_LOCATION),
+    'solarLocation' => $systemConfig['installation'] ?? null,
+    'solarEvents' => $systemConfig === null ? [] : buildAppSolarEvents($systemConfig['installation']),
 ];
 ?>
 <!doctype html>
@@ -631,44 +639,18 @@ $appConfig = [
         </section>
     </main>
 
-    <dialog class="gsd-dialog app-hour-dialog" id="app-hour-dialog" aria-labelledby="app-hour-dialog-title">
-        <header class="gsd-dialog__header gsd-dialog__header--simple">
-            <h2 class="gsd-dialog__title" id="app-hour-dialog-title" data-role="hour-dialog-title">Hour details</h2>
-            <button class="gsd-icon-btn" type="button" aria-label="Close dialog" data-gsd-dialog-close>
-                <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
-            </button>
-        </header>
-        <div class="gsd-dialog__body">
-            <p class="gsd-dialog__hero" data-role="hour-dialog-price">—</p>
-            <dl class="app-hour-details">
-                <div><dt>Spot price</dt><dd data-role="hour-dialog-spot">—</dd></div>
-                <div><dt>Scheduled action</dt><dd data-role="hour-dialog-action">—</dd></div>
-                <div><dt>Scheduled power</dt><dd data-role="hour-dialog-power">—</dd></div>
-                <div><dt>Allowed power</dt><dd data-role="hour-dialog-limits">—</dd></div>
-                <div><dt>Source</dt><dd data-role="hour-dialog-source">—</dd></div>
-                <div><dt>Estimated battery change</dt><dd data-role="hour-dialog-estimate">—</dd></div>
-            </dl>
-        </div>
-        <footer class="gsd-dialog__footer">
-            <button class="gsd-btn gsd-btn--secondary" type="button" data-gsd-dialog-close>Close</button>
-            <button class="gsd-btn gsd-btn--primary" type="button" data-role="hour-dialog-edit">Edit schedule</button>
-        </footer>
-    </dialog>
-
     <dialog class="gsd-dialog app-schedule-edit-dialog" id="app-schedule-edit-dialog" aria-labelledby="app-schedule-edit-title">
         <header class="gsd-dialog__header gsd-dialog__header--simple">
-            <h2 class="gsd-dialog__title" id="app-schedule-edit-title" data-role="schedule-edit-title">Edit schedule</h2>
+            <div class="app-schedule-edit-dialog__heading">
+                <h2 class="gsd-dialog__title" id="app-schedule-edit-title" data-role="schedule-edit-title">Edit hourly override</h2>
+                <p class="app-schedule-edit-dialog__price" data-role="schedule-edit-price-summary">Price (— / —)</p>
+            </div>
             <button class="gsd-icon-btn" type="button" aria-label="Close dialog" title="Close without saving changes" data-gsd-dialog-close>
                 <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
             </button>
         </header>
         <form data-role="schedule-edit-form">
             <div class="gsd-dialog__body">
-                <div class="app-edit-context">
-                    <strong data-role="schedule-edit-time">Selected hour</strong>
-                    <span data-role="schedule-edit-context">Creates an override for this hour.</span>
-                </div>
-
                 <fieldset class="app-edit-fieldset">
                     <legend>Battery action</legend>
                     <div class="app-mode-options">
