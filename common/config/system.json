@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "battery": {
+    "capacityWh": 5760,
+    "minChargePercent": 15,
+    "maxChargePercent": 91
+  },
+  "installation": {
+    "name": "Amsterdam",
+    "latitude": 52.3676,
+    "longitude": 4.9041,
+    "timezone": "Europe/Amsterdam"
+  },
+  "priceConversion": {
+    "supplierMarkupEurPerKwh": 0.0219,
+    "energyTaxEurPerKwh": 0.0898,
+    "vatMultiplier": 1.21,
+    "consumerPrecision": 4,
+    "spotPrecision": 6
+  }
+}

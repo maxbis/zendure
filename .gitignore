@@ -40,11 +40,15 @@ daily_report/.env
 automate/data/status_updates.db
 automate/data/*.db
 db-replication/server/status_updates.db
+
 # Prices ENTSO-E token (secrets)
 main/prices/config.json
+
 # All JSON files (data, caches, generated) - keep out of git
 *.json
 **/*.json
+!/common/config/
+!/common/config/**
 /main/data/price/
 /config/*
 config.json

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zendure.local/schemas/system.schema.json",
+  "title": "Zendure shared system configuration",
+  "description": "Canonical non-secret installation, battery and price-conversion values shared across the Zendure project.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "battery",
+    "installation",
+    "priceConversion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Contract version understood by configuration loaders.",
+      "const": 1
+    },
+    "battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacityWh",
+        "minChargePercent",
+        "maxChargePercent"
+      ],
+      "properties": {
+        "capacityWh": {
+          "description": "Nominal total battery capacity in watt-hours.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "minChargePercent": {
+          "description": "Persistent lower state-of-charge boundary as a whole percentage.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        },
+        "maxChargePercent": {
+          "description": "Persistent upper state-of-charge boundary as a whole percentage.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "latitude",
+        "longitude",
+        "timezone"
+      ],
+      "properties": {
+        "name": {
+          "description": "Human-readable installation location.",
+          "type": "string",
+          "minLength": 1
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "timezone": {
+          "description": "IANA timezone used for local schedules and solar calculations.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "priceConversion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supplierMarkupEurPerKwh",
+        "energyTaxEurPerKwh",
+        "vatMultiplier",
+        "consumerPrecision",
+        "spotPrecision"
+      ],
+      "properties": {
+        "supplierMarkupEurPerKwh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energyTaxEurPerKwh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "vatMultiplier": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "consumerPrecision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "spotPrecision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        }
+      }
+    }
+  }
+}
