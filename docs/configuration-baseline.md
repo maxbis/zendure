@@ -231,6 +231,8 @@ Intermediate colours are interpolated. The scale is independent of the configure
 
 The colour boundary and textual balanced range intentionally or accidentally use different thresholds. This should be reviewed as an interface policy, not folded into the automation configuration.
 
+This remains the historical Phase 1 baseline. On 2026-08-03, a later interface-only change aligned the grid state and chevrons with the color boundaries, making -10 W through +10 W the current balanced range. See [`configuration-target-values.md`](configuration-target-values.md#grid-presentation) for the subsequent decision.
+
 ### Old-interface calculation fallbacks
 
 The old price overview currently falls back to:

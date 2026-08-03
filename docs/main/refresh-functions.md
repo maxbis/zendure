@@ -17,7 +17,7 @@ Overview of refresh-related JavaScript in the schedule app: the two main APIs, w
 **When triggered:**
 
 - **Initial page load** — `DOMContentLoaded` runs `refreshScheduleAndPrices()` once.
-- **After save/delete** — `edit_modal.js` calls `window.refreshScheduleAndPricesImmediate()` when the API returns success.
+- **After save/delete** — `edit_modal.js` calls `window.refreshScheduleAndPricesImmediate()` when the API returns success. A successful save first requests an immediate backend schedule reread; see [manual-override-save-flow.md](manual-override-save-flow.md).
 - **After Clear button** — `handleClearClick()` runs `refreshScheduleAndPricesImmediate()` after a successful clear.
 - **After Auto button** — `handleAutoClick()` runs `refreshScheduleAndPricesImmediate()` after entries are added.
 - **Tab or page becomes visible** — A `visibilitychange` listener runs `refreshScheduleAndPricesImmediate()` once when the document goes from hidden to visible (e.g. user returns from another app or tab on mobile or desktop). A `wasSchedulePageHidden` flag avoids running twice on first load.
@@ -34,6 +34,8 @@ Overview of refresh-related JavaScript in the schedule app: the two main APIs, w
 - Shortwave radiation graph, via `refreshShortwaveRadiationGraph()` when this refresh runs; the graph fetches only when its displayed payload is missing, errored, or older than 4 hours
 
 Does **not** touch automation status or charge status.
+
+This browser-data refresh is distinct from the backend schedule reread after a manual save. The browser refresh redraws the old GUI, while `requestScheduleReloadBeforePageReload()` tells the running automation process to fetch the newly stored schedule immediately.
 
 ---
 

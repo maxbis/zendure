@@ -1191,7 +1191,23 @@ class EditModal {
             console.log('Save response:', json);
             if (json.success) {
                 this.close();
-                console.log('Save successful, refreshing data...');
+                console.log('Save successful, forcing backend schedule refresh...');
+
+                try {
+                    if (typeof window.requestScheduleReloadBeforePageReload === 'function') {
+                        await window.requestScheduleReloadBeforePageReload();
+                        console.log('Backend schedule refreshed successfully');
+                    } else {
+                        console.warn('requestScheduleReloadBeforePageReload not available');
+                    }
+                } catch (refreshError) {
+                    console.error('Override saved, but backend schedule refresh failed:', refreshError);
+                    if (window.notifications) {
+                        window.notifications.error('Override saved, but the backend schedule refresh failed');
+                    }
+                }
+
+                console.log('Refreshing displayed schedule data...');
                 if (typeof window.refreshScheduleAndPricesImmediate === 'function') {
                     await window.refreshScheduleAndPricesImmediate();
                     console.log('Data refreshed successfully');

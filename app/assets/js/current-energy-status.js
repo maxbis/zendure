@@ -82,7 +82,9 @@
     const batteryPopover = document.createElement("div");
     batteryPopover.id = "app-battery-energy-popover";
     batteryPopover.className = "app-battery-popover";
-    batteryPopover.setAttribute("role", "tooltip");
+    batteryPopover.setAttribute("role", "dialog");
+    batteryPopover.setAttribute("aria-modal", "false");
+    batteryPopover.setAttribute("aria-label", "Battery details");
     batteryPopover.hidden = true;
     document.body.appendChild(batteryPopover);
 
@@ -93,6 +95,7 @@
     let currentPriceEurPerKwh = null;
     const batteryPopoverDetails = new Map();
     let activeBatteryPopoverTrigger = null;
+    let activeBatteryPopoverView = "energy";
     const batteryViewCookie = "zendure_battery_view";
     const powerViewCookie = "zendure_power_view";
     const gridViewCookie = "zendure_grid_view";
@@ -242,6 +245,22 @@
         };
     }
 
+    function activeFlowChevronCount(actualPercent, isFlowing) {
+        if (!isFlowing) return 0;
+        const dynamicChevrons = Math.min(9, Math.round(clamp(actualPercent, 0, 100) / 10));
+        return 1 + dynamicChevrons;
+    }
+
+    function renderFlowChevrons(segments, activeCount, startsFromRight) {
+        segments.forEach((segment, index) => {
+            const flowIndex = startsFromRight
+                ? segments.length - 1 - index
+                : index;
+            segment.dataset.active = String(flowIndex < activeCount);
+            segment.style.setProperty("--app-segment-delay", `${flowIndex * 60}ms`);
+        });
+    }
+
     function timestampToMs(timestamp) {
         const numeric = finiteNumber(timestamp);
         if (numeric === null) return null;
@@ -296,11 +315,28 @@
         return Number.isFinite(value) ? `${value.toFixed(2)} kWh` : "—";
     }
 
+    function formatTemperature(value) {
+        return Number.isFinite(value) ? `${value.toFixed(1)}°C` : "—";
+    }
+
+    function temperatureFromHyperTmp(value) {
+        const hyperTmp = finiteNumber(value);
+        return hyperTmp === null ? null : (hyperTmp - 2731) / 10;
+    }
+
     function batteryEnergyValues(model, batteryPercent = model.batteryPercent) {
         if (!Number.isFinite(batteryPercent)) return null;
         const storedKwh = (batteryPercent / 100) * (model.capacityWh / 1000);
         const usableKwh = Math.max(0, ((batteryPercent - model.minimumPercent) / 100) * (model.capacityWh / 1000));
         return { storedKwh, usableKwh };
+    }
+
+    function batteryHealthValues(model) {
+        return {
+            wifiRssi: model.wifiRssi,
+            systemTemperature: model.systemTemperature,
+            batteryPacks: model.batteryPacks
+        };
     }
 
     function batteryProjectionAtHourEnd(model, now = new Date()) {
@@ -328,10 +364,10 @@
     function hideBatteryPopover(trigger = null) {
         if (trigger && trigger !== activeBatteryPopoverTrigger) return;
         if (activeBatteryPopoverTrigger) {
-            activeBatteryPopoverTrigger.removeAttribute("aria-describedby");
             activeBatteryPopoverTrigger.setAttribute("aria-expanded", "false");
         }
         activeBatteryPopoverTrigger = null;
+        activeBatteryPopoverView = "energy";
         batteryPopover.hidden = true;
         batteryPopover.style.removeProperty("left");
         batteryPopover.style.removeProperty("top");
@@ -355,30 +391,7 @@
         batteryPopover.style.visibility = "visible";
     }
 
-    function showBatteryPopover(detail, trigger) {
-        if (!detail || !trigger) return;
-        hideBatteryPopover();
-        activeBatteryPopoverTrigger = trigger;
-        trigger.setAttribute("aria-describedby", batteryPopover.id);
-        trigger.setAttribute("aria-expanded", "true");
-
-        const header = document.createElement("div");
-        header.className = "app-battery-popover__header";
-        const title = document.createElement("strong");
-        title.textContent = detail.title;
-        header.appendChild(title);
-
-        const details = document.createElement("div");
-        details.className = "app-battery-popover__details";
-        const rows = [
-            ["Total stored energy", formatKwh(detail.storedKwh)],
-            ["Usable energy", formatKwh(detail.usableKwh)],
-            ["Battery rate", detail.rate],
-            [
-                `Energy @ ${detail.projectionTime}`,
-                `${formatKwh(detail.projectedUsableKwh)} (${Math.round(detail.projectedUsablePercent)}%)`
-            ]
-        ];
+    function appendBatteryPopoverRows(container, rows) {
         rows.forEach(([label, value]) => {
             const row = document.createElement("p");
             const name = document.createElement("span");
@@ -386,10 +399,93 @@
             name.textContent = label;
             amount.textContent = value;
             row.append(name, amount);
-            details.appendChild(row);
+            container.appendChild(row);
+        });
+    }
+
+    function showBatteryPopover(detail, trigger, initialView = "energy") {
+        if (!detail || !trigger) return;
+        hideBatteryPopover();
+        activeBatteryPopoverTrigger = trigger;
+        activeBatteryPopoverView = initialView === "health" ? "health" : "energy";
+        trigger.setAttribute("aria-controls", batteryPopover.id);
+        trigger.setAttribute("aria-haspopup", "dialog");
+        trigger.setAttribute("aria-expanded", "true");
+
+        const header = document.createElement("div");
+        header.className = "app-battery-popover__header";
+        const title = document.createElement("strong");
+        title.id = "app-battery-popover-title";
+        const navigation = document.createElement("button");
+        navigation.className = "app-battery-popover__navigation";
+        navigation.type = "button";
+        header.append(title, navigation);
+
+        const viewport = document.createElement("div");
+        viewport.className = "app-battery-popover__viewport";
+        const slider = document.createElement("div");
+        slider.className = "app-battery-popover__slider";
+
+        const energyDetails = document.createElement("div");
+        energyDetails.className = "app-battery-popover__details app-battery-popover__panel";
+        energyDetails.dataset.view = "energy";
+        appendBatteryPopoverRows(energyDetails, [
+            ["Total stored energy", formatKwh(detail.storedKwh)],
+            ["Usable energy", formatKwh(detail.usableKwh)],
+            ["Battery rate", detail.rate],
+            [
+                `Energy @ ${detail.projectionTime}`,
+                `${formatKwh(detail.projectedUsableKwh)} (${Math.round(detail.projectedUsablePercent)}%)`
+            ]
+        ]);
+
+        const healthDetails = document.createElement("div");
+        healthDetails.className = "app-battery-popover__details app-battery-popover__panel";
+        healthDetails.dataset.view = "health";
+        const healthRows = [
+            ["Controller temperature", formatTemperature(detail.systemTemperature)]
+        ];
+        healthRows.push(...detail.batteryPacks.map((pack, index) => [
+            `Battery ${index + 1}`,
+            `${Number.isFinite(pack.percent) ? `${Math.round(pack.percent)}%` : "—"} · ${formatTemperature(pack.temperature)}`
+        ]));
+        if (detail.batteryPacks.length === 0) healthRows.push(["Battery packs", "Unavailable"]);
+        healthRows.push(["Wi-Fi signal", Number.isFinite(detail.wifiRssi) ? `${Math.round(detail.wifiRssi)} dBm` : "—"]);
+        appendBatteryPopoverRows(healthDetails, healthRows);
+
+        slider.append(energyDetails, healthDetails);
+        viewport.appendChild(slider);
+
+        function setPopoverView(view) {
+            activeBatteryPopoverView = view === "health" ? "health" : "energy";
+            const showingHealth = activeBatteryPopoverView === "health";
+            batteryPopover.dataset.view = activeBatteryPopoverView;
+            title.textContent = showingHealth ? "Battery health" : detail.title;
+            navigation.replaceChildren();
+
+            const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            icon.classList.add("gsd-icon");
+            icon.setAttribute("aria-hidden", "true");
+            const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+            use.setAttribute("href", `../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-${showingHealth ? "left" : "right"}`);
+            icon.appendChild(use);
+
+            const label = document.createElement("span");
+            label.textContent = showingHealth ? "Energy" : "Health";
+            if (showingHealth) navigation.append(icon, label);
+            else navigation.append(label, icon);
+            navigation.setAttribute("aria-label", showingHealth ? "Back to battery energy" : "Show battery health");
+            energyDetails.setAttribute("aria-hidden", String(showingHealth));
+            healthDetails.setAttribute("aria-hidden", String(!showingHealth));
+        }
+
+        navigation.addEventListener("click", () => {
+            setPopoverView(activeBatteryPopoverView === "energy" ? "health" : "energy");
         });
 
-        batteryPopover.replaceChildren(header, details);
+        batteryPopover.replaceChildren(header, viewport);
+        batteryPopover.setAttribute("aria-labelledby", title.id);
+        setPopoverView(activeBatteryPopoverView);
         batteryPopover.hidden = false;
         batteryPopover.style.visibility = "hidden";
         positionBatteryPopover(trigger);
@@ -397,6 +493,8 @@
 
     function bindBatteryPopover(trigger) {
         trigger.setAttribute("aria-expanded", "false");
+        trigger.setAttribute("aria-controls", batteryPopover.id);
+        trigger.setAttribute("aria-haspopup", "dialog");
         trigger.addEventListener("click", () => {
             if (activeBatteryPopoverTrigger === trigger && !batteryPopover.hidden) {
                 hideBatteryPopover(trigger);
@@ -452,6 +550,7 @@
         }
 
         const properties = readings.properties;
+        const packData = Array.isArray(readings.packData) ? readings.packData : [];
         const p1Readings = payload?.p1?.readings || payload?.p1?.data || null;
         const powerW = calculateBatteryPower(properties);
         const batteryPercent = finiteNumber(properties.electricLevel);
@@ -465,6 +564,12 @@
             minimumPercent,
             100
         );
+        const wifiRssi = finiteNumber(properties.rssi);
+        const systemTemperature = temperatureFromHyperTmp(properties.hyperTmp);
+        const batteryPacks = packData.map((pack) => ({
+            percent: finiteNumber(pack?.socLevel),
+            temperature: temperatureFromHyperTmp(pack?.maxTemp)
+        }));
 
         let remainingHours = null;
         if (batteryPercent !== null && powerW > 0) {
@@ -483,7 +588,10 @@
             remainingTime: formatDuration(remainingHours),
             capacityWh,
             minimumPercent,
-            maximumPercent
+            maximumPercent,
+            wifiRssi,
+            systemTemperature,
+            batteryPacks
         };
     }
 
@@ -540,7 +648,10 @@
         if (gridPowerW === null) {
             return { label: "Unknown", description: "P1 reading unavailable", direction: "balanced" };
         }
-        if (Math.abs(gridPowerW) <= 25) {
+        const colorConfig = window.GraphiteGridExchangeColorScale?.config || {};
+        const exportBoundaryW = finiteNumber(colorConfig.exportGreenBelowW, -10);
+        const importBoundaryW = finiteNumber(colorConfig.importRedAboveW, 10);
+        if (gridPowerW >= exportBoundaryW && gridPowerW <= importBoundaryW) {
             return { label: "Balanced", description: "Balanced near zero", direction: "balanced" };
         }
         if (gridPowerW > 0) {
@@ -636,10 +747,15 @@
         const maxPower = Math.max(1, finiteNumber(config.powerMaxW, 1200));
         const axisLimit = model.powerW >= 0 ? maxPower : Math.abs(minPower);
         const powerScale = calculateVisualBarScale(model.powerW, axisLimit);
-        const activePowerSegments = Math.round(powerScale.actualPercent / 10);
-        elements.powerSegments.forEach((segment, index) => {
-            segment.dataset.active = String(index < activePowerSegments);
-        });
+        const activePowerSegments = activeFlowChevronCount(
+            powerScale.actualPercent,
+            model.mode !== "standby"
+        );
+        renderFlowChevrons(
+            elements.powerSegments,
+            activePowerSegments,
+            model.mode === "discharging"
+        );
         setFlipToggleLabels(
             elements.powerViewToggles,
             elements.powerFront,
@@ -736,6 +852,7 @@
             });
             batteryPopoverDetails.set(elements.batteryIcon, {
                 title: "Battery energy",
+                ...batteryHealthValues(model),
                 usableKwh: energy.usableKwh,
                 storedKwh: energy.storedKwh,
                 rate: formatSignedWatts(model.powerW),
@@ -751,6 +868,7 @@
             if (model.remainingTime && projection) {
                 const projectionDetail = {
                     title: `Projected at ${projection.time}`,
+                    ...batteryHealthValues(model),
                     usableKwh: energy.usableKwh,
                     storedKwh: energy.storedKwh,
                     rate: formatSignedWatts(model.powerW),
@@ -795,7 +913,11 @@
         elements.batterySimpleTarget.removeAttribute("title");
         elements.batterySimpleTarget.dataset.mode = model.mode;
         if (activeBatteryPopoverTrigger && !batteryPopover.hidden) {
-            showBatteryPopover(batteryPopoverDetails.get(activeBatteryPopoverTrigger), activeBatteryPopoverTrigger);
+            showBatteryPopover(
+                batteryPopoverDetails.get(activeBatteryPopoverTrigger),
+                activeBatteryPopoverTrigger,
+                activeBatteryPopoverView
+            );
         }
         elements.batteryMinMarker.style.setProperty("--app-marker", `${model.minimumPercent}%`);
         elements.batteryTargetMarker.style.setProperty("--app-marker", `${model.maximumPercent}%`);
@@ -823,9 +945,10 @@
         elements.gridFlowFill.dataset.direction = grid.direction;
         const gridAxis = gridValue >= 0 ? maxPower : Math.abs(minPower);
         const gridScale = calculateVisualBarScale(gridValue, gridAxis);
-        const activeGridSegments = grid.direction === "balanced"
-            ? 0
-            : Math.round(gridScale.actualPercent / 10);
+        const activeGridSegments = activeFlowChevronCount(
+            gridScale.actualPercent,
+            grid.direction !== "balanced"
+        );
         elements.gridCard.style.setProperty("--app-grid-color", gridValueColor || "var(--gsd-neutral)");
         elements.gridSimpleState.textContent = grid.label;
         setSimpleValue(
@@ -837,9 +960,11 @@
         elements.gridSimpleFlow.dataset.direction = grid.direction;
         elements.gridSimpleFlow.dataset.valueSize = powerValueSize(gridValue);
         const gridFinancial = renderGridSimpleCaption(grid, model.gridPowerW);
-        elements.gridSegments.forEach((segment, index) => {
-            segment.dataset.active = String(index < activeGridSegments);
-        });
+        renderFlowChevrons(
+            elements.gridSegments,
+            activeGridSegments,
+            grid.direction === "import"
+        );
         setFlipToggleLabels(
             elements.gridViewToggles,
             elements.gridFront,
@@ -1024,7 +1149,12 @@
     [elements.batteryIcon, elements.batteryTarget, elements.batterySimpleTarget].forEach(bindBatteryPopover);
     document.addEventListener("pointerdown", (event) => {
         if (!activeBatteryPopoverTrigger) return;
-        if (!activeBatteryPopoverTrigger.contains(event.target)) hideBatteryPopover(activeBatteryPopoverTrigger);
+        if (
+            !activeBatteryPopoverTrigger.contains(event.target) &&
+            !batteryPopover.contains(event.target)
+        ) {
+            hideBatteryPopover(activeBatteryPopoverTrigger);
+        }
     });
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || !activeBatteryPopoverTrigger) return;

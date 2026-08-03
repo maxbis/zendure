@@ -46,6 +46,7 @@ Important inputs include:
 It presents:
 
 - current charge or discharge status, battery level, and grid exchange
+- battery Energy and Health details, including stored and usable energy, projected energy, controller and pack temperatures, pack charge levels, and Wi-Fi signal
 - prices and the current energy plan for today or tomorrow
 - four days of hourly battery energy history
 - charged, discharged, and net totals for the selected day
@@ -68,9 +69,10 @@ It presents and modifies:
 1. Authentication is checked before either GUI exposes protected information.
 2. The new GUI loads its presentation from `app/` but continues to use shared configuration and backend endpoints in `main/`.
 3. The new GUI is the preferred monitoring interface.
-4. When a user selects a day in the new GUI's four-day history, the summary cards show totals for that selected calendar day. For today, totals cover the available readings up to the current time.
-5. When schedule editing, rule editing, or an automation function is needed, the user continues in the old GUI.
-6. Backend changes to shared APIs must be tested against both GUIs.
+4. When a user activates a battery detail trigger, the non-modal dialog opens on its Energy view and can switch to live battery Health details.
+5. When a user selects a day in the new GUI's four-day history, the summary cards show totals for that selected calendar day. For today, totals cover the available readings up to the current time.
+6. When schedule editing, rule editing, or an automation function is needed, the user continues in the old GUI.
+7. Backend changes to shared APIs must be tested against both GUIs.
 
 ## Edge cases and failure modes
 
@@ -82,6 +84,9 @@ It presents and modifies:
 
 ## Related files
 
+- [New GUI current energy status and battery details](assets/js/current-energy-status.md)
+- [New GUI prices and energy plan](assets/js/price-plan.md)
+- [New GUI shared system configuration](shared-system-configuration.md)
 - [Old GUI page description](../main/page-description.md)
 - [Old GUI page layout](../main/page-layout.md)
 - [Old GUI schedule architecture](../main/schedule-overview.md)

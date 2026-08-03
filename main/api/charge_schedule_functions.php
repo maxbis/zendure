@@ -648,7 +648,7 @@ function extractDateFromKey($key)
  */
 function cleanOutdatedScheduleEntries(array $schedule): array
 {
-    // Yesterday's date in YYYYMMDD format, using server timezone
+    // Yesterday's date in YYYYMMDD format, using server timezone.
     $yesterdayDate = date('Ymd', strtotime('-1 day'));
 
     foreach ($schedule as $key => $value) {
@@ -671,7 +671,7 @@ function cleanOutdatedScheduleEntries(array $schedule): array
             continue;
         }
 
-        // Delete only if the date is strictly before yesterday
+        // Keep yesterday for troubleshooting; delete anything older.
         if ($datePart < $yesterdayDate) {
             unset($schedule[$key]);
         }

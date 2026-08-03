@@ -59,6 +59,11 @@ Use the schedule section to manage entries.
 Notes:
 
 - Wildcards are supported in both date and time patterns.
+- A concrete whole-hour override normally applies for one hour. The system adds an `auto` boundary at the next hour (N+1) so normal wildcard and rule-based scheduling resumes.
+- If an applicable entry already exists at N+1, it is preserved instead of being overwritten.
+- No N+1 boundary is added for wildcard entries, non-whole-hour entries, an `auto` entry, or a 23:00 override.
+- After a successful save, the running automation backend is told to reread the schedule immediately; the old GUI also refreshes its displayed schedule.
+- During the save, concrete entries older than yesterday are silently removed. Yesterday is retained for troubleshooting, and wildcard entries are retained.
 - For `netzero` and `netzero+`, the modal can also show optional `min_power` / `max_power` fields.
 - `min_power` and `max_power` use watt values and step in `100 W`.
 - If both are empty, runtime behaves as before with no extra min/max enforcement.
@@ -132,10 +137,12 @@ If data looks stale or missing:
 If schedule changes do not appear:
 
 1. Save in the edit modal.
-2. Wait for refresh or reload the page.
+2. Check for a message that the override was saved but the backend refresh failed.
 3. Verify `main/data/charge_schedule.json` updates.
+4. Reload the page if the displayed schedule is still stale.
 
 ## 10. Related Manuals
 
 - Rules editor manual: `[install_dir]/docs/user_manuals/edit_rules_user_manual.md`
 - Min/max values manual: `[install_dir]/docs/user_manuals/min-max-values_user_manual.md`
+- Manual override save flow: `[install_dir]/docs/main/manual-override-save-flow.md`

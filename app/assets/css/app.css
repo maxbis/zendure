@@ -269,7 +269,6 @@
     border-radius: 10px;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
     color: var(--gsd-text);
-    pointer-events: none;
 }
 
 .app-battery-popover[hidden] {
@@ -277,6 +276,10 @@
 }
 
 .app-battery-popover__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     padding: 9px 11px;
     background: var(--gsd-surface-2);
     border-bottom: 1px solid var(--gsd-border-subtle);
@@ -284,6 +287,59 @@
 
 .app-battery-popover__header strong {
     font-size: 0.75rem;
+}
+
+.app-battery-popover__navigation {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 28px;
+    appearance: none;
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--gsd-accent);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.app-battery-popover__navigation:hover {
+    background: var(--gsd-accent-soft);
+    border-color: color-mix(in srgb, var(--gsd-accent) 30%, transparent);
+}
+
+.app-battery-popover__navigation:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: 1px;
+}
+
+.app-battery-popover__navigation .gsd-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.app-battery-popover__viewport {
+    overflow: hidden;
+}
+
+.app-battery-popover__slider {
+    display: flex;
+    align-items: flex-start;
+    width: 200%;
+    transform: translateX(0);
+    transition: transform var(--gsd-duration-medium) ease;
+}
+
+.app-battery-popover[data-view="health"] .app-battery-popover__slider {
+    transform: translateX(-50%);
+}
+
+.app-battery-popover__panel {
+    width: 50%;
+    flex: 0 0 50%;
 }
 
 .app-battery-popover__details {
@@ -307,6 +363,7 @@
     color: var(--gsd-text);
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
 .app-target-label[data-mode="charging"] {
@@ -1205,7 +1262,7 @@
 
 .app-price-summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     margin-bottom: 10px;
 }
@@ -1410,7 +1467,7 @@
 .app-price-solar-marker {
     position: absolute;
     z-index: 2;
-    top: 42px;
+    top: 0;
     bottom: 4px;
     left: var(--app-solar-position);
     width: 0;
@@ -1420,7 +1477,7 @@
 
 .app-price-solar-marker__badge {
     position: absolute;
-    top: 4px;
+    top: 2px;
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -3001,6 +3058,7 @@
     }
 
     .app-price-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         margin-bottom: 7px;
     }
 
@@ -3204,6 +3262,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .app-battery-popover__slider,
     .app-battery-card__inner,
     .app-battery-icon__segment,
     .app-power-card__inner,

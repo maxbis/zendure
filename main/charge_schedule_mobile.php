@@ -4,20 +4,33 @@
  * Mobile-optimized dark mode version with reordered sections
  */
 
-// Ensure server timezone matches local expectation
-date_default_timezone_set('Europe/Amsterdam');
-
 // Validate user access
 $validateFile = __DIR__ . '/../login/validate.php';
 require_once $validateFile;
 
+require_once __DIR__ . '/../common/php/system_config.php';
 require_once __DIR__ . '/api/charge_schedule_functions.php';
 // Include centralized configuration loader
 require_once __DIR__ . '/includes/config_loader.php';
-require_once __DIR__ . '/includes/price_conversion.php';
 
-$configLoadError = ConfigLoader::getLoadError();
-if ($configLoadError !== null) {
+$systemConfig = null;
+$configLoadErrors = [];
+
+try {
+    $systemConfig = loadSystemConfig();
+} catch (SystemConfigException $error) {
+    $configLoadErrors[] = 'Shared system configuration: ' . $error->getMessage();
+}
+
+// Use the configured installation timezone whenever the shared config is valid.
+date_default_timezone_set($systemConfig['installation']['timezone'] ?? 'UTC');
+
+$webConfigLoadError = ConfigLoader::getLoadError();
+if ($webConfigLoadError !== null) {
+    $configLoadErrors[] = 'Web configuration: ' . $webConfigLoadError;
+}
+
+if ($configLoadErrors !== []) {
     http_response_code(500);
     ?>
     <!DOCTYPE html>
@@ -37,7 +50,7 @@ if ($configLoadError !== null) {
                     The app could not start because the configuration file is invalid.
                 </p>
                 <p style="color: #ff8a80; line-height: 1.5;">
-                    <?= htmlspecialchars($configLoadError, ENT_QUOTES, 'UTF-8'); ?>
+                    <?= htmlspecialchars(implode(' | ', $configLoadErrors), ENT_QUOTES, 'UTF-8'); ?>
                 </p>
                 <p style="color: var(--text-tertiary); line-height: 1.5;">
                     Fix the JSON in the config file and reload this page.
@@ -72,7 +85,7 @@ $resolvedToday = resolveScheduleForDateWithConditions($schedule, $today, $includ
 $resolvedTomorrow = resolveScheduleForDateWithConditions($schedule, $tomorrow, $includeConditions);
 $currentHour = date('H') . '00';
 $currentTime = date('Hi'); // Current time in HHmm format (e.g., "0930")
-$priceConversionConfig = getPriceConversionConfig();
+$priceConversionConfig = $systemConfig['priceConversion'];
 
 ?>
 <!DOCTYPE html>
@@ -151,9 +164,9 @@ $priceConversionConfig = getPriceConversionConfig();
 
             // Charge status unified API (same-origin proxy) + config levels
             const CHARGE_STATUS_ALL_API_URL = <?php echo json_encode('api/charge_status_all_proxy.php', JSON_UNESCAPED_SLASHES); ?>;
-            const CHARGE_STATUS_MIN_CHARGE_LEVEL = <?php echo (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 20); ?>;
-            const CHARGE_STATUS_MAX_CHARGE_LEVEL = <?php echo (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 90); ?>;
-            const BASE_WH = <?php echo (int) ConfigLoader::get('baseWh', 5760); ?>;
+            const CHARGE_STATUS_MIN_CHARGE_LEVEL = <?php echo (int) $systemConfig['battery']['minChargePercent']; ?>;
+            const CHARGE_STATUS_MAX_CHARGE_LEVEL = <?php echo (int) $systemConfig['battery']['maxChargePercent']; ?>;
+            const BASE_WH = <?php echo (int) $systemConfig['battery']['capacityWh']; ?>;
             const GRID_MIN_POWER = <?php echo (int) ConfigLoader::get('minGridPower', -1200); ?>;
             const GRID_MAX_POWER = <?php echo (int) ConfigLoader::get('maxGridPower', 1200); ?>;
             window.PRICE_OVERVIEW_CONFIG = {

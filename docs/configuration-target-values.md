@@ -235,14 +235,13 @@ These settings remain owned by the new interface and must not be loaded by autom
 
 ### Grid presentation
 
-Current values are preserved during migration:
+The Phase 2 migration originally preserved different color and textual-state boundaries. A subsequent interface decision on 2026-08-03 aligned grid state and chevrons with the color configuration:
 
-- Export colour boundary: -10 W.
-- Balance point: 0 W.
-- Import colour boundary: 10 W.
-- Textual balanced magnitude: 25 W.
+- Below -10 W: exporting, using the exporting color and at least one chevron.
+- -10 W through +10 W: balanced, using a near-zero color and no chevrons.
+- Above +10 W: importing, using the importing color and at least one chevron.
 
-The difference between the 10 W colour transition and 25 W textual balance range is retained to avoid an unrelated visual behaviour change. A later interface-only task may align them.
+The state calculation reads these thresholds from the grid color-scale configuration, with matching defensive fallbacks, rather than maintaining a separate textual threshold.
 
 ### Timeline day parts
 
@@ -349,7 +348,6 @@ The following decisions are approved for Phase 3:
 
 - Whether the web/editor range should later be reduced to the automation command caps.
 - Whether automation should later increase its command caps to match the editor range.
-- Whether the 10 W and 25 W new-interface grid thresholds should be aligned.
 - Whether battery capacity should eventually influence automation decisions.
 - Which automation-owned values will become editable from an interface.
 - How synchronized persistent writes, versioning and acknowledgment will work.

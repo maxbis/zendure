@@ -4,7 +4,7 @@
 
 A web-based application for viewing, editing, and visualizing charge/discharge schedules for energy management systems. The active entrypoint in this repository is `main/charge_schedule_mobile.php`, which uses the shared schedule JS modules.
 
-**Related docs:** [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).
+**Related docs:** [manual-override-save-flow.md](manual-override-save-flow.md) (manual save and N+1 boundary), [refresh-functions.md](refresh-functions.md) (refresh logic), [page-layout.md](page-layout.md) (layout and DOM), [schedule-resolution-technical.md](../data/schedule-resolution-technical.md) (full resolution pipeline including conditions).
 
 ## Architecture Overview
 
@@ -154,11 +154,15 @@ Main application orchestrator.
 
 ```
 1. User clicks entry → EditModal opens
-2. User saves → schedule_api.js sends POST/DELETE
-3. API returns success
-4. refreshData() called
-5. All UI components updated
+2. User saves → edit_modal.js sends PUT with key + entry
+3. API validates and overwrites the entry
+4. For an eligible whole-hour concrete override, API adds an N+1 `auto` boundary
+5. API silently removes concrete entries older than yesterday and writes atomically
+6. Browser forces the automation backend to reread the schedule
+7. Browser immediately refreshes schedule-dependent UI
 ```
+
+See [Manual Override Save Flow](manual-override-save-flow.md) for the complete behavior, exceptions, and failure handling.
 
 ### Auto Calculate
 
@@ -251,7 +255,7 @@ The application reads configuration from `main/config/config.json`:
 - `*` = wildcard (matches any value)
 - More specific keys override wildcards
 - Exact manual entries, including `0`, block condition-rule overrides
-- Transparent/auto behavior comes from deleting the exact entry rather than storing a sentinel value
+- Deleting an exact entry makes the underlying schedule visible again; eligible whole-hour manual overrides can also store an N+1 `auto` boundary to stop the override from carrying forward
 
 **Value types:**
 - `number` - Power in watts (positive=charge, negative=discharge)

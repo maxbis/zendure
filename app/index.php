@@ -529,6 +529,10 @@ $appConfig = [
                         <span>Horizon low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
                     </button>
+                    <button class="app-price-kpi" type="button" data-role="price-average-kpi" disabled>
+                        <span>Horizon average</span>
+                        <strong data-role="price-average">—</strong>
+                    </button>
                     <button class="app-price-kpi" type="button" data-role="price-high-kpi" disabled>
                         <span>Horizon high</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>

@@ -21,6 +21,8 @@
         current: component.querySelector('[data-role="price-current"]'),
         lowKpi: component.querySelector('[data-role="price-low-kpi"]'),
         low: component.querySelector('[data-role="price-low"]'),
+        averageKpi: component.querySelector('[data-role="price-average-kpi"]'),
+        average: component.querySelector('[data-role="price-average"]'),
         highKpi: component.querySelector('[data-role="price-high-kpi"]'),
         high: component.querySelector('[data-role="price-high"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
@@ -561,12 +563,17 @@
         const header = document.createElement("div");
         header.className = "app-schedule-tooltip__header";
         const period = document.createElement("strong");
-        period.textContent = `${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        period.textContent = detail.kind === "average"
+            ? `Horizon average · ${detail.hourCount} hourly price${detail.hourCount === 1 ? "" : "s"}`
+            : `${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
         header.appendChild(period);
 
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
-        [["Consumer price", detail.price], ["Spot price", spotPrice(detail.price)]].forEach(([label, value]) => {
+        const detailSpotPrice = Number.isFinite(detail.spotPrice)
+            ? detail.spotPrice
+            : spotPrice(detail.price);
+        [["Consumer price", detail.price], ["Spot price", detailSpotPrice]].forEach(([label, value]) => {
             const row = document.createElement("p");
             const name = document.createElement("span");
             const amount = document.createElement("strong");
@@ -587,11 +594,15 @@
         summaryTooltipDetails.set(card, detail);
         card.disabled = !detail;
         card.setAttribute("aria-expanded", "false");
-        const dateAndTime = detail
-            ? `${formatDate(detail.date)}, ${pad(detail.hour)}:00 to ${pad((detail.hour + 1) % 24)}:00`
-            : "time unavailable";
+        const dateAndTime = detail?.kind === "average"
+            ? `${detail.hourCount} available hourly price${detail.hourCount === 1 ? "" : "s"} from ${formatDate(detail.startDate)} through ${formatDate(detail.endDate)}`
+            : detail
+                ? `${formatDate(detail.date)}, ${pad(detail.hour)}:00 to ${pad((detail.hour + 1) % 24)}:00`
+                : "time unavailable";
         const consumer = detail ? formatPrice(detail.price) : "unavailable";
-        const spot = detail ? formatPrice(spotPrice(detail.price)) : "unavailable";
+        const spot = detail
+            ? formatPrice(Number.isFinite(detail.spotPrice) ? detail.spotPrice : spotPrice(detail.price))
+            : "unavailable";
         card.setAttribute("aria-label", `${label}. ${dateAndTime}. Consumer price ${consumer}. Spot price ${spot}. Show price details.`);
     }
 
@@ -846,12 +857,22 @@
         const current = entries.find((entry) => entry.day === "today" && entry.hour === hour) || null;
         const low = available.reduce((lowest, entry) => !lowest || entry.price < lowest.price ? entry : lowest, null);
         const high = available.reduce((highest, entry) => !highest || entry.price > highest.price ? entry : highest, null);
+        const average = available.length ? {
+            kind: "average",
+            price: available.reduce((sum, entry) => sum + entry.price, 0) / available.length,
+            spotPrice: available.reduce((sum, entry) => sum + spotPrice(entry.price), 0) / available.length,
+            hourCount: available.length,
+            startDate: available[0].date,
+            endDate: available[available.length - 1].date
+        } : null;
         elements.currentLabel.textContent = "Current";
         setDimmedToken(elements.current, formatPrice(current?.price), "€");
         setDimmedToken(elements.low, formatPrice(low?.price), "€");
+        setDimmedToken(elements.average, formatPrice(average?.price), "€");
         setDimmedToken(elements.high, formatPrice(high?.price), "€");
         setSummaryTooltip(elements.currentKpi, "Current price", current);
         setSummaryTooltip(elements.lowKpi, "Horizon low", low);
+        setSummaryTooltip(elements.averageKpi, "Horizon average", average);
         setSummaryTooltip(elements.highKpi, "Horizon high", high);
     }
 
@@ -1185,7 +1206,7 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
-    [elements.currentKpi, elements.lowKpi, elements.highKpi].forEach(bindSummaryTooltip);
+    [elements.currentKpi, elements.lowKpi, elements.averageKpi, elements.highKpi].forEach(bindSummaryTooltip);
     editElements?.form?.addEventListener("submit", saveScheduleEdit);
     editElements?.modeInputs.forEach((input) => input.addEventListener("change", () => updateEditFields({ resetLimits: true })));
     editElements?.limitsEnabled?.addEventListener("change", () => updateEditFields({ resetLimits: editElements.limitsEnabled.checked }));
