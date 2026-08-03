@@ -1435,6 +1435,10 @@
     font-weight: 750;
 }
 
+.app-price-day-heading__label {
+    white-space: nowrap;
+}
+
 .app-price-day-heading[data-day="tomorrow"] {
     padding-inline-start: 12px;
     background: linear-gradient(
@@ -3299,12 +3303,15 @@
     }
 
     .app-price-day-heading {
-        position: sticky;
         z-index: 4;
-        left: 0;
-        width: fit-content;
         padding-inline: 4px;
         font-size: 0.58rem;
+    }
+
+    .app-price-day-heading__label {
+        position: sticky;
+        left: 4px;
+        width: fit-content;
     }
 
     .app-price-daypart {

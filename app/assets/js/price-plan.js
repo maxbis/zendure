@@ -954,11 +954,14 @@
 
         days.forEach((day, dayIndex) => {
             const dayHeading = document.createElement("span");
+            const dayHeadingLabel = document.createElement("span");
             dayHeading.className = "app-price-day-heading";
             dayHeading.dataset.day = day.key;
             dayHeading.style.setProperty("--app-day-start", String(dayIndex * 24 + 1));
             dayHeading.style.setProperty("--app-day-end", String((dayIndex + 1) * 24 + 1));
-            dayHeading.textContent = `${day.label} · ${formatDate(day.date)}`;
+            dayHeadingLabel.className = "app-price-day-heading__label";
+            dayHeadingLabel.textContent = `${day.label} · ${formatDate(day.date)}`;
+            dayHeading.appendChild(dayHeadingLabel);
             fragment.appendChild(dayHeading);
 
             DAY_PARTS.forEach((dayPart) => {
