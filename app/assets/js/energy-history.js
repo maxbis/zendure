@@ -40,7 +40,7 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
     const compactChartMedia = window.matchMedia("(max-width: 600px)");
     const CHART_LAYOUTS = Object.freeze({
-        compact: Object.freeze({ height: 210, margin: Object.freeze({ top: 16, right: 44, bottom: 34, left: 50 }) }),
+        compact: Object.freeze({ height: 170, margin: Object.freeze({ top: 12, right: 36, bottom: 28, left: 44 }) }),
         standard: Object.freeze({ height: 250, margin: Object.freeze({ top: 18, right: 48, bottom: 40, left: 54 }) })
     });
     let payload = null;
@@ -254,11 +254,20 @@
         return `${formatDay(row.day)}, ${String(row.hour).padStart(2, "0")}:00 to ${String((row.hour + 1) % 24).padStart(2, "0")}:00, ${direction}${energy}. ${battery} Activate to show totals for this day.`;
     }
 
+    function setActiveChartBar(index = null) {
+        elements.chart.querySelectorAll(".app-energy-chart__bar.is-active").forEach((element) => {
+            element.classList.remove("is-active");
+        });
+        if (index === null || index === undefined || index === "") return;
+        elements.chart.querySelector(`.app-energy-chart__bar[data-index="${index}"]`)?.classList.add("is-active");
+    }
+
     function showHourDetail(row, previousBattery, target) {
         elements.chart.querySelectorAll(".app-energy-chart__hit.is-active").forEach((element) => {
             element.classList.remove("is-active");
         });
         target?.classList.add("is-active");
+        setActiveChartBar(target?.dataset.index);
         elements.detail.hidden = false;
 
         elements.detailTime.textContent = `${formatDay(row.day)} · ${String(row.hour).padStart(2, "0")}:00–${String((row.hour + 1) % 24).padStart(2, "0")}:00`;
@@ -338,18 +347,22 @@
             }
         });
 
+        const bars = [];
         rows.forEach((row, index) => {
             const x = xForIndex(index);
             const height = Math.abs(row.wh) / energyMax * (plotHeight / 2);
             const y = row.wh >= 0 ? baseline - height : baseline;
-            svg.append(createSvgElement("rect", {
+            const bar = createSvgElement("rect", {
                 x: x - (barWidth / 2),
                 y,
                 width: barWidth,
                 height: Math.max(row.wh === 0 ? 1 : height, 1),
                 rx: Math.min(3, barWidth / 3),
-                class: row.wh >= 0 ? "app-energy-chart__bar app-energy-chart__bar--charged" : "app-energy-chart__bar app-energy-chart__bar--discharged"
-            }));
+                class: row.wh >= 0 ? "app-energy-chart__bar app-energy-chart__bar--charged" : "app-energy-chart__bar app-energy-chart__bar--discharged",
+                "data-index": String(index)
+            });
+            bars.push(bar);
+            svg.append(bar);
         });
 
         const path = batteryPath(rows, xForIndex, yForBattery);
@@ -420,11 +433,15 @@
                 height: plotHeight,
                 class: "app-energy-chart__hit",
                 "data-day": row.day,
+                "data-index": String(index),
                 tabindex: "0",
                 role: "button",
                 "aria-label": hourAriaLabel(row, previousBattery)
             });
+            const bar = bars[index];
             hit.append(createSvgElement("title", {}, hourAriaLabel(row, previousBattery)));
+            hit.addEventListener("pointerenter", () => bar.classList.add("is-hover"));
+            hit.addEventListener("pointerleave", () => bar.classList.remove("is-hover"));
             hit.addEventListener("focus", () => showHourDetail(row, previousBattery, hit));
             hit.addEventListener("click", () => {
                 showHourDetail(row, previousBattery, hit);
@@ -567,6 +584,10 @@
     }
 
     function resetDetail() {
+        elements.chart.querySelectorAll(".app-energy-chart__hit.is-active").forEach((element) => {
+            element.classList.remove("is-active");
+        });
+        setActiveChartBar(null);
         elements.detailTime.textContent = "Select an hour";
         elements.detailFlow.textContent = "Explore the chart for exact values";
         elements.detailFlow.dataset.direction = "idle";
@@ -596,7 +617,9 @@
 
     function render() {
         const rows = normalizedRows();
-        elements.date.textContent = `${formatDateRange(availableDays)} · energy flow and battery level`;
+        const dateRange = formatDateRange(availableDays);
+        elements.date.textContent = `${dateRange} · energy flow and battery level`;
+        elements.date.dataset.mobileLabel = `${dateRange} · flow & battery`;
         renderChart(rows);
         selectSummaryDay(selectedDay);
         resetDetail();

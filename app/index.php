@@ -526,15 +526,18 @@ $appConfig = [
                         <strong data-role="price-current">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-low-kpi" disabled>
-                        <span>Horizon low</span>
+                        <span class="app-price-kpi__label--desktop">Horizon low</span>
+                        <span class="app-price-kpi__label--mobile" aria-hidden="true">Low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-average-kpi" disabled>
-                        <span>Horizon average</span>
+                        <span class="app-price-kpi__label--desktop">Horizon average</span>
+                        <span class="app-price-kpi__label--mobile" aria-hidden="true">Average</span>
                         <strong data-role="price-average">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-high-kpi" disabled>
-                        <span>Horizon high</span>
+                        <span class="app-price-kpi__label--desktop">Horizon high</span>
+                        <span class="app-price-kpi__label--mobile" aria-hidden="true">High</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>
                     </button>
                 </div>
