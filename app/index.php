@@ -520,23 +520,23 @@ $appConfig = [
             </div>
 
             <div class="app-price-plan__content" data-role="price-content" hidden>
-                <div class="app-price-summary" aria-label="Price summary for the visible planning horizon">
+                <div class="app-price-summary" aria-label="Price summary for the current hour through tomorrow">
                     <button class="app-price-kpi" type="button" data-role="price-current-kpi" disabled>
                         <span data-role="price-current-label">Current</span>
                         <strong data-role="price-current">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-low-kpi" disabled>
-                        <span class="app-price-kpi__label--desktop">Horizon low</span>
+                        <span class="app-price-kpi__label--desktop">From now low</span>
                         <span class="app-price-kpi__label--mobile" aria-hidden="true">Low</span>
                         <strong class="app-price-kpi--low" data-role="price-low">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-average-kpi" disabled>
-                        <span class="app-price-kpi__label--desktop">Horizon average</span>
+                        <span class="app-price-kpi__label--desktop">Average</span>
                         <span class="app-price-kpi__label--mobile" aria-hidden="true">Average</span>
                         <strong data-role="price-average">—</strong>
                     </button>
                     <button class="app-price-kpi" type="button" data-role="price-high-kpi" disabled>
-                        <span class="app-price-kpi__label--desktop">Horizon high</span>
+                        <span class="app-price-kpi__label--desktop">From now high</span>
                         <span class="app-price-kpi__label--mobile" aria-hidden="true">High</span>
                         <strong class="app-price-kpi--high" data-role="price-high">—</strong>
                     </button>

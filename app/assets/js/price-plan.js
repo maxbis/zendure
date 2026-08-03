@@ -609,12 +609,36 @@
         header.className = "app-schedule-tooltip__header";
         const period = document.createElement("strong");
         period.textContent = detail.kind === "average"
-            ? `Horizon average · ${detail.hourCount} hourly price${detail.hourCount === 1 ? "" : "s"}`
+            ? detail.tomorrowAverage
+                ? "Daily average prices"
+                : `Today average · ${detail.hourCount} hourly price${detail.hourCount === 1 ? "" : "s"}`
             : `${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
         header.appendChild(period);
 
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
+        if (detail.kind === "average" && detail.tomorrowAverage) {
+            [
+                ["Today · consumer", detail.price],
+                ["Today · spot", detail.spotPrice],
+                ["Tomorrow · consumer", detail.tomorrowAverage.price],
+                ["Tomorrow · spot", detail.tomorrowAverage.spotPrice]
+            ].forEach(([label, value]) => {
+                const row = document.createElement("p");
+                const name = document.createElement("span");
+                const amount = document.createElement("strong");
+                name.textContent = label;
+                amount.textContent = formatPrice(value);
+                row.append(name, amount);
+                prices.appendChild(row);
+            });
+            priceTooltip.replaceChildren(header, prices);
+            priceTooltip.hidden = false;
+            priceTooltip.style.visibility = "hidden";
+            positionPriceTooltip(trigger);
+            return;
+        }
+
         const detailSpotPrice = Number.isFinite(detail.spotPrice)
             ? detail.spotPrice
             : spotPrice(detail.price);
@@ -639,8 +663,17 @@
         summaryTooltipDetails.set(card, detail);
         card.disabled = !detail;
         card.setAttribute("aria-expanded", "false");
+        if (detail?.kind === "average" && detail.tomorrowAverage) {
+            card.setAttribute(
+                "aria-label",
+                `${label}. Today consumer price ${formatPrice(detail.price)}, spot price ${formatPrice(detail.spotPrice)}. Tomorrow consumer price ${formatPrice(detail.tomorrowAverage.price)}, spot price ${formatPrice(detail.tomorrowAverage.spotPrice)}. Show price details.`
+            );
+            return;
+        }
         const dateAndTime = detail?.kind === "average"
-            ? `${detail.hourCount} available hourly price${detail.hourCount === 1 ? "" : "s"} from ${formatDate(detail.startDate)} through ${formatDate(detail.endDate)}`
+            ? detail.startDate === detail.endDate
+                ? `${detail.hourCount} available hourly price${detail.hourCount === 1 ? "" : "s"} for ${formatDate(detail.startDate)}`
+                : `${detail.hourCount} available hourly price${detail.hourCount === 1 ? "" : "s"} from ${formatDate(detail.startDate)} through ${formatDate(detail.endDate)}`
             : detail
                 ? `${formatDate(detail.date)}, ${pad(detail.hour)}:00 to ${pad((detail.hour + 1) % 24)}:00`
                 : "time unavailable";
@@ -911,28 +944,37 @@
             hour,
             price
         })));
-        const available = entries.filter((entry) => Number.isFinite(entry.price));
         const hour = new Date().getHours();
+        const available = entries.filter((entry) => Number.isFinite(entry.price)
+            && (entry.day === "tomorrow" || (entry.day === "today" && entry.hour >= hour)));
         const current = entries.find((entry) => entry.day === "today" && entry.hour === hour) || null;
         const low = available.reduce((lowest, entry) => !lowest || entry.price < lowest.price ? entry : lowest, null);
         const high = available.reduce((highest, entry) => !highest || entry.price > highest.price ? entry : highest, null);
-        const average = available.length ? {
-            kind: "average",
-            price: available.reduce((sum, entry) => sum + entry.price, 0) / available.length,
-            spotPrice: available.reduce((sum, entry) => sum + spotPrice(entry.price), 0) / available.length,
-            hourCount: available.length,
-            startDate: available[0].date,
-            endDate: available[available.length - 1].date
-        } : null;
+        const dailyAverage = (day) => {
+            if (!day) return null;
+            const prices = day.values.filter(Number.isFinite);
+            return prices.length ? {
+                kind: "average",
+                date: day.date,
+                price: prices.reduce((sum, price) => sum + price, 0) / prices.length,
+                spotPrice: prices.reduce((sum, price) => sum + spotPrice(price), 0) / prices.length,
+                hourCount: prices.length,
+                startDate: day.date,
+                endDate: day.date
+            } : null;
+        };
+        const todayAverage = dailyAverage(days.find((day) => day.key === "today"));
+        const tomorrowAverage = dailyAverage(days.find((day) => day.key === "tomorrow"));
+        const averageDetail = todayAverage ? { ...todayAverage, tomorrowAverage } : null;
         elements.currentLabel.textContent = "Current";
         setDimmedToken(elements.current, formatPrice(current?.price), "€");
         setDimmedToken(elements.low, formatPrice(low?.price), "€");
-        setDimmedToken(elements.average, formatPrice(average?.price), "€");
+        setDimmedToken(elements.average, formatPrice(todayAverage?.price), "€");
         setDimmedToken(elements.high, formatPrice(high?.price), "€");
         setSummaryTooltip(elements.currentKpi, "Current price", current);
-        setSummaryTooltip(elements.lowKpi, "Horizon low", low);
-        setSummaryTooltip(elements.averageKpi, "Horizon average", average);
-        setSummaryTooltip(elements.highKpi, "Horizon high", high);
+        setSummaryTooltip(elements.lowKpi, "From now low", low);
+        setSummaryTooltip(elements.averageKpi, "Daily averages", averageDetail);
+        setSummaryTooltip(elements.highKpi, "From now high", high);
     }
 
     function publishCurrentPrice() {
