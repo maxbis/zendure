@@ -737,10 +737,18 @@
 .app-battery-icon__segment {
     background: var(--gsd-page-deep);
     border-radius: 2px;
-    transition: background-color var(--gsd-duration-fast) ease;
+    transition:
+        background-color var(--gsd-duration-fast) ease,
+        box-shadow var(--gsd-duration-fast) ease;
 }
 
 .app-battery-icon__segment[data-active="true"] {
+    background: color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 80%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 18%, transparent);
+}
+
+.app-battery-icon:hover .app-battery-icon__segment[data-active="true"],
+.app-battery-icon:focus-visible .app-battery-icon__segment[data-active="true"] {
     background: var(--app-battery-color, var(--gsd-positive));
     box-shadow: 0 0 6px color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 30%, transparent);
 }
@@ -1578,15 +1586,20 @@
     width: 100%;
     height: var(--app-price-height, 10%);
     min-height: 5px;
-    background: var(--app-price-color, var(--gsd-neutral));
+    background: color-mix(in srgb, var(--app-price-color, var(--gsd-neutral)) 70%, transparent);
     border-radius: 4px 4px 2px 2px;
-    opacity: 0.9;
-    transition: height var(--gsd-duration-medium) ease;
+    transition:
+        height var(--gsd-duration-medium) ease,
+        background var(--gsd-duration-fast) ease;
+}
+
+.app-price-hour__edit:hover .app-price-hour__bar,
+.app-price-hour__edit:focus-visible .app-price-hour__bar {
+    background: var(--app-price-color, var(--gsd-neutral));
 }
 
 .app-price-hour[data-current="true"] .app-price-hour__bar {
     box-shadow: 0 0 0 1px var(--gsd-price), 0 0 10px color-mix(in srgb, var(--gsd-price) 34%, transparent);
-    opacity: 1;
 }
 
 .app-price-hour__price,
