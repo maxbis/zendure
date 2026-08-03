@@ -107,11 +107,33 @@ function formatHourRange(hourValue) {
 }
 
 function getBaseWhForPopup() {
-    const fallback = 5760;
-    if (typeof BASE_WH === 'undefined') return fallback;
+    if (typeof BASE_WH === 'undefined') {
+        throw new Error('Missing required shared battery capacity.');
+    }
     const parsed = Number(BASE_WH);
-    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error('The shared battery capacity is invalid.');
+    }
     return parsed;
+}
+
+function getRequiredPriceOverviewChargeLevels() {
+    const minimumPercent = typeof CHARGE_STATUS_MIN_CHARGE_LEVEL === 'undefined'
+        ? NaN
+        : Number(CHARGE_STATUS_MIN_CHARGE_LEVEL);
+    const maximumPercent = typeof CHARGE_STATUS_MAX_CHARGE_LEVEL === 'undefined'
+        ? NaN
+        : Number(CHARGE_STATUS_MAX_CHARGE_LEVEL);
+    if (
+        !Number.isFinite(minimumPercent)
+        || !Number.isFinite(maximumPercent)
+        || minimumPercent < 0
+        || maximumPercent > 100
+        || minimumPercent >= maximumPercent
+    ) {
+        throw new Error('The shared charge-level settings are missing or invalid.');
+    }
+    return { minimumPercent, maximumPercent };
 }
 
 function powerToCapacityPercent(powerW) {
@@ -598,19 +620,12 @@ function getPopupForecastBatteryState() {
     const electricLevel = Number(state.electricLevel);
     if (!Number.isFinite(electricLevel)) return null;
 
-    const minChargeLevelRaw = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
-        : 20;
-    const maxChargeLevelRaw = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
-        : 90;
-    const minChargeLevel = Math.max(0, Math.min(100, minChargeLevelRaw));
-    const maxChargeLevel = Math.max(minChargeLevel, Math.min(100, maxChargeLevelRaw));
+    const chargeLevels = getRequiredPriceOverviewChargeLevels();
 
     return {
         electricLevel: Math.max(0, Math.min(100, electricLevel)),
-        minChargeLevel,
-        maxChargeLevel
+        minChargeLevel: chargeLevels.minimumPercent,
+        maxChargeLevel: chargeLevels.maximumPercent
     };
 }
 

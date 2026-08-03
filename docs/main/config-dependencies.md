@@ -18,13 +18,13 @@ This file reflects the currently active schedule UI entrypoint:
 4. `zendureFetchApiUrl` (via `ConfigLoader::getWithLocation(...)`)
 - Location-aware fetch endpoint selection
 
-5. `MIN_CHARGE_LEVEL`
+5. `battery.minChargePercent` from `common/config/system.json`
 - Injected into JS as `CHARGE_STATUS_MIN_CHARGE_LEVEL`
 
-6. `MAX_CHARGE_LEVEL`
+6. `battery.maxChargePercent` from `common/config/system.json`
 - Injected into JS as `CHARGE_STATUS_MAX_CHARGE_LEVEL`
 
-7. `baseWh`
+7. `battery.capacityWh` from `common/config/system.json`
 - Injected into JS as `BASE_WH`
 
 8. `minGridPower`
@@ -47,7 +47,7 @@ This file reflects the currently active schedule UI entrypoint:
   - `wh-per-hourApi`
   - `apiBaseUrlPiControl`
   - `whPerHourCacheMinutes`
-  - `baseWh`
+  - `battery.capacityWh` and `installation.timezone` from `common/config/system.json`
 
 ## Notes
 

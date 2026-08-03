@@ -4,6 +4,28 @@
  * Uses utility functions from schedule_utils.js
  */
 
+function getRequiredScheduleBatterySettings() {
+    const minimumPercent = typeof CHARGE_STATUS_MIN_CHARGE_LEVEL === 'undefined'
+        ? NaN
+        : Number(CHARGE_STATUS_MIN_CHARGE_LEVEL);
+    const maximumPercent = typeof CHARGE_STATUS_MAX_CHARGE_LEVEL === 'undefined'
+        ? NaN
+        : Number(CHARGE_STATUS_MAX_CHARGE_LEVEL);
+    const capacityWh = typeof BASE_WH === 'undefined' ? NaN : Number(BASE_WH);
+    if (
+        !Number.isFinite(minimumPercent)
+        || !Number.isFinite(maximumPercent)
+        || !Number.isFinite(capacityWh)
+        || capacityWh <= 0
+        || minimumPercent < 0
+        || maximumPercent > 100
+        || minimumPercent >= maximumPercent
+    ) {
+        throw new Error('The shared battery settings are missing or invalid.');
+    }
+    return { minimumPercent, maximumPercent, capacityWh };
+}
+
 /**
  * Render today's schedule list
  * @param {Array} resolved - Resolved schedule slots
@@ -679,18 +701,10 @@ function renderChargeStatus(zendureData, p1Data = null) {
     }
 
     // Calculate power display and time estimate
-    const MIN_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
-        : 20;
-    const MAX_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
-        : 90;
-    const MIN_CHARGE_LEVEL = Math.max(0, Math.min(100, MIN_CHARGE_LEVEL_RAW));
-    const MAX_CHARGE_LEVEL = Math.max(MIN_CHARGE_LEVEL, Math.min(100, MAX_CHARGE_LEVEL_RAW));
-    const BASE_WH_RAW = (typeof BASE_WH !== 'undefined' && Number.isFinite(Number(BASE_WH)))
-        ? Number(BASE_WH)
-        : 5760;
-    const TOTAL_CAPACITY_KWH = BASE_WH_RAW / 1000;
+    const batterySettings = getRequiredScheduleBatterySettings();
+    const MIN_CHARGE_LEVEL = batterySettings.minimumPercent;
+    const MAX_CHARGE_LEVEL = batterySettings.maximumPercent;
+    const TOTAL_CAPACITY_KWH = batterySettings.capacityWh / 1000;
 
     let powerDisplay = '0 W';
     let timeEstimate = '';
@@ -1088,18 +1102,10 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
     const detailsContainer = document;
 
     // Constants
-    const MIN_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MIN_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MIN_CHARGE_LEVEL)
-        : 20;
-    const MAX_CHARGE_LEVEL_RAW = (typeof CHARGE_STATUS_MAX_CHARGE_LEVEL !== 'undefined')
-        ? Number(CHARGE_STATUS_MAX_CHARGE_LEVEL)
-        : 90;
-    const MIN_CHARGE_LEVEL = Math.max(0, Math.min(100, MIN_CHARGE_LEVEL_RAW));
-    const MAX_CHARGE_LEVEL = Math.max(MIN_CHARGE_LEVEL, Math.min(100, MAX_CHARGE_LEVEL_RAW));
-    const BASE_WH_RAW = (typeof BASE_WH !== 'undefined' && Number.isFinite(Number(BASE_WH)))
-        ? Number(BASE_WH)
-        : 5760;
-    const TOTAL_CAPACITY_KWH = BASE_WH_RAW / 1000;
+    const batterySettings = getRequiredScheduleBatterySettings();
+    const MIN_CHARGE_LEVEL = batterySettings.minimumPercent;
+    const MAX_CHARGE_LEVEL = batterySettings.maximumPercent;
+    const TOTAL_CAPACITY_KWH = batterySettings.capacityWh / 1000;
     const minTemp = -10;
     const maxTemp = 40;
 

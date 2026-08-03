@@ -136,7 +136,7 @@ P1 Meter Device → Data Collector → data_api.php → zendure_p1_data.json →
 
 ## Configuration
 
-The page uses configuration from `main/config/config.json` (or fallback to `main/run_schedule/config/config.json`):
+The page uses shared system configuration from `common/config/system.json` for battery limits/capacity, installation location/timezone and price conversion. It uses `main/config/config.json` for these web-specific values:
 
 - `scheduleApiUrl`: API endpoint for schedule operations
 - `priceApiUrl`: Price API endpoint
@@ -150,7 +150,7 @@ The page uses configuration from `main/config/config.json` (or fallback to `main
 
 ## Technical Notes
 
-- **Timezone**: All times use `Europe/Amsterdam` timezone
+- **Timezone**: Installation-local times use `installation.timezone` from the shared system configuration; electricity-market services retain their explicit market timezone.
 - **Schedule Resolution**: Wildcard patterns (containing `*`) are resolved to specific dates
 - **Data Caching**: Battery and P1 data are cached in JSON files, updated periodically
 - **Real-time Updates**: Some sections refresh automatically via JavaScript

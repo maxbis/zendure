@@ -1,10 +1,13 @@
 (function () {
     'use strict';
 
-    function getPriceConversionNumberConfig(key, fallback) {
-        const source = window.PRICE_CONVERSION_CONFIG || {};
+    function getPriceConversionNumberConfig(key) {
+        const source = window.PRICE_CONVERSION_CONFIG;
         const value = source[key];
-        return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new Error(`Missing required shared price-conversion setting: ${key}.`);
+        }
+        return value;
     }
 
     function getPriceConversionPrecision(precision, fallback) {
@@ -13,18 +16,33 @@
     }
 
     window.getPriceConversionConfig = function getPriceConversionConfig() {
+        if (!window.PRICE_CONVERSION_CONFIG || typeof window.PRICE_CONVERSION_CONFIG !== 'object') {
+            throw new Error('Missing required shared price-conversion settings.');
+        }
+        const supplierMarkupEurPerKwh = getPriceConversionNumberConfig('supplierMarkupEurPerKwh');
+        const energyTaxEurPerKwh = getPriceConversionNumberConfig('energyTaxEurPerKwh');
+        const vatMultiplier = getPriceConversionNumberConfig('vatMultiplier');
+        const consumerPrecision = window.PRICE_CONVERSION_CONFIG.consumerPrecision;
+        const spotPrecision = window.PRICE_CONVERSION_CONFIG.spotPrecision;
+        if (
+            supplierMarkupEurPerKwh < 0
+            || energyTaxEurPerKwh < 0
+            || vatMultiplier <= 0
+            || !Number.isInteger(consumerPrecision)
+            || !Number.isInteger(spotPrecision)
+            || consumerPrecision < 0
+            || consumerPrecision > 12
+            || spotPrecision < 0
+            || spotPrecision > 12
+        ) {
+            throw new Error('The shared price-conversion settings are invalid.');
+        }
         return {
-            supplierMarkupEurPerKwh: getPriceConversionNumberConfig('supplierMarkupEurPerKwh', 0.0219),
-            energyTaxEurPerKwh: getPriceConversionNumberConfig('energyTaxEurPerKwh', 0.0898),
-            vatMultiplier: Math.max(getPriceConversionNumberConfig('vatMultiplier', 1.21), Number.EPSILON),
-            consumerPrecision: getPriceConversionPrecision(
-                window.PRICE_CONVERSION_CONFIG ? window.PRICE_CONVERSION_CONFIG.consumerPrecision : undefined,
-                4
-            ),
-            spotPrecision: getPriceConversionPrecision(
-                window.PRICE_CONVERSION_CONFIG ? window.PRICE_CONVERSION_CONFIG.spotPrecision : undefined,
-                6
-            )
+            supplierMarkupEurPerKwh,
+            energyTaxEurPerKwh,
+            vatMultiplier,
+            consumerPrecision,
+            spotPrecision
         };
     };
 

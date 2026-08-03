@@ -8,7 +8,7 @@ if(strlen($today_modified) > 6) {
 }
 
 // Calculate tomorrow's date for display
-$tz = new DateTimeZone(date_default_timezone_get() ?: 'Europe/Amsterdam');
+$tz = new DateTimeZone(date_default_timezone_get());
 $todayDigits = preg_replace('/\D/', '', (string)($today ?? ''));
 $todayDt = null;
 if (strlen($todayDigits) === 8) {

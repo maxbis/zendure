@@ -1,9 +1,7 @@
 <?php
 // schedule/api/charge_schedule_api.php
 
-// Ensure server timezone matches local expectation
-date_default_timezone_set('Europe/Amsterdam');
-
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 require_once __DIR__ . '/charge_schedule_functions.php';
 
 function buildScheduleWriteFailureMessage($context, $filePath) {
@@ -23,6 +21,18 @@ header('Content-Type: application/json');
 // Handle OPTIONS preflight request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    exit();
+}
+
+try {
+    $chargeScheduleSystemConfig = loadSystemConfig();
+    date_default_timezone_set($chargeScheduleSystemConfig['installation']['timezone']);
+} catch (SystemConfigException $error) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Shared system configuration: ' . $error->getMessage(),
+    ]);
     exit();
 }
 

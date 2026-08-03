@@ -180,7 +180,8 @@ See [Manual Override Save Flow](manual-override-save-flow.md) for the complete b
 
 #### `charge_schedule_mobile.php`
 - Entry point for the application
-- Loads configuration from `main/config/config.json` through `ConfigLoader`
+- Loads shared battery, installation and price-conversion settings through the common PHP loader
+- Loads web-only routes, power ranges and display policies from `main/config/config.json` through `ConfigLoader`
 - Performs initial server-side render
 - Injects API URLs as JavaScript constants
 - Includes partials for HTML structure
@@ -222,7 +223,7 @@ Auto-calculation endpoint:
 
 ## Configuration
 
-The application reads configuration from `main/config/config.json`:
+The application reads web-specific configuration from `main/config/config.json`:
 
 ```json
 {
@@ -234,6 +235,8 @@ The application reads configuration from `main/config/config.json`:
   "zendureFetchApiUrl-local": "..."
 }
 ```
+
+Battery limits, capacity, installation coordinates/timezone and price conversion come from `common/config/system.json`.
 
 ## Schedule Data Format
 

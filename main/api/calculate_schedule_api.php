@@ -1,9 +1,7 @@
 <?php
 // schedule/api/calculate_schedule_api.php
 
-// Ensure server timezone matches local expectation
-date_default_timezone_set('Europe/Amsterdam');
-
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 require_once __DIR__ . '/charge_schedule_functions.php';
 
 // CORS headers to allow cross-origin requests
@@ -15,6 +13,18 @@ header('Content-Type: application/json');
 // Handle OPTIONS preflight request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    exit();
+}
+
+try {
+    $calculateScheduleSystemConfig = loadSystemConfig();
+    date_default_timezone_set($calculateScheduleSystemConfig['installation']['timezone']);
+} catch (SystemConfigException $error) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Shared system configuration: ' . $error->getMessage(),
+    ]);
     exit();
 }
 

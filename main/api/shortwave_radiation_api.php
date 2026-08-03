@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-date_default_timezone_set('Europe/Amsterdam');
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -25,11 +25,24 @@ if ($requestMethod !== 'GET') {
     exit();
 }
 
-$latitude = isset($_GET['latitude']) ? (float) $_GET['latitude'] : 52.3;
-$longitude = isset($_GET['longitude']) ? (float) $_GET['longitude'] : 4.863;
+try {
+    $shortwaveSystemConfig = loadSystemConfig();
+    $installation = $shortwaveSystemConfig['installation'];
+    date_default_timezone_set($installation['timezone']);
+} catch (SystemConfigException $error) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Shared system configuration: ' . $error->getMessage(),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
+$latitude = isset($_GET['latitude']) ? (float) $_GET['latitude'] : $installation['latitude'];
+$longitude = isset($_GET['longitude']) ? (float) $_GET['longitude'] : $installation['longitude'];
 $timezone = isset($_GET['timezone']) && is_string($_GET['timezone']) && $_GET['timezone'] !== ''
     ? $_GET['timezone']
-    : 'Europe/Amsterdam';
+    : $installation['timezone'];
 $cacheTtlSeconds = 2 * 60 * 60;
 $cachePath = buildShortwaveCachePath($latitude, $longitude, $timezone);
 

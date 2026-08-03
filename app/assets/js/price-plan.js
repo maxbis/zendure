@@ -725,10 +725,20 @@
 
     function spotPrice(consumerPrice) {
         if (!Number.isFinite(consumerPrice)) return null;
-        const conversion = config.priceConversion || {};
-        const vat = Math.max(Number(conversion.vatMultiplier) || 1.21, Number.EPSILON);
-        const markup = Number(conversion.supplierMarkupEurPerKwh) || 0;
-        const tax = Number(conversion.energyTaxEurPerKwh) || 0;
+        const conversion = config.priceConversion;
+        const vat = conversion?.vatMultiplier;
+        const markup = conversion?.supplierMarkupEurPerKwh;
+        const tax = conversion?.energyTaxEurPerKwh;
+        if (
+            !Number.isFinite(vat)
+            || !Number.isFinite(markup)
+            || !Number.isFinite(tax)
+            || vat <= 0
+            || markup < 0
+            || tax < 0
+        ) {
+            throw new Error("The shared price-conversion settings are missing or invalid.");
+        }
         return (consumerPrice / vat) - markup - tax;
     }
 

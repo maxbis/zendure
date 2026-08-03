@@ -619,10 +619,15 @@
 .app-battery-card__face {
     min-height: 142px;
     padding: 14px;
+    -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     background: var(--gsd-surface-2);
     border: 1px solid var(--gsd-border-subtle);
     border-radius: 11px;
+}
+
+.app-battery-card__face--front {
+    transform: rotateY(0deg);
 }
 
 .app-battery-card__face--back {
@@ -735,20 +740,28 @@
 }
 
 .app-battery-icon__segment {
+    position: relative;
+    overflow: hidden;
     background: var(--gsd-page-deep);
     border-radius: 2px;
+}
+
+.app-battery-icon__segment::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: var(--app-battery-segment-fill, 0%);
+    background: color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 80%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 18%, transparent);
+    content: "";
     transition:
+        width var(--gsd-duration-medium) ease,
         background-color var(--gsd-duration-fast) ease,
         box-shadow var(--gsd-duration-fast) ease;
 }
 
-.app-battery-icon__segment[data-active="true"] {
-    background: color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 80%, transparent);
-    box-shadow: 0 0 6px color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 18%, transparent);
-}
-
-.app-battery-icon:hover .app-battery-icon__segment[data-active="true"],
-.app-battery-icon:focus-visible .app-battery-icon__segment[data-active="true"] {
+.app-battery-icon:hover .app-battery-icon__segment[data-active="true"]::before,
+.app-battery-icon:focus-visible .app-battery-icon__segment[data-active="true"]::before {
     background: var(--app-battery-color, var(--gsd-positive));
     box-shadow: 0 0 6px color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 30%, transparent);
 }
@@ -782,10 +795,15 @@
 .app-power-card__face {
     min-height: 142px;
     padding: 14px;
+    -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     background: var(--gsd-surface-2);
     border: 1px solid var(--gsd-border-subtle);
     border-radius: 11px;
+}
+
+.app-power-card__face--front {
+    transform: rotateY(0deg);
 }
 
 .app-power-card__face--back {
@@ -961,10 +979,15 @@
 .app-grid-card__face {
     min-height: 142px;
     padding: 14px;
+    -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     background: var(--gsd-surface-2);
     border: 1px solid var(--gsd-border-subtle);
     border-radius: 11px;
+}
+
+.app-grid-card__face--front {
+    transform: rotateY(0deg);
 }
 
 .app-grid-card__face--back {
@@ -3216,17 +3239,18 @@
     }
 
     .app-price-plan [data-role="price-plan-date"] {
-        font-size: 0;
-    }
-
-    .app-price-plan [data-role="price-plan-date"]::after {
-        content: "48-hour forecast · swipe to explore";
-        font-size: 0.64rem;
+        display: none;
     }
 
     .app-price-plan .app-tomorrow-status {
         padding: 5px 8px;
         font-size: 0.64rem;
+    }
+
+    .app-price-plan .app-tomorrow-status:has(
+        .app-day-availability[data-availability="available"]
+    ) {
+        display: none;
     }
 
     .app-price-refresh {
@@ -3490,16 +3514,26 @@
 
     .app-price-plan .app-section-heading {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 34px;
+        grid-template-columns: minmax(0, 1fr) auto 34px;
         grid-template-rows: auto auto;
         align-items: center;
-        gap: 6px 8px;
+        gap: 4px 8px;
     }
 
     .app-price-plan .app-section-heading > div:first-child {
+        display: contents;
+    }
+
+    .app-price-plan .app-section-heading h2 {
+        min-width: 0;
+        grid-column: 1 / 3;
+        grid-row: 1;
+    }
+
+    .app-price-plan [data-role="price-plan-date"] {
         min-width: 0;
         grid-column: 1;
-        grid-row: 1;
+        grid-row: 2;
     }
 
     .app-price-plan .app-section-heading__actions {
@@ -3507,13 +3541,13 @@
     }
 
     .app-price-plan .app-tomorrow-status {
-        grid-column: 1;
+        grid-column: 1 / 3;
         grid-row: 2;
         justify-self: start;
     }
 
     .app-price-plan .app-price-refresh {
-        grid-column: 2;
+        grid-column: 3;
         grid-row: 1 / 3;
     }
 
@@ -3564,6 +3598,7 @@
     .app-battery-popover__slider,
     .app-battery-card__inner,
     .app-battery-icon__segment,
+    .app-battery-icon__segment::before,
     .app-energy-chart__bar,
     .app-power-card__inner,
     .app-power-flow-icon,

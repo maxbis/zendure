@@ -50,7 +50,10 @@ Config keys used by proxy:
 - `wh-per-hourApi`
 - `apiBaseUrlPiControl`
 - `whPerHourCacheMinutes`
-- `baseWh`
+- `battery.capacityWh` from `common/config/system.json`
+- `installation.timezone` from `common/config/system.json`
+
+The browser requires a positive `baseWh` in the proxy response and no longer falls back to an embedded 5760 Wh value.
 
 Proxy query support:
 - optional `days` query parameter

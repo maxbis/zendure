@@ -101,8 +101,8 @@ Current flow after both GUI integrations:
 4. The old GUI loads shared battery, installation-timezone and price-conversion values through the same PHP loader.
 5. The old GUI continues loading web-only settings from `main/config/config.json`.
 6. Existing automation continues loading `automate/config/config.jsonc`.
-7. Schedule solar resolution, PHP price conversion and new-GUI energy history use shared values through the PHP loader.
-8. Unmigrated legacy PHP calculations may continue loading duplicated values from `main/config/config.json` until separately audited.
+7. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
+8. Both GUIs' active shared-setting frontend and PHP backend paths are migrated; web-only routing, ranges and display policies remain in `main/config/config.json`.
 9. The Python loader remains available but unused by automation.
 10. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
 

@@ -78,14 +78,14 @@ No new write path is introduced. The new GUI remains a read-only consumer of com
 - When a migrated JSON endpoint encounters malformed shared configuration, then it returns an error and does not use the former duplicated location, capacity or conversion values.
 - When server-side price conversion is invoked with malformed shared configuration, then the strict loader rejects the operation rather than calculating with embedded defaults.
 
-The GUI does not silently return to the former 20%/90% or hard-coded-location defaults.
+The GUI does not silently return to the former 20%/90%, 5760 Wh, VAT 1.21 or hard-coded-location defaults. Those duplicated shared-value fallbacks have been removed from the new GUI JavaScript.
 
 ## Edge cases and failure modes
 
 - When `system.json` is synchronized incompletely, then the strict loader rejects it and the GUI shows a configuration error.
 - When the configured timezone is unsupported, then the common loader rejects it before solar calculations run.
 - When web power limits differ from automation command caps, then the GUI continues to expose its existing web/editor range; this migration does not alter that behaviour.
-- When JavaScript is reused without the PHP entry point, then its internal defensive defaults may still exist, but the authenticated GUI entry point only renders operational components after server configuration succeeds.
+- When JavaScript is reused without the PHP entry point, then battery and price components report missing required shared settings instead of operating with embedded shared-value defaults.
 - When the common configuration changes, then the next PHP page request reads the new values because the loader does not cache across requests.
 
 ## Verification

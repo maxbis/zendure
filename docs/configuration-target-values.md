@@ -106,7 +106,7 @@ Meaning:
 - The timezone defines local schedule dates and hours.
 - Sunrise/sunset rounding policies remain consumer behaviour and are not part of the coordinates themselves.
 
-The less precise 52.3/4.863 coordinate pair used by the standalone shortwave endpoint and Path Lab is considered a legacy fallback. The intended migration target is the precise pair already used by the main configuration, schedule resolver and new interface.
+The less precise 52.3/4.863 coordinate pair historically used by the standalone shortwave endpoint and still used by Path Lab is considered a legacy fallback. The shortwave endpoint now defaults to the canonical installation location; Path Lab remains a separate future consumer.
 
 ### Price conversion
 
@@ -361,7 +361,7 @@ These deferred questions do not block Phase 3 because Phase 3 can preserve the c
 - [`automate/config_loader.py`](../automate/config_loader.py): current automation JSONC loader.
 - [`main/includes/price_conversion.php`](../main/includes/price_conversion.php): current price-conversion implementation.
 - [`main/data/resolve_schedule_conditions.php`](../main/data/resolve_schedule_conditions.php): current canonical-coordinate consumer.
-- [`main/api/shortwave_radiation_api.php`](../main/api/shortwave_radiation_api.php): legacy shortwave-coordinate fallback.
+- [`main/api/shortwave_radiation_api.php`](../main/api/shortwave_radiation_api.php): common-backed default shortwave location.
 - [`pathlab/api/path_data.php`](../pathlab/api/path_data.php): legacy shortwave-coordinate and projection consumer.
 - [`app/assets/js/power-bar-scale.js`](../app/assets/js/power-bar-scale.js): new-interface nonlinear scale.
 - [`app/assets/js/battery-color-scale.js`](../app/assets/js/battery-color-scale.js): new-interface battery colours.

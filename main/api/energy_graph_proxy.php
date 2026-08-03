@@ -5,9 +5,8 @@
  * Fetches from URL in config, caches transformed response for N minutes (default 5).
  * On API failure, serves cache if any (even stale). No fallback to automation_status.json.
  */
-date_default_timezone_set('Europe/Amsterdam');
-
 // require_once __DIR__ . '/../../login/validate.php';
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 require_once __DIR__ . '/../includes/config_loader.php';
 
 header('Content-Type: application/json');
@@ -16,13 +15,22 @@ header('Cache-Control: no-store, max-age=0');
 const WH_PER_HOUR_DAYS_DEFAULT = 3;
 const WH_PER_HOUR_DAYS_MAX = 30;
 
+try {
+    $energyGraphSystemConfig = loadSystemConfig();
+    date_default_timezone_set($energyGraphSystemConfig['installation']['timezone']);
+} catch (SystemConfigException $error) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Shared system configuration: ' . $error->getMessage()]);
+    exit();
+}
+
 // if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 //     http_response_code(200);
 //     exit();
 // }
 
 $ttlSeconds = (int) ConfigLoader::get('whPerHourCacheMinutes', 5) * 60;
-$baseWh = (int) ConfigLoader::get('baseWh', 5760);
+$baseWh = $energyGraphSystemConfig['battery']['capacityWh'];
 $requestedDays = resolveRequestedDays($_GET['days'] ?? null);
 $cachePath = __DIR__ . '/../data/energy_graph_cache_days_' . $requestedDays . '.json';
 $energyGraphDaysBack = $requestedDays;
@@ -68,7 +76,7 @@ function appendDaysQueryParam(string $url, int $days): string {
 /**
  * Transform external API response to front-end format.
  * External: { "YYYY-MM-DD": [ { "hour": "00".."23", "charged_wh", "discharged_wh", "electric_level" }, ... ], ... }
- * Return: [ 'whPerHour' => [...], 'whPerDay' => [...], 'baseWh' => 5760 ]
+ * Return: [ 'whPerHour' => [...], 'whPerDay' => [...], 'baseWh' => configured capacity ]
  */
 function transformWhPerHourResponse(array $external, $baseWh, $energyGraphDaysBack, $energyTableDaysBack) {
     $now = time();
@@ -177,6 +185,10 @@ function emitPayload(array $payload, array $cacheInfo = []) {
 
 // 1) Try fresh cache
 $cached = readCache($cachePath);
+if ($cached !== null) {
+    // Capacity is configuration, not cached upstream data.
+    $cached['baseWh'] = $baseWh;
+}
 if ($cached !== null && (time() - (int) $cached['cachedAt']) <= $ttlSeconds) {
     emitPayload($cached, [
         'source' => 'cache',

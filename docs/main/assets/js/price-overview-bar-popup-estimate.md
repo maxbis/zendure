@@ -16,11 +16,11 @@ This is a **UI estimate only**; it does not drive automation.
 
 These globals are **not** defined inside `price_overview_bar.js`; they are emitted by [`main/charge_schedule_mobile.php`](../../../../main/charge_schedule_mobile.php) (inline `<script>` before the JS bundles load):
 
-- `CHARGE_STATUS_MIN_CHARGE_LEVEL` — from config key `MIN_CHARGE_LEVEL` (default 20)
-- `CHARGE_STATUS_MAX_CHARGE_LEVEL` — from config key `MAX_CHARGE_LEVEL` (default 90)
-- `BASE_WH` — from config key `baseWh` (default 5760), battery energy base in watt-hours for percent conversion
+- `CHARGE_STATUS_MIN_CHARGE_LEVEL` — from shared `battery.minChargePercent`
+- `CHARGE_STATUS_MAX_CHARGE_LEVEL` — from shared `battery.maxChargePercent`
+- `BASE_WH` — from shared `battery.capacityWh`, the battery energy base in watt-hours for percent conversion
 
-Config is read via `ConfigLoader::get(...)`.
+Shared values are loaded by `common/php/system_config.php`. Missing or invalid values stop the estimate instead of selecting embedded battery defaults.
 
 ## Constants defined in `price_overview_bar.js`
 
@@ -66,7 +66,7 @@ Runtime rule parsing:
 
 6. **Percent delta for the interval** — `powerToCapacityPercent(abs(powerW))` is “percent points per hour” at that power:
 
-   - `baseWh = BASE_WH` from page (fallback 5760 if missing)
+   - `baseWh = BASE_WH` from the shared page configuration
    - `onePercentUsableWh = (baseWh / 100) * POPUP_POWER_EFFICIENCY`
    - `percentPerHour = abs(powerW) / onePercentUsableWh`
    - For the interval: `rawDelta = percentPerHour * durationHours`, signed negative for discharge and positive for charge.
@@ -86,7 +86,7 @@ Runtime rule parsing:
 
 - When `currentBatteryForecastState` is missing or SoC is not a finite number, the estimate block is omitted.
 - When there are no qualifying future bars, the forecast is null.
-- If `BASE_WH` is invalid, `powerToCapacityPercent` returns null and the delta for that step is treated as 0.
+- If shared capacity or charge levels are missing or invalid, the popup reports a configuration error rather than calculating with embedded defaults.
 - Runtime conditions use only `>` / `>=` on battery fields for the discharge floor; other operators are ignored for this estimate.
 
 ## Related files

@@ -5,9 +5,6 @@
         statusUrl: "../main/api/charge_status_all_proxy.php",
         refreshIntervalMs: 20000,
         staleAfterMs: 90000,
-        minChargePercent: 20,
-        maxChargePercent: 90,
-        capacityWh: 5760,
         powerMinW: -1200,
         powerMaxW: 1200,
         ...(window.GRAPHITE_APP_CONFIG || {})
@@ -106,6 +103,14 @@
         return Number.isFinite(number) ? number : fallback;
     }
 
+    function requiredSharedNumber(key) {
+        const number = config[key];
+        if (!Number.isFinite(number)) {
+            throw new Error(`Missing required shared setting: ${key}.`);
+        }
+        return number;
+    }
+
     function clamp(value, minimum, maximum) {
         return Math.min(maximum, Math.max(minimum, value));
     }
@@ -115,8 +120,9 @@
         return clamp(((percent - minimum) / (maximum - minimum)) * 100, 0, 100);
     }
 
-    function batterySegmentsInRange(percent, minimum, maximum) {
-        return Math.round(usableBatteryPercent(percent, minimum, maximum) / 10);
+    function batterySegmentFillPercent(percent, minimum, maximum, segmentIndex) {
+        const usablePercent = usableBatteryPercent(percent, minimum, maximum);
+        return clamp((usablePercent - (segmentIndex * 10)) * 10, 0, 100);
     }
 
     function storedBatteryViewIsSimple() {
@@ -557,13 +563,17 @@
         const gridPowerW = p1Readings ? finiteNumber(p1Readings.total_power) : null;
         const timestampMs = timestampToMs(zendure.timestamp);
         const mode = determineMode(powerW);
-        const capacityWh = Math.max(0, finiteNumber(config.capacityWh, 5760));
-        const minimumPercent = clamp(finiteNumber(config.minChargePercent, 20), 0, 100);
-        const maximumPercent = clamp(
-            finiteNumber(config.maxChargePercent, 90),
-            minimumPercent,
-            100
-        );
+        const capacityWh = requiredSharedNumber("capacityWh");
+        const minimumPercent = requiredSharedNumber("minChargePercent");
+        const maximumPercent = requiredSharedNumber("maxChargePercent");
+        if (
+            capacityWh <= 0
+            || minimumPercent < 0
+            || maximumPercent > 100
+            || minimumPercent >= maximumPercent
+        ) {
+            throw new Error("The shared battery settings are invalid.");
+        }
         const wifiRssi = finiteNumber(properties.rssi);
         const systemTemperature = temperatureFromHyperTmp(properties.hyperTmp);
         const batteryPacks = packData.map((pack) => ({
@@ -793,6 +803,7 @@
             elements.batteryIcon.style.removeProperty("--app-battery-color");
             elements.batterySegments.forEach((segment) => {
                 segment.dataset.active = "false";
+                segment.style.setProperty("--app-battery-segment-fill", "0%");
             });
             [elements.batteryIcon, elements.batteryTarget, elements.batterySimpleTarget].forEach((trigger) => {
                 if (activeBatteryPopoverTrigger === trigger) hideBatteryPopover(trigger);
@@ -842,13 +853,15 @@
                 elements.batterySimplePercent.style.removeProperty("color");
                 elements.batteryIcon.style.removeProperty("--app-battery-color");
             }
-            const activeSegments = batterySegmentsInRange(
-                model.batteryPercent,
-                model.minimumPercent,
-                model.maximumPercent
-            );
             elements.batterySegments.forEach((segment, index) => {
-                segment.dataset.active = String(index < activeSegments);
+                const fillPercent = batterySegmentFillPercent(
+                    model.batteryPercent,
+                    model.minimumPercent,
+                    model.maximumPercent,
+                    index
+                );
+                segment.dataset.active = String(fillPercent > 0);
+                segment.style.setProperty("--app-battery-segment-fill", `${fillPercent.toFixed(2)}%`);
             });
             batteryPopoverDetails.set(elements.batteryIcon, {
                 title: "Battery energy",

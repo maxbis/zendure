@@ -10,7 +10,7 @@
     var selectedMobileDay = null;
     var latestWhPerHour = [];
     var latestWhPerDay = {};
-    var latestBaseWh = 5760;
+    var latestBaseWh = null;
     var latestDailyPnlByDate = {};
     var latestDailyPnlRequestKey = '';
     var energyGraphControlsBound = false;
@@ -746,7 +746,9 @@
     function renderMobileDailyTable(whPerDay, baseWh, pnlByDate) {
         var container = document.querySelector('.energy-graph-mobile-daily-table');
         if (!container) return;
-        baseWh = baseWh || 5760;
+        if (!Number.isFinite(baseWh) || baseWh <= 0) {
+            throw new Error('The energy graph response is missing shared battery capacity.');
+        }
         var dates = getVisibleDailyTotalDates(whPerDay);
         if (dates.length === 0) {
             container.innerHTML = '<p class="energy-graph-mobile-no-data">No data</p>';
@@ -790,7 +792,10 @@
             var json = await res.json();
             var whPerHour = json.whPerHour;
             var whPerDay = json.whPerDay;
-            var baseWh = json.baseWh != null ? Number(json.baseWh) : 5760;
+            var baseWh = Number(json.baseWh);
+            if (!Number.isFinite(baseWh) || baseWh <= 0) {
+                throw new Error('The energy graph response is missing shared battery capacity.');
+            }
             var cacheInfo = json.cacheInfo || null;
 
             latestWhPerHour = Array.isArray(whPerHour) ? whPerHour : [];

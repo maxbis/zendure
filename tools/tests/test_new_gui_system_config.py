@@ -13,6 +13,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_INDEX = REPO_ROOT / "app" / "index.php"
+CURRENT_ENERGY_STATUS = REPO_ROOT / "app" / "assets" / "js" / "current-energy-status.js"
+PRICE_PLAN = REPO_ROOT / "app" / "assets" / "js" / "price-plan.js"
 SYSTEM_CONFIG = REPO_ROOT / "common" / "config" / "system.json"
 MAIN_CONFIG = REPO_ROOT / "main" / "config" / "config.json"
 VALID_KEYS = REPO_ROOT / "login" / "validkeys.txt"
@@ -59,6 +61,26 @@ def test_new_gui_source_uses_common_loader_for_shared_values():
     assert "ConfigLoader::get('MIN_CHARGE_LEVEL'" not in source
     assert "ConfigLoader::get('MAX_CHARGE_LEVEL'" not in source
     assert "ConfigLoader::get('baseWh'" not in source
+
+
+def test_new_gui_javascript_has_no_shared_value_fallbacks():
+    status_source = CURRENT_ENERGY_STATUS.read_text(encoding="utf-8")
+    price_source = PRICE_PLAN.read_text(encoding="utf-8")
+
+    assert "minChargePercent: 20" not in status_source
+    assert "maxChargePercent: 90" not in status_source
+    assert "capacityWh: 5760" not in status_source
+    assert "finiteNumber(config.minChargePercent, 20)" not in status_source
+    assert "finiteNumber(config.maxChargePercent, 90)" not in status_source
+    assert "finiteNumber(config.capacityWh, 5760)" not in status_source
+    assert 'requiredSharedNumber("minChargePercent")' in status_source
+    assert 'requiredSharedNumber("maxChargePercent")' in status_source
+    assert 'requiredSharedNumber("capacityWh")' in status_source
+
+    assert "|| 1.21" not in price_source
+    assert "Number(conversion.supplierMarkupEurPerKwh) || 0" not in price_source
+    assert "Number(conversion.energyTaxEurPerKwh) || 0" not in price_source
+    assert "shared price-conversion settings are missing or invalid" in price_source
 
 
 @pytest.mark.skipif(not VALID_KEYS.is_file(), reason="Local authentication fixture is unavailable")

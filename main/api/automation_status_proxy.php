@@ -2,8 +2,6 @@
 // schedule/api/automation_status_proxy.php
 // Same-origin proxy for automation status API to avoid CORS in browsers.
 
-date_default_timezone_set('Europe/Amsterdam');
-
 require_once __DIR__ . '/../includes/config_loader.php';
 
 header('Content-Type: application/json');
@@ -79,4 +77,3 @@ try {
         'error'   => 'Proxy error: ' . $e->getMessage()
     ]);
 }
-
