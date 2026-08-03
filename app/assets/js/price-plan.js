@@ -60,6 +60,9 @@
     const priceTooltip = ensurePriceTooltip();
     let activeTooltipTrigger = null;
     let pinnedTooltipTrigger = null;
+    let selectedHourKey = null;
+    let isProgrammaticTimelineScroll = false;
+    let programmaticTimelineScrollTimer = null;
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -80,6 +83,48 @@
 
     function pad(value) {
         return String(value).padStart(2, "0");
+    }
+
+    function hourSelectionKey(detail) {
+        if (!detail?.date || !Number.isInteger(detail.hour)) return null;
+        return `${detail.date}${pad(detail.hour)}00`;
+    }
+
+    function centerTimelineHour(hourColumn, { smooth = false } = {}) {
+        if (!hourColumn) return;
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                const centeredLeft = hourColumn.offsetLeft - ((elements.scroll.clientWidth - hourColumn.offsetWidth) / 2);
+                const maximumLeft = Math.max(0, elements.scroll.scrollWidth - elements.scroll.clientWidth);
+                const left = Math.min(maximumLeft, Math.max(0, centeredLeft));
+                const useSmoothScroll = smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+                if (programmaticTimelineScrollTimer !== null) {
+                    window.clearTimeout(programmaticTimelineScrollTimer);
+                }
+                isProgrammaticTimelineScroll = true;
+                elements.scroll.scrollTo({ left, behavior: useSmoothScroll ? "smooth" : "auto" });
+                programmaticTimelineScrollTimer = window.setTimeout(() => {
+                    isProgrammaticTimelineScroll = false;
+                    programmaticTimelineScrollTimer = null;
+                }, useSmoothScroll ? 500 : 0);
+            });
+        });
+    }
+
+    function setSelectedHour(key, { scroll = false, smooth = false } = {}) {
+        const hourColumns = elements.timeline.querySelectorAll(".app-price-hour");
+        let selectedColumn = null;
+        hourColumns.forEach((hourColumn) => {
+            const selected = Boolean(key) && hourColumn.dataset.selectionKey === key;
+            hourColumn.dataset.selected = String(selected);
+            hourColumn.querySelector(".app-price-hour__edit")?.setAttribute("aria-pressed", String(selected));
+            if (selected) selectedColumn = hourColumn;
+        });
+
+        selectedHourKey = selectedColumn ? key : null;
+        if (scroll && selectedColumn) centerTimelineHour(selectedColumn, { smooth });
+        return selectedColumn;
     }
 
     function dayPartForHour(hour) {
@@ -613,7 +658,11 @@
                 hidePriceTooltip(card);
                 return;
             }
-            showSummaryPriceTooltip(summaryTooltipDetails.get(card), card);
+            const detail = summaryTooltipDetails.get(card);
+            if (detail?.kind !== "average") {
+                setSelectedHour(hourSelectionKey(detail), { scroll: true, smooth: true });
+            }
+            showSummaryPriceTooltip(detail, card);
         });
     }
 
@@ -928,8 +977,11 @@
                 const editButton = document.createElement("button");
                 const isCurrent = day.key === "today" && hour === currentHour;
                 const dayPart = dayPartForHour(hour);
+                const selectionKey = hourSelectionKey({ date: day.date, hour });
                 hourColumn.className = "app-price-hour";
                 hourColumn.dataset.current = isCurrent ? "true" : "false";
+                hourColumn.dataset.selectionKey = selectionKey;
+                hourColumn.dataset.selected = String(selectionKey === selectedHourKey);
                 hourColumn.dataset.daypart = dayPart.key;
                 hourColumn.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
                 hourColumn.dataset.dayStart = hour === 0 ? "true" : "false";
@@ -937,6 +989,7 @@
                 hourColumn.style.gridColumn = String(dayIndex * 24 + hour + 1);
                 editButton.type = "button";
                 editButton.className = "app-price-hour__edit";
+                editButton.setAttribute("aria-pressed", String(selectionKey === selectedHourKey));
                 editButton.setAttribute(
                     "aria-label",
                     `Create or edit hourly override for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
@@ -990,6 +1043,7 @@
             actionElement.addEventListener("focus", () => showPriceTooltip(tooltipDetail, actionElement, actionElement));
             actionElement.addEventListener("blur", () => hidePriceTooltip(actionElement));
             actionElement.addEventListener("click", () => {
+                setSelectedHour(selectionKey);
                 if (pinnedTooltipTrigger === actionElement && activeTooltipTrigger === actionElement && !priceTooltip.hidden) {
                     hidePriceTooltip(actionElement);
                     return;
@@ -1001,6 +1055,7 @@
 
             editButton.append(barZone, priceLabel, time);
             editButton.addEventListener("click", () => {
+                setSelectedHour(selectionKey);
                 hidePriceTooltip();
                 openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
             });
@@ -1010,22 +1065,21 @@
         });
 
         elements.timeline.replaceChildren(fragment);
+        if (selectedHourKey && !setSelectedHour(selectedHourKey)) {
+            selectedHourKey = null;
+        }
     }
 
-    function scrollTimelineToCurrentHour() {
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-                const current = elements.timeline.querySelector('[data-current="true"]');
-                if (!current) {
-                    elements.scroll.scrollLeft = 0;
-                    return;
-                }
-
-                const centeredLeft = current.offsetLeft - ((elements.scroll.clientWidth - current.offsetWidth) / 2);
-                const maximumLeft = Math.max(0, elements.scroll.scrollWidth - elements.scroll.clientWidth);
-                elements.scroll.scrollLeft = Math.min(maximumLeft, Math.max(0, centeredLeft));
-            });
-        });
+    function scrollTimelineToActiveHour() {
+        const selected = selectedHourKey
+            ? elements.timeline.querySelector('[data-selected="true"]')
+            : null;
+        const target = selected || elements.timeline.querySelector('[data-current="true"]');
+        if (target) {
+            centerTimelineHour(target);
+            return;
+        }
+        elements.scroll.scrollLeft = 0;
     }
 
     function descriptionFor(action) {
@@ -1062,7 +1116,7 @@
             elements.tomorrowStatusLabel.textContent = tomorrowHasPrices ? "Tomorrow ready" : "Tomorrow pending";
         }
         elements.tomorrowStatus?.setAttribute("aria-label", tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet");
-        scrollTimelineToCurrentHour();
+        scrollTimelineToActiveHour();
     }
 
     function setView(view, message = "") {
@@ -1219,16 +1273,29 @@
         if (!document.hidden) load();
     });
     window.addEventListener("resize", () => hidePriceTooltip());
-    window.addEventListener("scroll", () => hidePriceTooltip(), true);
+    window.addEventListener("scroll", (event) => {
+        if (isProgrammaticTimelineScroll && event.target === elements.scroll) return;
+        hidePriceTooltip();
+    }, true);
+    elements.timeline.addEventListener("click", (event) => {
+        if (event.target instanceof Element && !event.target.closest(".app-price-hour")) {
+            setSelectedHour(null);
+        }
+    });
     document.addEventListener("pointerdown", (event) => {
         if (!activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
         if (!activeTooltipTrigger.contains(event.target)) hidePriceTooltip(activeTooltipTrigger);
     });
     document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape" || !activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
-        const trigger = activeTooltipTrigger;
-        hidePriceTooltip(trigger);
-        trigger.focus({ preventScroll: true });
+        if (event.key !== "Escape") return;
+        if (activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) {
+            const trigger = activeTooltipTrigger;
+            hidePriceTooltip(trigger);
+            trigger.focus({ preventScroll: true });
+            return;
+        }
+        if (event.target instanceof Element && event.target.closest("#app-schedule-edit-dialog")) return;
+        setSelectedHour(null);
     });
 
     load();

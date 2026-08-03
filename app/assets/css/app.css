@@ -1578,6 +1578,14 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gsd-price) 58%, transparent);
 }
 
+.app-price-hour[data-selected="true"] {
+    z-index: 1;
+    background: color-mix(in srgb, var(--gsd-accent-soft) 62%, transparent);
+    box-shadow:
+        inset 0 0 0 2px var(--gsd-accent),
+        0 0 10px color-mix(in srgb, var(--gsd-accent) 24%, transparent);
+}
+
 .app-price-hour__bar-zone {
     display: flex;
     align-items: flex-end;
