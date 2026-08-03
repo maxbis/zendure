@@ -220,7 +220,7 @@ date_default_timezone_set('Europe/Amsterdam');
 
     <section>
         <h2>Sun Rules</h2>
-        <p>Sunrise/sunset are calculated in the resolver for each rendered date using latitude/longitude from <code>main/config/config.json</code>. Rounding policy: <code>sunrise_hour = floor</code>, <code>sunset_hour = ceil</code>.</p>
+        <p>Sunrise/sunset are calculated in the resolver for each rendered date using the installation latitude, longitude, and timezone from <code>common/config/system.json</code>. Rounding policy: <code>sunrise_hour = floor</code>, <code>sunset_hour = ceil</code>.</p>
         <p><code>sunrise_offset_hour</code> and <code>sunset_offset_hour</code> use the condition <code>value</code> as an offset in hours relative to sunrise/sunset:</p>
         <ul>
             <li><strong>Negative value</strong>: hours <em>before</em> sunrise/sunset (example: <code>-2</code> means 2 hours before).</li>

@@ -5,12 +5,13 @@ import json
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--date", required=True)
+parser.add_argument("--timezone", required=True)
 parser.add_argument("--output")
 args = parser.parse_args()
 
 report = {
     "date": args.date,
-    "timezone": "Europe/Amsterdam",
+    "timezone": args.timezone,
     "day_start_ts": 0,
     "day_end_ts": 0,
     "analysis_end_ts": 0,

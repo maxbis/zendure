@@ -2,8 +2,6 @@
 // main/edit_rules.php
 // Standalone rule editor for data/charge_schedule_conditions.json
 
-date_default_timezone_set('Europe/Amsterdam');
-
 require_once __DIR__ . '/includes/config_loader.php';
 
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';

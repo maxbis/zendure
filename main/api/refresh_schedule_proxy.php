@@ -1,8 +1,6 @@
 <?php
 // Same-origin proxy for the automation refresh-schedule command.
 
-date_default_timezone_set('Europe/Amsterdam');
-
 require_once __DIR__ . '/../../login/validate.php';
 require_once __DIR__ . '/../../automate/control/commands.php';
 require_once __DIR__ . '/../includes/config_loader.php';

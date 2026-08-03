@@ -17,7 +17,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
+SYSTEM_CONFIG_FILE = REPO_ROOT / "common" / "config" / "system.json"
 MONTHLY_REPORT_API_FILE = REPO_ROOT / "daily_report" / "api" / "monthly_report_data.php"
 MONTHLY_REPORT_PAGE_FILE = REPO_ROOT / "daily_report" / "monthly.php"
 MONTHLY_REPORT_JS_FILE = REPO_ROOT / "daily_report" / "assets" / "js" / "monthly_report.js"
@@ -173,14 +173,8 @@ def _temporary_reports(reports: dict[str, dict[str, object]]) -> Iterator[None]:
 
 
 def _current_price_config() -> dict[str, float | int]:
-    config = json.loads(MAIN_CONFIG_FILE.read_text(encoding="utf-8"))
-    return config.get("priceConversion", {
-        "supplierMarkupEurPerKwh": 0.0219,
-        "energyTaxEurPerKwh": 0.0898,
-        "vatMultiplier": 1.21,
-        "consumerPrecision": 4,
-        "spotPrecision": 6,
-    })
+    config = json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))
+    return config["priceConversion"]
 
 
 def _consumer_to_spot(value: float) -> float:

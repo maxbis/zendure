@@ -13,7 +13,7 @@
 // }
 //
 // Behavior:
-// - Always attempts today + tomorrow (Europe/Amsterdam)
+// - Always attempts today + tomorrow in the configured installation timezone
 // - Includes a date only when a corresponding price file exists
 // - Missing/invalid hour price => condition false for that hour (skip hour)
 // - Supports static conditions: price, ranking, min_time, max_time, month, hour
@@ -26,14 +26,11 @@
 // - Supports sun context for static conditions:
 //   sunrise_hour (floor), sunset_hour (ceil), and dynamic offset fields
 
-date_default_timezone_set('Europe/Amsterdam');
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 
 const CONDITIONS_FILE = __DIR__ . '/charge_schedule_conditions.json';
 const RULE_PROFILES_FILE = __DIR__ . '/rule_profiles.json';
 const PRICE_DIR = __DIR__ . '/price';
-const MAIN_CONFIG_FILE = __DIR__ . '/../config/config.json';
-const DEFAULT_LATITUDE = 52.3676;
-const DEFAULT_LONGITUDE = 4.9041;
 const SHOW_ALL_PROFILE_ID = 'show_all';
 
 function buildPriceFilePath(string $yyyymmdd): string
@@ -56,20 +53,6 @@ function readJsonFileAsArray(string $path): ?array
         return null;
     }
     return is_array($data) ? $data : null;
-}
-
-function loadMainConfig(): array
-{
-    $cfg = readJsonFileAsArray(MAIN_CONFIG_FILE);
-    return is_array($cfg) ? $cfg : [];
-}
-
-function getConfigFloat(array $cfg, string $key, float $default): float
-{
-    if (!array_key_exists($key, $cfg) || !is_numeric($cfg[$key])) {
-        return $default;
-    }
-    return (float) $cfg[$key];
 }
 
 function clampHour(int $hour): int
@@ -983,10 +966,12 @@ function runResolve(): array
     $profileConfig = ($profilesResult['error'] === null && is_array($profilesResult['data']))
         ? normalizeProfileConfig($profilesResult['data'], $rules)
         : ['active_profile_id' => SHOW_ALL_PROFILE_ID, 'profiles' => []];
-    $tz = new DateTimeZone('Europe/Amsterdam');
-    $cfg = loadMainConfig();
-    $latitude = getConfigFloat($cfg, 'latitude', DEFAULT_LATITUDE);
-    $longitude = getConfigFloat($cfg, 'longitude', DEFAULT_LONGITUDE);
+    $systemConfig = loadSystemConfig();
+    $installation = $systemConfig['installation'];
+    $tz = new DateTimeZone($installation['timezone']);
+    date_default_timezone_set($installation['timezone']);
+    $latitude = $installation['latitude'];
+    $longitude = $installation['longitude'];
     $today = new DateTimeImmutable('now', $tz);
     $dates = [
         $today->format('Ymd'),
@@ -1053,7 +1038,14 @@ if ($method !== 'GET' && $method !== 'CLI') {
     exit();
 }
 
-$output = runResolve();
+try {
+    $output = runResolve();
+} catch (SystemConfigException $error) {
+    $output = [
+        'success' => false,
+        'error' => 'Shared system configuration: ' . $error->getMessage(),
+    ];
+}
 if (!$output['success']) {
     http_response_code(500);
 }

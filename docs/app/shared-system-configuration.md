@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The new Graphite Signal Dark GUI is the first runtime consumer of the common system configuration. It reads shared battery, installation and price-conversion values through the strict PHP loader.
+The production Graphite Signal Dark GUI and its supporting PHP services read shared battery, installation and price-conversion values through the strict common PHP loader.
 
-The temporary shadow-comparison phase was intentionally skipped because the new GUI is not yet in production and its existing shared values already matched the common configuration.
+The temporary frontend shadow-comparison phase was intentionally skipped before production because the new GUI's existing shared values already matched the common configuration. The supporting backend consumers were migrated separately with focused regression and malformed-configuration tests.
 
 ## Location
 
@@ -13,6 +13,7 @@ The temporary shadow-comparison phase was intentionally skipped because the new 
 - Common configuration: [`common/config/system.json`](../../common/config/system.json)
 - Common contract: [`system-configuration.md`](../common/config/system-configuration.md)
 - Integration tests: [`tools/tests/test_new_gui_system_config.py`](../../tools/tests/test_new_gui_system_config.py)
+- Backend integration tests: [`tools/tests/test_new_gui_backend_system_config.py`](../../tools/tests/test_new_gui_backend_system_config.py)
 
 ## Inputs and outputs
 
@@ -41,6 +42,17 @@ The new GUI continues to obtain these values from `main/config/config.json` thro
 
 `app/index.php` injects the combined result into `window.GRAPHITE_APP_CONFIG`. Browser JavaScript therefore receives one object even though the values have two clearly separated server-side owners.
 
+### Supporting backend inputs
+
+The PHP services called by the new GUI now obtain these shared values from `system.json`:
+
+- Schedule condition resolver: installation latitude, longitude and timezone.
+- Price endpoints: supplier markup, energy tax, VAT multiplier and conversion precision.
+- Energy-history endpoint: installation timezone and battery capacity.
+- Daily-report helpers used by live energy history: installation timezone, including the explicit timezone argument passed to Python report generators.
+
+The schedule data endpoint retains `include_conditions` in `main/config/config.json`. API URLs, signed editor power limits and Dutch electricity-market timezone rules also remain outside shared system configuration because they represent web deployment or market policy rather than installation facts.
+
 ## Flow and behaviour
 
 1. Authentication completes through the existing login validator.
@@ -50,6 +62,9 @@ The new GUI continues to obtain these values from `main/config/config.json` thro
 5. Sunrise and sunset events are calculated using the common installation coordinates and timezone.
 6. Shared and web-specific values are combined into `GRAPHITE_APP_CONFIG`.
 7. The browser components use the injected values as before.
+8. Schedule requests resolve sunrise and sunset conditions with the common installation values.
+9. Price requests use the common price-conversion values.
+10. Energy-history requests use common capacity and timezone values through the daily-report backend.
 
 No new write path is introduced. The new GUI remains a read-only consumer of common configuration.
 
@@ -60,6 +75,8 @@ No new write path is introduced. The new GUI remains a read-only consumer of com
 - When both fail, then both labelled errors are displayed.
 - When common configuration fails, then shared browser values are `null` and solar events are empty, but normal application components are not rendered.
 - When configuration fails before a timezone is available, then the error page uses UTC rather than an installation-specific fallback.
+- When a migrated JSON endpoint encounters malformed shared configuration, then it returns an error and does not use the former duplicated location, capacity or conversion values.
+- When server-side price conversion is invoked with malformed shared configuration, then the strict loader rejects the operation rather than calculating with embedded defaults.
 
 The GUI does not silently return to the former 20%/90% or hard-coded-location defaults.
 
@@ -78,14 +95,21 @@ Run the focused loader and GUI integration tests with:
 ```sh
 python -m pytest -q \
   tools/tests/test_system_config_loaders.py \
-  tools/tests/test_new_gui_system_config.py
+  tools/tests/test_new_gui_system_config.py \
+  tools/tests/test_new_gui_backend_system_config.py \
+  tools/tests/test_price_conversion.py \
+  tools/tests/test_app_energy_history.py
 ```
 
-The integration test renders the authenticated PHP entry point when a local authentication fixture is available and verifies that common values and web-specific values come from their intended sources.
+The frontend integration test renders the authenticated PHP entry point when a local authentication fixture is available. The backend tests verify source ownership, canonical values, schedule solar resolution, explicit report timezone propagation and strict malformed-configuration behavior.
 
 ## Related files
 
 - [`app/assets/js/current-energy-status.js`](../../app/assets/js/current-energy-status.js): battery and live-status consumer.
 - [`app/assets/js/price-plan.js`](../../app/assets/js/price-plan.js): price conversion and solar-marker consumer.
 - [`main/includes/config_loader.php`](../../main/includes/config_loader.php): existing web configuration loader.
+- [`main/data/resolve_schedule_conditions.php`](../../main/data/resolve_schedule_conditions.php): shared-location schedule condition resolver.
+- [`main/includes/price_conversion.php`](../../main/includes/price_conversion.php): shared server-side price conversion.
+- [`main/api/app_energy_history.php`](../../main/api/app_energy_history.php): shared-capacity and timezone history endpoint.
+- [`daily_report/includes/report_api_common.php`](../../daily_report/includes/report_api_common.php): shared daily-report configuration and timezone owner.
 - [`configuration-target-values.md`](../configuration-target-values.md): approved ownership and target values.

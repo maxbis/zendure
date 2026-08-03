@@ -43,7 +43,7 @@ The configuration contains:
 
 The PHP `loadSystemConfig()` function and Python `load_system_config()` function return the same validated, normalized configuration structure. Both accept an optional file path for tests and otherwise locate `common/config/system.json` relative to their own source file.
 
-Neither loader caches the result. Both GUIs now use the PHP loader and inject validated shared values into browser JavaScript. The Python loader remains unused by production automation.
+The base loaders do not cache the result. Both GUIs and their migrated PHP backend services use the PHP loader; request-level helpers may retain the validated array for the duration of one PHP request. The Python loader remains unused by production automation.
 
 ## Contract
 
@@ -101,9 +101,10 @@ Current flow after both GUI integrations:
 4. The old GUI loads shared battery, installation-timezone and price-conversion values through the same PHP loader.
 5. The old GUI continues loading web-only settings from `main/config/config.json`.
 6. Existing automation continues loading `automate/config/config.jsonc`.
-7. Shared PHP backend calculations that have not been migrated continue loading `main/config/config.json`.
-8. The Python loader remains available but unused by automation.
-9. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
+7. Schedule solar resolution, PHP price conversion and new-GUI energy history use shared values through the PHP loader.
+8. Unmigrated legacy PHP calculations may continue loading duplicated values from `main/config/config.json` until separately audited.
+9. The Python loader remains available but unused by automation.
+10. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
 
 Run the focused Phase 4 tests with:
 
@@ -157,9 +158,9 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 
 - [`main/includes/config_loader.php`](../../../main/includes/config_loader.php): old-GUI loader for remaining web-specific settings.
 - [`automate/config_loader.py`](../../../automate/config_loader.py): current automation JSONC loader.
-- [`main/config/config.json`](../../../main/config/config.json): current old-GUI web-specific and unmigrated backend configuration source.
+- [`main/config/config.json`](../../../main/config/config.json): current web-specific and remaining unmigrated legacy configuration source.
 - [`automate/config/config.jsonc`](../../../automate/config/config.jsonc): current automation source.
-- [`main/includes/price_conversion.php`](../../../main/includes/price_conversion.php): current price-conversion consumer.
+- [`main/includes/price_conversion.php`](../../../main/includes/price_conversion.php): common-backed PHP price-conversion consumer.
 - [`app/index.php`](../../../app/index.php): current new-interface configuration injection.
 - [`common/php/system_config.php`](../../../common/php/system_config.php): strict PHP reader.
 - [`common/python/system_config.py`](../../../common/python/system_config.py): strict Python reader.

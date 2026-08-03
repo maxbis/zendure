@@ -47,7 +47,7 @@ The configuration editor still writes `main/config/config.json`. Its duplicated 
 - Invalid old-GUI web configuration also stops the page and is identified separately in the error message.
 - If both configurations fail, then both errors appear in the startup error page.
 - The timezone temporarily falls back to UTC only while constructing the error response when shared configuration cannot be loaded; no operational page is rendered in that state.
-- The schedule calculation backends and Raspberry Pi automation have not been migrated by this change and may still read duplicated values from their current configuration files.
+- The shared schedule condition resolver now uses common installation values. Other legacy PHP paths may still require a separate audit, and Raspberry Pi automation still reads its own configuration.
 - The old configuration editor can still alter duplicated shared-looking fields, but those edits no longer affect the GUI. This is intentional until a shared write API is designed.
 
 ## Related files
@@ -55,6 +55,5 @@ The configuration editor still writes `main/config/config.json`. Its duplicated 
 - [`common/config/system-configuration.md`](../common/config/system-configuration.md): canonical contract and cross-consumer status.
 - [`app/shared-system-configuration.md`](../app/shared-system-configuration.md): equivalent new-GUI integration.
 - [`main/includes/config_loader.php`](../../main/includes/config_loader.php): remaining web-specific configuration loader.
-- [`main/includes/price_conversion.php`](../../main/includes/price_conversion.php): legacy helper still used by backend/report consumers, but no longer by the old GUI page.
+- [`main/includes/price_conversion.php`](../../main/includes/price_conversion.php): common-backed helper used by price and report consumers.
 - [`automate/config/config.jsonc`](../../automate/config/config.jsonc): current automation configuration source.
-

@@ -118,7 +118,11 @@ function dailyReportGenerateLive(string $date): array
         throw new RuntimeException('Report generator script not found.');
     }
 
-    $output = dailyReportRunPythonCommand($scriptPath, ['--date', $date], 'Report generator');
+    $output = dailyReportRunPythonCommand(
+        $scriptPath,
+        ['--date', $date, '--timezone', dailyReportTimezone()->getName()],
+        'Report generator'
+    );
     $report = json_decode($output, true);
     if (!is_array($report)) {
         throw new RuntimeException('Report generator returned invalid JSON.');
@@ -306,7 +310,11 @@ function dailyReportRegenerateAggregate(string $date): void
         throw new RuntimeException('Aggregate updater script not found.');
     }
 
-    dailyReportRunPythonCommand($scriptPath, ['--date', $date], 'Aggregate updater');
+    dailyReportRunPythonCommand(
+        $scriptPath,
+        ['--date', $date, '--timezone', dailyReportTimezone()->getName()],
+        'Aggregate updater'
+    );
 }
 
 /**

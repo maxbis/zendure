@@ -14,7 +14,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
+SYSTEM_CONFIG_FILE = REPO_ROOT / "common" / "config" / "system.json"
 PRICE_HELPER_FILE = REPO_ROOT / "main" / "includes" / "price_conversion.php"
 CHARGE_SCHEDULE_MOBILE_FILE = REPO_ROOT / "main" / "charge_schedule_mobile.php"
 PRICE_CONVERSION_JS_FILE = REPO_ROOT / "main" / "assets" / "js" / "price_conversion.js"
@@ -74,16 +74,16 @@ def _write_daily_report_fixture(path: Path, date: str) -> None:
 
 
 @pytest.fixture
-def backup_and_restore_main_config():
-    exists = MAIN_CONFIG_FILE.exists()
-    original = MAIN_CONFIG_FILE.read_text(encoding="utf-8") if exists else None
+def backup_and_restore_system_config():
+    exists = SYSTEM_CONFIG_FILE.exists()
+    original = SYSTEM_CONFIG_FILE.read_text(encoding="utf-8") if exists else None
     try:
         yield
     finally:
         if exists and original is not None:
-            MAIN_CONFIG_FILE.write_text(original, encoding="utf-8")
-        elif MAIN_CONFIG_FILE.exists():
-            MAIN_CONFIG_FILE.unlink()
+            SYSTEM_CONFIG_FILE.write_text(original, encoding="utf-8")
+        elif SYSTEM_CONFIG_FILE.exists():
+            SYSTEM_CONFIG_FILE.unlink()
 
 
 @pytest.fixture
@@ -134,8 +134,8 @@ def test_php_helper_converts_both_directions_and_returns_null():
     assert payload["null_spot"] is None
 
 
-def test_php_helper_uses_config_backed_override(backup_and_restore_main_config):
-    config = json.loads(MAIN_CONFIG_FILE.read_text(encoding="utf-8"))
+def test_php_helper_uses_shared_system_override(backup_and_restore_system_config):
+    config = json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))
     config["priceConversion"] = {
         "supplierMarkupEurPerKwh": 0.05,
         "energyTaxEurPerKwh": 0.01,
@@ -143,7 +143,7 @@ def test_php_helper_uses_config_backed_override(backup_and_restore_main_config):
         "consumerPrecision": 3,
         "spotPrecision": 5,
     }
-    MAIN_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    SYSTEM_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     php_code = (
         f'require "{PRICE_HELPER_FILE.as_posix()}";'
@@ -235,12 +235,13 @@ def test_daily_report_api_post_regenerate_forces_overwrite_and_enables_button(tm
             "",
             "parser = argparse.ArgumentParser()",
             "parser.add_argument('--date', required=True)",
+            "parser.add_argument('--timezone', required=True)",
             "parser.add_argument('--output')",
             "args = parser.parse_args()",
             "",
             "payload = {",
             "    'date': args.date,",
-            "    'timezone': 'Europe/Amsterdam',",
+            "    'timezone': args.timezone,",
             "    'generated_at': '2026-04-18T12:00:00+02:00',",
             "    'hours': [],",
             "    'totals': {}",

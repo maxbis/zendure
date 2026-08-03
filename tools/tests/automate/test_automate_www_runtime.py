@@ -36,6 +36,7 @@ CONDITIONS_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_conditions_bak.json"
 RESOLVER_FILE = MAIN_DATA_DIR / "resolve_schedule_conditions.php"
 DATA_API_FILE = MAIN_DATA_DIR / "api" / "data_api.php"
 MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
+SYSTEM_CONFIG_FILE = REPO_ROOT / "common" / "config" / "system.json"
 AUTOMATE_DATA_DIR = REPO_ROOT / "automate" / "data"
 
 TEST_DESCRIPTIONS = [
@@ -108,19 +109,14 @@ def _unique_status_db_path() -> Path:
     return AUTOMATE_DATA_DIR / f"test_status_updates_{uuid.uuid4().hex}.db"
 
 
-def _load_lat_lon_from_main_config() -> tuple[float, float]:
-    if MAIN_CONFIG_FILE.exists():
-        cfg = json.loads(MAIN_CONFIG_FILE.read_text(encoding="utf-8"))
-    else:
-        cfg = {}
-    lat = cfg.get("latitude", 52.3676)
-    lon = cfg.get("longitude", 4.9041)
-    return float(lat), float(lon)
+def _load_shared_installation() -> dict[str, object]:
+    config = json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))
+    return config["installation"]
 
 
-def _php_expected_sun_hours(yyyymmdd: str, lat: float, lon: float) -> dict:
+def _php_expected_sun_hours(yyyymmdd: str, lat: float, lon: float, timezone: str) -> dict:
     php_code = (
-        '$tz=new DateTimeZone("Europe/Amsterdam");'
+        f'$tz=new DateTimeZone({json.dumps(timezone)});'
         f'$dt=DateTimeImmutable::createFromFormat("Ymd H:i:s","{yyyymmdd} 12:00:00",$tz);'
         f'$info=date_sun_info($dt->getTimestamp(),{lat},{lon});'
         '$sunrise=(new DateTimeImmutable("@".$info["sunrise"]))->setTimezone($tz);'
@@ -751,8 +747,13 @@ def test_resolver_emits_sun_context_with_expected_rounding(backup_and_restore_pr
     today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
     assert isinstance(today_group, dict)
 
-    lat, lon = _load_lat_lon_from_main_config()
-    expected = _php_expected_sun_hours(today, lat, lon)
+    installation = _load_shared_installation()
+    expected = _php_expected_sun_hours(
+        today,
+        float(installation["latitude"]),
+        float(installation["longitude"]),
+        str(installation["timezone"]),
+    )
 
     assert today_group.get("sunrise_time") == expected["sunrise_time"]
     assert today_group.get("sunset_time") == expected["sunset_time"]

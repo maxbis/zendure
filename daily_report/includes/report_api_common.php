@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/load_env.php';
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 daily_report_bootstrap_env();
 
 if (!defined('DAILY_REPORT_ROOT')) {
@@ -12,6 +13,18 @@ if (!defined('DAILY_REPORT_GENERATOR_SCRIPT')) {
     define('DAILY_REPORT_GENERATOR_SCRIPT', DAILY_REPORT_ROOT . '/tools/hourly_daily_grid_battery_report.py');
 }
 
+/** @return array<string, mixed> */
+function dailyReportSystemConfig(): array
+{
+    static $config = null;
+    if (is_array($config)) {
+        return $config;
+    }
+
+    $config = loadSystemConfig();
+    return $config;
+}
+
 function dailyReportTimezone(): DateTimeZone
 {
     static $tz = null;
@@ -19,7 +32,8 @@ function dailyReportTimezone(): DateTimeZone
         return $tz;
     }
 
-    $tz = new DateTimeZone('Europe/Amsterdam');
+    $config = dailyReportSystemConfig();
+    $tz = new DateTimeZone($config['installation']['timezone']);
     return $tz;
 }
 
@@ -149,6 +163,7 @@ function dailyReportGenerateAndSave(string $date, string $outputPath): void
     $command = escapeshellarg($pythonBin)
         . ' ' . escapeshellarg($scriptPath)
         . ' --date ' . escapeshellarg($date)
+        . ' --timezone ' . escapeshellarg(dailyReportTimezone()->getName())
         . ' --output ' . escapeshellarg($outputPath)
         . (PHP_OS_FAMILY === 'Windows' ? '' : ' 2>&1');
 

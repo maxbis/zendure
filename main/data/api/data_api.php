@@ -1,8 +1,7 @@
 <?php
 // data/api/data_api.php
 
-date_default_timezone_set('Europe/Amsterdam');
-
+require_once dirname(__DIR__, 3) . '/common/php/system_config.php';
 require_once __DIR__ . '/data_functions.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -12,6 +11,19 @@ header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    exit();
+}
+
+try {
+    $dataApiSystemConfig = loadSystemConfig();
+    date_default_timezone_set($dataApiSystemConfig['installation']['timezone']);
+} catch (SystemConfigException $error) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'error' => 'Shared system configuration: ' . $error->getMessage(),
+    ]);
     exit();
 }
 

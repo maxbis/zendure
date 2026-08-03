@@ -12,7 +12,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
+SYSTEM_CONFIG_FILE = REPO_ROOT / "common" / "config" / "system.json"
 PNL_API_FILE = REPO_ROOT / "daily_report" / "api" / "pnl_data.php"
 DAILY_REPORT_DATA_DIR = REPO_ROOT / "daily_report" / "data"
 
@@ -121,14 +121,8 @@ def _build_report(
 
 
 def _current_price_config() -> dict[str, float | int]:
-    config = json.loads(MAIN_CONFIG_FILE.read_text(encoding="utf-8"))
-    return config.get("priceConversion", {
-        "supplierMarkupEurPerKwh": 0.0219,
-        "energyTaxEurPerKwh": 0.0898,
-        "vatMultiplier": 1.21,
-        "consumerPrecision": 4,
-        "spotPrecision": 6,
-    })
+    config = json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))
+    return config["priceConversion"]
 
 
 def _consumer_to_spot(value: float) -> float:

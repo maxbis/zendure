@@ -6,7 +6,6 @@ require_once dirname(__DIR__, 2) . '/daily_report/load_env.php';
 
 daily_report_bootstrap_env();
 
-const APP_ENERGY_HISTORY_TIMEZONE = 'Europe/Amsterdam';
 const APP_ENERGY_HISTORY_DAYS_DEFAULT = 3;
 const APP_ENERGY_HISTORY_DAYS_MAX = 30;
 

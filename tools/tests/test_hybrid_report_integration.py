@@ -23,7 +23,7 @@ def test_live_loader_runs_generator_without_output_file():
 
     assert "function dailyReportGenerateLive" in source
     assert "DAILY_REPORT_GENERATOR_SCRIPT" in source
-    assert "['--date', $date]" in source
+    assert "['--date', $date, '--timezone', dailyReportTimezone()->getName()]" in source
     assert "--output" not in source
 
 
