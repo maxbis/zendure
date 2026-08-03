@@ -1332,6 +1332,11 @@
         if (isProgrammaticTimelineScroll && event.target === elements.scroll) return;
         hidePriceTooltip();
     }, true);
+    document.addEventListener("touchmove", () => hidePriceTooltip(), {
+        capture: true,
+        passive: true
+    });
+    window.visualViewport?.addEventListener("scroll", () => hidePriceTooltip(), { passive: true });
     elements.timeline.addEventListener("click", (event) => {
         if (event.target instanceof Element && !event.target.closest(".app-price-hour")) {
             setSelectedHour(null);
