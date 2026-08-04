@@ -491,17 +491,24 @@
         priceTooltip.style.removeProperty("visibility");
     }
 
-    function positionPriceTooltip(anchor) {
+    function positionPriceTooltip(anchor, { preferAbove = false } = {}) {
         const gap = 8;
         const viewportPadding = 12;
         const anchorRect = anchor.getBoundingClientRect();
         const tooltipRect = priceTooltip.getBoundingClientRect();
         let left = anchorRect.left + ((anchorRect.width - tooltipRect.width) / 2);
         left = Math.max(viewportPadding, Math.min(left, window.innerWidth - tooltipRect.width - viewportPadding));
-        let top = anchorRect.bottom + gap;
-        if (top + tooltipRect.height > window.innerHeight - viewportPadding) {
-            top = anchorRect.top - tooltipRect.height - gap;
-        }
+        const aboveTop = anchorRect.top - tooltipRect.height - gap;
+        const belowTop = anchorRect.bottom + gap;
+        const fitsAbove = aboveTop >= viewportPadding;
+        const fitsBelow = belowTop + tooltipRect.height <= window.innerHeight - viewportPadding;
+        let top = preferAbove && fitsAbove
+            ? aboveTop
+            : fitsBelow
+                ? belowTop
+                : fitsAbove
+                    ? aboveTop
+                    : belowTop;
         top = Math.max(viewportPadding, top);
         priceTooltip.style.left = `${Math.round(left)}px`;
         priceTooltip.style.top = `${Math.round(top)}px`;
@@ -635,7 +642,7 @@
             priceTooltip.replaceChildren(header, prices);
             priceTooltip.hidden = false;
             priceTooltip.style.visibility = "hidden";
-            positionPriceTooltip(trigger);
+            positionPriceTooltip(trigger, { preferAbove: true });
             return;
         }
 
@@ -655,7 +662,7 @@
         priceTooltip.replaceChildren(header, prices);
         priceTooltip.hidden = false;
         priceTooltip.style.visibility = "hidden";
-        positionPriceTooltip(trigger);
+        positionPriceTooltip(trigger, { preferAbove: true });
     }
 
     function setSummaryTooltip(card, label, detail) {
