@@ -19,34 +19,35 @@
         retry: component.querySelector('[data-role="energy-history-retry"]'),
         chartScroll: component.querySelector('[data-role="energy-chart-scroll"]'),
         chart: component.querySelector('[data-role="energy-chart"]'),
-        detail: component.querySelector('[data-role="energy-hour-detail"]'),
-        detailTime: component.querySelector('[data-role="energy-detail-time"]'),
-        detailFlow: component.querySelector('[data-role="energy-detail-flow"]'),
-        detailBattery: component.querySelector('[data-role="energy-detail-battery"]'),
         summary: component.querySelector('[data-role="energy-summary"]'),
         summaryPeriod: component.querySelector('[data-role="energy-summary-period"]'),
         charged: component.querySelector('[data-role="energy-total-charged"]'),
         discharged: component.querySelector('[data-role="energy-total-discharged"]'),
         net: component.querySelector('[data-role="energy-total-net"]'),
-        chargedConsumer: component.querySelector('[data-role="energy-charged-consumer"]'),
-        chargedSpot: component.querySelector('[data-role="energy-charged-spot"]'),
-        dischargedConsumer: component.querySelector('[data-role="energy-discharged-consumer"]'),
-        dischargedSpot: component.querySelector('[data-role="energy-discharged-spot"]'),
-        netConsumer: component.querySelector('[data-role="energy-net-consumer"]'),
-        netSpot: component.querySelector('[data-role="energy-net-spot"]'),
+        chargedSummary: component.querySelector('[data-role="energy-charged-summary"]'),
+        dischargedSummary: component.querySelector('[data-role="energy-discharged-summary"]'),
+        netSummary: component.querySelector('[data-role="energy-net-summary"]'),
         status: component.querySelector('[data-role="energy-history-status"]')
     };
 
     const SVG_NS = "http://www.w3.org/2000/svg";
     const compactChartMedia = window.matchMedia("(max-width: 600px)");
+    const ENERGY_SYMLOG_THRESHOLD = 50;
     const CHART_LAYOUTS = Object.freeze({
-        compact: Object.freeze({ height: 170, margin: Object.freeze({ top: 12, right: 36, bottom: 28, left: 44 }) }),
-        standard: Object.freeze({ height: 250, margin: Object.freeze({ top: 18, right: 48, bottom: 40, left: 54 }) })
+        compact: Object.freeze({ height: 140, margin: Object.freeze({ top: 20, right: 36, bottom: 26, left: 44 }) }),
+        standard: Object.freeze({ height: 165, margin: Object.freeze({ top: 20, right: 48, bottom: 32, left: 54 }) })
     });
     let payload = null;
     let availableDays = [];
     let selectedDay = null;
     let activeController = null;
+    const summaryTooltip = ensureSummaryTooltip();
+    const summaryTooltipDetails = new Map();
+    let activeSummaryTooltipTrigger = null;
+    let pinnedSummaryTooltipTrigger = null;
+    const hourTooltip = ensureHourTooltip();
+    let activeHourTooltipTrigger = null;
+    let pinnedHourTooltipTrigger = null;
 
     function localDateKey(date = new Date()) {
         const year = date.getFullYear();
@@ -165,8 +166,209 @@
         setDimmedToken(element, formatted, formatted.includes("kWh") ? "kWh" : "Wh");
     }
 
-    function setMoneySummaryValue(element, value, signed = false) {
-        setDimmedToken(element, formatMoney(value, signed), "€");
+    function ensureSummaryTooltip() {
+        const existing = document.getElementById("app-energy-summary-tooltip");
+        if (existing) return existing;
+        const tooltip = document.createElement("div");
+        tooltip.id = "app-energy-summary-tooltip";
+        tooltip.className = "app-schedule-tooltip";
+        tooltip.setAttribute("role", "tooltip");
+        tooltip.hidden = true;
+        document.body.appendChild(tooltip);
+        return tooltip;
+    }
+
+    function ensureHourTooltip() {
+        const existing = document.getElementById("app-energy-hour-tooltip");
+        if (existing) return existing;
+        const tooltip = document.createElement("div");
+        tooltip.id = "app-energy-hour-tooltip";
+        tooltip.className = "app-schedule-tooltip";
+        tooltip.setAttribute("role", "tooltip");
+        tooltip.hidden = true;
+        document.body.appendChild(tooltip);
+        return tooltip;
+    }
+
+    function hideSummaryTooltip(trigger = null) {
+        if (trigger && trigger !== activeSummaryTooltipTrigger) return;
+        if (activeSummaryTooltipTrigger) {
+            activeSummaryTooltipTrigger.removeAttribute("aria-describedby");
+            activeSummaryTooltipTrigger.setAttribute("aria-expanded", "false");
+        }
+        if (!trigger || pinnedSummaryTooltipTrigger === trigger || pinnedSummaryTooltipTrigger === activeSummaryTooltipTrigger) {
+            pinnedSummaryTooltipTrigger = null;
+        }
+        activeSummaryTooltipTrigger = null;
+        summaryTooltip.hidden = true;
+        summaryTooltip.style.removeProperty("left");
+        summaryTooltip.style.removeProperty("top");
+        summaryTooltip.style.removeProperty("visibility");
+    }
+
+    function positionSummaryTooltip(anchor) {
+        const gap = 8;
+        const viewportPadding = 12;
+        const anchorRect = anchor.getBoundingClientRect();
+        const tooltipRect = summaryTooltip.getBoundingClientRect();
+        let left = anchorRect.left + ((anchorRect.width - tooltipRect.width) / 2);
+        left = Math.max(viewportPadding, Math.min(left, window.innerWidth - tooltipRect.width - viewportPadding));
+        const aboveTop = anchorRect.top - tooltipRect.height - gap;
+        const belowTop = anchorRect.bottom + gap;
+        const fitsAbove = aboveTop >= viewportPadding;
+        const fitsBelow = belowTop + tooltipRect.height <= window.innerHeight - viewportPadding;
+        const top = fitsAbove
+            ? aboveTop
+            : fitsBelow
+                ? belowTop
+                : Math.max(viewportPadding, aboveTop);
+        summaryTooltip.style.left = `${Math.round(left)}px`;
+        summaryTooltip.style.top = `${Math.round(top)}px`;
+        summaryTooltip.style.visibility = "visible";
+    }
+
+    function showSummaryTooltip(detail, trigger) {
+        if (!detail) return;
+        hideHourTooltip();
+        hideSummaryTooltip();
+        activeSummaryTooltipTrigger = trigger;
+        trigger.setAttribute("aria-describedby", summaryTooltip.id);
+        trigger.setAttribute("aria-expanded", "true");
+
+        const header = document.createElement("div");
+        header.className = "app-schedule-tooltip__header";
+        const title = document.createElement("strong");
+        title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
+        header.appendChild(title);
+
+        const prices = document.createElement("div");
+        prices.className = "app-price-summary-tooltip__prices";
+        [["Consumer", detail.consumer], ["Spot", detail.spot]].forEach(([label, value]) => {
+            const row = document.createElement("p");
+            const name = document.createElement("span");
+            const amount = document.createElement("strong");
+            name.textContent = label;
+            amount.textContent = formatMoney(value, detail.signed);
+            row.append(name, amount);
+            prices.appendChild(row);
+        });
+
+        summaryTooltip.replaceChildren(header, prices);
+        summaryTooltip.hidden = false;
+        summaryTooltip.style.visibility = "hidden";
+        positionSummaryTooltip(trigger);
+    }
+
+    function hideHourTooltip(trigger = null) {
+        if (trigger && trigger !== activeHourTooltipTrigger) return;
+        if (activeHourTooltipTrigger) {
+            activeHourTooltipTrigger.removeAttribute("aria-describedby");
+            activeHourTooltipTrigger.setAttribute("aria-expanded", "false");
+            activeHourTooltipTrigger.classList.remove("is-active");
+        }
+        if (!trigger || pinnedHourTooltipTrigger === trigger || pinnedHourTooltipTrigger === activeHourTooltipTrigger) {
+            pinnedHourTooltipTrigger = null;
+        }
+        activeHourTooltipTrigger = null;
+        setActiveChartBar(null);
+        hourTooltip.hidden = true;
+        hourTooltip.style.removeProperty("left");
+        hourTooltip.style.removeProperty("top");
+        hourTooltip.style.removeProperty("visibility");
+    }
+
+    function hourTooltipRow(label, value, direction = "idle") {
+        const row = document.createElement("p");
+        const name = document.createElement("span");
+        const amount = document.createElement("strong");
+        name.textContent = label;
+        amount.textContent = value;
+        amount.dataset.direction = direction;
+        row.append(name, amount);
+        return row;
+    }
+
+    function showHourTooltip(row, previousBattery, trigger, anchor) {
+        hideSummaryTooltip();
+        hideHourTooltip();
+        activeHourTooltipTrigger = trigger;
+        trigger.setAttribute("aria-describedby", hourTooltip.id);
+        trigger.setAttribute("aria-expanded", "true");
+        trigger.classList.add("is-active");
+        setActiveChartBar(trigger.dataset.index);
+
+        const nextHour = (row.hour + 1) % 24;
+        const header = document.createElement("div");
+        header.className = "app-schedule-tooltip__header";
+        const title = document.createElement("strong");
+        title.textContent = `${formatDay(row.day, true)} · ${String(row.hour).padStart(2, "0")}:00–${String(nextHour).padStart(2, "0")}:00`;
+        header.appendChild(title);
+
+        const details = document.createElement("div");
+        details.className = "app-price-summary-tooltip__prices app-energy-hour-tooltip__details";
+        const direction = row.wh > 0 ? "charged" : row.wh < 0 ? "discharged" : "idle";
+        const flowLabel = row.wh > 0 ? "Charged" : row.wh < 0 ? "Discharged" : "Energy flow";
+        const flowValue = row.wh === 0 ? "None" : formatEnergy(row.wh);
+        details.appendChild(hourTooltipRow(flowLabel, flowValue, direction));
+
+        if (row.battery === null) {
+            details.appendChild(hourTooltipRow("Battery", "Unavailable"));
+        } else if (previousBattery === null) {
+            details.appendChild(hourTooltipRow("Battery", `${Math.round(row.battery)}%`));
+        } else {
+            const delta = row.battery - previousBattery;
+            const deltaText = delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(Math.round(delta))} pts`;
+            details.appendChild(hourTooltipRow("Battery", `${Math.round(previousBattery)}% → ${Math.round(row.battery)}%`));
+            details.appendChild(hourTooltipRow("Change", deltaText, delta > 0 ? "charged" : delta < 0 ? "discharged" : "idle"));
+        }
+
+        hourTooltip.replaceChildren(header, details);
+        hourTooltip.hidden = false;
+        hourTooltip.style.visibility = "hidden";
+
+        const anchorRect = anchor.getBoundingClientRect();
+        const plotRect = trigger.getBoundingClientRect();
+        const tooltipRect = hourTooltip.getBoundingClientRect();
+        const viewportPadding = 12;
+        const gap = 8;
+        let left = anchorRect.left + ((anchorRect.width - tooltipRect.width) / 2);
+        left = Math.max(viewportPadding, Math.min(left, window.innerWidth - tooltipRect.width - viewportPadding));
+        const top = Math.max(viewportPadding, plotRect.top - tooltipRect.height - gap);
+        hourTooltip.style.left = `${Math.round(left)}px`;
+        hourTooltip.style.top = `${Math.round(top)}px`;
+        hourTooltip.style.visibility = "visible";
+    }
+
+    function setSummaryTooltip(trigger, detail) {
+        summaryTooltipDetails.set(trigger, detail);
+        const energy = formatEnergy(detail.energy, detail.signed);
+        const consumer = formatMoney(detail.consumer, detail.signed);
+        const spot = formatMoney(detail.spot, detail.signed);
+        trigger.setAttribute("aria-label", `${detail.label} ${energy}. Consumer ${consumer}. Spot ${spot}. Show price totals.`);
+    }
+
+    function bindSummaryTooltip(trigger) {
+        trigger.addEventListener("mouseenter", () => {
+            if (!pinnedSummaryTooltipTrigger) showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+        });
+        trigger.addEventListener("mouseleave", () => {
+            if (pinnedSummaryTooltipTrigger !== trigger && document.activeElement !== trigger) {
+                hideSummaryTooltip(trigger);
+            }
+        });
+        trigger.addEventListener("focus", () => showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger));
+        trigger.addEventListener("blur", () => {
+            if (pinnedSummaryTooltipTrigger !== trigger) hideSummaryTooltip(trigger);
+        });
+        trigger.addEventListener("click", () => {
+            if (pinnedSummaryTooltipTrigger === trigger && activeSummaryTooltipTrigger === trigger && !summaryTooltip.hidden) {
+                hideSummaryTooltip(trigger);
+                return;
+            }
+            pinnedSummaryTooltipTrigger = trigger;
+            showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+            pinnedSummaryTooltipTrigger = trigger;
+        });
     }
 
     function formatAxisEnergy(value) {
@@ -228,6 +430,16 @@
         return candidates.find((candidate) => candidate >= peak) || Math.ceil(peak / 10000) * 10000;
     }
 
+    function symlogMagnitude(value, maximum, threshold = ENERGY_SYMLOG_THRESHOLD) {
+        if (maximum <= 0) return 0;
+        return Math.log1p(Math.abs(value) / threshold) / Math.log1p(maximum / threshold);
+    }
+
+    function inverseSymlogMagnitude(position, maximum, threshold = ENERGY_SYMLOG_THRESHOLD) {
+        if (maximum <= 0) return 0;
+        return threshold * Math.expm1(position * Math.log1p(maximum / threshold));
+    }
+
     function batteryPath(rows, xForIndex, yForBattery) {
         let path = "";
         let segmentOpen = false;
@@ -262,34 +474,8 @@
         elements.chart.querySelector(`.app-energy-chart__bar[data-index="${index}"]`)?.classList.add("is-active");
     }
 
-    function showHourDetail(row, previousBattery, target) {
-        elements.chart.querySelectorAll(".app-energy-chart__hit.is-active").forEach((element) => {
-            element.classList.remove("is-active");
-        });
-        target?.classList.add("is-active");
-        setActiveChartBar(target?.dataset.index);
-        elements.detail.hidden = false;
-
-        elements.detailTime.textContent = `${formatDay(row.day)} · ${String(row.hour).padStart(2, "0")}:00–${String((row.hour + 1) % 24).padStart(2, "0")}:00`;
-        elements.detailFlow.textContent = row.wh > 0
-            ? `Charged ${formatEnergy(row.wh)}`
-            : row.wh < 0
-                ? `Discharged ${formatEnergy(row.wh)}`
-                : "No battery flow";
-        elements.detailFlow.dataset.direction = row.wh > 0 ? "charged" : row.wh < 0 ? "discharged" : "idle";
-
-        if (row.battery === null) {
-            elements.detailBattery.textContent = "Battery level unavailable";
-        } else if (previousBattery === null) {
-            elements.detailBattery.textContent = `Battery ${Math.round(row.battery)}%`;
-        } else {
-            const delta = row.battery - previousBattery;
-            const deltaText = delta === 0 ? "no change" : `${delta > 0 ? "+" : "−"}${Math.abs(Math.round(delta))} pts`;
-            elements.detailBattery.textContent = `Battery ${Math.round(previousBattery)}% → ${Math.round(row.battery)}% · ${deltaText}`;
-        }
-    }
-
     function renderChart(rows) {
+        hideHourTooltip();
         elements.chart.replaceChildren();
         if (!rows.length) {
             elements.chart.innerHTML = '<p class="app-energy-history__empty">No hourly battery data is available for the last four days.</p>';
@@ -299,14 +485,14 @@
         const layout = compactChartMedia.matches ? CHART_LAYOUTS.compact : CHART_LAYOUTS.standard;
         const chartHeight = layout.height;
         const margin = layout.margin;
-        const slotWidth = 14;
+        const slotWidth = 12;
         const chartWidth = Math.max(1320, margin.left + margin.right + (rows.length * slotWidth));
         const plotWidth = chartWidth - margin.left - margin.right;
         const plotHeight = chartHeight - margin.top - margin.bottom;
         const baseline = margin.top + (plotHeight / 2);
         const energyMax = axisMaximum(rows);
         const actualSlotWidth = plotWidth / rows.length;
-        const barWidth = Math.max(4, actualSlotWidth * 0.68);
+        const barWidth = Math.max(4, actualSlotWidth * 0.75);
         const xForIndex = (index) => margin.left + ((index + 0.5) * actualSlotWidth);
         const yForBattery = (value) => margin.top + ((100 - clamp(value, 0, 100)) / 100 * plotHeight);
         const svg = createSvgElement("svg", {
@@ -320,6 +506,9 @@
 
         [-1, -0.5, 0, 0.5, 1].forEach((factor) => {
             const y = baseline - (factor * plotHeight / 2);
+            const energyTick = factor === 0
+                ? 0
+                : Math.sign(factor) * inverseSymlogMagnitude(Math.abs(factor), energyMax);
             svg.append(createSvgElement("line", {
                 x1: margin.left,
                 y1: y,
@@ -327,11 +516,12 @@
                 y2: y,
                 class: factor === 0 ? "app-energy-chart__zero" : "app-energy-chart__grid"
             }));
-            appendText(svg, margin.left - 9, y + 4, formatAxisEnergy(energyMax * factor), "app-energy-chart__axis-label", "end");
+            appendText(svg, margin.left - 9, y + 4, formatAxisEnergy(energyTick), "app-energy-chart__axis-label", "end");
             appendText(svg, chartWidth - margin.right + 9, y + 4, `${Math.round(50 + factor * 50)}%`, "app-energy-chart__axis-label app-energy-chart__axis-label--battery");
         });
 
-        appendText(svg, 6, 11, "Wh", "app-energy-chart__unit");
+        const energyUnit = appendText(svg, 6, 11, "Wh · symlog", "app-energy-chart__unit");
+        energyUnit.append(createSvgElement("title", {}, `Symmetric logarithmic energy scale with a ${ENERGY_SYMLOG_THRESHOLD} Wh linear threshold`));
         appendText(svg, chartWidth - 5, 11, "Battery", "app-energy-chart__unit app-energy-chart__unit--battery", "end");
 
         rows.forEach((row, index) => {
@@ -350,7 +540,7 @@
         const bars = [];
         rows.forEach((row, index) => {
             const x = xForIndex(index);
-            const height = Math.abs(row.wh) / energyMax * (plotHeight / 2);
+            const height = symlogMagnitude(row.wh, energyMax) * (plotHeight / 2);
             const y = row.wh >= 0 ? baseline - height : baseline;
             const bar = createSvgElement("rect", {
                 x: x - (barWidth / 2),
@@ -436,29 +626,43 @@
                 "data-index": String(index),
                 tabindex: "0",
                 role: "button",
+                "aria-expanded": "false",
                 "aria-label": hourAriaLabel(row, previousBattery)
             });
             const bar = bars[index];
-            hit.append(createSvgElement("title", {}, hourAriaLabel(row, previousBattery)));
-            hit.addEventListener("pointerenter", () => bar.classList.add("is-hover"));
-            hit.addEventListener("pointerleave", () => bar.classList.remove("is-hover"));
-            hit.addEventListener("focus", () => showHourDetail(row, previousBattery, hit));
+            hit.addEventListener("pointerenter", () => {
+                bar.classList.add("is-hover");
+                if (!pinnedHourTooltipTrigger) showHourTooltip(row, previousBattery, hit, bar);
+            });
+            hit.addEventListener("pointerleave", () => {
+                bar.classList.remove("is-hover");
+                if (pinnedHourTooltipTrigger !== hit && document.activeElement !== hit) hideHourTooltip(hit);
+            });
+            hit.addEventListener("focus", () => showHourTooltip(row, previousBattery, hit, bar));
+            hit.addEventListener("blur", () => {
+                if (pinnedHourTooltipTrigger !== hit) hideHourTooltip(hit);
+            });
             hit.addEventListener("click", () => {
-                showHourDetail(row, previousBattery, hit);
+                if (pinnedHourTooltipTrigger === hit && activeHourTooltipTrigger === hit && !hourTooltip.hidden) {
+                    hideHourTooltip(hit);
+                    return;
+                }
+                pinnedHourTooltipTrigger = hit;
+                showHourTooltip(row, previousBattery, hit, bar);
+                pinnedHourTooltipTrigger = hit;
                 selectSummaryDay(row.day);
             });
             hit.addEventListener("keydown", (event) => {
                 if (event.key !== "Enter" && event.key !== " ") return;
                 event.preventDefault();
-                showHourDetail(row, previousBattery, hit);
-                selectSummaryDay(row.day);
+                hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
             });
             svg.append(hit);
         });
 
         elements.chart.append(svg);
         elements.chart.style.width = `${chartWidth}px`;
-        elements.chart.setAttribute("aria-label", `Four-day battery energy chart. Scale from minus ${formatEnergy(energyMax)} to plus ${formatEnergy(energyMax)}.`);
+        elements.chart.setAttribute("aria-label", `Four-day battery energy chart. Symmetric logarithmic energy scale from minus ${formatEnergy(energyMax)} to plus ${formatEnergy(energyMax)}, with a ${ENERGY_SYMLOG_THRESHOLD} Wh linear threshold.`);
 
         requestAnimationFrame(() => {
             elements.chartScroll.scrollLeft = elements.chartScroll.scrollWidth - elements.chartScroll.clientWidth;
@@ -543,15 +747,26 @@
         setEnergySummaryValue(elements.discharged, totals.discharged);
         setEnergySummaryValue(elements.net, net, true);
         elements.net.dataset.direction = net > 0 ? "charged" : net < 0 ? "discharged" : "idle";
-        setMoneySummaryValue(elements.chargedConsumer, money.consumer.charged.eur);
-        setMoneySummaryValue(elements.chargedSpot, money.spot.charged.eur);
-        setMoneySummaryValue(elements.dischargedConsumer, money.consumer.discharged.eur);
-        setMoneySummaryValue(elements.dischargedSpot, money.spot.discharged.eur);
-        setMoneySummaryValue(elements.netConsumer, money.consumer.net.eur, true);
-        setMoneySummaryValue(elements.netSpot, money.spot.net.eur, true);
-        [elements.netConsumer, elements.netSpot].forEach((element, index) => {
-            const value = index === 0 ? money.consumer.net.eur : money.spot.net.eur;
-            element.dataset.direction = value > 0 ? "charged" : value < 0 ? "discharged" : "idle";
+        setSummaryTooltip(elements.chargedSummary, {
+            label: "Charged",
+            energy: totals.charged,
+            consumer: money.consumer.charged.eur,
+            spot: money.spot.charged.eur,
+            signed: false
+        });
+        setSummaryTooltip(elements.dischargedSummary, {
+            label: "Discharged",
+            energy: totals.discharged,
+            consumer: money.consumer.discharged.eur,
+            spot: money.spot.discharged.eur,
+            signed: false
+        });
+        setSummaryTooltip(elements.netSummary, {
+            label: "Net",
+            energy: net,
+            consumer: money.consumer.net.eur,
+            spot: money.spot.net.eur,
+            signed: true
         });
         return priceWarning(money);
     }
@@ -583,18 +798,6 @@
         renderStatus(renderSummary([day]));
     }
 
-    function resetDetail() {
-        elements.chart.querySelectorAll(".app-energy-chart__hit.is-active").forEach((element) => {
-            element.classList.remove("is-active");
-        });
-        setActiveChartBar(null);
-        elements.detailTime.textContent = "Select an hour";
-        elements.detailFlow.textContent = "Explore the chart for exact values";
-        elements.detailFlow.dataset.direction = "idle";
-        elements.detailBattery.textContent = "Battery level appears when available";
-        elements.detail.hidden = true;
-    }
-
     function renderStatus(priceMessage = "") {
         const cache = payload?.cacheInfo || {};
         const messages = [];
@@ -622,7 +825,6 @@
         elements.date.dataset.mobileLabel = `${dateRange} · flow & battery`;
         renderChart(rows);
         selectSummaryDay(selectedDay);
-        resetDetail();
     }
 
     function normalizePayload(data) {
@@ -668,6 +870,35 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
+    [elements.chargedSummary, elements.dischargedSummary, elements.netSummary].forEach(bindSummaryTooltip);
+    window.addEventListener("resize", () => {
+        hideSummaryTooltip();
+        hideHourTooltip();
+    });
+    window.addEventListener("scroll", () => {
+        hideSummaryTooltip();
+        hideHourTooltip();
+    }, true);
+    document.addEventListener("touchmove", () => {
+        hideSummaryTooltip();
+        hideHourTooltip();
+    }, { capture: true, passive: true });
+    document.addEventListener("pointerdown", (event) => {
+        if (activeSummaryTooltipTrigger && !activeSummaryTooltipTrigger.contains(event.target)) {
+            hideSummaryTooltip(activeSummaryTooltipTrigger);
+        }
+        if (activeHourTooltipTrigger && !activeHourTooltipTrigger.contains(event.target)) {
+            hideHourTooltip(activeHourTooltipTrigger);
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        const trigger = activeHourTooltipTrigger || activeSummaryTooltipTrigger;
+        if (!trigger) return;
+        if (activeHourTooltipTrigger) hideHourTooltip(trigger);
+        else hideSummaryTooltip(trigger);
+        trigger.focus({ preventScroll: true });
+    });
     compactChartMedia.addEventListener?.("change", () => {
         if (payload) render();
     });

@@ -598,38 +598,20 @@ $appConfig = [
                     <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level for the last four days"></div>
                 </div>
 
-                <div class="app-energy-history__detail" data-role="energy-hour-detail" aria-live="polite" hidden>
-                    <span data-role="energy-detail-time">Select an hour</span>
-                    <strong data-role="energy-detail-flow">Explore the chart for exact values</strong>
-                    <span data-role="energy-detail-battery">Battery level appears when available</span>
-                </div>
-
                 <p class="app-energy-history__summary-period" data-role="energy-summary-period" aria-live="polite">Today totals · through now</p>
                 <div class="app-energy-history__summary" data-role="energy-summary" aria-label="Energy and price totals for today">
-                    <div>
+                    <button type="button" data-role="energy-charged-summary" aria-expanded="false">
                         <span class="app-energy-history__summary-title">Charged</span>
                         <strong class="gsd-positive" data-role="energy-total-charged">—</strong>
-                        <div class="app-energy-history__prices">
-                            <p><span>Consumer</span><strong data-role="energy-charged-consumer">—</strong></p>
-                            <p><span>Spot</span><strong data-role="energy-charged-spot">—</strong></p>
-                        </div>
-                    </div>
-                    <div>
+                    </button>
+                    <button type="button" data-role="energy-discharged-summary" aria-expanded="false">
                         <span class="app-energy-history__summary-title">Discharged</span>
                         <strong class="gsd-negative" data-role="energy-total-discharged">—</strong>
-                        <div class="app-energy-history__prices">
-                            <p><span>Consumer</span><strong data-role="energy-discharged-consumer">—</strong></p>
-                            <p><span>Spot</span><strong data-role="energy-discharged-spot">—</strong></p>
-                        </div>
-                    </div>
-                    <div>
+                    </button>
+                    <button type="button" data-role="energy-net-summary" aria-expanded="false">
                         <span class="app-energy-history__summary-title">Net</span>
                         <strong data-role="energy-total-net">—</strong>
-                        <div class="app-energy-history__prices">
-                            <p><span>Consumer</span><strong data-role="energy-net-consumer">—</strong></p>
-                            <p><span>Spot</span><strong data-role="energy-net-spot">—</strong></p>
-                        </div>
-                    </div>
+                    </button>
                 </div>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>
