@@ -618,14 +618,6 @@ $appConfig = [
             </div>
         </section>
 
-        <section class="app-next-step" aria-label="Implementation status">
-            <span>Graphite Signal Dark migration</span>
-            <strong>Step 3 · Energy history</strong>
-            <p>Automation remains in the legacy application for now.</p>
-            <a class="gsd-btn gsd-btn--quiet" href="../main/charge_schedule_mobile.php">
-                Open legacy application
-            </a>
-        </section>
     </main>
 
     <dialog class="gsd-dialog app-schedule-edit-dialog" id="app-schedule-edit-dialog" aria-labelledby="app-schedule-edit-title">

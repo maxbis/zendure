@@ -2999,35 +2999,6 @@
     height: 9px;
 }
 
-.app-next-step {
-    display: grid;
-    justify-items: start;
-    gap: 4px;
-    margin-top: 12px;
-    padding: 16px;
-    background: var(--gsd-surface-1);
-    border: 1px dashed var(--gsd-border);
-    border-radius: var(--gsd-radius-card);
-}
-
-.app-next-step > span {
-    color: var(--gsd-text-muted);
-    font-size: 0.67rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.app-next-step > strong {
-    font-size: 0.9rem;
-}
-
-.app-next-step p {
-    margin: 2px 0 10px;
-    color: var(--gsd-text-secondary);
-    font-size: 0.75rem;
-}
-
 @keyframes app-spin {
     to {
         transform: rotate(360deg);
