@@ -41,6 +41,7 @@ The forecast receives:
 - Interval duration.
 - Whether it is the partial current hour.
 - Whether a runtime fallback was selected.
+- Primary and fallback powers and durations when the action changes at a battery threshold during the hour.
 
 ## Flow and behavior
 
@@ -54,8 +55,10 @@ The forecast receives:
 8. Convert the effective schedule action to forecast power.
 9. Apply dynamic `min_power` and `max_power` limits to primary net-zero actions.
 10. Convert power and duration into a battery percentage change.
-11. Clamp discharge and charge to the configured operating range and applicable runtime battery boundary.
-12. Use the predicted end percentage as the next hour's start percentage.
+11. When the primary action reaches a runtime battery threshold before the hour ends, calculate the time spent on the primary action.
+12. Apply the configured fallback action for the remainder of that hour without inheriting the primary action's power limits.
+13. Clamp the final result to the configured battery operating range.
+14. Use the predicted end percentage as the next hour's start percentage.
 
 ### Action assumptions
 
@@ -86,8 +89,10 @@ percentage change = (watts × hours × efficiency ÷ capacity Wh) × 100
 - When capacity, operating limits, or efficiency are invalid, then return no predictions.
 - When the battery is already at or below its configured minimum, then do not predict additional discharge.
 - When the battery is already at or above its configured maximum, then do not predict additional charge.
-- When a discharging runtime rule requires battery level to remain above a threshold, then stop the modeled discharge at that threshold.
-- When a charging runtime rule requires battery level to remain below a threshold, then stop the modeled charge at that threshold.
+- When a discharging primary rule reaches its lower battery threshold, then switch to the configured fallback for the remaining time; only a zero-power fallback keeps the prediction at the threshold.
+- When a charging primary rule reaches its upper battery threshold, then switch to the configured fallback for the remaining time; only a zero-power fallback keeps the prediction at the threshold.
+- When the predicted hour starts exactly on an inclusive threshold and the primary action would immediately cross it, then give the primary action zero duration and use the fallback for the full interval.
+- When the primary action and fallback both operate during one hour, then expose both powers and durations so the tooltip can show the transition.
 - When a household profile entry is missing or invalid, then use 0 W for that hour.
 - The model does not predict solar generation, unexpected household loads, controller ramping, or schedule changes made after calculation.
 

@@ -71,6 +71,51 @@ assert.equal(Object.isFrozen(DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR), true);
     });
     near(forecast[`${DATE}1200`].endPercent, 30);
     near(forecast[`${DATE}1300`].startPercent, 30);
+    assert.equal(forecast[`${DATE}1200`].usedFallback, true);
+}
+
+{
+    const thresholdSlots = slots(0);
+    thresholdSlots[5] = {
+        value: -800,
+        runtime_conditions: [{ field: "electricity_level", op: ">=", value: 35 }],
+        fallback_value: "netzero-"
+    };
+    const forecast = buildForecast({
+        now: new Date(2026, 7, 5, 5, 0),
+        battery: { ...BATTERY, percent: 35 },
+        days: [{ date: DATE, slots: thresholdSlots }]
+    });
+    const hour = forecast[`${DATE}0500`];
+    near(hour.endPercent, 35 - ((100 / POWER_EFFICIENCY) / 5760) * 100);
+    near(hour.estimatedPowerW, -100);
+    assert.equal(hour.source, "household_profile");
+    assert.equal(hour.usedFallback, true);
+    assert.equal(hour.transitionedToFallback, true);
+    near(hour.primaryDurationHours, 0);
+    near(hour.fallbackDurationHours, 1);
+}
+
+{
+    const thresholdSlots = slots(0);
+    thresholdSlots[5] = {
+        value: -800,
+        runtime_conditions: [{ field: "electricity_level", op: ">=", value: 35 }],
+        fallback_value: "netzero-"
+    };
+    const forecast = buildForecast({
+        now: new Date(2026, 7, 5, 5, 0),
+        battery: { ...BATTERY, percent: 36 },
+        days: [{ date: DATE, slots: thresholdSlots }]
+    });
+    const hour = forecast[`${DATE}0500`];
+    const primaryHours = 1 / ((800 / POWER_EFFICIENCY) / 5760 * 100);
+    const expectedEnd = 35 - (((100 * (1 - primaryHours)) / POWER_EFFICIENCY) / 5760) * 100;
+    near(hour.primaryDurationHours, primaryHours);
+    near(hour.fallbackDurationHours, 1 - primaryHours);
+    near(hour.endPercent, expectedEnd);
+    assert.equal(hour.primaryPowerW, -800);
+    assert.equal(hour.fallbackPowerW, -100);
 }
 
 {

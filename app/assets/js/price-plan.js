@@ -637,7 +637,11 @@
         detail.className = "app-schedule-tooltip__forecast-detail";
         const deltaPrefix = forecast.deltaPercent > 0 ? "+" : forecast.deltaPercent < 0 ? "−" : "";
         const durationMinutes = Math.round(forecast.durationHours * 60);
-        detail.textContent = `${deltaPrefix}${Math.abs(forecast.deltaPercent).toFixed(1)} pp · ${formatWatts(forecast.estimatedPowerW)} · ${forecastSourceCopy(forecast)}${forecast.currentHour ? ` · ${durationMinutes} min remaining` : ""}`;
+        const primaryMinutes = Math.round((forecast.primaryDurationHours || 0) * 60);
+        const powerDescription = forecast.transitionedToFallback && primaryMinutes > 0
+            ? `${formatWatts(forecast.primaryPowerW)} → ${formatWatts(forecast.fallbackPowerW)}`
+            : formatWatts(forecast.transitionedToFallback ? forecast.fallbackPowerW : forecast.estimatedPowerW);
+        detail.textContent = `${deltaPrefix}${Math.abs(forecast.deltaPercent).toFixed(1)} pp · ${powerDescription} · ${forecastSourceCopy(forecast)}${forecast.currentHour ? ` · ${durationMinutes} min remaining` : ""}`;
         section.append(values, detail);
         return section;
     }

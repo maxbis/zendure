@@ -45,6 +45,7 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 9. Build one battery forecast from the live percentage through the end of tomorrow whenever schedules render or live battery state refreshes.
 10. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
 11. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
+12. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 

@@ -148,6 +148,72 @@
         return clamp(startPercent + deltaPercent, minimumPercent, maximumPercent);
     }
 
+    function transitionToFallback({
+        boundary,
+        startPercent,
+        durationHours,
+        primaryPower,
+        originalSlot,
+        hour,
+        householdUsageWByHour,
+        capacityWh,
+        efficiency,
+        minimumPercent,
+        maximumPercent
+    }) {
+        if (!boundary || primaryPower.powerW === 0) return null;
+        if (boundary.type === "floor" && boundary.percent < minimumPercent) return null;
+        if (boundary.type === "ceiling" && boundary.percent > maximumPercent) return null;
+
+        const percentPerHour = forecastDeltaPercent(primaryPower.powerW, 1, capacityWh, efficiency);
+        const distancePercent = boundary.type === "floor"
+            ? startPercent - boundary.percent
+            : boundary.percent - startPercent;
+        const ratePercentPerHour = Math.abs(percentPerHour);
+        if (distancePercent < 0 || ratePercentPerHour <= 0) return null;
+
+        const primaryDurationHours = distancePercent / ratePercentPerHour;
+        if (primaryDurationHours > durationHours) return null;
+
+        const fallbackDurationHours = Math.max(0, durationHours - primaryDurationHours);
+        if (fallbackDurationHours <= 1e-9) return null;
+
+        const fallbackSlot = {
+            value: Object.prototype.hasOwnProperty.call(originalSlot || {}, "fallback_value")
+                ? originalSlot.fallback_value
+                : 0
+        };
+        const fallbackPower = effectivePower(fallbackSlot, hour, householdUsageWByHour, false);
+        const fallbackDeltaPercent = forecastDeltaPercent(
+            fallbackPower.powerW,
+            fallbackDurationHours,
+            capacityWh,
+            efficiency
+        );
+        const endPercent = constrainedEndPercent(
+            boundary.percent,
+            fallbackDeltaPercent,
+            minimumPercent,
+            maximumPercent
+        );
+
+        return {
+            endPercent,
+            estimatedPowerW: (
+                (primaryPower.powerW * primaryDurationHours)
+                + (fallbackPower.powerW * fallbackDurationHours)
+            ) / durationHours,
+            source: fallbackPower.source,
+            mode: fallbackPower.mode,
+            usedFallback: true,
+            transitionedToFallback: true,
+            primaryPowerW: primaryPower.powerW,
+            fallbackPowerW: fallbackPower.powerW,
+            primaryDurationHours,
+            fallbackDurationHours
+        };
+    }
+
     function validBatteryState(battery) {
         const percent = finiteNumber(battery?.percent);
         const capacityWh = finiteNumber(battery?.capacityWh);
@@ -220,8 +286,20 @@
                 );
 
                 const boundary = resolved.primary ? runtimeBoundary(resolved.conditions, power.powerW) : null;
-                if (boundary?.type === "floor") endPercent = Math.max(endPercent, boundary.percent);
-                if (boundary?.type === "ceiling") endPercent = Math.min(endPercent, boundary.percent);
+                const fallbackTransition = resolved.primary ? transitionToFallback({
+                    boundary,
+                    startPercent,
+                    durationHours,
+                    primaryPower: power,
+                    originalSlot,
+                    hour,
+                    householdUsageWByHour,
+                    capacityWh: normalizedBattery.capacityWh,
+                    efficiency: validEfficiency,
+                    minimumPercent: normalizedBattery.minimumPercent,
+                    maximumPercent: normalizedBattery.maximumPercent
+                }) : null;
+                if (fallbackTransition) endPercent = fallbackTransition.endPercent;
                 endPercent = clamp(endPercent, 0, 100);
 
                 const key = `${day.date}${pad(hour)}00`;
@@ -232,11 +310,18 @@
                     startPercent,
                     endPercent,
                     deltaPercent: endPercent - startPercent,
-                    estimatedPowerW: Math.abs(endPercent - startPercent) < 1e-9 ? 0 : power.powerW,
+                    estimatedPowerW: Math.abs(endPercent - startPercent) < 1e-9
+                        ? 0
+                        : fallbackTransition?.estimatedPowerW ?? power.powerW,
                     durationHours,
-                    source: power.source,
-                    mode: power.mode,
-                    usedFallback: resolved.usedFallback,
+                    source: fallbackTransition?.source ?? power.source,
+                    mode: fallbackTransition?.mode ?? power.mode,
+                    usedFallback: fallbackTransition?.usedFallback ?? resolved.usedFallback,
+                    transitionedToFallback: fallbackTransition?.transitionedToFallback ?? false,
+                    primaryPowerW: fallbackTransition?.primaryPowerW ?? null,
+                    fallbackPowerW: fallbackTransition?.fallbackPowerW ?? (resolved.usedFallback ? power.powerW : null),
+                    primaryDurationHours: fallbackTransition?.primaryDurationHours ?? null,
+                    fallbackDurationHours: fallbackTransition?.fallbackDurationHours ?? (resolved.usedFallback ? durationHours : null),
                     currentHour: slotStart <= currentTime && slotEnd > currentTime
                 };
                 runningPercent = endPercent;
