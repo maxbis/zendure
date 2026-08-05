@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+    <title id="title">Zendure Energy Manager app icon</title>
+    <desc id="description">A blue battery with bidirectional energy arrows, a lightning bolt, and a lime optimization signal on a graphite background.</desc>
+
+    <rect width="1024" height="1024" fill="#0d0f12"/>
+
+    <g fill="none" stroke="#65a9e8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="244" y="214" width="536" height="656" rx="104" stroke-width="72"/>
+
+        <!-- Interrupt the frame so the charge/discharge arrows read as part of it. -->
+        <path d="M244 468V622" stroke="#0d0f12" stroke-width="88"/>
+        <path d="M780 468V622" stroke="#0d0f12" stroke-width="88"/>
+
+        <path d="M244 454V592" stroke-width="58"/>
+        <path d="M190 542L244 602L298 542" stroke-width="58"/>
+
+        <path d="M780 636V498" stroke-width="58"/>
+        <path d="M726 548L780 488L834 548" stroke-width="58"/>
+    </g>
+
+    <rect x="418" y="130" width="188" height="116" rx="38" fill="#65a9e8"/>
+
+    <path
+        d="M584 314L402 566H500L438 754L634 498H532L584 314Z"
+        fill="#65a9e8"
+    />
+
+    <circle cx="512" cy="790" r="28" fill="#c7e500"/>
+</svg>

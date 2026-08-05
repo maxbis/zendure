@@ -113,9 +113,13 @@ $appConfig = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0d0f12">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Zendure">
     <title>Zendure Energy Manager</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="../main/favicon-32x32.png">
-    <link rel="apple-touch-icon" href="../main/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/app-icon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/app-icon-180.png">
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/theme.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/components.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('assets/css/app.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
@@ -140,9 +144,7 @@ $appConfig = [
         <header class="app-topbar">
             <div class="app-brand">
                 <span class="app-brand__mark" aria-hidden="true">
-                    <svg class="gsd-icon">
-                        <use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#bolt"></use>
-                    </svg>
+                    <img src="assets/icons/app-icon-180.png" alt="">
                 </span>
                 <div class="app-brand__copy">
                     <h1 class="app-brand__title">Zendure Energy Manager</h1>
