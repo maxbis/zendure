@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The new GUI's Prices & Energy Plan component combines hourly consumer prices, resolved schedule actions, and solar events for the today-and-tomorrow planning horizon. It provides summary metrics above a horizontally scrollable 48-hour timeline.
+The new GUI's Prices & Energy Plan component combines hourly consumer prices, resolved schedule actions, solar events, and predicted battery levels for the today-and-tomorrow planning horizon. It provides summary metrics above a horizontally scrollable 48-hour timeline.
 
 ## Location
 
@@ -20,15 +20,17 @@ The component reads:
 - Rule colors from the configured rules endpoint.
 - Price-conversion values from `window.GRAPHITE_APP_CONFIG` for deriving spot prices.
 - Sunrise and sunset events calculated by `app/index.php` for the configured installation.
+- Live battery forecast state published by `current-energy-status.js`.
+- Chained hourly predictions calculated by `battery-forecast.js`.
 
 The price summary presents four metrics in this order:
 
 - Current: the current hour's consumer price.
-- Horizon low: the lowest available hourly consumer price across today and tomorrow.
-- Horizon average: the arithmetic mean of every available hourly consumer price across today and tomorrow.
-- Horizon high: the highest available hourly consumer price across today and tomorrow.
+- From now low: the lowest available hourly consumer price from the current hour through tomorrow.
+- Daily averages: today's arithmetic mean, with tomorrow's mean included in the tooltip when tomorrow is available.
+- From now high: the highest available hourly consumer price from the current hour through tomorrow.
 
-Each metric displays three decimal places. Horizon average excludes missing or invalid hourly prices rather than treating them as zero.
+Each metric displays three decimal places. Daily averages exclude missing or invalid hourly prices rather than treating them as zero.
 
 ## Flow and behavior
 
@@ -38,8 +40,11 @@ Each metric displays three decimal places. Horizon average excludes missing or i
 4. It renders the four summary metrics and the hourly timeline.
 5. Activating a summary metric opens the shared price tooltip.
 6. Current, low, and high tooltips identify their specific date and hour and show consumer and derived spot prices.
-7. The Horizon average tooltip identifies how many hourly prices contributed and shows both the average consumer price and average derived spot price.
+7. The Daily averages tooltip identifies how many hourly prices contributed and shows both the average consumer price and average derived spot price.
 8. Activating the same metric again, clicking outside it, scrolling, resizing, or pressing `Escape` closes the tooltip. Escape returns focus to the trigger.
+9. Build one battery forecast from the live percentage through the end of tomorrow whenever schedules render or live battery state refreshes.
+10. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
+11. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 
@@ -48,14 +53,19 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 ## Edge cases and failure modes
 
 - When no finite prices are available, then the low, average, and high metrics display an unavailable value and their tooltip triggers are disabled.
-- When tomorrow's prices are pending, then Horizon average uses only the available today-and-tomorrow values and its tooltip reports the contributing hour count.
+- When tomorrow's prices are pending, then Daily averages shows today's available average and omits tomorrow's comparison.
 - When the current hour has no price, then Current is unavailable even if other horizon metrics can still be calculated.
 - When price conversion is configured differently, then the tooltip's spot values use that same conversion for each contributing consumer price.
 - When sunrise or sunset data is absent or invalid, then that solar marker is omitted without preventing the price timeline from rendering.
 - When all primary price and schedule requests fail, then the component displays its error state instead of stale summary metrics.
+- When live battery state is not ready, then a current or future action tooltip displays `Waiting for a live battery reading`.
+- When live battery state is stale, then the tooltip reports that the forecast is unavailable instead of showing an outdated prediction.
+- When a schedule tooltip represents an hour that has already ended, then it does not display a battery forecast section.
+- When live battery state refreshes while a schedule tooltip is open, then its forecast content is rebuilt in place.
 
 ## Related files
 
 - [Old and new GUI overview](../../gui-overview.md)
 - [Current energy status and battery details](current-energy-status.md)
+- [Battery level forecast](battery-forecast.md)
 - [Shared system configuration](../../shared-system-configuration.md)

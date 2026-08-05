@@ -35,6 +35,8 @@ The component also uses the configured battery capacity and minimum and maximum 
 - Usable energy above the configured minimum charge percentage.
 - Projected usable energy and usable-range percentage at the next whole hour.
 
+After each successful render, the component publishes `graphite:battery-forecast-state`. The event detail and `window.GRAPHITE_BATTERY_FORECAST_STATE` snapshot contain the live battery percentage, capacity, operating limits, reading timestamp, and stale state. The Prices & Energy Plan consumes this read-only snapshot for its chained hourly forecast.
+
 Encoded controller and pack temperatures are converted to Celsius with `(value - 2731) / 10` and displayed to one decimal place.
 
 The simplified battery-power and grid-exchange cards share one chevron calculation. When a card has an active flow, one chevron is always active and the remaining nine are dynamic:
@@ -59,6 +61,7 @@ With a 1200 W directional limit, an active flow below 60 W therefore shows one c
 9. The Health view shows controller temperature, each reported battery pack's percentage and temperature, and controller Wi-Fi signal.
 10. Activating **Energy** returns to the Energy view.
 11. When live status refreshes while the dialog is open, the dialog is rebuilt with current values and keeps the selected Energy or Health view.
+12. Publish the normalized battery state so the Prices & Energy Plan can rebuild its display-only hourly forecast.
 
 The dialog is positioned below its trigger when space permits. It moves above the trigger when it would otherwise extend beyond the bottom of the viewport, and its horizontal position is constrained to the viewport.
 
@@ -91,9 +94,11 @@ The dialog is positioned below its trigger when space permits. It moves above th
 - When the initial status load fails, then the component replaces its content with an unavailable state.
 - When the status proxy returns HTTP 502, then the error state specifically identifies the energy controller as unavailable.
 - When a response does not contain Zendure readings with `properties`, then normalization fails and the normal status error handling runs.
+- When the battery percentage is unavailable, then the published forecast snapshot contains a null percentage and the price-plan forecast remains unavailable.
 
 ## Related files
 
 - [Old and new GUI overview](../../gui-overview.md)
 - [New GUI shared system configuration](../../shared-system-configuration.md)
+- [Battery level forecast](battery-forecast.md)
 - [Graphite Signal Dark style guide](../../../../themes/graphite-signal-dark/style-guide.md)

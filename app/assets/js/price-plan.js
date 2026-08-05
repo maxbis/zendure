@@ -63,6 +63,7 @@
     let selectedHourKey = null;
     let isProgrammaticTimelineScroll = false;
     let programmaticTimelineScrollTimer = null;
+    let activeScheduleTooltip = null;
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -71,6 +72,8 @@
         schedules: { today: [], tomorrow: [] },
         entries: { today: [], tomorrow: [] },
         ruleColors: {},
+        battery: window.GRAPHITE_BATTERY_FORECAST_STATE || null,
+        batteryForecast: {},
         controller: null
     };
 
@@ -386,6 +389,38 @@
         return result;
     }
 
+    function forecastDays() {
+        const dates = localDates();
+        return [
+            {
+                date: state.dates.today || dates.today,
+                slots: scheduleMap(state.schedules.today)
+            },
+            {
+                date: state.dates.tomorrow || dates.tomorrow,
+                slots: scheduleMap(state.schedules.tomorrow)
+            }
+        ];
+    }
+
+    function rebuildBatteryForecast() {
+        const forecastEngine = window.GraphiteBatteryForecast;
+        state.batteryForecast = forecastEngine?.buildForecast
+            ? forecastEngine.buildForecast({ battery: state.battery, days: forecastDays() })
+            : {};
+    }
+
+    function forecastKey(date, hour) {
+        return `${date}${pad(hour)}00`;
+    }
+
+    function hourEndsInFuture(date, hour) {
+        const start = dateFromKey(date);
+        if (!start) return false;
+        start.setHours(hour + 1, 0, 0, 0);
+        return start > new Date();
+    }
+
     function priceValues(dayPrices) {
         return Array.from({ length: 24 }, (_, hour) => {
             const raw = dayPrices && typeof dayPrices === "object" ? dayPrices[pad(hour)] : null;
@@ -485,6 +520,7 @@
             pinnedTooltipTrigger = null;
         }
         activeTooltipTrigger = null;
+        activeScheduleTooltip = null;
         priceTooltip.hidden = true;
         priceTooltip.style.removeProperty("left");
         priceTooltip.style.removeProperty("top");
@@ -554,9 +590,62 @@
         return limits;
     }
 
-    function showPriceTooltip({ hour, slot, action, limited }, trigger, anchor) {
+    function forecastSourceCopy(forecast) {
+        const fallback = forecast.usedFallback ? "Runtime fallback · " : "";
+        if (forecast.source === "scheduled_power") return `${fallback}scheduled power`;
+        if (forecast.source === "household_profile") return `${fallback}household estimate`;
+        if (forecast.source === "solar_forecast_unavailable") return `${fallback}no solar forecast`;
+        return `${fallback}automatic action unknown`;
+    }
+
+    function tooltipBatteryForecast(date, hour) {
+        if (!hourEndsInFuture(date, hour)) return null;
+
+        const section = document.createElement("div");
+        section.className = "app-schedule-tooltip__forecast";
+        const title = tooltipSectionLabel("Estimated battery");
+        const forecast = state.batteryForecast[forecastKey(date, hour)];
+        section.appendChild(title);
+
+        if (!forecast) {
+            const unavailable = document.createElement("p");
+            unavailable.className = "app-schedule-tooltip__forecast-unavailable";
+            unavailable.textContent = state.battery?.stale
+                ? "Unavailable because the live battery reading is stale."
+                : "Waiting for a live battery reading.";
+            section.appendChild(unavailable);
+            return section;
+        }
+
+        const values = document.createElement("div");
+        values.className = "app-schedule-tooltip__forecast-values";
+        const start = document.createElement("p");
+        const end = document.createElement("p");
+        const startLabel = document.createElement("span");
+        const endLabel = document.createElement("span");
+        const startValue = document.createElement("strong");
+        const endValue = document.createElement("strong");
+        startLabel.textContent = forecast.currentHour ? "Now" : "Start";
+        endLabel.textContent = "End";
+        startValue.textContent = `${forecast.startPercent.toFixed(1)}%`;
+        endValue.textContent = `${forecast.endPercent.toFixed(1)}%`;
+        start.append(startLabel, startValue);
+        end.append(endLabel, endValue);
+        values.append(start, end);
+
+        const detail = document.createElement("p");
+        detail.className = "app-schedule-tooltip__forecast-detail";
+        const deltaPrefix = forecast.deltaPercent > 0 ? "+" : forecast.deltaPercent < 0 ? "−" : "";
+        const durationMinutes = Math.round(forecast.durationHours * 60);
+        detail.textContent = `${deltaPrefix}${Math.abs(forecast.deltaPercent).toFixed(1)} pp · ${formatWatts(forecast.estimatedPowerW)} · ${forecastSourceCopy(forecast)}${forecast.currentHour ? ` · ${durationMinutes} min remaining` : ""}`;
+        section.append(values, detail);
+        return section;
+    }
+
+    function showPriceTooltip({ date, hour, slot, action, limited }, trigger, anchor) {
         hidePriceTooltip();
         activeTooltipTrigger = trigger;
+        activeScheduleTooltip = { detail: { date, hour, slot, action, limited }, trigger, anchor };
         trigger.setAttribute("aria-describedby", priceTooltip.id);
         if (trigger.matches(".app-price-hour__action")) trigger.setAttribute("aria-expanded", "true");
 
@@ -598,6 +687,9 @@
             content.appendChild(tooltipActionRow(slot, action));
             if (limited) content.appendChild(tooltipLimits(slot));
         }
+
+        const batteryForecast = tooltipBatteryForecast(date, hour);
+        if (batteryForecast) content.appendChild(batteryForecast);
 
         priceTooltip.replaceChildren(header, content);
         priceTooltip.hidden = false;
@@ -1088,7 +1180,7 @@
             }
             if (action.type === "netzero") actionElement.dataset.netzeroDirection = action.direction;
             setActionBadgeContent(actionElement, slot, action);
-            const tooltipDetail = { hour, slot, action, limited };
+            const tooltipDetail = { date: day.date, hour, slot, action, limited };
             actionElement.setAttribute("aria-expanded", "false");
             actionElement.setAttribute(
                 "aria-label",
@@ -1169,6 +1261,7 @@
             { key: "today", label: "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
             { key: "tomorrow", label: "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
         ];
+        rebuildBatteryForecast();
         renderSummary(days);
         renderTimeline(days);
         if (elements.tomorrowAvailability) {
@@ -1333,6 +1426,17 @@
     editElements?.fixedRange?.addEventListener("input", () => updateFixedPowerControls({ fromSlider: true }));
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) load();
+    });
+    document.addEventListener("graphite:battery-forecast-state", (event) => {
+        state.battery = event.detail || null;
+        rebuildBatteryForecast();
+
+        if (activeScheduleTooltip && !priceTooltip.hidden) {
+            const openTooltip = activeScheduleTooltip;
+            const wasPinned = pinnedTooltipTrigger === openTooltip.trigger;
+            showPriceTooltip(openTooltip.detail, openTooltip.trigger, openTooltip.anchor);
+            if (wasPinned) pinnedTooltipTrigger = openTooltip.trigger;
+        }
     });
     window.addEventListener("resize", () => hidePriceTooltip());
     window.addEventListener("scroll", (event) => {

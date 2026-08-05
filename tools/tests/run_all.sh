@@ -23,6 +23,15 @@ else
 fi
 
 echo ""
+echo "==> Running app battery forecast tests"
+if node "$SCRIPT_DIR/app_battery_forecast_test.js"; then
+  :
+else
+  FAILED=1
+  FAILED_SUITES+=("app_battery_forecast")
+fi
+
+echo ""
 if [ "$FAILED" -eq 0 ]; then
   echo "SUMMARY: ALL OK"
   exit 0

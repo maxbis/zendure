@@ -724,6 +724,19 @@
         elements.connectionBadge.textContent = label;
     }
 
+    function publishBatteryForecastState(model) {
+        const detail = Object.freeze({
+            percent: model.batteryPercent,
+            capacityWh: model.capacityWh,
+            minimumPercent: model.minimumPercent,
+            maximumPercent: model.maximumPercent,
+            timestampMs: model.timestampMs,
+            stale: model.stale
+        });
+        window.GRAPHITE_BATTERY_FORECAST_STATE = detail;
+        document.dispatchEvent(new CustomEvent("graphite:battery-forecast-state", { detail }));
+    }
+
     function renderModel(model) {
         latestModel = model;
         hasRenderedData = true;
@@ -1007,6 +1020,7 @@
         elements.powerSimpleFreshness.dataset.state = model.stale ? "stale" : "live";
         elements.lastUpdate.textContent = formatRelativeTime(model.timestampMs);
         setConnectionState(model.stale ? "stale" : "online", model.stale ? "Stale" : "Live");
+        publishBatteryForecastState(model);
     }
 
     function renderLoading() {
