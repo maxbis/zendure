@@ -26,6 +26,15 @@ function getRequiredScheduleBatterySettings() {
     return { minimumPercent, maximumPercent, capacityWh };
 }
 
+function getRequiredSchedulePowerRange() {
+    const minimumW = typeof GRID_MIN_POWER === 'undefined' ? NaN : Number(GRID_MIN_POWER);
+    const maximumW = typeof GRID_MAX_POWER === 'undefined' ? NaN : Number(GRID_MAX_POWER);
+    if (!Number.isFinite(minimumW) || !Number.isFinite(maximumW) || minimumW >= maximumW) {
+        throw new Error('The shared schedule power range is missing or invalid.');
+    }
+    return { minimumW, maximumW };
+}
+
 /**
  * Render today's schedule list
  * @param {Array} resolved - Resolved schedule slots
@@ -730,13 +739,9 @@ function renderChargeStatus(zendureData, p1Data = null) {
         }
     }
 
-    // Calculate bar width (use config GRID_MIN_POWER / GRID_MAX_POWER when available)
-    const minPower = (typeof GRID_MIN_POWER !== 'undefined' && Number.isFinite(Number(GRID_MIN_POWER)))
-        ? Number(GRID_MIN_POWER)
-        : -1200;
-    const maxPower = (typeof GRID_MAX_POWER !== 'undefined' && Number.isFinite(Number(GRID_MAX_POWER)))
-        ? Number(GRID_MAX_POWER)
-        : 1200;
+    const powerRange = getRequiredSchedulePowerRange();
+    const minPower = powerRange.minimumW;
+    const maxPower = powerRange.maximumW;
     const clampedValue = Math.max(minPower, Math.min(maxPower, chargeDischargeValue));
     // Minimum visible width for non-zero charge/discharge bars (percent of full bar width).
     const MIN_POWER_BAR_WIDTH_PERCENT = 15;
@@ -1130,13 +1135,9 @@ function renderChargeStatusDetails(zendureData, p1Data = null) {
         const gridAnimatedValue = gridValueSpan.querySelector('.charge-grid-value-highlight');
         animateGridValueRefresh(gridAnimatedValue);
 
-        // Calculate bar width for -1200 to +1200 range
-        const minGridPower = (typeof GRID_MIN_POWER !== 'undefined' && Number.isFinite(Number(GRID_MIN_POWER)))
-            ? Number(GRID_MIN_POWER)
-            : -1200;
-        const maxGridPower = (typeof GRID_MAX_POWER !== 'undefined' && Number.isFinite(Number(GRID_MAX_POWER)))
-            ? Number(GRID_MAX_POWER)
-            : 1200;
+        const powerRange = getRequiredSchedulePowerRange();
+        const minGridPower = powerRange.minimumW;
+        const maxGridPower = powerRange.maximumW;
         const clampedGridValue = Math.max(minGridPower, Math.min(maxGridPower, p1TotalPower));
 
         let gridBarWidth = 0;

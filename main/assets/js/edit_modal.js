@@ -10,7 +10,7 @@ class EditModal {
         const sharedBounds = this.resolveSharedPowerBounds();
         this.limitMin = sharedBounds.min;
         this.limitMax = sharedBounds.max;
-        this.limitStep = 100;
+        this.limitStep = this.resolveSharedPowerStep();
         this.modal = document.getElementById('edit-modal');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.powerRangeIndicator = document.getElementById('power-range-indicator');
@@ -37,21 +37,20 @@ class EditModal {
     }
 
     resolveSharedPowerBounds() {
-        const fallbackMin = -1200;
-        const fallbackMax = 2000;
-        const globalMin = typeof GRID_MIN_POWER !== 'undefined' ? Number(GRID_MIN_POWER) : fallbackMin;
-        const globalMax = typeof GRID_MAX_POWER !== 'undefined' ? Number(GRID_MAX_POWER) : fallbackMax;
-
-        let min = Number.isFinite(globalMin) ? globalMin : fallbackMin;
-        let max = Number.isFinite(globalMax) ? globalMax : fallbackMax;
-        min = Math.min(min, 0);
-        max = Math.max(max, 0);
-
-        if (min > max) {
-            return { min: fallbackMin, max: fallbackMax };
+        const min = typeof GRID_MIN_POWER === 'undefined' ? NaN : Number(GRID_MIN_POWER);
+        const max = typeof GRID_MAX_POWER === 'undefined' ? NaN : Number(GRID_MAX_POWER);
+        if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) {
+            throw new Error('The shared schedule power range is missing or invalid.');
         }
-
         return { min, max };
+    }
+
+    resolveSharedPowerStep() {
+        const step = typeof SCHEDULE_POWER_STEP_W === 'undefined' ? NaN : Number(SCHEDULE_POWER_STEP_W);
+        if (!Number.isInteger(step) || step <= 0) {
+            throw new Error('The shared schedule power step is missing or invalid.');
+        }
+        return step;
     }
 
     init() {

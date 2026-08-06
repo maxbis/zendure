@@ -475,9 +475,11 @@ function handleGetData($type) {
                     'maximum_percent' => (float) $dataApiSystemConfig['battery']['maxChargePercent'],
                 ];
                 $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, [
-                    'max_discharge_power_w' => abs((int) ConfigLoader::get('minGridPower', -1600)),
-                    'max_charge_power_w' => max(0, (int) ConfigLoader::get('maxGridPower', 1600)),
-                    'charge_power_step_w' => TARGET_CHARGE_POWER_STEP_W,
+                    'usage_w_by_hour' => $dataApiSystemConfig['forecast']['defaultHouseholdUsageWByHour'],
+                    'efficiency' => $dataApiSystemConfig['battery']['efficiency'],
+                    'max_discharge_power_w' => $dataApiSystemConfig['battery']['maxDischargePowerW'],
+                    'max_charge_power_w' => $dataApiSystemConfig['battery']['maxChargePowerW'],
+                    'charge_power_step_w' => $dataApiSystemConfig['schedule']['powerStepW'],
                 ]);
             }
             foreach ($planningDays as $planningDay) {

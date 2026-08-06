@@ -3,7 +3,43 @@
   "battery": {
     "capacityWh": 5760,
     "minChargePercent": 15,
-    "maxChargePercent": 91
+    "maxChargePercent": 91,
+    "efficiency": 0.9,
+    "maxChargePowerW": 1200,
+    "maxDischargePowerW": 1200
+  },
+  "forecast": {
+    "defaultHouseholdUsageWByHour": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220,
+      220
+    ]
+  },
+  "schedule": {
+    "minPowerW": -1600,
+    "maxPowerW": 1600,
+    "powerStepW": 100
   },
   "installation": {
     "name": "Amsterdam",

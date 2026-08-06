@@ -9,13 +9,21 @@ function getPriceOverviewNumberConfig(key, fallback) {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function getRequiredPriceOverviewNumberConfig(key) {
+    const value = window.PRICE_OVERVIEW_CONFIG ? window.PRICE_OVERVIEW_CONFIG[key] : undefined;
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`Missing required shared price-overview setting: ${key}.`);
+    }
+    return value;
+}
+
 function getPriceOverviewObjectConfig(key) {
     const value = window.PRICE_OVERVIEW_CONFIG ? window.PRICE_OVERVIEW_CONFIG[key] : undefined;
     return (value && typeof value === 'object' && !Array.isArray(value)) ? value : null;
 }
 
 const PRICE_PROXY_NO_DATA = getPriceOverviewNumberConfig('priceProxyNoData', 0.24);
-const POPUP_POWER_EFFICIENCY = getPriceOverviewNumberConfig('popupPowerEfficiency', 0.9);
+const POPUP_POWER_EFFICIENCY = getRequiredPriceOverviewNumberConfig('popupPowerEfficiency');
 const POPUP_NETZERO_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroReferenceW', 200);
 const POPUP_NETZERO_MINUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroMinusReferenceW', -180);
 const POPUP_NETZERO_PLUS_REFERENCE_W = getPriceOverviewNumberConfig('popupNetzeroPlusReferenceW', 300);

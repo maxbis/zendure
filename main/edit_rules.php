@@ -11,8 +11,6 @@ $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
 $profilesFile = __DIR__ . '/data/rule_profiles.json';
 const SHOW_ALL_PROFILE_ID = 'show_all';
 const DEFAULT_PROFILE_IDS = ['profile_a', 'profile_b', 'profile_c', 'profile_d', 'profile_e'];
-const DEFAULT_LIMIT_MIN = -1200;
-const DEFAULT_LIMIT_MAX = 1200;
 
 function jsonResponse(array $payload, int $status = 200): void
 {
@@ -73,19 +71,12 @@ function normalizeConditionRelationValue($value): string
     return $normalized === 'or' ? 'or' : 'and';
 }
 
-function resolveRuleEditorLimits(): array
+function resolveRuleEditorLimits(array $systemConfig): array
 {
-    $min = ConfigLoader::get('minGridPower', DEFAULT_LIMIT_MIN);
-    $max = ConfigLoader::get('maxGridPower', DEFAULT_LIMIT_MAX);
-
-    $min = is_numeric($min) ? (int) $min : DEFAULT_LIMIT_MIN;
-    $max = is_numeric($max) ? (int) $max : DEFAULT_LIMIT_MAX;
-
-    if ($min > $max) {
-        return ['min' => DEFAULT_LIMIT_MIN, 'max' => DEFAULT_LIMIT_MAX];
-    }
-
-    return ['min' => $min, 'max' => $max];
+    return [
+        'min' => (int) $systemConfig['schedule']['minPowerW'],
+        'max' => (int) $systemConfig['schedule']['maxPowerW'],
+    ];
 }
 
 /**
@@ -533,15 +524,13 @@ if ($isApi) {
     }
 }
 
-$editorLimits = resolveRuleEditorLimits();
+$editorSystemConfig = loadSystemConfig();
+$editorLimits = resolveRuleEditorLimits($editorSystemConfig);
 $editorLimitMin = $editorLimits['min'];
 $editorLimitMax = $editorLimits['max'];
-$editorMinChargePercent = (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 15);
-$editorMaxChargePercent = (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 95);
-if ($editorMinChargePercent < 0 || $editorMaxChargePercent > 100 || $editorMinChargePercent >= $editorMaxChargePercent) {
-    $editorMinChargePercent = 15;
-    $editorMaxChargePercent = 95;
-}
+$editorPowerStepW = (int) $editorSystemConfig['schedule']['powerStepW'];
+$editorMinChargePercent = (int) $editorSystemConfig['battery']['minChargePercent'];
+$editorMaxChargePercent = (int) $editorSystemConfig['battery']['maxChargePercent'];
 $editorTodayContext = resolveEditorTodayContext();
 ?>
 <!doctype html>
@@ -753,8 +742,8 @@ $editorTodayContext = resolveEditorTodayContext();
                         <div id="limits-slider" class="limits-slider">
                             <div class="limits-slider-track"></div>
                             <div id="limits-selected-range" class="limits-selected-range"></div>
-                            <input id="limits-min-range" class="limits-range limits-range-min" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="100" value="<?php echo $editorLimitMin; ?>" aria-label="Minimum power limit">
-                            <input id="limits-max-range" class="limits-range limits-range-max" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="100" value="<?php echo $editorLimitMax; ?>" aria-label="Maximum power limit">
+                            <input id="limits-min-range" class="limits-range limits-range-min" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="<?php echo $editorPowerStepW; ?>" value="<?php echo $editorLimitMin; ?>" aria-label="Minimum power limit">
+                            <input id="limits-max-range" class="limits-range limits-range-max" type="range" min="<?php echo $editorLimitMin; ?>" max="<?php echo $editorLimitMax; ?>" step="<?php echo $editorPowerStepW; ?>" value="<?php echo $editorLimitMax; ?>" aria-label="Maximum power limit">
                         </div>
                         <div id="power-range-indicator" class="power-range-indicator" hidden></div>
                     </div>
@@ -831,6 +820,7 @@ window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule
 window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'limitMin' => $editorLimitMin,
     'limitMax' => $editorLimitMax,
+    'powerStepW' => $editorPowerStepW,
     'minChargePercent' => $editorMinChargePercent,
     'maxChargePercent' => $editorMaxChargePercent,
     'sunToday' => $editorTodayContext,

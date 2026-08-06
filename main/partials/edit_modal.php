@@ -51,7 +51,7 @@
             <div class="edit-modal-value-panel">
                 <div class="form-group" id="group-watts">
                     <label>Watts (Positive = Charge, Negative = Discharge)</label>
-                    <input type="number" id="inp-watts" placeholder="0" step="100">
+                    <input type="number" id="inp-watts" placeholder="0" step="<?php echo (int) $systemConfig['schedule']['powerStepW']; ?>">
                     <div class="edit-modal-fixed-panel">
                         <div class="edit-modal-fixed-values">
                             <div class="edit-modal-limits-chip edit-modal-fixed-chip">

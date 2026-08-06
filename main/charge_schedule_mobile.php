@@ -167,11 +167,12 @@ $priceConversionConfig = $systemConfig['priceConversion'];
             const CHARGE_STATUS_MIN_CHARGE_LEVEL = <?php echo (int) $systemConfig['battery']['minChargePercent']; ?>;
             const CHARGE_STATUS_MAX_CHARGE_LEVEL = <?php echo (int) $systemConfig['battery']['maxChargePercent']; ?>;
             const BASE_WH = <?php echo (int) $systemConfig['battery']['capacityWh']; ?>;
-            const GRID_MIN_POWER = <?php echo (int) ConfigLoader::get('minGridPower', -1200); ?>;
-            const GRID_MAX_POWER = <?php echo (int) ConfigLoader::get('maxGridPower', 1200); ?>;
+            const GRID_MIN_POWER = <?php echo (int) $systemConfig['schedule']['minPowerW']; ?>;
+            const GRID_MAX_POWER = <?php echo (int) $systemConfig['schedule']['maxPowerW']; ?>;
+            const SCHEDULE_POWER_STEP_W = <?php echo (int) $systemConfig['schedule']['powerStepW']; ?>;
             window.PRICE_OVERVIEW_CONFIG = {
                 priceProxyNoData: <?php echo json_encode(ConfigLoader::get('priceProxyNoData', 0.24), JSON_UNESCAPED_SLASHES); ?>,
-                popupPowerEfficiency: <?php echo json_encode(ConfigLoader::get('popupPowerEfficiency', 0.9), JSON_UNESCAPED_SLASHES); ?>,
+                popupPowerEfficiency: <?php echo json_encode($systemConfig['battery']['efficiency'], JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroReferenceW', 200), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroMinusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroMinusReferenceW', -180), JSON_UNESCAPED_SLASHES); ?>,
                 popupNetzeroPlusReferenceW: <?php echo json_encode(ConfigLoader::get('popupNetzeroPlusReferenceW', 300), JSON_UNESCAPED_SLASHES); ?>,

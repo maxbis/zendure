@@ -2,12 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://zendure.local/schemas/system.schema.json",
   "title": "Zendure shared system configuration",
-  "description": "Canonical non-secret installation, battery and price-conversion values shared across the Zendure project.",
+  "description": "Canonical non-secret battery, forecast, schedule, installation and price-conversion values shared across the Zendure project.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "battery",
+    "forecast",
+    "schedule",
     "installation",
     "priceConversion"
   ],
@@ -22,7 +24,10 @@
       "required": [
         "capacityWh",
         "minChargePercent",
-        "maxChargePercent"
+        "maxChargePercent",
+        "efficiency",
+        "maxChargePowerW",
+        "maxDischargePowerW"
       ],
       "properties": {
         "capacityWh": {
@@ -41,6 +46,67 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "efficiency": {
+          "description": "One-way charge and discharge efficiency factor used by battery forecasts.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "maxChargePowerW": {
+          "description": "Maximum charge command magnitude in watts.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxDischargePowerW": {
+          "description": "Maximum discharge command magnitude in watts.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "defaultHouseholdUsageWByHour"
+      ],
+      "properties": {
+        "defaultHouseholdUsageWByHour": {
+          "description": "Fallback household demand for each local hour from 00 through 23, in watts.",
+          "type": "array",
+          "minItems": 24,
+          "maxItems": 24,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minPowerW",
+        "maxPowerW",
+        "powerStepW"
+      ],
+      "properties": {
+        "minPowerW": {
+          "description": "Lowest signed power accepted by schedule planning and editing.",
+          "type": "integer",
+          "maximum": 0
+        },
+        "maxPowerW": {
+          "description": "Highest signed power accepted by schedule planning and editing.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "powerStepW": {
+          "description": "Power increment used by schedule planning and editing.",
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

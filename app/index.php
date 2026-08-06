@@ -92,8 +92,11 @@ $appConfig = [
     'minChargePercent' => $systemConfig['battery']['minChargePercent'] ?? null,
     'maxChargePercent' => $systemConfig['battery']['maxChargePercent'] ?? null,
     'capacityWh' => $systemConfig['battery']['capacityWh'] ?? null,
-    'powerMinW' => (float) ConfigLoader::get('minGridPower', -1200),
-    'powerMaxW' => (float) ConfigLoader::get('maxGridPower', 1200),
+    'batteryEfficiency' => $systemConfig['battery']['efficiency'] ?? null,
+    'forecastHouseholdUsageWByHour' => $systemConfig['forecast']['defaultHouseholdUsageWByHour'] ?? null,
+    'powerMinW' => $systemConfig['schedule']['minPowerW'] ?? null,
+    'powerMaxW' => $systemConfig['schedule']['maxPowerW'] ?? null,
+    'powerStepW' => $systemConfig['schedule']['powerStepW'] ?? null,
     'scheduleUrl' => ConfigLoader::get(
         'scheduleApiUrl',
         '../main/api/charge_schedule_api.php'
@@ -694,7 +697,7 @@ $appConfig = [
                 <div class="gsd-field" data-role="schedule-fixed-field" hidden>
                     <label class="gsd-field__label" for="schedule-edit-watts">Fixed power</label>
                     <div class="app-input-with-unit">
-                        <input class="gsd-input" id="schedule-edit-watts" name="watts" type="number" step="100" inputmode="numeric">
+                        <input class="gsd-input" id="schedule-edit-watts" name="watts" type="number" step="<?= htmlspecialchars((string) ($appConfig['powerStepW'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" inputmode="numeric">
                         <span>W</span>
                     </div>
                     <small>Positive charges the battery; negative discharges it.</small>
@@ -706,7 +709,7 @@ $appConfig = [
                         <div class="app-fixed-slider" data-role="schedule-fixed-slider">
                             <span class="app-fixed-slider__track" aria-hidden="true"></span>
                             <span class="app-fixed-slider__selection" data-role="schedule-fixed-selection" aria-hidden="true"></span>
-                            <input type="range" step="100" data-role="schedule-fixed-range" aria-label="Fixed power value">
+                            <input type="range" step="<?= htmlspecialchars((string) ($appConfig['powerStepW'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-role="schedule-fixed-range" aria-label="Fixed power value">
                         </div>
                         <p class="app-fixed-power-summary" data-role="schedule-fixed-summary">Idle: 0 W</p>
                     </div>
@@ -733,8 +736,8 @@ $appConfig = [
                         <div class="app-limit-slider" data-role="schedule-limit-slider">
                             <span class="app-limit-slider__track" aria-hidden="true"></span>
                             <span class="app-limit-slider__selection" data-role="schedule-limit-selection" aria-hidden="true"></span>
-                            <input type="range" step="100" data-role="schedule-limit-min-range" aria-label="Minimum power limit">
-                            <input type="range" step="100" data-role="schedule-limit-max-range" aria-label="Maximum power limit">
+                            <input type="range" step="<?= htmlspecialchars((string) ($appConfig['powerStepW'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-role="schedule-limit-min-range" aria-label="Minimum power limit">
+                            <input type="range" step="<?= htmlspecialchars((string) ($appConfig['powerStepW'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-role="schedule-limit-max-range" aria-label="Maximum power limit">
                         </div>
                     </div>
                     <p class="app-limit-editor__summary" data-role="schedule-limit-summary"></p>

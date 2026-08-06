@@ -81,6 +81,25 @@
         controller: null
     };
 
+    function requiredSharedNumber(key) {
+        const value = Number(config[key]);
+        if (!Number.isFinite(value)) throw new Error(`Missing required shared setting: ${key}.`);
+        return value;
+    }
+
+    function sharedPowerBounds() {
+        const minimum = requiredSharedNumber("powerMinW");
+        const maximum = requiredSharedNumber("powerMaxW");
+        if (minimum >= maximum) throw new Error("The shared schedule power range is invalid.");
+        return { minimum, maximum };
+    }
+
+    function sharedPowerStepW() {
+        const step = requiredSharedNumber("powerStepW");
+        if (!Number.isInteger(step) || step <= 0) throw new Error("The shared schedule power step is invalid.");
+        return step;
+    }
+
     const DAY_PARTS = [
         { key: "night", label: "Night", start: 0, end: 6 },
         { key: "morning", label: "Morning", start: 6, end: 12 },
@@ -477,7 +496,12 @@
     function rebuildBatteryForecast() {
         const forecastEngine = window.GraphiteBatteryForecast;
         state.batteryForecast = forecastEngine?.buildForecast
-            ? forecastEngine.buildForecast({ battery: state.battery, days: forecastDays() })
+            ? forecastEngine.buildForecast({
+                battery: state.battery,
+                days: forecastDays(),
+                householdUsageWByHour: config.forecastHouseholdUsageWByHour,
+                efficiency: requiredSharedNumber("batteryEfficiency")
+            })
             : {};
     }
 
@@ -961,7 +985,8 @@
         const magnitude = Math.abs(Number(value));
         if (!Number.isFinite(magnitude)) return "";
         if (magnitude < 1000) return String(magnitude);
-        const rounded = Math.round(magnitude / 100) * 100;
+        const step = sharedPowerStepW();
+        const rounded = Math.round(magnitude / step) * step;
         const thousands = Math.floor(rounded / 1000);
         const hundreds = (rounded % 1000) / 100;
         return `${thousands}K${hundreds || ""}`;
@@ -1037,8 +1062,9 @@
     }
 
     function limitBoundsForMode(mode = selectedMode()) {
-        const lower = Math.min(Number(config.powerMinW) || -1200, -1);
-        const upper = Math.max(Number(config.powerMaxW) || 1200, 1);
+        const bounds = sharedPowerBounds();
+        const lower = Math.min(bounds.minimum, -1);
+        const upper = Math.max(bounds.maximum, 1);
         if (mode === "netzero+") return { minimum: 0, maximum: upper };
         if (mode === "netzero-") return { minimum: lower, maximum: 0 };
         return { minimum: lower, maximum: upper };
@@ -1047,7 +1073,8 @@
     function clampLimit(value, bounds, fallback) {
         const numeric = numericValue(value);
         if (numeric === null) return fallback;
-        const snapped = Math.round(numeric / 100) * 100;
+        const step = sharedPowerStepW();
+        const snapped = Math.round(numeric / step) * step;
         return Math.min(bounds.maximum, Math.max(bounds.minimum, snapped));
     }
 
@@ -1072,7 +1099,7 @@
         const sliderValue = clampLimit(displayValue, bounds, 0);
         editElements.fixedRange.min = String(bounds.minimum);
         editElements.fixedRange.max = String(bounds.maximum);
-        editElements.fixedRange.step = "100";
+        editElements.fixedRange.step = String(sharedPowerStepW());
         editElements.fixedRange.value = String(sliderValue);
         editElements.fixedDisplay.textContent = formatLimitValue(displayValue);
         setLimitTone(editElements.watts, displayValue);
@@ -1118,7 +1145,7 @@
         [editElements.minimumRange, editElements.maximumRange].forEach((input) => {
             input.min = String(bounds.minimum);
             input.max = String(bounds.maximum);
-            input.step = "100";
+            input.step = String(sharedPowerStepW());
         });
         editElements.minimumRange.value = String(minimum);
         editElements.maximumRange.value = String(maximum);
@@ -1459,8 +1486,9 @@
         if (mode === "fixed") {
             value = optionalInteger(editElements.watts, "Fixed power");
             if (value === null) throw new Error("Enter a fixed power value.");
-            const lower = Math.min(Number(config.powerMinW) || -1200, -1);
-            const upper = Math.max(Number(config.powerMaxW) || 1200, 1);
+            const bounds = sharedPowerBounds();
+            const lower = Math.min(bounds.minimum, -1);
+            const upper = Math.max(bounds.maximum, 1);
             if (value < lower || value > upper) throw new Error(`Fixed power must be between ${lower} W and ${upper} W.`);
         }
         entry.value = value;

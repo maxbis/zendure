@@ -2,18 +2,26 @@
 
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
+
 const TARGET_BATTERY_MODE = 'empty_at_solar_charge';
 const TARGET_BATTERY_ANCHOR = 'next_solar_capable_netzero';
 const TARGET_CHARGE_MODE = 'full_at_netzero_minus';
 const TARGET_CHARGE_ANCHOR = 'next_netzero_minus';
-const TARGET_BATTERY_POWER_STEP_W = 100;
-const TARGET_CHARGE_POWER_STEP_W = 100;
-const TARGET_BATTERY_EFFICIENCY = 0.9;
-const TARGET_BATTERY_DEFAULT_USAGE_W_BY_HOUR = [
-    100, 100, 100, 100, 100, 100, 100, 100,
-    220, 220, 220, 220, 220, 220, 220, 220,
-    220, 220, 220, 220, 220, 220, 220, 220,
-];
+
+function tbp_system_config(): array
+{
+    static $config = null;
+    if ($config === null) {
+        $config = loadSystemConfig();
+    }
+    return $config;
+}
+
+function tbp_shared_power_step_w(): int
+{
+    return (int) tbp_system_config()['schedule']['powerStepW'];
+}
 
 function tbp_clamp(float $value, float $minimum, float $maximum): float
 {
@@ -239,22 +247,22 @@ function tbp_target_charge_group_key(array $slot): string
     return 'anonymous-target-charge';
 }
 
-function tbp_round_charge_minimum(float $powerW, int $maximumPowerW, int $stepW = TARGET_CHARGE_POWER_STEP_W): int
+function tbp_round_charge_minimum(float $powerW, int $maximumPowerW, ?int $stepW = null): int
 {
     if ($powerW <= 0 || $maximumPowerW <= 0) {
         return 0;
     }
-    $stepW = max(1, $stepW);
+    $stepW = max(1, $stepW ?? tbp_shared_power_step_w());
     $rounded = (int) (ceil($powerW / $stepW) * $stepW);
     return min($maximumPowerW, $rounded);
 }
 
-function tbp_round_discharge_power(float $powerW, int $maximumPowerW, int $stepW = TARGET_BATTERY_POWER_STEP_W): int
+function tbp_round_discharge_power(float $powerW, int $maximumPowerW, ?int $stepW = null): int
 {
     if ($powerW >= 0 || $maximumPowerW <= 0) {
         return 0;
     }
-    $stepW = max(1, $stepW);
+    $stepW = max(1, $stepW ?? tbp_shared_power_step_w());
     $roundedMagnitude = (int) (round(abs($powerW) / $stepW) * $stepW);
     $maximumSteppedMagnitude = (int) (floor($maximumPowerW / $stepW) * $stepW);
     return -min($roundedMagnitude, $maximumSteppedMagnitude);
@@ -279,7 +287,7 @@ function tbp_target_charge_metadata(
         'status' => $status,
         'rule_date' => $entry['date'],
         'rule_time' => $entry['time'],
-        'power_step_w' => TARGET_CHARGE_POWER_STEP_W,
+        'power_step_w' => tbp_shared_power_step_w(),
     ];
     if ($anchor !== null) {
         $metadata['anchor_date'] = $anchor['date'];
@@ -323,7 +331,7 @@ function tbp_planning_metadata(
         'status' => $status,
         'rule_date' => $entry['date'],
         'rule_time' => $entry['time'],
-        'power_step_w' => TARGET_BATTERY_POWER_STEP_W,
+        'power_step_w' => tbp_shared_power_step_w(),
     ];
     if ($anchor !== null) {
         $metadata['anchor_date'] = $anchor['date'];
@@ -357,17 +365,18 @@ function tbp_materialize_horizon(
     DateTimeImmutable $now,
     array $options = []
 ): array {
+    $sharedConfig = tbp_system_config();
     $timezone = $now->getTimezone();
     $flat = tbp_flatten_days($days, $timezone);
     $usageByHour = isset($options['usage_w_by_hour']) && is_array($options['usage_w_by_hour'])
         ? $options['usage_w_by_hour']
-        : TARGET_BATTERY_DEFAULT_USAGE_W_BY_HOUR;
+        : $sharedConfig['forecast']['defaultHouseholdUsageWByHour'];
     $efficiency = isset($options['efficiency']) && is_numeric($options['efficiency'])
         ? tbp_clamp((float) $options['efficiency'], 0.01, 1.0)
-        : TARGET_BATTERY_EFFICIENCY;
+        : (float) $sharedConfig['battery']['efficiency'];
     $defaultMaxDischargeW = isset($options['max_discharge_power_w']) && is_numeric($options['max_discharge_power_w'])
         ? max(1, (int) $options['max_discharge_power_w'])
-        : 1600;
+        : (int) $sharedConfig['battery']['maxDischargePowerW'];
 
     foreach ($flat as $targetIndex => &$entry) {
         if (($entry['slot']['value'] ?? null) !== TARGET_BATTERY_MODE) {
@@ -418,7 +427,11 @@ function tbp_materialize_horizon(
             ? max(1, (int) $entry['slot']['max_discharge_power'])
             : $defaultMaxDischargeW;
         $maxDischargeW = min($defaultMaxDischargeW, $ruleMax);
-        $calculatedPowerW = tbp_round_discharge_power($rawCalculatedPowerW, $maxDischargeW);
+        $calculatedPowerW = tbp_round_discharge_power(
+            $rawCalculatedPowerW,
+            $maxDischargeW,
+            (int) $sharedConfig['schedule']['powerStepW']
+        );
 
         $entry['slot']['value'] = $calculatedPowerW;
         $flat[$targetIndex]['slot'] = $entry['slot'];
@@ -549,10 +562,10 @@ function tbp_materialize_horizon(
 
         $maximumPowerW = isset($options['max_charge_power_w']) && is_numeric($options['max_charge_power_w'])
             ? max(0, (int) $options['max_charge_power_w'])
-            : 1600;
+            : (int) $sharedConfig['battery']['maxChargePowerW'];
         $stepW = isset($options['charge_power_step_w']) && is_numeric($options['charge_power_step_w'])
             ? max(1, (int) $options['charge_power_step_w'])
-            : TARGET_CHARGE_POWER_STEP_W;
+            : (int) $sharedConfig['schedule']['powerStepW'];
         $remainingPercent = max(0.0, $targetPercent - $currentPercent);
         $requiredEnergyWh = ($remainingPercent / 100.0) * (float) $battery['capacity_wh'];
         $rawMinimumW = $requiredEnergyWh > 0 ? $requiredEnergyWh / $remainingDurationHours : 0.0;

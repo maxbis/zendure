@@ -30,6 +30,21 @@ EXPECTED_CONFIG = {
         "capacityWh": 5760,
         "minChargePercent": 15,
         "maxChargePercent": 91,
+        "efficiency": 0.9,
+        "maxChargePowerW": 1200,
+        "maxDischargePowerW": 1200,
+    },
+    "forecast": {
+        "defaultHouseholdUsageWByHour": [
+            100, 100, 100, 100, 100, 100, 100, 100,
+            220, 220, 220, 220, 220, 220, 220, 220,
+            220, 220, 220, 220, 220, 220, 220, 220,
+        ],
+    },
+    "schedule": {
+        "minPowerW": -1600,
+        "maxPowerW": 1600,
+        "powerStepW": 100,
     },
     "installation": {
         "name": "Amsterdam",
@@ -109,7 +124,7 @@ def test_schema_contract_matches_loader_sections():
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["additionalProperties"] is False
     assert set(schema["required"]) == set(EXPECTED_CONFIG)
-    for section in ("battery", "installation", "priceConversion"):
+    for section in ("battery", "forecast", "schedule", "installation", "priceConversion"):
         section_schema = schema["properties"][section]
         assert section_schema["additionalProperties"] is False
         assert set(section_schema["required"]) == set(EXPECTED_CONFIG[section])
@@ -126,6 +141,14 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"capacityWh": 0}), r"\$\.battery\.capacityWh must be at least 1\."),
         (lambda value: value["battery"].update({"minChargePercent": True}), r"\$\.battery\.minChargePercent must be an integer\."),
         (lambda value: value["battery"].update({"minChargePercent": 91}), r"must be lower than"),
+        (lambda value: value["battery"].update({"efficiency": 0}), r"efficiency must be greater than 0\."),
+        (lambda value: value["battery"].update({"efficiency": 1.01}), r"efficiency must be at most 1\."),
+        (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
+        (lambda value: value["forecast"].update({"defaultHouseholdUsageWByHour": [100] * 23}), r"must contain exactly 24 items\."),
+        (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__(4, -1), r"defaultHouseholdUsageWByHour\[4\] must be at least 0\."),
+        (lambda value: value["schedule"].update({"minPowerW": 1}), r"minPowerW must be at most 0\."),
+        (lambda value: value["schedule"].update({"maxPowerW": 0, "minPowerW": 0}), r"minPowerW must be lower than"),
+        (lambda value: value["schedule"].update({"powerStepW": 0}), r"powerStepW must be at least 1\."),
         (lambda value: value["installation"].update({"latitude": 91}), r"\$\.installation\.latitude must be at most 90\."),
         (lambda value: value["installation"].update({"timezone": "Not/AZone"}), r"not a recognized IANA timezone"),
         (lambda value: value["priceConversion"].update({"supplierMarkupEurPerKwh": -0.01}), r"supplierMarkupEurPerKwh must be at least 0\."),

@@ -91,6 +91,34 @@ Migration rule:
 - When automation is eventually switched to the common file, changing its persistent maximum from 93% to 91% is a real controller behaviour change.
 - That switch must be separately visible in the deployment plan and verified against the effective controller state.
 
+### Battery efficiency and command caps
+
+Canonical values:
+
+- `battery.efficiency`: 0.9.
+- `battery.maxChargePowerW`: 1200 W.
+- `battery.maxDischargePowerW`: 1200 W.
+
+Meaning:
+
+- Efficiency is the one-way factor used by charge and discharge forecasts; it is not folded into nominal battery capacity.
+- Charge and discharge power limits are positive command magnitudes.
+- The limits describe controller safety caps, not the wider signed range offered by schedule planning and editing.
+- These properties are defined in the common contract before consumers are migrated. Automation behavior remains unchanged until its controlled migration.
+
+### Default household-usage forecast
+
+Canonical value:
+
+- `forecast.defaultHouseholdUsageWByHour`: 24 local-hour watt values.
+- Hours 00 through 07 use 100 W.
+- Hours 08 through 23 use 220 W.
+
+Meaning:
+
+- This is a fallback demand model for battery forecasts when measured or configured usage is unavailable.
+- It is shared forecast policy rather than a physical battery property.
+
 ### Installation location
 
 Intended canonical values:
@@ -136,32 +164,34 @@ Phase 2 does not merge the web's 1600 W values with automation's 1200 W values. 
 
 ### Interface and schedule range
 
-Intended migration values:
+Canonical values:
 
-- `web.powerRange.minW`: -1600 W.
-- `web.powerRange.maxW`: 1600 W.
+- `schedule.minPowerW`: -1600 W.
+- `schedule.maxPowerW`: 1600 W.
+- `schedule.powerStepW`: 100 W.
 
 Meaning:
 
-- Signed range used by interface axes and schedule-editing controls.
+- Signed range used by schedule planning and editing controls.
 - Negative values represent discharge.
 - Positive values represent charge.
 - These are not automatically the controller's physical command caps.
+- The power step is the shared planning and editing increment; it does not require automation to change power in 100 W steps.
 
 The current key names `minGridPower` and `maxGridPower` are misleading because the same values are also used for battery schedule controls. Phase 3 should introduce clearer names while retaining compatibility mappings during migration.
 
 ### Automation command caps
 
-Intended migration values:
+Canonical values:
 
-- `automation.maxDischargePowerW`: 1200 W magnitude.
-- `automation.maxChargePowerW`: 1200 W magnitude.
+- `battery.maxDischargePowerW`: 1200 W magnitude.
+- `battery.maxChargePowerW`: 1200 W magnitude.
 
 Meaning:
 
 - These are non-negative magnitudes used to clamp outgoing commands.
 - Direction is determined by the command sign, not by storing a negative discharge cap.
-- These remain automation-owned settings during the initial consolidation.
+- The canonical declarations are shared, while runtime enforcement remains automation-owned during the initial consolidation.
 
 Phase 2 deliberately preserves the current 1200 W caps. Deciding whether an interface should offer values outside the controller caps is deferred as a separate behavioural and usability decision.
 
@@ -178,17 +208,6 @@ Intended migration values:
 - `history.timezone`: reference `installation.timezone` rather than maintaining another literal.
 
 The existing interpretation remains three previous calendar days plus today.
-
-### Schedule editor step
-
-Intended migration value:
-
-- `scheduleEditor.powerStepW`: 100 W.
-
-Meaning:
-
-- This is an interface input increment.
-- It does not require automation to change power in 100 W steps.
 
 ### Price overview fallbacks
 

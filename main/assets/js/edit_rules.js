@@ -107,8 +107,8 @@
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
         'inp-min-time': 'Optional lower time bound in hour format (0-23).',
         'inp-max-time': 'Optional upper time bound in hour format (0-23).',
-        'inp-min-value': 'Optional minimum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
-        'inp-max-value': 'Optional maximum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses 100 W steps.',
+        'inp-min-value': 'Optional minimum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses the configured power step.',
+        'inp-max-value': 'Optional maximum power for dynamic rules only. Netzero allows the full signed range, netzero+ only allows 0 W and above, and netzero- only allows 0 W and below. Slider uses the configured power step.',
         'inp-fallback-value': 'Optional value when runtime conditions fail.',
         'inp-condition-relation': 'Choose how static condition rows are combined inside this rule. Runtime-only rows force AND.',
     };
@@ -139,9 +139,15 @@
     ];
     const runtimeOnlyConditionFields = new Set(['electricity_level', 'electric_level', 'electricLevel']);
     const EDIT_RULES_CONFIG = window.EDIT_RULES_CONFIG || {};
-    const LIMIT_MIN = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMin)) ? Number(EDIT_RULES_CONFIG.limitMin) : -1200;
-    const LIMIT_MAX = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMax)) ? Number(EDIT_RULES_CONFIG.limitMax) : 1200;
-    const LIMIT_STEP = 100;
+    const LIMIT_MIN = Number(EDIT_RULES_CONFIG.limitMin);
+    const LIMIT_MAX = Number(EDIT_RULES_CONFIG.limitMax);
+    const LIMIT_STEP = Number(EDIT_RULES_CONFIG.powerStepW);
+    if (!Number.isFinite(LIMIT_MIN) || !Number.isFinite(LIMIT_MAX) || LIMIT_MIN >= LIMIT_MAX) {
+        throw new Error('The shared schedule power range is missing or invalid.');
+    }
+    if (!Number.isInteger(LIMIT_STEP) || LIMIT_STEP <= 0) {
+        throw new Error('The shared schedule power step is missing or invalid.');
+    }
     const MIN_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.minChargePercent)) ? Number(EDIT_RULES_CONFIG.minChargePercent) : 15;
     const MAX_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.maxChargePercent)) ? Number(EDIT_RULES_CONFIG.maxChargePercent) : 95;
     const SHOW_ALL_PROFILE_ID = 'show_all';

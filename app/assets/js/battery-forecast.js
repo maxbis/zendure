@@ -7,12 +7,6 @@
 })(typeof window !== "undefined" ? window : globalThis, function () {
     "use strict";
 
-    const DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR = Object.freeze([
-        100, 100, 100, 100, 100, 100, 100, 100,
-        220, 220, 220, 220, 220, 220, 220, 220,
-        220, 220, 220, 220, 220, 220, 220, 220
-    ]);
-    const POWER_EFFICIENCY = 0.9;
     const BATTERY_FIELDS = new Set(["electricity_level", "electric_level", "electricLevel"]);
 
     function finiteNumber(value) {
@@ -237,8 +231,8 @@
         now = new Date(),
         battery,
         days = [],
-        householdUsageWByHour = DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR,
-        efficiency = POWER_EFFICIENCY
+        householdUsageWByHour,
+        efficiency
     } = {}) {
         const normalizedBattery = validBatteryState(battery);
         const validEfficiency = finiteNumber(efficiency);
@@ -332,8 +326,6 @@
     }
 
     return Object.freeze({
-        DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR,
-        POWER_EFFICIENCY,
         buildForecast
     });
 });

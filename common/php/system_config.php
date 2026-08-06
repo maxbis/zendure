@@ -16,7 +16,16 @@ function systemConfigDefaultPath(): string
  *
  * @return array{
  *   schemaVersion: int,
- *   battery: array{capacityWh: int, minChargePercent: int, maxChargePercent: int},
+ *   battery: array{
+ *     capacityWh: int,
+ *     minChargePercent: int,
+ *     maxChargePercent: int,
+ *     efficiency: float,
+ *     maxChargePowerW: int,
+ *     maxDischargePowerW: int
+ *   },
+ *   forecast: array{defaultHouseholdUsageWByHour: list<int>},
+ *   schedule: array{minPowerW: int, maxPowerW: int, powerStepW: int},
  *   installation: array{name: string, latitude: float, longitude: float, timezone: string},
  *   priceConversion: array{
  *     supplierMarkupEurPerKwh: float,
@@ -67,18 +76,27 @@ function validateSystemConfig(array $config): array
 {
     systemConfigAssertExactKeys(
         $config,
-        ['schemaVersion', 'battery', 'installation', 'priceConversion'],
+        ['schemaVersion', 'battery', 'forecast', 'schedule', 'installation', 'priceConversion'],
         '$'
     );
 
     $schemaVersion = systemConfigRequireInteger($config['schemaVersion'], '$.schemaVersion', 1, 1);
     $battery = systemConfigRequireObject($config['battery'], '$.battery');
+    $forecast = systemConfigRequireObject($config['forecast'], '$.forecast');
+    $schedule = systemConfigRequireObject($config['schedule'], '$.schedule');
     $installation = systemConfigRequireObject($config['installation'], '$.installation');
     $priceConversion = systemConfigRequireObject($config['priceConversion'], '$.priceConversion');
 
     systemConfigAssertExactKeys(
         $battery,
-        ['capacityWh', 'minChargePercent', 'maxChargePercent'],
+        [
+            'capacityWh',
+            'minChargePercent',
+            'maxChargePercent',
+            'efficiency',
+            'maxChargePowerW',
+            'maxDischargePowerW',
+        ],
         '$.battery'
     );
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
@@ -98,6 +116,48 @@ function validateSystemConfig(array $config): array
         throw new SystemConfigException(
             '$.battery.minChargePercent must be lower than $.battery.maxChargePercent.'
         );
+    }
+    $efficiency = systemConfigRequireNumber($battery['efficiency'], '$.battery.efficiency', 0.0, 1.0, true);
+    $maxChargePowerW = systemConfigRequireInteger(
+        $battery['maxChargePowerW'],
+        '$.battery.maxChargePowerW',
+        1
+    );
+    $maxDischargePowerW = systemConfigRequireInteger(
+        $battery['maxDischargePowerW'],
+        '$.battery.maxDischargePowerW',
+        1
+    );
+
+    systemConfigAssertExactKeys(
+        $forecast,
+        ['defaultHouseholdUsageWByHour'],
+        '$.forecast'
+    );
+    $defaultHouseholdUsage = systemConfigRequireList(
+        $forecast['defaultHouseholdUsageWByHour'],
+        '$.forecast.defaultHouseholdUsageWByHour',
+        24
+    );
+    $defaultHouseholdUsageWByHour = [];
+    foreach ($defaultHouseholdUsage as $hour => $usageW) {
+        $defaultHouseholdUsageWByHour[] = systemConfigRequireInteger(
+            $usageW,
+            '$.forecast.defaultHouseholdUsageWByHour[' . $hour . ']',
+            0
+        );
+    }
+
+    systemConfigAssertExactKeys(
+        $schedule,
+        ['minPowerW', 'maxPowerW', 'powerStepW'],
+        '$.schedule'
+    );
+    $minPowerW = systemConfigRequireInteger($schedule['minPowerW'], '$.schedule.minPowerW', PHP_INT_MIN, 0);
+    $maxPowerW = systemConfigRequireInteger($schedule['maxPowerW'], '$.schedule.maxPowerW', 0);
+    $powerStepW = systemConfigRequireInteger($schedule['powerStepW'], '$.schedule.powerStepW', 1);
+    if ($minPowerW >= $maxPowerW) {
+        throw new SystemConfigException('$.schedule.minPowerW must be lower than $.schedule.maxPowerW.');
     }
 
     systemConfigAssertExactKeys(
@@ -160,6 +220,17 @@ function validateSystemConfig(array $config): array
             'capacityWh' => $capacityWh,
             'minChargePercent' => $minChargePercent,
             'maxChargePercent' => $maxChargePercent,
+            'efficiency' => $efficiency,
+            'maxChargePowerW' => $maxChargePowerW,
+            'maxDischargePowerW' => $maxDischargePowerW,
+        ],
+        'forecast' => [
+            'defaultHouseholdUsageWByHour' => $defaultHouseholdUsageWByHour,
+        ],
+        'schedule' => [
+            'minPowerW' => $minPowerW,
+            'maxPowerW' => $maxPowerW,
+            'powerStepW' => $powerStepW,
         ],
         'installation' => [
             'name' => $name,
@@ -182,6 +253,18 @@ function systemConfigRequireObject($value, string $path): array
 {
     if (!is_array($value)) {
         throw new SystemConfigException('Expected an object at ' . $path . '.');
+    }
+    return $value;
+}
+
+/** @param mixed $value @return list<mixed> */
+function systemConfigRequireList($value, string $path, int $length): array
+{
+    if (!is_array($value) || !array_is_list($value)) {
+        throw new SystemConfigException('Expected an array at ' . $path . '.');
+    }
+    if (count($value) !== $length) {
+        throw new SystemConfigException($path . ' must contain exactly ' . $length . ' items.');
     }
     return $value;
 }

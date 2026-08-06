@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`system.json` is the future canonical, non-secret source for installation facts that must eventually agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
+`system.json` is the canonical, non-secret source for system properties that must eventually agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
 
 Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers. Both GUIs now consume shared values through the PHP reader; automation still uses its existing configuration source.
 
@@ -29,6 +29,12 @@ The configuration contains:
 - Nominal battery capacity: 5760 Wh.
 - Minimum state of charge: 15%.
 - Maximum state of charge: 91%.
+- Battery forecast efficiency: 0.9.
+- Maximum charge command magnitude: 1200 W.
+- Maximum discharge command magnitude: 1200 W.
+- Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59 and 220 W from 08:00 through 23:59.
+- Schedule range: -1600 through 1600 W.
+- Schedule power step: 100 W.
 - Installation: Amsterdam.
 - Latitude: 52.3676.
 - Longitude: 4.9041.
@@ -53,6 +59,8 @@ Required properties:
 
 - `schemaVersion`
 - `battery`
+- `forecast`
+- `schedule`
 - `installation`
 - `priceConversion`
 
@@ -65,8 +73,31 @@ Required properties:
 - `capacityWh`: positive integer.
 - `minChargePercent`: integer from 0 through 99.
 - `maxChargePercent`: integer from 1 through 100.
+- `efficiency`: number greater than 0 and no greater than 1.
+- `maxChargePowerW`: positive integer command magnitude.
+- `maxDischargePowerW`: positive integer command magnitude.
 
 The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare two sibling numeric properties.
+
+The power-cap properties are canonical declarations but are not automation inputs yet. Until the controlled automation migration, `/automate` continues enforcing its existing local values.
+
+### Forecast
+
+Required properties:
+
+- `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, indexed by local hour 0 through 23.
+
+This is the fallback usage model shared by forecast calculations. Defining it here does not yet migrate the JavaScript or PHP forecast consumers.
+
+### Schedule
+
+Required properties:
+
+- `minPowerW`: integer no greater than zero.
+- `maxPowerW`: non-negative integer.
+- `powerStepW`: positive integer.
+
+Both loaders additionally require `minPowerW < maxPowerW`. The range describes schedule planning and editing; it remains distinct from the smaller battery command caps.
 
 ### Installation
 
@@ -95,7 +126,7 @@ Unknown properties are rejected inside every section.
 
 Current flow after both GUI integrations:
 
-1. `system.json` records the approved Phase 2 values.
+1. `system.json` records the approved shared battery, forecast, schedule, installation and price-conversion values.
 2. `system.schema.json` defines its structural contract.
 3. The new GUI loads shared system values through the common PHP loader.
 4. The old GUI loads shared battery, installation-timezone and price-conversion values through the same PHP loader.
@@ -126,10 +157,14 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When a required property is absent, then schema validation fails.
 - When an unknown property is present, then schema validation fails rather than silently ignoring a likely typo.
 - When minimum is equal to or greater than maximum, then schema ranges alone may pass, but both loaders reject it.
+- When the schedule minimum is equal to or greater than its maximum, then both loaders reject it.
+- When the household-usage profile does not contain exactly 24 non-negative integer values, then both loaders reject it.
+- When efficiency is zero, negative or greater than one, then both loaders reject it.
 - When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.
 - When the synchronized file is stale on one host, then valid JSON does not prove both hosts use the same version.
 - When direct web access is not blocked by the active web server, then the current non-secret file could be downloadable; secrets must never be added.
 - When automation eventually switches to this file, then its maximum changes from its current persistent value to the intended shared 91%; that migration needs its own controlled test phase.
+- When automation eventually reads the shared power caps, then its existing 1200 W behavior should remain unchanged because the canonical values match its current persistent values.
 - When duplicated shared-looking fields are changed through the current old configuration editor, then neither GUI changes because `system.json` is authoritative for both interfaces.
 
 ## Phase 3 acceptance criteria

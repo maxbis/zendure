@@ -46,18 +46,27 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
 
     _assert_exact_keys(
         config,
-        {"schemaVersion", "battery", "installation", "priceConversion"},
+        {"schemaVersion", "battery", "forecast", "schedule", "installation", "priceConversion"},
         "$",
     )
 
     schema_version = _require_integer(config["schemaVersion"], "$.schemaVersion", 1, 1)
     battery = _require_object(config["battery"], "$.battery")
+    forecast = _require_object(config["forecast"], "$.forecast")
+    schedule = _require_object(config["schedule"], "$.schedule")
     installation = _require_object(config["installation"], "$.installation")
     price_conversion = _require_object(config["priceConversion"], "$.priceConversion")
 
     _assert_exact_keys(
         battery,
-        {"capacityWh", "minChargePercent", "maxChargePercent"},
+        {
+            "capacityWh",
+            "minChargePercent",
+            "maxChargePercent",
+            "efficiency",
+            "maxChargePowerW",
+            "maxDischargePowerW",
+        },
         "$.battery",
     )
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
@@ -71,6 +80,31 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         raise SystemConfigError(
             "$.battery.minChargePercent must be lower than $.battery.maxChargePercent."
         )
+    efficiency = _require_number(battery["efficiency"], "$.battery.efficiency", 0.0, 1.0, exclusive_minimum=True)
+    max_charge_power_w = _require_integer(
+        battery["maxChargePowerW"], "$.battery.maxChargePowerW", 1
+    )
+    max_discharge_power_w = _require_integer(
+        battery["maxDischargePowerW"], "$.battery.maxDischargePowerW", 1
+    )
+
+    _assert_exact_keys(forecast, {"defaultHouseholdUsageWByHour"}, "$.forecast")
+    default_household_usage = _require_list(
+        forecast["defaultHouseholdUsageWByHour"],
+        "$.forecast.defaultHouseholdUsageWByHour",
+        24,
+    )
+    default_household_usage_w_by_hour = [
+        _require_integer(value, f"$.forecast.defaultHouseholdUsageWByHour[{hour}]", 0)
+        for hour, value in enumerate(default_household_usage)
+    ]
+
+    _assert_exact_keys(schedule, {"minPowerW", "maxPowerW", "powerStepW"}, "$.schedule")
+    min_power_w = _require_integer(schedule["minPowerW"], "$.schedule.minPowerW", -(2**63), 0)
+    max_power_w = _require_integer(schedule["maxPowerW"], "$.schedule.maxPowerW", 0)
+    power_step_w = _require_integer(schedule["powerStepW"], "$.schedule.powerStepW", 1)
+    if min_power_w >= max_power_w:
+        raise SystemConfigError("$.schedule.minPowerW must be lower than $.schedule.maxPowerW.")
 
     _assert_exact_keys(
         installation,
@@ -134,6 +168,17 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             "capacityWh": capacity_wh,
             "minChargePercent": min_charge_percent,
             "maxChargePercent": max_charge_percent,
+            "efficiency": efficiency,
+            "maxChargePowerW": max_charge_power_w,
+            "maxDischargePowerW": max_discharge_power_w,
+        },
+        "forecast": {
+            "defaultHouseholdUsageWByHour": default_household_usage_w_by_hour,
+        },
+        "schedule": {
+            "minPowerW": min_power_w,
+            "maxPowerW": max_power_w,
+            "powerStepW": power_step_w,
         },
         "installation": {
             "name": name,
@@ -154,6 +199,14 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
 def _require_object(value: Any, path: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemConfigError(f"Expected an object at {path}.")
+    return value
+
+
+def _require_list(value: Any, path: str, length: int) -> list[Any]:
+    if not isinstance(value, list):
+        raise SystemConfigError(f"Expected an array at {path}.")
+    if len(value) != length:
+        raise SystemConfigError(f"{path} must contain exactly {length} items.")
     return value
 
 
