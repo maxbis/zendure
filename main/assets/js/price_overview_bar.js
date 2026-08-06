@@ -80,15 +80,15 @@ function formatPrice(price) {
 }
 
 /**
- * Formats price as cents (price * 100, rounded to 0 decimals)
+ * Formats price as cents with unit (price * 100, rounded to 0 decimals)
  * @param {number|null} price - Price value or null
- * @returns {string} Price in cents as string, or empty string for null
+ * @returns {string} Price like "28 ct", or empty string for null
  */
 function formatPriceCents(price) {
     if (price === null || price === undefined || isNaN(price)) {
         return '';
     }
-    return Math.round(price * 100).toString();
+    return Math.round(price * 100).toString() + ' ct';
 }
 
 let priceGraphPopup = null;

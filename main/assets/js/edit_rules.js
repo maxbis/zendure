@@ -14,6 +14,8 @@
         hasPendingImportedRules: false,
         pageWasHidden: false,
         isRefreshingForFreshData: false,
+        editorBaseline: null,
+        unsavedDialogResolver: null,
     };
 
     const els = {
@@ -36,6 +38,12 @@
         btnNew: document.getElementById('btn-new'),
         btnAddCondition: document.getElementById('btn-add-condition'),
         btnCancel: document.getElementById('btn-cancel'),
+        unsavedDialog: document.getElementById('unsaved-rule-dialog'),
+        unsavedDialogMessage: document.getElementById('unsaved-rule-dialog-message'),
+        unsavedDialogCancel: document.getElementById('unsaved-rule-dialog-cancel'),
+        unsavedDialogDiscard: document.getElementById('unsaved-rule-dialog-discard'),
+        unsavedDialogSave: document.getElementById('unsaved-rule-dialog-save'),
+        unsavedDialogClose: document.getElementById('unsaved-rule-dialog-close'),
         inpName: document.getElementById('inp-name'),
         inpValueMode: document.getElementById('inp-value-mode'),
         inpFixedValue: document.getElementById('inp-fixed-value'),
@@ -1568,7 +1576,170 @@
         return row;
     }
 
-    function clearEditor() {
+    function serializeEditorState() {
+        return JSON.stringify({
+            name: els.inpName ? els.inpName.value : '',
+            valueMode: els.inpValueMode ? els.inpValueMode.value : '',
+            fixedValue: els.inpFixedValue ? els.inpFixedValue.value : '',
+            color: els.inpColor ? els.inpColor.value : '',
+            month: els.inpMonth ? els.inpMonth.value : '',
+            hour: els.inpHour ? els.inpHour.value : '',
+            minTime: els.inpMinTime ? els.inpMinTime.value : '',
+            maxTime: els.inpMaxTime ? els.inpMaxTime.value : '',
+            targetSoc: els.inpTargetSoc ? els.inpTargetSoc.value : '',
+            maxDischargePower: els.inpMaxDischargePower ? els.inpMaxDischargePower.value : '',
+            limitsOn: !!(els.limitsOn && els.limitsOn.checked),
+            minValue: els.inpMinValue ? els.inpMinValue.value : '',
+            maxValue: els.inpMaxValue ? els.inpMaxValue.value : '',
+            fallbackValue: els.inpFallbackValue ? els.inpFallbackValue.value : '',
+            conditionRelation: els.inpConditionRelation ? els.inpConditionRelation.value : 'and',
+            conditions: Array.from(els.conditionsList?.querySelectorAll('.condition-row') || []).map(function (row) {
+                return {
+                    field: row.querySelector('[data-role="condition-field"]')?.value || '',
+                    op: row.querySelector('[data-role="condition-op"]')?.value || '',
+                    value: row.querySelector('[data-role="condition-value"]')?.value || '',
+                    valueRef: row.querySelector('[data-role="condition-value-ref"]')?.value || '',
+                };
+            }),
+        });
+    }
+
+    function markEditorClean() {
+        state.editorBaseline = serializeEditorState();
+    }
+
+    function isEditorDirty() {
+        if (state.editorBaseline === null) return false;
+        return serializeEditorState() !== state.editorBaseline;
+    }
+
+    function resolveUnsavedDialog(choice) {
+        const resolver = state.unsavedDialogResolver;
+        state.unsavedDialogResolver = null;
+        if (els.unsavedDialog && els.unsavedDialog.open) {
+            els.unsavedDialog.close();
+        }
+        if (typeof resolver === 'function') {
+            resolver(choice);
+        }
+    }
+
+    function showUnsavedChangesDialog() {
+        if (!els.unsavedDialog) {
+            return Promise.resolve(window.confirm('This rule has unsaved changes. Leave without saving?') ? 'discard' : 'cancel');
+        }
+        if (state.unsavedDialogResolver) {
+            resolveUnsavedDialog('cancel');
+        }
+        const label = Number.isInteger(state.editIndex)
+            ? ('Rule #' + (state.editIndex + 1) + (state.rules[state.editIndex]?.name ? (' · ' + state.rules[state.editIndex].name) : ''))
+            : 'This new rule';
+        if (els.unsavedDialogMessage) {
+            els.unsavedDialogMessage.textContent = label + ' has unsaved changes. Save before leaving?';
+        }
+        return new Promise(function (resolve) {
+            state.unsavedDialogResolver = resolve;
+            if (typeof els.unsavedDialog.showModal === 'function') {
+                els.unsavedDialog.showModal();
+            } else {
+                els.unsavedDialog.setAttribute('open', '');
+            }
+            const focusTarget = els.unsavedDialogCancel || els.unsavedDialog.querySelector('[data-gsd-initial-focus]');
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                focusTarget.focus();
+            }
+        });
+    }
+
+    async function saveCurrentRuleFromEditor() {
+        const rule = readRuleFromForm();
+        const isNew = state.editIndex === null;
+        if (!isNew) {
+            const existing = state.rules[state.editIndex];
+            if (existing && existing.rule_id) {
+                rule.rule_id = existing.rule_id;
+            }
+            if (existing && existing.key) {
+                rule.key = existing.key;
+            }
+            if (existing) {
+                rule.enabled = existing.enabled !== false;
+            }
+        }
+        const ok = await mutateAndPersist(function () {
+            if (isNew) {
+                state.rules.push(rule);
+            } else {
+                state.rules[state.editIndex] = rule;
+            }
+        }, isNew ? 'Rule added and saved.' : 'Rule updated and saved.');
+        if (!ok) return false;
+        if (isNew) {
+            state.editIndex = state.rules.length - 1;
+        }
+        if (Number.isInteger(state.editIndex) && state.rules[state.editIndex]) {
+            fillEditor(state.rules[state.editIndex], state.editIndex);
+        } else {
+            markEditorClean();
+        }
+        return true;
+    }
+
+    async function confirmLeaveEditorIfDirty() {
+        if (!isEditorDirty()) return true;
+        const choice = await showUnsavedChangesDialog();
+        if (choice === 'cancel') return false;
+        if (choice === 'discard') return true;
+        if (choice === 'save') {
+            try {
+                return await saveCurrentRuleFromEditor();
+            } catch (err) {
+                setStatus(err.message || 'Invalid rule.', 'error');
+                return false;
+            }
+        }
+        return false;
+    }
+
+    async function openRuleEditor(idx) {
+        if (!Number.isInteger(idx) || !state.rules[idx]) return false;
+        if (state.editIndex === idx) return true;
+        if (!(await confirmLeaveEditorIfDirty())) return false;
+        fillEditor(state.rules[idx], idx);
+        return true;
+    }
+
+    function getRuleIndexFromUrl() {
+        try {
+            const raw = new URLSearchParams(window.location.search).get('rule');
+            const oneBased = Number.parseInt(raw, 10);
+            if (!Number.isInteger(oneBased) || oneBased < 1) return null;
+            return oneBased - 1;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function syncRuleQueryParam(zeroBasedIndex) {
+        try {
+            const url = new URL(window.location.href);
+            if (Number.isInteger(zeroBasedIndex) && zeroBasedIndex >= 0) {
+                url.searchParams.set('rule', String(zeroBasedIndex + 1));
+            } else {
+                url.searchParams.delete('rule');
+            }
+            const next = url.pathname + url.search + url.hash;
+            const current = window.location.pathname + window.location.search + window.location.hash;
+            if (next !== current) {
+                history.replaceState({}, '', next);
+            }
+        } catch (e) {
+            // Ignore URL sync failures (file:// / restricted history).
+        }
+    }
+
+    function clearEditor(options) {
+        const syncUrl = !(options && options.syncUrl === false);
         state.editIndex = null;
         els.editorTitle.textContent = 'Rule Editor';
         els.form.reset();
@@ -1600,6 +1771,10 @@
         updateAllFieldStates();
         renderTable();
         renderProfiles();
+        if (syncUrl) {
+            syncRuleQueryParam(null);
+        }
+        markEditorClean();
     }
 
     function resetImportedFileInput() {
@@ -1637,6 +1812,7 @@
 
     function fillEditor(rule, idx) {
         state.editIndex = idx;
+        syncRuleQueryParam(idx);
         const safeName = String(rule?.name || '').trim();
         els.editorTitle.textContent = safeName ? ('Editing Rule #' + (idx + 1) + ' · ' + safeName) : ('Editing Rule #' + (idx + 1));
         els.inpName.value = rule.name || '';
@@ -1695,13 +1871,21 @@
         updateAllFieldStates();
         renderTable();
         renderProfiles();
+        markEditorClean();
     }
 
-    function applyInitialRuleSelection() {
-        if (!Number.isInteger(state.initialRuleIndex)) return false;
-        const idx = state.initialRuleIndex;
+    function applyInitialRuleSelection(preferredIndex) {
+        let idx = Number.isInteger(preferredIndex) ? preferredIndex : null;
+        if (!Number.isInteger(idx) && Number.isInteger(state.initialRuleIndex)) {
+            idx = state.initialRuleIndex;
+        }
+        if (!Number.isInteger(idx)) {
+            idx = getRuleIndexFromUrl();
+        }
         state.initialRuleIndex = null;
+        if (!Number.isInteger(idx)) return false;
         if (idx < 0 || idx >= state.rules.length || !state.rules[idx]) {
+            syncRuleQueryParam(null);
             setStatus('Requested rule not found.', 'error');
             return false;
         }
@@ -1939,8 +2123,10 @@
             resetImportedFileInput();
             renderTable();
             renderProfiles();
-            clearEditor();
-            if (!applyInitialRuleSelection()) {
+            const restoreIdx = Number.isInteger(state.editIndex) ? state.editIndex : null;
+            clearEditor({ syncUrl: false });
+            if (!applyInitialRuleSelection(restoreIdx)) {
+                syncRuleQueryParam(null);
                 setStatus('Loaded ' + state.rules.length + ' rules.', 'ok');
             }
         } catch (e) {
@@ -2186,11 +2372,16 @@
             });
         }
 
-        els.btnReload.addEventListener('click', loadRules);
+        els.btnReload.addEventListener('click', async function () {
+            if (!(await confirmLeaveEditorIfDirty())) return;
+            loadRules();
+        });
 
-        els.btnNew.addEventListener('click', function () {
+        els.btnNew.addEventListener('click', async function () {
+            if (!(await confirmLeaveEditorIfDirty())) return;
             clearEditor();
             els.editorTitle.textContent = 'New Rule';
+            markEditorClean();
         });
 
         els.inpValueMode.addEventListener('change', function () {
@@ -2278,9 +2469,27 @@
             updateFallbackVisibility();
         });
 
-        els.btnCancel.addEventListener('click', function () {
+        els.btnCancel.addEventListener('click', async function () {
+            if (!(await confirmLeaveEditorIfDirty())) return;
             clearEditor();
         });
+
+        if (els.unsavedDialog) {
+            const bindUnsavedChoice = function (button, choice) {
+                if (!button) return;
+                button.addEventListener('click', function () {
+                    resolveUnsavedDialog(choice);
+                });
+            };
+            bindUnsavedChoice(els.unsavedDialogCancel, 'cancel');
+            bindUnsavedChoice(els.unsavedDialogClose, 'cancel');
+            bindUnsavedChoice(els.unsavedDialogDiscard, 'discard');
+            bindUnsavedChoice(els.unsavedDialogSave, 'save');
+            els.unsavedDialog.addEventListener('cancel', function (e) {
+                e.preventDefault();
+                resolveUnsavedDialog('cancel');
+            });
+        }
 
         els.rulesTbody.addEventListener('click', async function (e) {
             const toggleBtn = e.target.closest('button[data-menu-toggle]');
@@ -2304,7 +2513,7 @@
             ) {
                 const rowIdx = Number(row.getAttribute('data-row-idx'));
                 if (Number.isInteger(rowIdx) && state.rules[rowIdx]) {
-                    fillEditor(state.rules[rowIdx], rowIdx);
+                    await openRuleEditor(rowIdx);
                     return;
                 }
             }
@@ -2317,7 +2526,7 @@
             if (!Number.isInteger(idx)) return;
 
             if (action === 'edit') {
-                fillEditor(state.rules[idx], idx);
+                await openRuleEditor(idx);
                 return;
             }
             if (action === 'dup') {
@@ -2383,33 +2592,10 @@
         els.form.addEventListener('submit', async function (e) {
             e.preventDefault();
             try {
-                const rule = readRuleFromForm();
                 const isNew = state.editIndex === null;
-                if (!isNew) {
-                    const existing = state.rules[state.editIndex];
-                    if (existing && existing.rule_id) {
-                        rule.rule_id = existing.rule_id;
-                    }
-                    if (existing && existing.key) {
-                        rule.key = existing.key;
-                    }
-                    if (existing) {
-                        rule.enabled = existing.enabled !== false;
-                    }
-                }
-                const ok = await mutateAndPersist(function () {
-                    if (isNew) {
-                        state.rules.push(rule);
-                    } else {
-                        state.rules[state.editIndex] = rule;
-                    }
-                }, isNew ? 'Rule added and saved.' : 'Rule updated and saved.');
-                if (ok) {
-                    if (isNew) {
-                        clearEditor();
-                    } else {
-                        fillEditor(state.rules[state.editIndex], state.editIndex);
-                    }
+                const ok = await saveCurrentRuleFromEditor();
+                if (ok && isNew) {
+                    clearEditor();
                 }
             } catch (err) {
                 setStatus(err.message || 'Invalid rule.', 'error');

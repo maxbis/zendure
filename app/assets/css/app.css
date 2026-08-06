@@ -1405,7 +1405,7 @@
 .app-price-timeline {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(48, minmax(32px, 1fr));
+    grid-template-columns: repeat(48, minmax(36px, 1fr));
     grid-template-rows: 22px 20px auto;
     row-gap: 4px;
     min-width: 1584px;
@@ -1655,19 +1655,19 @@
     text-overflow: clip;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
 }
 
 .app-price-hour__price {
     align-self: end;
     color: var(--gsd-text);
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
     font-weight: 650;
-    letter-spacing: 0.01em;
 }
 
 .app-price-hour__time {
     color: var(--gsd-text-muted);
-    font-size: 0.6rem;
+    font-size: 0.5625rem;
     font-weight: 450;
 }
 
@@ -1841,10 +1841,28 @@
     border-bottom: 1px solid var(--gsd-border-subtle);
 }
 
+.app-schedule-tooltip__title {
+    display: inline-flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35em;
+}
+
+.app-schedule-tooltip__header > .app-schedule-tooltip__title > strong,
 .app-schedule-tooltip__header > strong {
     flex: 0 0 auto;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
+}
+
+.app-schedule-tooltip__price {
+    color: var(--gsd-text);
+    font-size: 0.75rem;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .app-schedule-tooltip__rule {

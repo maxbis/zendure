@@ -1328,6 +1328,18 @@ form {
     flex: 0 0 auto;
 }
 
+#unsaved-rule-dialog {
+    width: min(calc(100% - 24px), 420px);
+}
+
+#unsaved-rule-dialog .gsd-dialog__lead {
+    margin: 0;
+}
+
+#unsaved-rule-dialog .gsd-dialog__footer {
+    flex-wrap: wrap;
+}
+
 .condition-kind-help {
     position: absolute;
     left: auto;

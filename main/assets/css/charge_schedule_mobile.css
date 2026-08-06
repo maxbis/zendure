@@ -671,10 +671,10 @@ body.mobile-dark {
     scrollbar-width: thin;
     min-width: 0;
     scroll-behavior: smooth;
-    --price-graph-bar-width: 18px;
+    --price-graph-bar-width: 28px;
     --price-graph-bar-gap: 2px;
-    --price-graph-label-size: 0.6rem;
-    --price-graph-price-size: 0.6rem;
+    --price-graph-label-size: 0.58rem;
+    --price-graph-price-size: 0.58rem;
     --price-graph-hit-padding: 0px;
 }
 
@@ -682,7 +682,7 @@ body.mobile-dark {
     gap: 6px;
     height: 92px;
     padding: 8px 6px;
-    --price-graph-bar-width: 36px;
+    --price-graph-bar-width: 40px;
     --price-graph-bar-gap: 6px;
     --price-graph-label-size: calc(0.72rem + 2px);
     --price-graph-price-size: calc(0.72rem + 4px);
@@ -807,9 +807,11 @@ body.mobile-dark {
     font-size: var(--price-graph-label-size);
     color: var(--text-secondary);
     margin-top: 4px;
-    padding: 0 3px;
+    padding: 0;
     font-weight: 500;
     white-space: nowrap;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 .price-graph-row-mobile .price-graph-bar-label[data-block-start="true"] {
@@ -828,6 +830,8 @@ body.mobile-dark {
     font-weight: 400;
     white-space: nowrap;
     line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 .price-graph-row-mobile .price-graph-bar.price-current .price-graph-bar-price {

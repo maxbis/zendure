@@ -720,9 +720,17 @@
         const nextHour = (hour + 1) % 24;
         const header = document.createElement("div");
         header.className = "app-schedule-tooltip__header";
+        const title = document.createElement("div");
+        title.className = "app-schedule-tooltip__title";
         const time = document.createElement("strong");
         time.textContent = `${pad(hour)}:00–${pad(nextHour)}:00`;
-        header.appendChild(time);
+        const dayPrices = date === state.dates.tomorrow ? state.prices.tomorrow : state.prices.today;
+        const hourPrice = numericValue(dayPrices && typeof dayPrices === "object" ? dayPrices[pad(hour)] : null);
+        const priceMeta = document.createElement("span");
+        priceMeta.className = "app-schedule-tooltip__price";
+        priceMeta.textContent = `Price (${formatPriceCents(hourPrice)} / ${formatPriceCents(spotPrice(hourPrice))})`;
+        title.append(time, priceMeta);
+        header.appendChild(title);
 
         const runtimeConditions = formatRuntimeConditions(slot);
         const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
@@ -1229,10 +1237,10 @@
 
             const priceLabel = document.createElement("span");
             priceLabel.className = "app-price-hour__price";
-            priceLabel.textContent = Number.isFinite(price) ? String(Math.round(price * 100)) : "—";
+            priceLabel.textContent = Number.isFinite(price) ? formatPriceCents(price) : "—";
             const time = document.createElement("span");
             time.className = "app-price-hour__time";
-            time.textContent = pad(hour);
+            time.textContent = `${pad(hour)}:00`;
             const actionElement = document.createElement("button");
             actionElement.type = "button";
             actionElement.className = "app-price-hour__action";

@@ -807,6 +807,24 @@ $editorTodayContext = resolveEditorTodayContext();
         </section>
     </section>
 </main>
+
+<dialog class="gsd-dialog" id="unsaved-rule-dialog" role="alertdialog" aria-labelledby="unsaved-rule-dialog-title" aria-describedby="unsaved-rule-dialog-message">
+    <header class="gsd-dialog__header gsd-dialog__header--simple">
+        <h2 class="gsd-dialog__title" id="unsaved-rule-dialog-title">Unsaved changes</h2>
+        <button class="gsd-icon-btn" type="button" id="unsaved-rule-dialog-close" aria-label="Close dialog">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </header>
+    <div class="gsd-dialog__body">
+        <p class="gsd-dialog__lead" id="unsaved-rule-dialog-message">This rule has unsaved changes. Save before leaving?</p>
+    </div>
+    <footer class="gsd-dialog__footer">
+        <button class="gsd-btn gsd-btn--secondary" type="button" id="unsaved-rule-dialog-cancel" data-gsd-initial-focus>Keep editing</button>
+        <button class="gsd-btn gsd-btn--quiet" type="button" id="unsaved-rule-dialog-discard">Discard</button>
+        <button class="gsd-btn gsd-btn--primary" type="button" id="unsaved-rule-dialog-save">Save</button>
+    </footer>
+</dialog>
+
 <script>
 window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8'); ?>?api=1';
 window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
