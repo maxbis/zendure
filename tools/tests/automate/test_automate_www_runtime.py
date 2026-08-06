@@ -33,6 +33,7 @@ SCHEDULE_FILE = MAIN_DATA_DIR / "charge_schedule.json"
 CONDITIONS_FILE = MAIN_DATA_DIR / "charge_schedule_conditions.json"
 SCHEDULE_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_bak.json"
 CONDITIONS_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_conditions_bak.json"
+RULE_PROFILES_FILE = MAIN_DATA_DIR / "rule_profiles.json"
 RESOLVER_FILE = MAIN_DATA_DIR / "resolve_schedule_conditions.php"
 DATA_API_FILE = MAIN_DATA_DIR / "api" / "data_api.php"
 MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
@@ -51,6 +52,7 @@ TEST_DESCRIPTIONS = [
     ("test_resolver_wildcard_and_specific_rule_precedence", "Checks wildcard base rule and specific-hour override precedence."),
     ("test_resolver_emits_signed_power_bounds_from_netzero_minus_rules", "Checks resolver includes min_power and max_power for netzero- rules."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
+    ("test_resolver_emits_target_charge_at_next_netzero_minus_metadata", "Checks resolver preserves the symbolic target-charge mode, anchor, and stable rule id."),
     ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
     ("test_resolver_price_condition_supports_max_price_negative_offset", "Checks price conditions support value_ref with a negative numeric offset."),
     ("test_resolver_price_condition_supports_min_price_positive_offset", "Checks price conditions support value_ref with a positive numeric offset."),
@@ -140,11 +142,17 @@ def backup_and_restore_schedule_files():
     """Back up schedule files to *_bak.json and restore after each test."""
     shutil.copy2(SCHEDULE_FILE, SCHEDULE_BAK_FILE)
     shutil.copy2(CONDITIONS_FILE, CONDITIONS_BAK_FILE)
+    profile_contents = RULE_PROFILES_FILE.read_text(encoding="utf-8") if RULE_PROFILES_FILE.exists() else None
+    _write_json(RULE_PROFILES_FILE, {"active_profile_id": "show_all", "profiles": []})
     try:
         yield
     finally:
         shutil.copy2(SCHEDULE_BAK_FILE, SCHEDULE_FILE)
         shutil.copy2(CONDITIONS_BAK_FILE, CONDITIONS_FILE)
+        if profile_contents is None:
+            RULE_PROFILES_FILE.unlink(missing_ok=True)
+        else:
+            RULE_PROFILES_FILE.write_text(profile_contents, encoding="utf-8")
 
 
 @pytest.fixture
@@ -425,6 +433,33 @@ def test_resolver_emits_runtime_condition_metadata(backup_and_restore_price_file
     assert slot["fallback_value"] == 0
     assert isinstance(slot["runtime_conditions"], list)
     assert slot["runtime_conditions"][0]["field"] == "electricity_level"
+
+
+def test_resolver_emits_target_charge_at_next_netzero_minus_metadata(backup_and_restore_price_files):
+    today, tomorrow = _today_and_tomorrow_ymd()
+    _write_json(_price_file_path(today), _build_hourly_prices(0.10))
+    _write_json(_price_file_path(tomorrow), _build_hourly_prices(0.20))
+
+    rules = [
+        {
+            "rule_id": "rule-target-charge",
+            "name": "target-charge-1000",
+            "key": "********1000",
+            "value": "full_at_netzero_minus",
+            "enabled": True,
+        },
+    ]
+    _write_json(CONDITIONS_FILE, rules)
+
+    payload = _run_php_json(["php", str(RESOLVER_FILE)])
+    assert payload.get("success") is True
+    today_group = next((g for g in payload.get("resolved", []) if g.get("date") == today), None)
+    assert isinstance(today_group, dict)
+    by_time = {str(item.get("time")): item for item in today_group.get("items", [])}
+    slot = by_time["1000"]
+    assert slot["value"] == "full_at_netzero_minus"
+    assert slot["target_anchor"] == "next_netzero_minus"
+    assert slot["rule_id"] == "rule-target-charge"
 
 
 def test_resolver_emits_am_pm_max_price_hour_value_refs(backup_and_restore_price_files):

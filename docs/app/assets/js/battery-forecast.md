@@ -6,6 +6,8 @@ The battery forecast module predicts the battery percentage at the start and end
 
 The initial household-usage profile is deliberately isolated behind one hourly array so a future usage-prediction API can replace the data source without replacing the forecast calculation.
 
+The server-side target battery planner uses the same initial hourly assumptions when it materializes `empty_at_solar_charge`. Its `full_at_netzero_minus` mode deliberately uses live SoC and remaining matching duration without a forecast or efficiency factor. Both server-side modes are separate from this display-only JavaScript module.
+
 ## Location
 
 - Forecast engine: [`app/assets/js/battery-forecast.js`](../../../../app/assets/js/battery-forecast.js)
@@ -102,3 +104,4 @@ percentage change = (watts × hours × efficiency ÷ capacity Wh) × 100
 - [Current energy status and battery details](current-energy-status.md)
 - [New GUI shared system configuration](../../shared-system-configuration.md)
 - [Legacy price-popup battery estimate](../../../main/assets/js/price-overview-bar-popup-estimate.md)
+- [Target battery planner](../../../main/data/target-battery-planner.md)

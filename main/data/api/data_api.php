@@ -3,6 +3,8 @@
 
 require_once dirname(__DIR__, 3) . '/common/php/system_config.php';
 require_once __DIR__ . '/data_functions.php';
+require_once __DIR__ . '/../../includes/config_loader.php';
+require_once __DIR__ . '/../target_battery_planner.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -104,33 +106,38 @@ function getDataParamsForType($type) {
     return $params;
 }
 
-function getConditionalResolvedForDate($date) {
+function getConditionalResolvedGroups() {
+    static $groups = null;
+    if (is_array($groups)) {
+        return $groups;
+    }
     if (!file_exists(CONDITIONAL_SCHEDULE_RESOLVER_PATH)) {
-        return null;
+        return [];
     }
 
     $cmd = 'php ' . escapeshellarg(CONDITIONAL_SCHEDULE_RESOLVER_PATH) . ' 2>/dev/null';
     $raw = @shell_exec($cmd);
     if (!is_string($raw) || trim($raw) === '') {
-        return null;
+        return [];
     }
 
     $decoded = json_decode($raw, true);
     if (!is_array($decoded) || empty($decoded['success']) || !isset($decoded['resolved']) || !is_array($decoded['resolved'])) {
-        return null;
+        return [];
     }
-
+    $groups = [];
     foreach ($decoded['resolved'] as $group) {
         if (!is_array($group) || !isset($group['date']) || !isset($group['items']) || !is_array($group['items'])) {
             continue;
         }
-        if ((string) $group['date'] !== (string) $date) {
-            continue;
-        }
-        return $group['items'];
+        $groups[(string) $group['date']] = $group['items'];
     }
+    return $groups;
+}
 
-    return null;
+function getConditionalResolvedForDate($date) {
+    $groups = getConditionalResolvedGroups();
+    return $groups[(string) $date] ?? null;
 }
 
 function normalizeDataApiResolvedConditionalMetadata($item) {
@@ -146,6 +153,9 @@ function normalizeDataApiResolvedConditionalMetadata($item) {
         'rule_index' => (array_key_exists('rule_index', $item) && is_numeric($item['rule_index']))
             ? ((int) $item['rule_index'])
             : null,
+        'rule_id' => (isset($item['rule_id']) && is_string($item['rule_id']) && trim($item['rule_id']) !== '')
+            ? trim($item['rule_id'])
+            : null,
     ];
 
     if (array_key_exists('min_power', $item)) {
@@ -153,6 +163,19 @@ function normalizeDataApiResolvedConditionalMetadata($item) {
     }
     if (array_key_exists('max_power', $item)) {
         $meta['max_power'] = normalizeOptionalScheduleBound($item['max_power'], 'max_power');
+    }
+    if (($item['value'] ?? null) === TARGET_BATTERY_MODE) {
+        $meta['target_soc_percent'] = isset($item['target_soc_percent']) && is_numeric($item['target_soc_percent'])
+            ? (float) $item['target_soc_percent']
+            : null;
+        $meta['target_anchor'] = TARGET_BATTERY_ANCHOR;
+        $meta['max_discharge_power'] = isset($item['max_discharge_power']) && is_numeric($item['max_discharge_power'])
+            ? max(1, (int) $item['max_discharge_power'])
+            : null;
+    }
+    if (($item['value'] ?? null) === TARGET_CHARGE_MODE) {
+        $meta['target_soc_percent'] = null;
+        $meta['target_anchor'] = TARGET_CHARGE_ANCHOR;
     }
     if (
         array_key_exists('min_power', $meta) &&
@@ -240,11 +263,107 @@ function mergeResolvedWithConditional($resolved, $date) {
             } else {
                 unset($slot['rule_index']);
             }
+            if ($slotMeta['rule_id'] !== null) {
+                $slot['rule_id'] = $slotMeta['rule_id'];
+            } else {
+                unset($slot['rule_id']);
+            }
+            if (($slotMeta['value'] ?? null) === TARGET_BATTERY_MODE) {
+                $slot['target_soc_percent'] = $slotMeta['target_soc_percent'];
+                $slot['target_anchor'] = TARGET_BATTERY_ANCHOR;
+                if ($slotMeta['max_discharge_power'] !== null) {
+                    $slot['max_discharge_power'] = $slotMeta['max_discharge_power'];
+                }
+            }
+            if (($slotMeta['value'] ?? null) === TARGET_CHARGE_MODE) {
+                $slot['target_anchor'] = TARGET_CHARGE_ANCHOR;
+            }
         }
     }
     unset($slot);
 
     return $resolved;
+}
+
+function extractLiveBatteryPercentFromPayload($payload) {
+    if (!is_array($payload)) {
+        return null;
+    }
+    $candidates = [
+        $payload['properties']['electricLevel'] ?? null,
+        $payload['readings']['properties']['electricLevel'] ?? null,
+        $payload['data']['properties']['electricLevel'] ?? null,
+        $payload['zendure']['readings']['properties']['electricLevel'] ?? null,
+        $payload['zendure']['data']['properties']['electricLevel'] ?? null,
+    ];
+    foreach ($candidates as $candidate) {
+        if (is_numeric($candidate)) {
+            return max(0.0, min(100.0, (float) $candidate));
+        }
+    }
+    return null;
+}
+
+function fetchTargetPlannerBatteryPercent() {
+    $plannerCachePath = DATA_DIR . '/target_battery_state_cache.json';
+    if (is_file($plannerCachePath) && is_readable($plannerCachePath) && (time() - (int) filemtime($plannerCachePath)) <= 30) {
+        $cachedPercent = extractLiveBatteryPercentFromPayload(readDataFile($plannerCachePath));
+        if ($cachedPercent !== null) {
+            return $cachedPercent;
+        }
+    }
+    $localPath = DATA_DIR . '/zendure_data.json';
+    if (is_file($localPath) && is_readable($localPath) && (time() - (int) filemtime($localPath)) <= 90) {
+        $localPercent = extractLiveBatteryPercentFromPayload(readDataFile($localPath));
+        if ($localPercent !== null) {
+            return $localPercent;
+        }
+    }
+
+    $rawUrl = ConfigLoader::get('chargeStatusApi', ConfigLoader::get('allApi'));
+    $baseUrl = ConfigLoader::get('apiBaseUrlPiControl');
+    if (!is_string($rawUrl) || trim($rawUrl) === '') {
+        return null;
+    }
+    if (is_string($baseUrl) && trim($baseUrl) !== '') {
+        $rawUrl = str_replace('${apiBaseUrlPiControl}', rtrim($baseUrl, '/'), $rawUrl);
+    }
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 2,
+            'ignore_errors' => true,
+            'method' => 'GET',
+            'header' => "User-Agent: Zendure-Target-Battery-Planner\r\n",
+        ],
+    ]);
+    $raw = @file_get_contents($rawUrl, false, $context);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+    $payload = json_decode($raw, true);
+    $percent = extractLiveBatteryPercentFromPayload($payload);
+    if ($percent !== null) {
+        $cachePayload = ['properties' => ['electricLevel' => $percent], 'cached_at' => gmdate('c')];
+        $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (is_string($cacheJson)) {
+            $temporaryPath = $plannerCachePath . '.tmp';
+            if (@file_put_contents($temporaryPath, $cacheJson) !== false) {
+                @rename($temporaryPath, $plannerCachePath);
+            }
+        }
+    }
+    return $percent;
+}
+
+function containsTargetBatteryMode(array $days) {
+    foreach ($days as $day) {
+        foreach (($day['items'] ?? []) as $slot) {
+            if (is_array($slot) && in_array(($slot['value'] ?? null), [TARGET_BATTERY_MODE, TARGET_CHARGE_MODE], true)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 // --- GET handlers ---
@@ -289,6 +408,7 @@ function handleGetPrice() {
 }
 
 function handleGetData($type) {
+    global $dataApiSystemConfig;
     $params = getDataParamsForType($type);
     $filePath = getDataFilePath($type, $params);
     if ($filePath === null) {
@@ -332,8 +452,40 @@ function handleGetData($type) {
             $date = date('Ymd');
         }
         $resolved = resolveScheduleForDate($schedule, $date);
+        $planningDays = [];
         if (include_conditions) {
-            $resolved = mergeResolvedWithConditional($resolved, $date);
+            $timezone = new DateTimeZone($dataApiSystemConfig['installation']['timezone']);
+            $now = new DateTimeImmutable('now', $timezone);
+            $todayYmd = $now->format('Ymd');
+            $tomorrowYmd = $now->modify('+1 day')->format('Ymd');
+            $horizonDates = in_array($date, [$todayYmd, $tomorrowYmd], true)
+                ? [$todayYmd, $tomorrowYmd]
+                : [$date, (DateTimeImmutable::createFromFormat('!Ymd', $date, $timezone) ?: $now)->modify('+1 day')->format('Ymd')];
+            foreach (array_values(array_unique($horizonDates)) as $horizonDate) {
+                $dayItems = resolveScheduleForDate($schedule, $horizonDate);
+                $dayItems = mergeResolvedWithConditional($dayItems, $horizonDate);
+                $planningDays[] = ['date' => $horizonDate, 'items' => $dayItems];
+            }
+            if (containsTargetBatteryMode($planningDays)) {
+                $batteryPercent = fetchTargetPlannerBatteryPercent();
+                $battery = $batteryPercent === null ? null : [
+                    'percent' => $batteryPercent,
+                    'capacity_wh' => (float) $dataApiSystemConfig['battery']['capacityWh'],
+                    'minimum_percent' => (float) $dataApiSystemConfig['battery']['minChargePercent'],
+                    'maximum_percent' => (float) $dataApiSystemConfig['battery']['maxChargePercent'],
+                ];
+                $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, [
+                    'max_discharge_power_w' => abs((int) ConfigLoader::get('minGridPower', -1600)),
+                    'max_charge_power_w' => max(0, (int) ConfigLoader::get('maxGridPower', 1600)),
+                    'charge_power_step_w' => TARGET_CHARGE_POWER_STEP_W,
+                ]);
+            }
+            foreach ($planningDays as $planningDay) {
+                if (($planningDay['date'] ?? null) === $date) {
+                    $resolved = $planningDay['items'];
+                    break;
+                }
+            }
         }
         $uiEntries = makeUiScheduleEntries($schedule);
         return [

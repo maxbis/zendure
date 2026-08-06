@@ -130,7 +130,7 @@ function isValidRuleKey(string $key): bool
 
 function isValidRuleValue($value): bool
 {
-    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || $value === 'empty_at_solar_charge' || $value === 'full_at_netzero_minus' || is_numeric($value);
 }
 
 function normalizeConditionRelationValue($value): string
@@ -823,6 +823,22 @@ function buildRuleFromEntry(array $entry, string $keyStr, int $order): array
             unset($rule['min_power'], $rule['max_power']);
         }
     }
+    if ($rule['value'] === 'empty_at_solar_charge') {
+        $targetSoc = isset($entry['target_soc_percent']) && is_numeric($entry['target_soc_percent'])
+            ? (float) $entry['target_soc_percent']
+            : null;
+        if ($targetSoc !== null && $targetSoc >= 0 && $targetSoc <= 100) {
+            $rule['target_soc_percent'] = round($targetSoc, 1);
+            $rule['target_anchor'] = 'next_netzero_plus';
+        }
+        $maxDischarge = normalizeOptionalRuleBoundValue($entry['max_discharge_power'] ?? null);
+        if ($maxDischarge !== null && $maxDischarge > 0) {
+            $rule['max_discharge_power'] = $maxDischarge;
+        }
+    }
+    if ($rule['value'] === 'full_at_netzero_minus') {
+        $rule['target_anchor'] = 'next_netzero_minus';
+    }
     return $rule;
 }
 
@@ -941,6 +957,16 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, arra
             }
             if (array_key_exists('max_power', $rule)) {
                 $items[count($items) - 1]['max_power'] = $rule['max_power'];
+            }
+            if ($rule['value'] === 'empty_at_solar_charge') {
+                $items[count($items) - 1]['target_soc_percent'] = $rule['target_soc_percent'] ?? null;
+                $items[count($items) - 1]['target_anchor'] = 'next_netzero_plus';
+                if (array_key_exists('max_discharge_power', $rule)) {
+                    $items[count($items) - 1]['max_discharge_power'] = $rule['max_discharge_power'];
+                }
+            }
+            if ($rule['value'] === 'full_at_netzero_minus') {
+                $items[count($items) - 1]['target_anchor'] = 'next_netzero_minus';
             }
             break;
         }

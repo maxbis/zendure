@@ -39,6 +39,11 @@
         inpName: document.getElementById('inp-name'),
         inpValueMode: document.getElementById('inp-value-mode'),
         inpFixedValue: document.getElementById('inp-fixed-value'),
+        batteryTargetRow: document.getElementById('battery-target-row'),
+        inpTargetSoc: document.getElementById('inp-target-soc'),
+        inpMaxDischargePower: document.getElementById('inp-max-discharge-power'),
+        batteryTargetPreview: document.getElementById('battery-target-preview'),
+        chargeTargetRow: document.getElementById('charge-target-row'),
         inpColor: document.getElementById('inp-color'),
         inpMonth: document.getElementById('inp-month'),
         inpHour: document.getElementById('inp-hour'),
@@ -85,8 +90,10 @@
     ];
     const editorHelpTexts = {
         'inp-name': 'Rule name shown in the rules list and source labels.',
-        'inp-value-mode': 'Select output mode: fixed watts, netzero, netzero-, or netzero+. Netzero+ limits are charge-only, netzero- limits are discharge-only.',
+        'inp-value-mode': 'Select output mode. Target @ next NZ+ calculates discharge; Target @ next NZ- continuously calculates an NZ+ minimum charge limit.',
         'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
+        'inp-target-soc': 'Required battery level at the start of the first future netzero+ schedule block.',
+        'inp-max-discharge-power': 'Optional positive watt cap for the calculated discharge action.',
         'inp-color': 'Optional hex color override for graph bars when this rule is active, for example #FF7043.',
         'inp-month': 'Optional month filter. Comma-separated values 1-12 (e.g. 10,11,12,1,2,3).',
         'inp-hour': 'Optional hour filter. Comma-separated values 0-23 (e.g. 1,2,17,18).',
@@ -101,6 +108,8 @@
         'inp-name',
         'inp-value-mode',
         'inp-fixed-value',
+        'inp-target-soc',
+        'inp-max-discharge-power',
         'inp-color',
         'inp-month',
         'inp-hour',
@@ -125,6 +134,8 @@
     const LIMIT_MIN = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMin)) ? Number(EDIT_RULES_CONFIG.limitMin) : -1200;
     const LIMIT_MAX = Number.isFinite(Number(EDIT_RULES_CONFIG.limitMax)) ? Number(EDIT_RULES_CONFIG.limitMax) : 1200;
     const LIMIT_STEP = 100;
+    const MIN_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.minChargePercent)) ? Number(EDIT_RULES_CONFIG.minChargePercent) : 15;
+    const MAX_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.maxChargePercent)) ? Number(EDIT_RULES_CONFIG.maxChargePercent) : 95;
     const SHOW_ALL_PROFILE_ID = 'show_all';
 
     function cloneDeep(v) {
@@ -328,6 +339,18 @@
             );
             out.min_power = normalizedLimits.minValue;
             out.max_power = normalizedLimits.maxValue;
+        }
+        if (rule.value === 'empty_at_solar_charge') {
+            const targetSoc = Number(rule.target_soc_percent);
+            out.target_soc_percent = Number.isFinite(targetSoc) ? targetSoc : MIN_CHARGE_PERCENT;
+            out.target_anchor = 'next_netzero_plus';
+            const maxDischargePower = Number(rule.max_discharge_power);
+            if (Number.isFinite(maxDischargePower) && maxDischargePower > 0) {
+                out.max_discharge_power = Math.trunc(maxDischargePower);
+            }
+        }
+        if (rule.value === 'full_at_netzero_minus') {
+            out.target_anchor = 'next_netzero_minus';
         }
         if (rule.fallback_value !== undefined && rule.fallback_value !== null && rule.fallback_value !== '') {
             out.fallback_value = rule.fallback_value;
@@ -777,7 +800,7 @@
 
     function updateFallbackVisibility() {
         if (!els.fallbackRow || !els.inpFallbackValue) return;
-        const shouldShow = hasRuntimeConditionRows();
+        const shouldShow = hasRuntimeConditionRows() || ['empty_at_solar_charge', 'full_at_netzero_minus'].includes(els.inpValueMode?.value);
         els.fallbackRow.hidden = !shouldShow;
         els.inpFallbackValue.disabled = !shouldShow;
         if (!shouldShow) {
@@ -829,7 +852,7 @@
     function updateValueModeTone() {
         if (!els.inpValueMode) return;
         const value = String(els.inpValueMode.value || '');
-        els.inpValueMode.classList.remove('value-mode-fixed', 'value-mode-netzero', 'value-mode-netzero-minus', 'value-mode-netzero-plus');
+        els.inpValueMode.classList.remove('value-mode-fixed', 'value-mode-netzero', 'value-mode-netzero-minus', 'value-mode-netzero-plus', 'value-mode-target');
 
         if (value === 'netzero') {
             els.inpValueMode.classList.add('value-mode-netzero');
@@ -841,6 +864,10 @@
         }
         if (value === 'netzero+') {
             els.inpValueMode.classList.add('value-mode-netzero-plus');
+            return;
+        }
+        if (value === 'empty_at_solar_charge' || value === 'full_at_netzero_minus') {
+            els.inpValueMode.classList.add('value-mode-target');
             return;
         }
         els.inpValueMode.classList.add('value-mode-fixed');
@@ -878,6 +905,11 @@
             const colorSwatchHtml = rule.color
                 ? '<span class="rule-color-indicator" style="background:' + escapeHtml(rule.color) + ';" aria-hidden="true"></span>'
                 : '';
+            const targetSummaryHtml = rule.value === 'empty_at_solar_charge'
+                ? '<span class="rule-target-summary">' + escapeHtml(rule.target_soc_percent) + '% @ NZ+</span>'
+                : rule.value === 'full_at_netzero_minus'
+                    ? '<span class="rule-target-summary">' + escapeHtml(MAX_CHARGE_PERCENT) + '% @ NZ-</span>'
+                    : '';
             const nameTitle = hasLimits
                 ? ' title="' + escapeHtml(limitLabel + (rule.color ? (' | Color: ' + rule.color) : '')) + '"'
                 : (rule.color ? ' title="Color: ' + escapeHtml(rule.color) + '"' : '');
@@ -894,7 +926,7 @@
             tr.innerHTML = [
                 '<td class="enabled-cell"><input type="checkbox" data-action="toggle-enabled" data-idx="' + idx + '"' + enabledAttr + ' aria-label="Enable rule ' + escapeHtml(rule.name || ('#' + (idx + 1))) + '"></td>',
                 '<td>' + (idx + 1) + '</td>',
-                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + colorSwatchHtml + limitIndicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code></button></td>',
+                '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + colorSwatchHtml + limitIndicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code>' + targetSummaryHtml + '</button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
                 '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
@@ -1148,6 +1180,8 @@
         els.inpHour.value = '';
         els.inpMinTime.value = '';
         els.inpMaxTime.value = '';
+        if (els.inpTargetSoc) els.inpTargetSoc.value = String(MIN_CHARGE_PERCENT);
+        if (els.inpMaxDischargePower) els.inpMaxDischargePower.value = '';
         els.inpMinValue.value = '';
         els.inpMaxValue.value = '';
         if (els.limitsOff) els.limitsOff.checked = true;
@@ -1161,7 +1195,7 @@
         els.inpValueMode.value = 'fixed';
         els.inpFixedValue.disabled = false;
         els.conditionsList.innerHTML = '';
-        updateFallbackVisibility();
+        updateValueModeFields();
         syncLimitsState({ resetToDefaults: true });
         els.inpColor.dispatchEvent(new Event('input', { bubbles: true }));
         els.inpColor.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1178,12 +1212,28 @@
 
     function updateValueModeFields() {
         const isFixed = els.inpValueMode.value === 'fixed';
+        const isTarget = els.inpValueMode.value === 'empty_at_solar_charge';
+        const isChargeTarget = els.inpValueMode.value === 'full_at_netzero_minus';
         els.inpFixedValue.disabled = !isFixed;
         if (!isFixed) {
             els.inpFixedValue.value = '';
         }
+        if (els.batteryTargetRow) els.batteryTargetRow.hidden = !isTarget;
+        if (els.chargeTargetRow) els.chargeTargetRow.hidden = !isChargeTarget;
+        if (els.inpTargetSoc) {
+            els.inpTargetSoc.disabled = !isTarget;
+            els.inpTargetSoc.required = isTarget;
+            if (isTarget && String(els.inpTargetSoc.value || '').trim() === '') {
+                els.inpTargetSoc.value = String(MIN_CHARGE_PERCENT);
+            }
+        }
+        if (els.inpMaxDischargePower) els.inpMaxDischargePower.disabled = !isTarget;
+        if (els.batteryTargetPreview && isTarget) {
+            els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ start. The resolved schedule will contain calculated fixed watts.`;
+        }
         updateValueModeTone();
         syncLimitsState();
+        updateFallbackVisibility();
         updateAllFieldStates();
     }
 
@@ -1197,6 +1247,14 @@
             els.inpValueMode.value = rule.value;
             els.inpFixedValue.value = '';
             els.inpFixedValue.disabled = true;
+        } else if (rule.value === 'empty_at_solar_charge') {
+            els.inpValueMode.value = 'empty_at_solar_charge';
+            els.inpFixedValue.value = '';
+            els.inpFixedValue.disabled = true;
+        } else if (rule.value === 'full_at_netzero_minus') {
+            els.inpValueMode.value = 'full_at_netzero_minus';
+            els.inpFixedValue.value = '';
+            els.inpFixedValue.disabled = true;
         } else {
             els.inpValueMode.value = 'fixed';
             els.inpFixedValue.value = String(rule.value);
@@ -1206,6 +1264,8 @@
         els.inpHour.value = rule.hour || '';
         els.inpMinTime.value = rule.min_time || '';
         els.inpMaxTime.value = rule.max_time || '';
+        if (els.inpTargetSoc) els.inpTargetSoc.value = rule.target_soc_percent !== undefined ? String(rule.target_soc_percent) : String(MIN_CHARGE_PERCENT);
+        if (els.inpMaxDischargePower) els.inpMaxDischargePower.value = rule.max_discharge_power !== undefined ? String(rule.max_discharge_power) : '';
         const hasLimits = (rule.min_power !== undefined && rule.min_power !== null) || (rule.max_power !== undefined && rule.max_power !== null);
         const normalizedLimits = normalizeLimitPair(
             rule.min_power !== undefined && rule.min_power !== null ? rule.min_power : null,
@@ -1287,7 +1347,7 @@
     function readRuleFromForm() {
         let value;
         const mode = els.inpValueMode.value;
-        if (isDynamicLimitMode(mode)) {
+        if (isDynamicLimitMode(mode) || mode === 'empty_at_solar_charge' || mode === 'full_at_netzero_minus') {
             value = mode;
         } else {
             const raw = els.inpFixedValue.value.trim();
@@ -1307,6 +1367,25 @@
         }
 
         const rule = { name: name, value: value };
+        if (mode === 'empty_at_solar_charge') {
+            const targetSoc = Number(els.inpTargetSoc?.value);
+            if (!Number.isFinite(targetSoc) || targetSoc < MIN_CHARGE_PERCENT || targetSoc > MAX_CHARGE_PERCENT) {
+                throw new Error(`Requested spare level must be between ${MIN_CHARGE_PERCENT}% and ${MAX_CHARGE_PERCENT}%.`);
+            }
+            rule.target_soc_percent = Math.round(targetSoc * 10) / 10;
+            rule.target_anchor = 'next_netzero_plus';
+            const maxDischargeRaw = String(els.inpMaxDischargePower?.value || '').trim();
+            if (maxDischargeRaw !== '') {
+                const maxDischargePower = Number(maxDischargeRaw);
+                if (!Number.isInteger(maxDischargePower) || maxDischargePower <= 0) {
+                    throw new Error('Maximum discharge must be a positive whole number of watts.');
+                }
+                rule.max_discharge_power = maxDischargePower;
+            }
+        }
+        if (mode === 'full_at_netzero_minus') {
+            rule.target_anchor = 'next_netzero_minus';
+        }
         const color = normalizeRuleColor(els.inpColor.value);
         if (String(els.inpColor.value || '').trim() !== '' && !color) {
             throw new Error('Rule color must be a hex color like #FF7043.');
@@ -1512,7 +1591,7 @@
             .map(normalizeRule)
             .filter(function (rule) {
                 if (!rule || !rule.name) return false;
-                if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+') return true;
+                if (rule.value === 'netzero' || rule.value === 'netzero-' || rule.value === 'netzero+' || rule.value === 'empty_at_solar_charge' || rule.value === 'full_at_netzero_minus') return true;
                 return Number.isFinite(Number(rule.value));
             });
         return normalized;
@@ -1720,6 +1799,14 @@
             updateValueModeFields();
             updateValueModeTone();
         });
+
+        if (els.inpTargetSoc) {
+            els.inpTargetSoc.addEventListener('input', function () {
+                if (els.batteryTargetPreview && els.inpValueMode.value === 'empty_at_solar_charge') {
+                    els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ start. The resolved schedule will contain calculated fixed watts.`;
+                }
+            });
+        }
 
         if (els.limitsOff) {
             els.limitsOff.addEventListener('change', function () {

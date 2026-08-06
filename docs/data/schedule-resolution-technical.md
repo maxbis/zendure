@@ -243,6 +243,8 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
    - **First matching rule fires** — break
 5. Emit `{ time, value, ranking, rule_name?, rule_index?, runtime_conditions?, fallback_value?, min_power?, max_power? }` per matched hour
 
+For `value = "empty_at_solar_charge"`, the conditional resolver also emits `target_soc_percent`, `target_anchor`, and optional `max_discharge_power`. For `value = "full_at_netzero_minus"`, it emits `target_anchor = "next_netzero_minus"`. These are intermediate planning values, not automation commands.
+
 ### Output Format
 
 ```json
@@ -313,7 +315,12 @@ Supported `value_ref` targets: `min_price`, `max_price`, `spread_price`, `min_pr
        - Slot is empty, has a wildcard key, **or has value = 0** → **replace with condition value**
       - Adds metadata: `source: "condition"`, `rule_name`, `rule_index`, `runtime_conditions`, `fallback_value`, `min_power`, `max_power`
 4. Build UI entries (all raw schedule entries, sorted by key)
-5. Return full response
+5. If the merged today-and-tomorrow horizon contains `empty_at_solar_charge` or `full_at_netzero_minus`, load live battery percentage and run `target_battery_planner.php`.
+6. Replace every symbolic target value with calculated fixed watts, calculated NZ+ bounds, or its safe fallback.
+7. Attach optional `planning` metadata for the app tooltip.
+8. Return the full response.
+
+The final `resolved` array never intentionally exposes `empty_at_solar_charge` or `full_at_netzero_minus` to automation. Automation continues consuming integer watts, `netzero`, `netzero-`, and `netzero+`. Unknown planning metadata is informational and may be ignored.
 
 ### `include_conditions` Config Flag
 

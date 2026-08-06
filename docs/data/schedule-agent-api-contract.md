@@ -158,6 +158,8 @@ The compatibility payload must obey all of the following rules:
   - `"netzero-"`
 - when both `min_power` and `max_power` are present, `min_power <= max_power` must hold
 - `runtime_conditions` are passed through and evaluated by Python, not by the compatibility resolver itself
+- symbolic planning objectives such as `empty_at_solar_charge` and `full_at_netzero_minus` must be materialized upstream and must not appear as a final `value`
+- optional `planning` metadata may explain an upstream calculation; automation may ignore it
 
 The compatibility endpoint should avoid emitting `null` values for active scheduling decisions. The current runtime can degrade `None` or a missing active slot effectively to `0`, but producers should not depend on that fallback.
 
@@ -571,6 +573,7 @@ The producer must validate all published compatibility payloads.
   - `"netzero"`
   - `"netzero+"`
   - `"netzero-"`
+- `empty_at_solar_charge` and `full_at_netzero_minus` are valid only in source rules and are invalid in the final compatibility payload
 
 ### Bound Validation
 

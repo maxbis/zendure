@@ -53,7 +53,7 @@ function writeRulesFileAtomic(string $path, array $data): void
 
 function validateValue($value): bool
 {
-    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || is_numeric($value);
+    return $value === 'netzero' || $value === 'netzero-' || $value === 'netzero+' || $value === 'empty_at_solar_charge' || $value === 'full_at_netzero_minus' || is_numeric($value);
 }
 
 function isRuntimeOnlyConditionField(string $field): bool
@@ -353,6 +353,25 @@ function normalizeRules(array $rules): array
                 $normalized['max_power'] = null;
             }
         }
+        if ($normalized['value'] === 'empty_at_solar_charge') {
+            $minimumTargetSoc = (float) ConfigLoader::get('MIN_CHARGE_LEVEL', 15);
+            $maximumTargetSoc = (float) ConfigLoader::get('MAX_CHARGE_LEVEL', 95);
+            $targetSoc = isset($rule['target_soc_percent']) && is_numeric($rule['target_soc_percent'])
+                ? (float) $rule['target_soc_percent']
+                : null;
+            if ($targetSoc === null || $targetSoc < $minimumTargetSoc || $targetSoc > $maximumTargetSoc) {
+                continue;
+            }
+            $normalized['target_soc_percent'] = round($targetSoc, 1);
+            $normalized['target_anchor'] = 'next_netzero_plus';
+            $maxDischarge = normalizeOptionalRuleBound($rule['max_discharge_power'] ?? null);
+            if ($maxDischarge !== null && $maxDischarge > 0) {
+                $normalized['max_discharge_power'] = $maxDischarge;
+            }
+        }
+        if ($normalized['value'] === 'full_at_netzero_minus') {
+            $normalized['target_anchor'] = 'next_netzero_minus';
+        }
 
         if (isset($rule['conditions']) && is_array($rule['conditions'])) {
             $conditions = [];
@@ -455,6 +474,12 @@ if ($isApi) {
 $editorLimits = resolveRuleEditorLimits();
 $editorLimitMin = $editorLimits['min'];
 $editorLimitMax = $editorLimits['max'];
+$editorMinChargePercent = (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 15);
+$editorMaxChargePercent = (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 95);
+if ($editorMinChargePercent < 0 || $editorMaxChargePercent > 100 || $editorMinChargePercent >= $editorMaxChargePercent) {
+    $editorMinChargePercent = 15;
+    $editorMaxChargePercent = 95;
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -462,6 +487,8 @@ $editorLimitMax = $editorLimits['max'];
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit Rules</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/edit-rules-icon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/edit-rules-icon-180.png">
     <link rel="stylesheet" href="assets/css/edit_rules.css">
     <link rel="stylesheet" href="assets/css/edit_rules_color_picker.css">
 </head>
@@ -554,6 +581,8 @@ $editorLimitMax = $editorLimits['max'];
                             <option value="netzero">netzero</option>
                             <option value="netzero-">netzero-</option>
                             <option value="netzero+">netzero+</option>
+                            <option value="empty_at_solar_charge">Target @ next NZ+</option>
+                            <option value="full_at_netzero_minus">Target @ next NZ-</option>
                         </select>
                     </div>
                     <div class="editor-grid-item editor-grid-fixed">
@@ -583,6 +612,50 @@ $editorLimitMax = $editorLimits['max'];
                         <label for="inp-max-time">Max Time</label>
                         <input id="inp-max-time" type="text" placeholder="11">
                     </div>
+                </div>
+
+                <div id="charge-target-row" class="battery-target-panel" hidden>
+                    <div class="battery-target-heading">
+                        <div>
+                            <span class="battery-target-eyebrow">Live recalculated minimum</span>
+                            <h3>Charge target</h3>
+                        </div>
+                        <span class="battery-target-anchor">At first scheduled NZ-</span>
+                    </div>
+                    <div class="battery-target-grid">
+                        <div class="editor-grid-item">
+                            <label>Target battery level</label>
+                            <strong><?php echo htmlspecialchars((string) $editorMaxChargePercent); ?>%</strong>
+                        </div>
+                        <div class="editor-grid-item">
+                            <label>Maximum charge power</label>
+                            <strong><?php echo htmlspecialchars((string) max(0, $editorLimitMax)); ?> W</strong>
+                        </div>
+                    </div>
+                    <p class="battery-target-help">Every schedule refresh, the planner divides the remaining battery deficit across this rule's remaining matching hours before NZ-. It emits NZ+ with a minimum charge limit rounded upward to 100 W.</p>
+                    <div class="battery-target-preview">The live minimum appears in the Prices and Energy Plan after the rule is saved.</div>
+                </div>
+
+                <div id="battery-target-row" class="battery-target-panel" hidden>
+                    <div class="battery-target-heading">
+                        <div>
+                            <span class="battery-target-eyebrow">Forecast-calculated value</span>
+                            <h3>Battery target</h3>
+                        </div>
+                        <span class="battery-target-anchor">At first scheduled NZ+</span>
+                    </div>
+                    <div class="battery-target-grid">
+                        <div class="editor-grid-item">
+                            <label for="inp-target-soc">Requested spare level (%)</label>
+                            <input id="inp-target-soc" type="number" step="0.1" min="<?php echo $editorMinChargePercent; ?>" max="<?php echo $editorMaxChargePercent; ?>" required>
+                        </div>
+                        <div class="editor-grid-item">
+                            <label for="inp-max-discharge-power">Maximum discharge (W, optional)</label>
+                            <input id="inp-max-discharge-power" type="number" step="1" min="1" max="<?php echo max(abs($editorLimitMin), abs($editorLimitMax)); ?>" placeholder="<?php echo abs($editorLimitMin); ?>">
+                        </div>
+                    </div>
+                    <p class="battery-target-help">The planner calculates a fixed discharge value for this rule hour so the forecast reaches the requested level when the next NZ+ period starts.</p>
+                    <div id="battery-target-preview" class="battery-target-preview" aria-live="polite">The live calculation appears in the Prices and Energy Plan after the rule is saved.</div>
                 </div>
 
                 <div id="limits-row" class="row" hidden>
@@ -675,6 +748,8 @@ window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule
 window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'limitMin' => $editorLimitMin,
     'limitMax' => $editorLimitMax,
+    'minChargePercent' => $editorMinChargePercent,
+    'maxChargePercent' => $editorMaxChargePercent,
 ], JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>

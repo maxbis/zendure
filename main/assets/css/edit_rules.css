@@ -589,6 +589,18 @@ select.is-field-filled {
     box-shadow: 0 0 0 1px rgba(244, 217, 139, 0.18);
 }
 
+.rule-target-summary {
+    margin-left: auto;
+    padding: 3px 7px;
+    border: 1px solid rgba(125, 211, 252, 0.3);
+    border-radius: 999px;
+    color: #7dd3fc;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .fallback-select.fallback-netzero-minus,
 .fallback-select.fallback-negative {
     color: var(--fallback-negative);
@@ -658,6 +670,13 @@ select.is-field-filled {
     box-shadow: 0 0 0 1px rgba(127, 215, 127, 0.18);
 }
 
+.value-mode-select.value-mode-target {
+    color: #7dd3fc;
+    -webkit-text-fill-color: #7dd3fc;
+    border-color: rgba(125, 211, 252, 0.5);
+    box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.2);
+}
+
 .value-mode-select option {
     background: #0b1324;
     color: var(--fallback-neutral);
@@ -673,6 +692,79 @@ select.is-field-filled {
 
 .value-mode-select option[value="netzero+"] {
     color: var(--fallback-positive);
+}
+
+.value-mode-select option[value="empty_at_solar_charge"] {
+    color: #7dd3fc;
+}
+
+.battery-target-panel {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid rgba(125, 211, 252, 0.35);
+    border-radius: 10px;
+    background: linear-gradient(145deg, rgba(14, 116, 144, 0.12), rgba(15, 23, 42, 0.66));
+}
+
+.battery-target-heading,
+.battery-target-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.battery-target-heading h3 {
+    margin: 2px 0 0;
+    font-size: 1rem;
+}
+
+.battery-target-eyebrow {
+    color: #7dd3fc;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.battery-target-anchor {
+    padding: 5px 9px;
+    border: 1px solid rgba(125, 211, 252, 0.28);
+    border-radius: 999px;
+    color: #bae6fd;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.battery-target-grid > * {
+    flex: 1 1 0;
+}
+
+.battery-target-help,
+.battery-target-preview {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.battery-target-preview {
+    padding: 10px 12px;
+    border-left: 3px solid #38bdf8;
+    background: rgba(2, 132, 199, 0.09);
+    color: #dbeafe;
+}
+
+@media (max-width: 700px) {
+    .battery-target-heading,
+    .battery-target-grid {
+        display: grid;
+    }
+
+    .battery-target-anchor {
+        justify-self: start;
+    }
 }
 
 label.is-optional-filled {

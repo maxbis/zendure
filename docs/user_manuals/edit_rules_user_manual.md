@@ -41,6 +41,8 @@ Each rule has:
   - `netzero`
   - `netzero+`
   - `netzero-`
+  - `Target level at next NZ+` (`empty_at_solar_charge`)
+  - `Target @ next NZ-` (`full_at_netzero_minus`)
 - optional top-level filters:
   - `month` (e.g. `10,11,12,1,2,3`)
   - `hour` (e.g. `1,2,17,18`)
@@ -59,6 +61,34 @@ Notes:
 - they do not apply to `fallback_value`, and fallback values do not inherit primary rule limits
 - the editor uses `100 W` steps for these inputs
 - `fallback_value` is optional and independent of `value` type
+
+### Target level at next NZ+
+
+Select this Value Mode when a price or time condition identifies a selling hour and the battery should reach a requested reserve when solar charging starts again.
+
+- `Requested spare level (%)` is required and must stay within the configured battery operating range.
+- `Maximum discharge (W)` is optional and limits the calculated action.
+- The first future resolved `netzero+` slot is the target anchor.
+- The rule can use `hour == max_price_hour_pm` to select the highest-priced PM hour.
+- The rule stores a symbolic objective, but the final schedule API converts it to fixed watts or a safe fallback.
+- A battery-level runtime condition is normally unnecessary because the planner already uses the predicted battery level.
+- The fallback remains visible for this mode even when the rule has no runtime conditions. If omitted, planning uses `netzero-` as its safe default.
+
+### Target at next NZ-
+
+Select this Value Mode for cheap or solar-rich hours when the battery should reach the configured maximum level before the first future NZ- period.
+
+- When the rule matches multiple hours before the same NZ-, then all remaining matching hours are treated as one charging group.
+- When the current hour is part of the group, then only its remaining minutes count.
+- When planning runs, then it uses live battery percentage, configured capacity, configured maximum battery percentage, remaining eligible duration, and configured maximum charge power.
+- When calculating the minimum, then it does not use a solar forecast, consumption forecast, or battery-efficiency factor.
+- When the raw minimum is calculated, then it is rounded upward to the next `100 W` and clamped to the configured maximum charge power.
+- When the target is materialized, then every remaining matching slot becomes `netzero+` with the calculated `min_power` and configured `max_power`.
+- When automation refreshes its schedule, then the live calculation runs again. The normal automation refresh interval is five minutes.
+- When the configured maximum battery percentage has been reached, then the minimum becomes `0 W`; NZ+ may still absorb solar surplus but cannot discharge.
+- When the required minimum exceeds the configured charge maximum, then the planner emits the maximum and reports `best_effort`.
+- When battery data or the next NZ- anchor is unavailable, then the planner uses `netzero+` as the safe default fallback unless another fallback is configured.
+- When the Prices and Energy Plan is open, then it refreshes the resolved schedule every five minutes and shows the current minimum in the limit badge.
 
 ## 5. Condition Fields
 
@@ -149,6 +179,28 @@ At API merge time (`data_api.php`):
 
 ```json
 [
+  {
+    "name": "Sell at PM maximum before solar",
+    "value": "empty_at_solar_charge",
+    "target_soc_percent": 15,
+    "target_anchor": "next_netzero_plus",
+    "max_discharge_power": 1600,
+    "fallback_value": "netzero-",
+    "conditions": [
+      { "field": "hour", "op": "==", "value_ref": "max_price_hour_pm" },
+      { "field": "spread_price", "op": ">=", "value": 16 }
+    ]
+  },
+  {
+    "name": "Fill during cheap solar hours before discharge",
+    "value": "full_at_netzero_minus",
+    "target_anchor": "next_netzero_minus",
+    "fallback_value": "netzero+",
+    "conditions": [
+      { "field": "ranking", "op": "<=", "value": 4 },
+      { "field": "price", "op": "<=", "value": 5 }
+    ]
+  },
   {
     "name": "Free Power",
     "value": 800,

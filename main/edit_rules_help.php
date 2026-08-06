@@ -143,7 +143,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><th>Field</th><th>Description</th><th>Example</th></tr>
             </thead>
             <tbody>
-                <tr><td><code>value</code></td><td>Output schedule value. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"value": "netzero"</code></td></tr>
+                <tr><td><code>value</code></td><td>Output schedule value. Can be integer watts, <code>netzero</code>, <code>netzero-</code>, <code>netzero+</code>, <code>empty_at_solar_charge</code>, or <code>full_at_netzero_minus</code>.</td><td><code>"value": "netzero"</code></td></tr>
                 <tr><td><code>key</code> (optional)</td><td>Pattern key <code>YYYYMMDDHHmm</code> with optional <code>*</code> wildcards.</td><td><code>"key": "********1800"</code></td></tr>
                 <tr><td><code>month</code> (optional)</td><td>Month filter list; accepts string list, array, or single value.</td><td><code>"month": "10,11,12,1,2,3"</code></td></tr>
                 <tr><td><code>hour</code> (optional)</td><td>Hour filter list; accepts string list, array, or single value.</td><td><code>"hour": "1,2,17,18"</code></td></tr>
@@ -152,6 +152,9 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>min_power</code> (optional)</td><td>Minimum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"min_power": -700</code></td></tr>
                 <tr><td><code>max_power</code> (optional)</td><td>Maximum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"max_power": -100</code></td></tr>
                 <tr><td><code>fallback_value</code> (optional)</td><td>Optional fallback power used by runtime integrations when runtime conditions fail. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"fallback_value": 0</code></td></tr>
+                <tr><td><code>target_soc_percent</code></td><td>Required reserve at the first future <code>netzero+</code> start for <code>empty_at_solar_charge</code>.</td><td><code>15</code></td></tr>
+                <tr><td><code>max_discharge_power</code> (optional)</td><td>Positive watt cap for the discharge calculated by the target battery planner.</td><td><code>1600</code></td></tr>
+                <tr><td><code>full_at_netzero_minus</code></td><td>Continuously recalculated charging objective. It targets the configured maximum battery level at the next NZ- start and resolves matching hours to NZ+ with a 100 W stepped minimum.</td><td><code>"value": "full_at_netzero_minus"</code></td></tr>
                 <tr><td><code>conditions</code></td><td>Array of condition objects. Static rows use <code>condition_relation</code>; runtime-only rows force AND.</td><td><code>"conditions": [ ... ]</code></td></tr>
                 <tr><td><code>condition_relation</code> (optional)</td><td>How static <code>conditions[]</code> rows are combined. Supported values: <code>and</code>, <code>or</code>. Default is <code>and</code>.</td><td><code>"condition_relation": "or"</code></td></tr>
             </tbody>
@@ -202,6 +205,7 @@ date_default_timezone_set('Europe/Amsterdam');
         <p>When a rule contains runtime-only conditions such as <code>electricity_level</code>, its effective condition relation is forced to <code>AND</code>.</p>
         <p>When present, <code>min_power</code> and <code>max_power</code> are also exposed in resolved output for <code>netzero</code> / <code>netzero+</code> rules so the Python runtime can apply them.</p>
         <p class="muted"><code>fallback_value</code> does not have its own min/max fields.</p>
+        <p>For <code>full_at_netzero_minus</code>, the planner uses the live battery percentage without a solar forecast or efficiency factor. It divides the remaining energy across the rule's remaining matching slots, rounds the NZ+ minimum upward to 100 W, and clamps it to the configured maximum charge power. If planning is unavailable, the default fallback is unbounded <code>netzero+</code>.</p>
     </section>
 
     <section>

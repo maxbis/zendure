@@ -87,6 +87,7 @@ function buildAppSolarEvents(array $location): array
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'refreshIntervalMs' => 20000,
+    'scheduleDisplayRefreshMs' => 300000,
     'staleAfterMs' => 90000,
     'minChargePercent' => $systemConfig['battery']['minChargePercent'] ?? null,
     'maxChargePercent' => $systemConfig['battery']['maxChargePercent'] ?? null,

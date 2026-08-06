@@ -23,6 +23,15 @@ else
 fi
 
 echo ""
+echo "==> Running target battery planner tests"
+if php "$SCRIPT_DIR/target_battery_planner_test.php"; then
+  :
+else
+  FAILED=1
+  FAILED_SUITES+=("target_battery_planner")
+fi
+
+echo ""
 echo "==> Running app battery forecast tests"
 if node "$SCRIPT_DIR/app_battery_forecast_test.js"; then
   :

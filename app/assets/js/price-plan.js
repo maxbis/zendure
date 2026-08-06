@@ -64,6 +64,7 @@
     let isProgrammaticTimelineScroll = false;
     let programmaticTimelineScrollTimer = null;
     let activeScheduleTooltip = null;
+    let scheduleRefreshInFlight = false;
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -646,6 +647,69 @@
         return section;
     }
 
+    function tooltipTargetPlanning(slot) {
+        const planning = slot?.planning;
+        if (!planning || !["empty_at_solar_charge", "full_at_netzero_minus"].includes(planning.mode)) return null;
+
+        const isChargeTarget = planning.mode === "full_at_netzero_minus";
+
+        const section = document.createElement("div");
+        section.className = "app-schedule-tooltip__forecast app-schedule-tooltip__target-plan";
+        section.appendChild(tooltipSectionLabel("Battery target"));
+
+        const values = document.createElement("div");
+        values.className = "app-schedule-tooltip__forecast-values";
+        const target = document.createElement("p");
+        const result = document.createElement("p");
+        const targetLabel = document.createElement("span");
+        const resultLabel = document.createElement("span");
+        const targetValue = document.createElement("strong");
+        const resultValue = document.createElement("strong");
+        targetLabel.textContent = isChargeTarget ? "Goal at NZ−" : "Goal at NZ+";
+        resultLabel.textContent = isChargeTarget ? "Current" : "Predicted";
+        targetValue.textContent = Number.isFinite(Number(planning.target_soc_percent))
+            ? `${Number(planning.target_soc_percent).toFixed(1)}%`
+            : "Unavailable";
+        const resultPercent = isChargeTarget ? planning.current_soc_percent : planning.predicted_anchor_soc_percent;
+        resultValue.textContent = Number.isFinite(Number(resultPercent))
+            ? `${Number(resultPercent).toFixed(1)}%`
+            : "Unavailable";
+        target.append(targetLabel, targetValue);
+        result.append(resultLabel, resultValue);
+        values.append(target, result);
+
+        const detail = document.createElement("p");
+        detail.className = "app-schedule-tooltip__forecast-detail";
+        const anchor = planning.anchor_date && planning.anchor_time
+            ? `${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
+            : `No ${isChargeTarget ? "NZ−" : "NZ+"} in horizon`;
+        const statuses = {
+            achievable: "Target achievable",
+            best_effort: "Best effort",
+            already_satisfied: isChargeTarget ? "Target already reached" : "No extra discharge needed",
+            unavailable: "Calculation unavailable",
+            past: "Rule hour passed"
+        };
+        const parts = [statuses[planning.status] || String(planning.status || "Planned"), `${isChargeTarget ? "NZ−" : "NZ+"} ${anchor}`];
+        if (isChargeTarget && Number.isFinite(Number(planning.calculated_min_power_w))) {
+            parts.push(`minimum ${formatWatts(Number(planning.calculated_min_power_w))}`);
+        } else if (Number.isFinite(Number(planning.calculated_power_w))) {
+            parts.push(`calculated ${formatWatts(Number(planning.calculated_power_w))}`);
+        }
+        if (isChargeTarget && Number.isFinite(Number(planning.remaining_eligible_hours))) {
+            parts.push(`${Number(planning.remaining_eligible_hours).toFixed(2)} h remaining`);
+        }
+        detail.textContent = parts.join(" · ");
+        section.append(values, detail);
+        if (planning.reason) {
+            const reason = document.createElement("p");
+            reason.className = "app-schedule-tooltip__forecast-unavailable";
+            reason.textContent = planning.reason;
+            section.appendChild(reason);
+        }
+        return section;
+    }
+
     function showPriceTooltip({ date, hour, slot, action, limited }, trigger, anchor) {
         hidePriceTooltip();
         activeTooltipTrigger = trigger;
@@ -662,13 +726,13 @@
 
         const runtimeConditions = formatRuntimeConditions(slot);
         const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
-        if (runtimeConditions) {
+        if (runtimeConditions || ["empty_at_solar_charge", "full_at_netzero_minus"].includes(slot?.planning?.mode)) {
             const rule = document.createElement("span");
             rule.className = "app-schedule-tooltip__rule";
             if (ruleColor) rule.style.setProperty("--app-rule-color", ruleColor);
             const dot = document.createElement("i");
             dot.setAttribute("aria-hidden", "true");
-            rule.append(dot, document.createTextNode(slot?.rule_name ? `Rule: ${slot.rule_name}` : "Runtime rule"));
+            rule.append(dot, document.createTextNode(slot?.rule_name ? `Rule: ${slot.rule_name}` : runtimeConditions ? "Runtime rule" : "Planned target"));
             header.appendChild(rule);
         }
 
@@ -692,6 +756,8 @@
             if (limited) content.appendChild(tooltipLimits(slot));
         }
 
+        const targetPlanning = tooltipTargetPlanning(slot);
+        if (targetPlanning) content.appendChild(targetPlanning);
         const batteryForecast = tooltipBatteryForecast(date, hour);
         if (batteryForecast) content.appendChild(batteryForecast);
 
@@ -1252,7 +1318,8 @@
         return "Controller chooses the action";
     }
 
-    function render() {
+    function render({ preserveScroll = false } = {}) {
+        const previousScrollLeft = elements.scroll.scrollLeft;
         hidePriceTooltip();
         const dates = localDates();
         const todayDate = state.dates.today || dates.today;
@@ -1275,7 +1342,11 @@
             elements.tomorrowStatusLabel.textContent = tomorrowHasPrices ? "Tomorrow ready" : "Tomorrow pending";
         }
         elements.tomorrowStatus?.setAttribute("aria-label", tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet");
-        scrollTimelineToActiveHour();
+        if (preserveScroll) {
+            elements.scroll.scrollLeft = previousScrollLeft;
+        } else {
+            scrollTimelineToActiveHour();
+        }
     }
 
     function setView(view, message = "") {
@@ -1417,6 +1488,31 @@
         }
     }
 
+    async function refreshSchedules() {
+        if (scheduleRefreshInFlight || document.hidden) return;
+        scheduleRefreshInFlight = true;
+        const dates = localDates();
+        const controller = new AbortController();
+        try {
+            const results = await Promise.allSettled([
+                fetchSchedule(dates.today, controller.signal),
+                fetchSchedule(dates.tomorrow, controller.signal)
+            ]);
+            if (results.every((result) => result.status === "rejected")) return;
+            if (results[0].status === "fulfilled") {
+                state.schedules.today = results[0].value.resolved;
+                state.entries.today = results[0].value.entries || [];
+            }
+            if (results[1].status === "fulfilled") {
+                state.schedules.tomorrow = results[1].value.resolved;
+                state.entries.tomorrow = results[1].value.entries || [];
+            }
+            render({ preserveScroll: true });
+        } finally {
+            scheduleRefreshInFlight = false;
+        }
+    }
+
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
     [elements.currentKpi, elements.lowKpi, elements.averageKpi, elements.highKpi].forEach(bindSummaryTooltip);
@@ -1473,5 +1569,7 @@
         setSelectedHour(null);
     });
 
+    const scheduleDisplayRefreshMs = Math.max(60000, Number(config.scheduleDisplayRefreshMs) || 300000);
+    window.setInterval(refreshSchedules, scheduleDisplayRefreshMs);
     load();
 })();
