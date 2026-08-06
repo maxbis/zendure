@@ -546,8 +546,30 @@ $appConfig = [
                     </button>
                 </div>
 
-                <div class="app-price-timeline-scroll" data-role="price-scroll" tabindex="0" aria-label="Scrollable hourly price and schedule timeline">
-                    <div class="app-price-timeline" data-role="price-timeline"></div>
+                <div class="app-chart-scroll-shell" data-role="price-scroll-shell">
+                    <button
+                        class="app-chart-scroll-btn app-chart-scroll-btn--prev"
+                        type="button"
+                        data-role="price-scroll-prev"
+                        aria-label="Scroll prices and energy plan left"
+                        tabindex="-1"
+                        hidden
+                    >
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-left"></use></svg>
+                    </button>
+                    <button
+                        class="app-chart-scroll-btn app-chart-scroll-btn--next"
+                        type="button"
+                        data-role="price-scroll-next"
+                        aria-label="Scroll prices and energy plan right"
+                        tabindex="-1"
+                        hidden
+                    >
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-right"></use></svg>
+                    </button>
+                    <div class="app-price-timeline-scroll" data-role="price-scroll" tabindex="0" aria-label="Scrollable hourly price and schedule timeline">
+                        <div class="app-price-timeline" data-role="price-timeline"></div>
+                    </div>
                 </div>
 
                 <div class="app-price-legend" aria-label="Timeline legend">
@@ -598,8 +620,30 @@ $appConfig = [
                     <span><i class="app-energy-history__key app-energy-history__key--now" aria-hidden="true"></i>Now</span>
                 </div>
 
-                <div class="app-energy-history__chart-scroll" data-role="energy-chart-scroll" tabindex="0" aria-label="Scrollable hourly battery energy chart for the last four days">
-                    <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level for the last four days"></div>
+                <div class="app-chart-scroll-shell" data-role="energy-chart-scroll-shell">
+                    <button
+                        class="app-chart-scroll-btn app-chart-scroll-btn--prev"
+                        type="button"
+                        data-role="energy-chart-scroll-prev"
+                        aria-label="Scroll battery energy chart left"
+                        tabindex="-1"
+                        hidden
+                    >
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-left"></use></svg>
+                    </button>
+                    <button
+                        class="app-chart-scroll-btn app-chart-scroll-btn--next"
+                        type="button"
+                        data-role="energy-chart-scroll-next"
+                        aria-label="Scroll battery energy chart right"
+                        tabindex="-1"
+                        hidden
+                    >
+                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-right"></use></svg>
+                    </button>
+                    <div class="app-energy-history__chart-scroll" data-role="energy-chart-scroll" tabindex="0" aria-label="Scrollable hourly battery energy chart for the last four days">
+                        <div class="app-energy-history__chart" data-role="energy-chart" role="group" aria-label="Hourly charged and discharged battery energy with battery level for the last four days"></div>
+                    </div>
                 </div>
 
                 <p class="app-energy-history__summary-period" data-role="energy-summary-period" aria-live="polite">Today totals · through now</p>

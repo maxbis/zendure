@@ -17,7 +17,10 @@
         date: component.querySelector('[data-role="energy-history-date"]'),
         refresh: component.querySelector('[data-role="energy-history-refresh"]'),
         retry: component.querySelector('[data-role="energy-history-retry"]'),
+        chartScrollShell: component.querySelector('[data-role="energy-chart-scroll-shell"]'),
         chartScroll: component.querySelector('[data-role="energy-chart-scroll"]'),
+        chartScrollPrev: component.querySelector('[data-role="energy-chart-scroll-prev"]'),
+        chartScrollNext: component.querySelector('[data-role="energy-chart-scroll-next"]'),
         chart: component.querySelector('[data-role="energy-chart"]'),
         summary: component.querySelector('[data-role="energy-summary"]'),
         summaryPeriod: component.querySelector('[data-role="energy-summary-period"]'),
@@ -48,6 +51,8 @@
     const hourTooltip = ensureHourTooltip();
     let activeHourTooltipTrigger = null;
     let pinnedHourTooltipTrigger = null;
+    let isProgrammaticChartScroll = false;
+    let programmaticChartScrollTimer = null;
 
     function localDateKey(date = new Date()) {
         const year = date.getFullYear();
@@ -474,11 +479,77 @@
         elements.chart.querySelector(`.app-energy-chart__bar[data-index="${index}"]`)?.classList.add("is-active");
     }
 
+    function chartScrollMetrics() {
+        const maxScrollLeft = Math.max(0, elements.chartScroll.scrollWidth - elements.chartScroll.clientWidth);
+        const scrollLeft = elements.chartScroll.scrollLeft;
+        return {
+            maxScrollLeft,
+            scrollLeft,
+            canScrollStart: scrollLeft > 1,
+            canScrollEnd: scrollLeft < maxScrollLeft - 1
+        };
+    }
+
+    function updateChartScrollButtons() {
+        if (!elements.chartScrollPrev || !elements.chartScrollNext) return;
+        const { maxScrollLeft, canScrollStart, canScrollEnd } = chartScrollMetrics();
+        const hasOverflow = maxScrollLeft > 0;
+        elements.chartScrollPrev.hidden = !hasOverflow;
+        elements.chartScrollNext.hidden = !hasOverflow;
+        elements.chartScrollPrev.disabled = !canScrollStart;
+        elements.chartScrollNext.disabled = !canScrollEnd;
+        if (!hasOverflow && elements.chartScrollShell?.dataset.hoverEdge) {
+            delete elements.chartScrollShell.dataset.hoverEdge;
+        }
+    }
+
+    function scrollChartByPage(direction) {
+        const { maxScrollLeft, scrollLeft } = chartScrollMetrics();
+        if (maxScrollLeft <= 0) return;
+        const distance = Math.max(180, Math.round(elements.chartScroll.clientWidth * 0.72));
+        const left = Math.min(maxScrollLeft, Math.max(0, scrollLeft + (direction * distance)));
+        const useSmoothScroll = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (programmaticChartScrollTimer !== null) {
+            window.clearTimeout(programmaticChartScrollTimer);
+        }
+        isProgrammaticChartScroll = true;
+        elements.chartScroll.scrollTo({ left, behavior: useSmoothScroll ? "smooth" : "auto" });
+        programmaticChartScrollTimer = window.setTimeout(() => {
+            isProgrammaticChartScroll = false;
+            programmaticChartScrollTimer = null;
+            updateChartScrollButtons();
+        }, useSmoothScroll ? 500 : 0);
+        updateChartScrollButtons();
+    }
+
+    function syncChartHoverEdge(clientX) {
+        if (!elements.chartScrollShell) return;
+        const { maxScrollLeft } = chartScrollMetrics();
+        if (maxScrollLeft <= 0) {
+            delete elements.chartScrollShell.dataset.hoverEdge;
+            return;
+        }
+        const rect = elements.chartScrollShell.getBoundingClientRect();
+        const edgeWidth = Math.min(72, Math.max(40, rect.width * 0.12));
+        const offsetX = clientX - rect.left;
+        if (offsetX <= edgeWidth) {
+            elements.chartScrollShell.dataset.hoverEdge = "start";
+            return;
+        }
+        if (offsetX >= rect.width - edgeWidth) {
+            elements.chartScrollShell.dataset.hoverEdge = "end";
+            return;
+        }
+        delete elements.chartScrollShell.dataset.hoverEdge;
+    }
+
     function renderChart(rows) {
         hideHourTooltip();
         elements.chart.replaceChildren();
         if (!rows.length) {
             elements.chart.innerHTML = '<p class="app-energy-history__empty">No hourly battery data is available for the last four days.</p>';
+            updateChartScrollButtons();
             return;
         }
 
@@ -666,6 +737,7 @@
 
         requestAnimationFrame(() => {
             elements.chartScroll.scrollLeft = elements.chartScroll.scrollWidth - elements.chartScroll.clientWidth;
+            updateChartScrollButtons();
         });
     }
 
@@ -870,10 +942,25 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
+    elements.chartScrollPrev?.addEventListener("click", () => scrollChartByPage(-1));
+    elements.chartScrollNext?.addEventListener("click", () => scrollChartByPage(1));
+    elements.chartScroll.addEventListener("scroll", () => {
+        updateChartScrollButtons();
+        if (isProgrammaticChartScroll) return;
+        hideHourTooltip();
+    }, { passive: true });
+    elements.chartScrollShell?.addEventListener("pointermove", (event) => {
+        if (event.pointerType && event.pointerType !== "mouse") return;
+        syncChartHoverEdge(event.clientX);
+    });
+    elements.chartScrollShell?.addEventListener("pointerleave", () => {
+        if (elements.chartScrollShell) delete elements.chartScrollShell.dataset.hoverEdge;
+    });
     [elements.chargedSummary, elements.dischargedSummary, elements.netSummary].forEach(bindSummaryTooltip);
     window.addEventListener("resize", () => {
         hideSummaryTooltip();
         hideHourTooltip();
+        updateChartScrollButtons();
     });
     window.addEventListener("scroll", () => {
         hideSummaryTooltip();

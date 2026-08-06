@@ -25,7 +25,10 @@
         average: component.querySelector('[data-role="price-average"]'),
         highKpi: component.querySelector('[data-role="price-high-kpi"]'),
         high: component.querySelector('[data-role="price-high"]'),
+        scrollShell: component.querySelector('[data-role="price-scroll-shell"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
+        scrollPrev: component.querySelector('[data-role="price-scroll-prev"]'),
+        scrollNext: component.querySelector('[data-role="price-scroll-next"]'),
         timeline: component.querySelector('[data-role="price-timeline"]')
     };
     const editDialog = document.getElementById("app-schedule-edit-dialog");
@@ -94,6 +97,71 @@
         return `${detail.date}${pad(detail.hour)}00`;
     }
 
+    function timelineScrollMetrics() {
+        const maxScrollLeft = Math.max(0, elements.scroll.scrollWidth - elements.scroll.clientWidth);
+        const scrollLeft = elements.scroll.scrollLeft;
+        return {
+            maxScrollLeft,
+            scrollLeft,
+            canScrollStart: scrollLeft > 1,
+            canScrollEnd: scrollLeft < maxScrollLeft - 1
+        };
+    }
+
+    function updateTimelineScrollButtons() {
+        if (!elements.scrollPrev || !elements.scrollNext) return;
+        const { maxScrollLeft, canScrollStart, canScrollEnd } = timelineScrollMetrics();
+        const hasOverflow = maxScrollLeft > 0;
+        elements.scrollPrev.hidden = !hasOverflow;
+        elements.scrollNext.hidden = !hasOverflow;
+        elements.scrollPrev.disabled = !canScrollStart;
+        elements.scrollNext.disabled = !canScrollEnd;
+        if (!hasOverflow && elements.scrollShell?.dataset.hoverEdge) {
+            delete elements.scrollShell.dataset.hoverEdge;
+        }
+    }
+
+    function scrollTimelineByPage(direction) {
+        const { maxScrollLeft, scrollLeft } = timelineScrollMetrics();
+        if (maxScrollLeft <= 0) return;
+        const distance = Math.max(180, Math.round(elements.scroll.clientWidth * 0.72));
+        const left = Math.min(maxScrollLeft, Math.max(0, scrollLeft + (direction * distance)));
+        const useSmoothScroll = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (programmaticTimelineScrollTimer !== null) {
+            window.clearTimeout(programmaticTimelineScrollTimer);
+        }
+        isProgrammaticTimelineScroll = true;
+        elements.scroll.scrollTo({ left, behavior: useSmoothScroll ? "smooth" : "auto" });
+        programmaticTimelineScrollTimer = window.setTimeout(() => {
+            isProgrammaticTimelineScroll = false;
+            programmaticTimelineScrollTimer = null;
+            updateTimelineScrollButtons();
+        }, useSmoothScroll ? 500 : 0);
+        updateTimelineScrollButtons();
+    }
+
+    function syncTimelineHoverEdge(clientX) {
+        if (!elements.scrollShell) return;
+        const { maxScrollLeft } = timelineScrollMetrics();
+        if (maxScrollLeft <= 0) {
+            delete elements.scrollShell.dataset.hoverEdge;
+            return;
+        }
+        const rect = elements.scrollShell.getBoundingClientRect();
+        const edgeWidth = Math.min(72, Math.max(40, rect.width * 0.12));
+        const offsetX = clientX - rect.left;
+        if (offsetX <= edgeWidth) {
+            elements.scrollShell.dataset.hoverEdge = "start";
+            return;
+        }
+        if (offsetX >= rect.width - edgeWidth) {
+            elements.scrollShell.dataset.hoverEdge = "end";
+            return;
+        }
+        delete elements.scrollShell.dataset.hoverEdge;
+    }
+
     function centerTimelineHour(hourColumn, { smooth = false } = {}) {
         if (!hourColumn) return;
         window.requestAnimationFrame(() => {
@@ -111,7 +179,9 @@
                 programmaticTimelineScrollTimer = window.setTimeout(() => {
                     isProgrammaticTimelineScroll = false;
                     programmaticTimelineScrollTimer = null;
+                    updateTimelineScrollButtons();
                 }, useSmoothScroll ? 500 : 0);
+                updateTimelineScrollButtons();
             });
         });
     }
@@ -1312,6 +1382,7 @@
             return;
         }
         elements.scroll.scrollLeft = 0;
+        updateTimelineScrollButtons();
     }
 
     function descriptionFor(action) {
@@ -1352,9 +1423,11 @@
         elements.tomorrowStatus?.setAttribute("aria-label", tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet");
         if (preserveScroll) {
             elements.scroll.scrollLeft = previousScrollLeft;
+            updateTimelineScrollButtons();
         } else {
             scrollTimelineToActiveHour();
         }
+        window.requestAnimationFrame(updateTimelineScrollButtons);
     }
 
     function setView(view, message = "") {
@@ -1523,6 +1596,16 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
+    elements.scrollPrev?.addEventListener("click", () => scrollTimelineByPage(-1));
+    elements.scrollNext?.addEventListener("click", () => scrollTimelineByPage(1));
+    elements.scroll.addEventListener("scroll", updateTimelineScrollButtons, { passive: true });
+    elements.scrollShell?.addEventListener("pointermove", (event) => {
+        if (event.pointerType && event.pointerType !== "mouse") return;
+        syncTimelineHoverEdge(event.clientX);
+    });
+    elements.scrollShell?.addEventListener("pointerleave", () => {
+        if (elements.scrollShell) delete elements.scrollShell.dataset.hoverEdge;
+    });
     [elements.currentKpi, elements.lowKpi, elements.averageKpi, elements.highKpi].forEach(bindSummaryTooltip);
     editElements?.form?.addEventListener("submit", saveScheduleEdit);
     editElements?.modeInputs.forEach((input) => input.addEventListener("change", () => updateEditFields({ resetLimits: true })));
@@ -1546,7 +1629,10 @@
             if (wasPinned) pinnedTooltipTrigger = openTooltip.trigger;
         }
     });
-    window.addEventListener("resize", () => hidePriceTooltip());
+    window.addEventListener("resize", () => {
+        hidePriceTooltip();
+        updateTimelineScrollButtons();
+    });
     window.addEventListener("scroll", (event) => {
         if (isProgrammaticTimelineScroll && event.target === elements.scroll) return;
         hidePriceTooltip();

@@ -1387,6 +1387,98 @@
     font-variant-numeric: tabular-nums;
 }
 
+.app-chart-scroll-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.app-chart-scroll-btn {
+    position: absolute;
+    z-index: 5;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--gsd-border) 72%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gsd-surface-3) 82%, transparent);
+    color: var(--gsd-text-muted);
+    box-shadow: 0 1px 10px color-mix(in srgb, var(--gsd-bg) 42%, transparent);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition:
+        opacity var(--gsd-duration-fast) ease,
+        color var(--gsd-duration-fast) ease,
+        background-color var(--gsd-duration-fast) ease,
+        border-color var(--gsd-duration-fast) ease;
+}
+
+.app-chart-scroll-btn .gsd-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.app-chart-scroll-btn--prev {
+    inset-inline-start: 4px;
+}
+
+.app-chart-scroll-btn--next {
+    inset-inline-end: 4px;
+}
+
+.app-chart-scroll-btn:hover:not(:disabled),
+.app-chart-scroll-btn:focus-visible:not(:disabled) {
+    color: var(--gsd-text);
+    background: color-mix(in srgb, var(--gsd-surface-hover) 88%, transparent);
+    border-color: var(--gsd-border-strong);
+}
+
+.app-chart-scroll-btn:disabled {
+    cursor: default;
+    opacity: 0;
+    color: color-mix(in srgb, var(--gsd-text-muted) 62%, transparent);
+    background: color-mix(in srgb, var(--gsd-surface-3) 58%, transparent);
+    border-color: color-mix(in srgb, var(--gsd-border) 48%, transparent);
+    box-shadow: none;
+}
+
+.app-chart-scroll-btn:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: 2px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.app-chart-scroll-btn:disabled:focus-visible {
+    opacity: 0.48;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .app-chart-scroll-shell[data-hover-edge="start"] .app-chart-scroll-btn--prev:not([hidden]),
+    .app-chart-scroll-shell[data-hover-edge="end"] .app-chart-scroll-btn--next:not([hidden]) {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .app-chart-scroll-shell[data-hover-edge="start"] .app-chart-scroll-btn--prev:disabled:not([hidden]),
+    .app-chart-scroll-shell[data-hover-edge="end"] .app-chart-scroll-btn--next:disabled:not([hidden]) {
+        opacity: 0.42;
+        pointer-events: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-chart-scroll-btn {
+        transition: none;
+    }
+}
+
 .app-price-timeline-scroll {
     overflow-x: auto;
     padding: 4px 2px 8px;
