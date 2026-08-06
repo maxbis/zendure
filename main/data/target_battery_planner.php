@@ -6,6 +6,7 @@ const TARGET_BATTERY_MODE = 'empty_at_solar_charge';
 const TARGET_BATTERY_ANCHOR = 'next_solar_capable_netzero';
 const TARGET_CHARGE_MODE = 'full_at_netzero_minus';
 const TARGET_CHARGE_ANCHOR = 'next_netzero_minus';
+const TARGET_BATTERY_POWER_STEP_W = 100;
 const TARGET_CHARGE_POWER_STEP_W = 100;
 const TARGET_BATTERY_EFFICIENCY = 0.9;
 const TARGET_BATTERY_DEFAULT_USAGE_W_BY_HOUR = [
@@ -248,6 +249,17 @@ function tbp_round_charge_minimum(float $powerW, int $maximumPowerW, int $stepW 
     return min($maximumPowerW, $rounded);
 }
 
+function tbp_round_discharge_power(float $powerW, int $maximumPowerW, int $stepW = TARGET_BATTERY_POWER_STEP_W): int
+{
+    if ($powerW >= 0 || $maximumPowerW <= 0) {
+        return 0;
+    }
+    $stepW = max(1, $stepW);
+    $roundedMagnitude = (int) (round(abs($powerW) / $stepW) * $stepW);
+    $maximumSteppedMagnitude = (int) (floor($maximumPowerW / $stepW) * $stepW);
+    return -min($roundedMagnitude, $maximumSteppedMagnitude);
+}
+
 function tbp_target_charge_metadata(
     array $entry,
     ?array $anchor,
@@ -311,6 +323,7 @@ function tbp_planning_metadata(
         'status' => $status,
         'rule_date' => $entry['date'],
         'rule_time' => $entry['time'],
+        'power_step_w' => TARGET_BATTERY_POWER_STEP_W,
     ];
     if ($anchor !== null) {
         $metadata['anchor_date'] = $anchor['date'];
@@ -400,12 +413,12 @@ function tbp_materialize_horizon(
 
         $baselinePowerW = tbp_power_for_slot($entry['slot'], (int) $entry['start']->format('G'), tbp_forecast_to_index($flat, $targetIndex, $now, $battery, $usageByHour, $efficiency), $usageByHour);
         $extraOutputWh = (($baselinePercent - $targetPercent) / 100.0) * (float) $battery['capacity_wh'] * $efficiency;
-        $calculatedPowerW = (int) round($baselinePowerW - ($extraOutputWh / $durationHours));
+        $rawCalculatedPowerW = $baselinePowerW - ($extraOutputWh / $durationHours);
         $ruleMax = isset($entry['slot']['max_discharge_power']) && is_numeric($entry['slot']['max_discharge_power'])
             ? max(1, (int) $entry['slot']['max_discharge_power'])
             : $defaultMaxDischargeW;
         $maxDischargeW = min($defaultMaxDischargeW, $ruleMax);
-        $calculatedPowerW = max(-$maxDischargeW, min(0, $calculatedPowerW));
+        $calculatedPowerW = tbp_round_discharge_power($rawCalculatedPowerW, $maxDischargeW);
 
         $entry['slot']['value'] = $calculatedPowerW;
         $flat[$targetIndex]['slot'] = $entry['slot'];

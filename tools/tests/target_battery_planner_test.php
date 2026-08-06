@@ -74,6 +74,9 @@ $planned = tbp_materialize_horizon(plannerTestDays(), $battery, $now, ['max_disc
 $targetSlot = $planned[0]['items'][20];
 plannerTestAssert(is_int($targetSlot['value']), 'Target mode must materialize to integer watts.');
 plannerTestAssert($targetSlot['value'] < 0, 'Target mode must calculate discharge power.');
+plannerTestAssert($targetSlot['value'] === -900, 'Calculated discharge power must round to the nearest 100 W.');
+plannerTestAssert($targetSlot['planning']['calculated_power_w'] === -900, 'Planning metadata must report the rounded discharge power.');
+plannerTestAssert($targetSlot['planning']['power_step_w'] === 100, 'Planning metadata must report the 100 W discharge step.');
 plannerTestAssert($targetSlot['planning']['status'] === 'achievable', 'Expected an achievable target.');
 plannerTestAssert($targetSlot['planning']['anchor_date'] === '20260806', 'Expected tomorrow solar-charge anchor.');
 plannerTestAssert($targetSlot['planning']['anchor_time'] === '0800', 'Expected 08:00 solar-charge anchor.');
@@ -100,6 +103,11 @@ $limitedDays[0]['items'][20]['max_discharge_power'] = 300;
 $limited = tbp_materialize_horizon($limitedDays, $battery, $now, ['max_discharge_power_w' => 1600]);
 plannerTestAssert($limited[0]['items'][20]['value'] === -300, 'Rule discharge cap must be applied.');
 plannerTestAssert($limited[0]['items'][20]['planning']['status'] === 'best_effort', 'Capped target should report best effort.');
+
+$nonSteppedLimitDays = plannerTestDays();
+$nonSteppedLimitDays[0]['items'][20]['max_discharge_power'] = 350;
+$nonSteppedLimit = tbp_materialize_horizon($nonSteppedLimitDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+plannerTestAssert($nonSteppedLimit[0]['items'][20]['value'] === -300, 'A non-stepped discharge cap must use the highest allowed 100 W multiple.');
 
 $partialNow = new DateTimeImmutable('2026-08-05 20:30:00', $timezone);
 $partial = tbp_materialize_horizon(plannerTestDays(), $battery, $partialNow, ['max_discharge_power_w' => 1600]);
