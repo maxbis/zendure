@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/includes/config_loader.php';
 require_once __DIR__ . '/includes/sun_context.php';
+require_once __DIR__ . '/includes/price_context.php';
 require_once dirname(__DIR__) . '/common/php/system_config.php';
 
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
@@ -88,11 +89,11 @@ function resolveRuleEditorLimits(): array
 }
 
 /**
- * Today's sunrise/sunset anchors for condition help tooltips.
+ * Today's sunrise/sunset and price anchors for condition help tooltips.
  *
  * @return array<string, mixed>|null
  */
-function resolveEditorSunContext(): ?array
+function resolveEditorTodayContext(): ?array
 {
     try {
         $systemConfig = loadSystemConfig();
@@ -100,19 +101,47 @@ function resolveEditorSunContext(): ?array
         $tz = new DateTimeZone((string) $installation['timezone']);
         $today = new DateTimeImmutable('now', $tz);
         $dateYmd = $today->format('Ymd');
+        $context = [
+            'date' => $dateYmd,
+            'date_label' => $today->format('Y-m-d'),
+        ];
+
         $sunCtx = getSunContextForDate(
             $dateYmd,
             (float) $installation['latitude'],
             (float) $installation['longitude'],
             $tz
         );
-        if ($sunCtx === []) {
-            return null;
+        if ($sunCtx !== []) {
+            $context = array_merge($context, $sunCtx);
         }
-        return array_merge($sunCtx, [
-            'date' => $dateYmd,
-            'date_label' => $today->format('Y-m-d'),
-        ]);
+
+        $yyyymm = substr($dateYmd, 0, 6);
+        $pricePath = __DIR__ . '/data/price/' . $yyyymm . '/price' . $dateYmd . '.json';
+        if (is_file($pricePath) && is_readable($pricePath)) {
+            $raw = file_get_contents($pricePath);
+            $priceData = is_string($raw) ? json_decode($raw, true) : null;
+            if (is_array($priceData)) {
+                $priceCtx = buildPriceContext($priceData);
+                foreach ([
+                    'min_price',
+                    'max_price',
+                    'min_price_hour',
+                    'max_price_hour',
+                    'max_price_hour_am',
+                    'max_price_hour_pm',
+                    'spread_price',
+                ] as $key) {
+                    if (array_key_exists($key, $priceCtx) && $priceCtx[$key] !== null) {
+                        $context[$key] = is_float($priceCtx[$key])
+                            ? round((float) $priceCtx[$key], 2)
+                            : $priceCtx[$key];
+                    }
+                }
+            }
+        }
+
+        return $context;
     } catch (Throwable $e) {
         return null;
     }
@@ -396,7 +425,7 @@ function normalizeRules(array $rules): array
                 continue;
             }
             $normalized['target_soc_percent'] = round($targetSoc, 1);
-            $normalized['target_anchor'] = 'next_netzero_plus';
+            $normalized['target_anchor'] = 'next_solar_capable_netzero';
             $maxDischarge = normalizeOptionalRuleBound($rule['max_discharge_power'] ?? null);
             if ($maxDischarge !== null && $maxDischarge > 0) {
                 $normalized['max_discharge_power'] = $maxDischarge;
@@ -513,7 +542,7 @@ if ($editorMinChargePercent < 0 || $editorMaxChargePercent > 100 || $editorMinCh
     $editorMinChargePercent = 15;
     $editorMaxChargePercent = 95;
 }
-$editorSunContext = resolveEditorSunContext();
+$editorTodayContext = resolveEditorTodayContext();
 ?>
 <!doctype html>
 <html lang="en">
@@ -524,22 +553,23 @@ $editorSunContext = resolveEditorSunContext();
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/edit-rules-icon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/edit-rules-icon-180.png">
     <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/components.css">
     <link rel="stylesheet" href="assets/css/edit_rules.css">
     <link rel="stylesheet" href="assets/css/edit_rules_color_picker.css">
 </head>
-<body>
+<body data-theme="graphite-signal-dark">
 <main class="rules-page">
-    <section class="card">
+    <section class="gsd-card card">
         <div class="card-header-row">
             <h1>⚡ Zendure Rules Editor</h1>
             <div class="actions">
-                <a class="btn-link" href="./">Back to /main</a>
-                <button id="btn-export-json" type="button">Export JSON</button>
-                <button id="btn-import-json" type="button">Import JSON</button>
-                <button id="btn-save-imported" type="button" hidden disabled>Save Imported Rules</button>
-                <button id="btn-raw-json" type="button">Raw JSON</button>
-                <button id="btn-reload" type="button">Reload</button>
-                <a class="btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
+                <a class="gsd-btn gsd-btn--quiet btn-link" href="./">Back to /main</a>
+                <button id="btn-export-json" class="gsd-btn gsd-btn--secondary" type="button">Export JSON</button>
+                <button id="btn-import-json" class="gsd-btn gsd-btn--secondary" type="button">Import JSON</button>
+                <button id="btn-save-imported" class="gsd-btn gsd-btn--primary" type="button" hidden disabled>Save Imported Rules</button>
+                <button id="btn-raw-json" class="gsd-btn gsd-btn--secondary" type="button">Raw JSON</button>
+                <button id="btn-reload" class="gsd-btn gsd-btn--secondary" type="button">Reload</button>
+                <a class="gsd-btn gsd-btn--quiet btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
             </div>
         </div>
         <div class="file-row">
@@ -549,23 +579,23 @@ $editorSunContext = resolveEditorSunContext();
         <input id="import-json-input" type="file" accept=".json,application/json" hidden>
     </section>
 
-    <section class="card raw-json-card" id="raw-json-card" hidden>
+    <section class="gsd-card card raw-json-card" id="raw-json-card" hidden>
         <div class="card-header-row">
             <h2>Raw JSON</h2>
             <div class="actions">
-                <button id="btn-copy-raw-json" type="button">Copy</button>
-                <button id="btn-close-raw-json" type="button">Close</button>
+                <button id="btn-copy-raw-json" class="gsd-btn gsd-btn--secondary" type="button">Copy</button>
+                <button id="btn-close-raw-json" class="gsd-btn gsd-btn--quiet" type="button">Close</button>
             </div>
         </div>
         <textarea id="raw-json-textarea" rows="12" readonly spellcheck="false"></textarea>
     </section>
 
-    <section class="card">
+    <section class="gsd-card card">
         <div class="card-header-row">
             <h2>Rule Profiles</h2>
             <div class="actions">
-                <button id="btn-activate-profile" type="button" hidden>Activate Profile</button>
-                <button id="btn-save-profile" type="button">Save Profile</button>
+                <button id="btn-activate-profile" class="gsd-btn gsd-btn--secondary" type="button" hidden>Activate Profile</button>
+                <button id="btn-save-profile" class="gsd-btn gsd-btn--primary" type="button">Save Profile</button>
             </div>
         </div>
         <div class="rule-profiles-box">
@@ -591,17 +621,17 @@ $editorSunContext = resolveEditorSunContext();
     </section>
 
     <section class="grid">
-        <section class="card">
+        <section class="gsd-card card">
             <div class="card-header-row rules-list-header">
                 <h2>Rules</h2>
-                <button id="btn-new" type="button">+ New Rule</button>
+                <button id="btn-new" class="gsd-btn gsd-btn--primary" type="button">+ New Rule</button>
             </div>
             <table class="rules-table">
                 <tbody id="rules-tbody"></tbody>
             </table>
         </section>
 
-        <section class="card">
+        <section class="gsd-card card">
             <h2 id="editor-title">Rule Editor</h2>
             <form id="rule-form" novalidate>
                 <div class="editor-top-grid">
@@ -616,7 +646,7 @@ $editorSunContext = resolveEditorSunContext();
                             <option value="netzero">netzero</option>
                             <option value="netzero-">netzero-</option>
                             <option value="netzero+">netzero+</option>
-                            <option value="empty_at_solar_charge">Target @ next NZ+</option>
+                            <option value="empty_at_solar_charge">Target @ solar charge</option>
                             <option value="full_at_netzero_minus">Target @ next NZ-</option>
                         </select>
                     </div>
@@ -677,7 +707,7 @@ $editorSunContext = resolveEditorSunContext();
                             <span class="battery-target-eyebrow">Forecast-calculated value</span>
                             <h3>Battery target</h3>
                         </div>
-                        <span class="battery-target-anchor">At first scheduled NZ+</span>
+                        <span class="battery-target-anchor">At first solar-capable net-zero slot</span>
                     </div>
                     <div class="battery-target-grid">
                         <div class="editor-grid-item">
@@ -689,7 +719,7 @@ $editorSunContext = resolveEditorSunContext();
                             <input id="inp-max-discharge-power" type="number" step="1" min="1" max="<?php echo max(abs($editorLimitMin), abs($editorLimitMax)); ?>" placeholder="<?php echo abs($editorLimitMin); ?>">
                         </div>
                     </div>
-                    <p class="battery-target-help">The planner calculates a fixed discharge value for this rule hour so the forecast reaches the requested level when the next NZ+ period starts.</p>
+                    <p class="battery-target-help">The planner calculates a fixed discharge value for this rule hour so the forecast reaches the requested level when the next NZ+ or charging-capable NZ± period starts.</p>
                     <div id="battery-target-preview" class="battery-target-preview" aria-live="polite">The live calculation appears in the Prices and Energy Plan after the rule is saved.</div>
                 </div>
 
@@ -763,15 +793,15 @@ $editorSunContext = resolveEditorSunContext();
                                 </select>
                             </div>
                         </div>
-                        <button id="btn-add-condition" type="button" title="Add a new condition row.">Add Condition</button>
+                        <button id="btn-add-condition" class="gsd-btn gsd-btn--secondary" type="button" title="Add a new condition row.">Add Condition</button>
                     </div>
                     <div id="condition-relation-note" class="muted condition-relation-note">OR applies only to static condition rows. Runtime-only rows force AND.</div>
                     <div id="conditions-list"></div>
                 </div>
 
                 <div class="actions">
-                    <button id="btn-cancel" type="button">Cancel</button>
-                    <button id="btn-save-rule" type="submit" class="primary">Save Rule</button>
+                    <button id="btn-cancel" class="gsd-btn gsd-btn--quiet" type="button">Cancel</button>
+                    <button id="btn-save-rule" type="submit" class="gsd-btn gsd-btn--primary">Save Rule</button>
                 </div>
             </form>
         </section>
@@ -785,7 +815,8 @@ window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'limitMax' => $editorLimitMax,
     'minChargePercent' => $editorMinChargePercent,
     'maxChargePercent' => $editorMaxChargePercent,
-    'sunToday' => $editorSunContext,
+    'sunToday' => $editorTodayContext,
+    'todayContext' => $editorTodayContext,
 ], JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>

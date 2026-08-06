@@ -75,9 +75,25 @@ $targetSlot = $planned[0]['items'][20];
 plannerTestAssert(is_int($targetSlot['value']), 'Target mode must materialize to integer watts.');
 plannerTestAssert($targetSlot['value'] < 0, 'Target mode must calculate discharge power.');
 plannerTestAssert($targetSlot['planning']['status'] === 'achievable', 'Expected an achievable target.');
-plannerTestAssert($targetSlot['planning']['anchor_date'] === '20260806', 'Expected tomorrow NZ+ anchor.');
-plannerTestAssert($targetSlot['planning']['anchor_time'] === '0800', 'Expected 08:00 NZ+ anchor.');
+plannerTestAssert($targetSlot['planning']['anchor_date'] === '20260806', 'Expected tomorrow solar-charge anchor.');
+plannerTestAssert($targetSlot['planning']['anchor_time'] === '0800', 'Expected 08:00 solar-charge anchor.');
 plannerTestAssert($targetSlot['planning']['predicted_anchor_soc_percent'] <= 15.3, 'Prediction should reach target tolerance.');
+
+$bidirectionalDays = plannerTestDays();
+$bidirectionalDays[1]['items'][8]['value'] = 'netzero';
+$bidirectional = tbp_materialize_horizon($bidirectionalDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+plannerTestAssert($bidirectional[0]['items'][20]['planning']['anchor_time'] === '0800', 'Unrestricted NZ± must qualify as a solar-charge anchor.');
+
+$boundedBidirectionalDays = plannerTestDays();
+$boundedBidirectionalDays[1]['items'][8] = ['time' => '0800', 'value' => 'netzero', 'max_power' => 400];
+$boundedBidirectional = tbp_materialize_horizon($boundedBidirectionalDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+plannerTestAssert($boundedBidirectional[0]['items'][20]['planning']['anchor_time'] === '0800', 'NZ± with a positive maximum must qualify as a solar-charge anchor.');
+
+$dischargeOnlyDays = plannerTestDays();
+$dischargeOnlyDays[1]['items'][8] = ['time' => '0800', 'value' => 'netzero', 'max_power' => 0];
+$dischargeOnly = tbp_materialize_horizon($dischargeOnlyDays, $battery, $now);
+plannerTestAssert($dischargeOnly[0]['items'][20]['value'] === 'netzero-', 'Discharge-only NZ± must not be used as a solar-charge anchor.');
+plannerTestAssert($dischargeOnly[0]['items'][20]['planning']['status'] === 'unavailable', 'Discharge-only NZ± must leave the target anchor unavailable.');
 
 $limitedDays = plannerTestDays();
 $limitedDays[0]['items'][20]['max_discharge_power'] = 300;
@@ -103,8 +119,8 @@ plannerTestAssert($unavailable[0]['items'][20]['planning']['status'] === 'unavai
 $noAnchorDays = plannerTestDays();
 $noAnchorDays[1]['items'][8]['value'] = 0;
 $noAnchor = tbp_materialize_horizon($noAnchorDays, $battery, $now);
-plannerTestAssert($noAnchor[0]['items'][20]['value'] === 'netzero-', 'Missing NZ+ must use fallback.');
-plannerTestAssert($noAnchor[0]['items'][20]['planning']['status'] === 'unavailable', 'Missing NZ+ should be unavailable.');
+plannerTestAssert($noAnchor[0]['items'][20]['value'] === 'netzero-', 'Missing solar-charge anchor must use fallback.');
+plannerTestAssert($noAnchor[0]['items'][20]['planning']['status'] === 'unavailable', 'Missing solar-charge anchor should be unavailable.');
 
 $chargeBattery = [
     'percent' => 60.0,

@@ -46,7 +46,7 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 10. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
 11. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
 12. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
-13. When a slot was produced by the target battery planner, show the requested NZ+ reserve, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
+13. When a slot was produced by the discharge-target planner, show the requested reserve at the next solar-capable net-zero slot, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
 14. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
 15. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
 

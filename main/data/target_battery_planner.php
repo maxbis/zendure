@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 const TARGET_BATTERY_MODE = 'empty_at_solar_charge';
-const TARGET_BATTERY_ANCHOR = 'next_netzero_plus';
+const TARGET_BATTERY_ANCHOR = 'next_solar_capable_netzero';
 const TARGET_CHARGE_MODE = 'full_at_netzero_minus';
 const TARGET_CHARGE_ANCHOR = 'next_netzero_minus';
 const TARGET_CHARGE_POWER_STEP_W = 100;
@@ -188,13 +188,27 @@ function tbp_forecast_to_index(
     return $percent;
 }
 
-function tbp_find_next_netzero_plus(array $flat, int $targetIndex, DateTimeImmutable $now): ?int
+function tbp_slot_allows_solar_charge(array $slot): bool
+{
+    $mode = tbp_normalize_mode($slot['value'] ?? null);
+    if ($mode === 'netzero+') {
+        return true;
+    }
+    if ($mode !== 'netzero') {
+        return false;
+    }
+    return !isset($slot['max_power'])
+        || !is_numeric($slot['max_power'])
+        || (float) $slot['max_power'] > 0;
+}
+
+function tbp_find_next_solar_charge(array $flat, int $targetIndex, DateTimeImmutable $now): ?int
 {
     for ($index = $targetIndex + 1, $count = count($flat); $index < $count; $index++) {
         if ($flat[$index]['start'] <= $now) {
             continue;
         }
-        if (tbp_normalize_mode($flat[$index]['slot']['value'] ?? null) === 'netzero+') {
+        if (tbp_slot_allows_solar_charge($flat[$index]['slot'])) {
             return $index;
         }
     }
@@ -230,7 +244,7 @@ function tbp_round_charge_minimum(float $powerW, int $maximumPowerW, int $stepW 
         return 0;
     }
     $stepW = max(1, $stepW);
-    $rounded = (int) (floor($powerW / $stepW) * $stepW);
+    $rounded = (int) (ceil($powerW / $stepW) * $stepW);
     return min($maximumPowerW, $rounded);
 }
 
@@ -350,7 +364,7 @@ function tbp_materialize_horizon(
             ? (float) $entry['slot']['target_soc_percent']
             : ($battery !== null ? (float) $battery['minimum_percent'] : 15.0);
         $fallback = tbp_fallback_value($entry['slot']);
-        $anchorIndex = tbp_find_next_netzero_plus($flat, $targetIndex, $now);
+        $anchorIndex = tbp_find_next_solar_charge($flat, $targetIndex, $now);
         $anchor = $anchorIndex !== null ? $flat[$anchorIndex] : null;
 
         if ($entry['end'] <= $now) {
@@ -365,7 +379,7 @@ function tbp_materialize_horizon(
         }
         if ($anchorIndex === null) {
             $entry['slot']['value'] = $fallback;
-            $entry['slot']['planning'] = tbp_planning_metadata($entry, null, $targetPercent, 'unavailable', null, null, null, 'No future NZ+ start was found in the planning horizon.');
+            $entry['slot']['planning'] = tbp_planning_metadata($entry, null, $targetPercent, 'unavailable', null, null, null, 'No future solar-capable net-zero start was found in the planning horizon.');
             continue;
         }
 

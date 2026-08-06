@@ -41,7 +41,7 @@ Each rule has:
   - `netzero`
   - `netzero+`
   - `netzero-`
-  - `Target level at next NZ+` (`empty_at_solar_charge`)
+  - `Target @ solar charge` (`empty_at_solar_charge`)
   - `Target @ next NZ-` (`full_at_netzero_minus`)
 - optional top-level filters:
   - `month` (e.g. `10,11,12,1,2,3`)
@@ -62,13 +62,14 @@ Notes:
 - the editor uses `100 W` steps for these inputs
 - `fallback_value` is optional and independent of `value` type
 
-### Target level at next NZ+
+### Target at solar charge
 
 Select this Value Mode when a price or time condition identifies a selling hour and the battery should reach a requested reserve when solar charging starts again.
 
 - `Requested spare level (%)` is required and must stay within the configured battery operating range.
 - `Maximum discharge (W)` is optional and limits the calculated action.
-- The first future resolved `netzero+` slot is the target anchor.
+- The first future solar-capable net-zero slot is the target anchor: `netzero+`, or `netzero` when its power limits permit positive charging.
+- `netzero-` and `netzero` constrained to `max_power <= 0` are discharge-only and do not qualify.
 - The rule can use `hour == max_price_hour_pm` to select the highest-priced PM hour.
 - The rule stores a symbolic objective, but the final schedule API converts it to fixed watts or a safe fallback.
 - A battery-level runtime condition is normally unnecessary because the planner already uses the predicted battery level.
@@ -183,7 +184,7 @@ At API merge time (`data_api.php`):
     "name": "Sell at PM maximum before solar",
     "value": "empty_at_solar_charge",
     "target_soc_percent": 15,
-    "target_anchor": "next_netzero_plus",
+    "target_anchor": "next_solar_capable_netzero",
     "max_discharge_power": 1600,
     "fallback_value": "netzero-",
     "conditions": [

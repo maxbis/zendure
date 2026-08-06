@@ -13,19 +13,15 @@ date_default_timezone_set('Europe/Amsterdam');
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit Rules Help</title>
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/components.css">
     <style>
         :root {
-            --bg: #0f172a;
-            --card: #111827;
-            --text: #e5e7eb;
-            --muted: #9ca3af;
-            --line: #374151;
-        }
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: radial-gradient(circle at top, #111827, #0b1222 60%);
-            color: var(--text);
+            --bg: var(--gsd-page);
+            --card: var(--gsd-surface-1);
+            --text: var(--gsd-text);
+            --muted: var(--gsd-text-muted);
+            --line: var(--gsd-border);
         }
         main {
             max-width: 980px;
@@ -40,41 +36,31 @@ date_default_timezone_set('Europe/Amsterdam');
             gap: 10px;
             margin-bottom: 6px;
         }
-        .btn-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid var(--line);
-            color: var(--text);
-            text-decoration: none;
-            background: #0b1324;
-        }
-        .btn-link:hover,
-        .btn-link:focus-visible {
-            background: #13203b;
-        }
         section {
-            background: color-mix(in srgb, var(--card) 92%, black);
-            border: 1px solid var(--line);
-            border-radius: 10px;
+            background: var(--gsd-surface-1);
+            border: 1px solid var(--gsd-border);
+            border-radius: var(--gsd-radius-card);
+            box-shadow: var(--gsd-shadow-card);
             padding: 14px;
         }
         h1, h2 {
             margin: 0 0 10px 0;
+            color: var(--gsd-text);
+            font-weight: 650;
+            letter-spacing: -0.015em;
         }
-        h1 { font-size: 1.3rem; }
-        h2 { font-size: 1rem; }
-        p, li { color: var(--text); line-height: 1.45; }
-        .muted { color: var(--muted); }
+        h1 { font-size: 1.5rem; }
+        h2 { font-size: 1.125rem; }
+        p, li { color: var(--gsd-text); line-height: 1.45; }
+        .muted { color: var(--gsd-text-muted); }
         code, pre {
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
+        code { color: var(--gsd-text-secondary); }
         pre {
-            background: #0b1324;
-            border: 1px solid var(--line);
-            border-radius: 8px;
+            background: var(--gsd-page-deep);
+            border: 1px solid var(--gsd-border);
+            border-radius: var(--gsd-radius-sm);
             padding: 10px;
             overflow: auto;
         }
@@ -87,12 +73,12 @@ date_default_timezone_set('Europe/Amsterdam');
             -webkit-overflow-scrolling: touch;
         }
         th, td {
-            border-bottom: 1px solid var(--line);
+            border-bottom: 1px solid var(--gsd-border);
             text-align: left;
             vertical-align: top;
             padding: 7px;
         }
-        th { color: var(--muted); }
+        th { color: var(--gsd-text-muted); }
         @media (max-width: 700px) {
             main {
                 margin: 12px auto;
@@ -118,18 +104,17 @@ date_default_timezone_set('Europe/Amsterdam');
                 padding: 10px;
                 font-size: 0.98rem;
             }
-            .btn-link {
-                padding: 10px 14px;
-                font-size: 1rem;
+            .gsd-btn {
+                min-height: 44px;
             }
         }
     </style>
 </head>
-<body>
+<body data-theme="graphite-signal-dark">
 <main>
     <section>
         <div class="top-links">
-            <a class="btn-link" href="edit_rules.php">Back to Rule Editor</a>
+            <a class="gsd-btn gsd-btn--quiet" href="edit_rules.php">Back to Rule Editor</a>
         </div>
         <h1>Condition Rules Help</h1>
         <p class="muted">This page describes all fields supported by <code>main/data/charge_schedule_conditions.json</code> and the editor.</p>
@@ -152,7 +137,7 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>min_power</code> (optional)</td><td>Minimum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"min_power": -700</code></td></tr>
                 <tr><td><code>max_power</code> (optional)</td><td>Maximum signed watt bound for <code>netzero</code> / <code>netzero+</code> rules. Negative = discharge, positive = charge. Defaults to <code>null</code>.</td><td><code>"max_power": -100</code></td></tr>
                 <tr><td><code>fallback_value</code> (optional)</td><td>Optional fallback power used by runtime integrations when runtime conditions fail. Can be integer watts, <code>netzero</code>, or <code>netzero+</code>.</td><td><code>"fallback_value": 0</code></td></tr>
-                <tr><td><code>target_soc_percent</code></td><td>Required reserve at the first future <code>netzero+</code> start for <code>empty_at_solar_charge</code>.</td><td><code>15</code></td></tr>
+                <tr><td><code>target_soc_percent</code></td><td>Required reserve at the first future solar-capable net-zero start for <code>empty_at_solar_charge</code>: <code>netzero+</code>, or <code>netzero</code> when positive charging is allowed.</td><td><code>15</code></td></tr>
                 <tr><td><code>max_discharge_power</code> (optional)</td><td>Positive watt cap for the discharge calculated by the target battery planner.</td><td><code>1600</code></td></tr>
                 <tr><td><code>full_at_netzero_minus</code></td><td>Continuously recalculated charging objective. It targets the configured maximum battery level at the next NZ- start and resolves matching hours to NZ+ with a 100 W stepped minimum.</td><td><code>"value": "full_at_netzero_minus"</code></td></tr>
                 <tr><td><code>conditions</code></td><td>Array of condition objects. Static rows use <code>condition_relation</code>; runtime-only rows force AND.</td><td><code>"conditions": [ ... ]</code></td></tr>

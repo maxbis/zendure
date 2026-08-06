@@ -90,7 +90,7 @@
     ];
     const editorHelpTexts = {
         'inp-name': 'Rule name shown in the rules list and source labels.',
-        'inp-value-mode': 'Select output mode. Target @ next NZ+ calculates discharge; Target @ next NZ- continuously calculates an NZ+ minimum charge limit.',
+        'inp-value-mode': 'Select output mode. Target @ solar charge calculates discharge for the next NZ+ or charging-capable NZ± slot; Target @ next NZ- continuously calculates an NZ+ minimum charge limit.',
         'inp-fixed-value': 'Used only when Value Mode is Fixed. Positive = charge, negative = discharge.',
         'inp-target-soc': 'Required battery level at the start of the first future netzero+ schedule block.',
         'inp-max-discharge-power': 'Optional positive watt cap for the calculated discharge action.',
@@ -137,9 +137,12 @@
     const MIN_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.minChargePercent)) ? Number(EDIT_RULES_CONFIG.minChargePercent) : 15;
     const MAX_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.maxChargePercent)) ? Number(EDIT_RULES_CONFIG.maxChargePercent) : 95;
     const SHOW_ALL_PROFILE_ID = 'show_all';
-    const SUN_TODAY = EDIT_RULES_CONFIG.sunToday && typeof EDIT_RULES_CONFIG.sunToday === 'object'
-        ? EDIT_RULES_CONFIG.sunToday
-        : null;
+    const TODAY_CONTEXT = (EDIT_RULES_CONFIG.todayContext && typeof EDIT_RULES_CONFIG.todayContext === 'object')
+        ? EDIT_RULES_CONFIG.todayContext
+        : ((EDIT_RULES_CONFIG.sunToday && typeof EDIT_RULES_CONFIG.sunToday === 'object')
+            ? EDIT_RULES_CONFIG.sunToday
+            : null);
+    const SUN_TODAY = TODAY_CONTEXT;
     const conditionFieldHelp = {
         price: 'Compares this hour’s electricity price to the given value or value_ref.',
         ranking: 'Compares this hour’s price rank (1 = cheapest, 24 = most expensive) to the given value.',
@@ -157,6 +160,17 @@
         min_time: 'Lower hour bound: equivalent to hour ≥ value.',
         max_time: 'Upper hour bound: equivalent to hour ≤ value.',
         electricity_level: 'Runtime battery SoC % check. Stored on the rule and evaluated live; the static schedule resolver skips it.',
+    };
+    const valueRefHelp = {
+        min_price: 'Today’s lowest hourly price in cents/kWh.',
+        max_price: 'Today’s highest hourly price in cents/kWh.',
+        min_price_hour: 'Hour (0–23) when today’s lowest price occurs (first occurrence).',
+        max_price_hour: 'Hour (0–23) when today’s highest price occurs (first occurrence).',
+        max_price_hour_am: 'Hour (0–11) when the AM half-day max price occurs (first occurrence).',
+        max_price_hour_pm: 'Hour (12–23) when the PM half-day max price occurs (first occurrence).',
+        spread_price: 'Today’s price spread: max_price − min_price (cents/kWh).',
+        sunrise_hour: 'Today’s sunrise hour (floor of sunrise time).',
+        sunset_hour: 'Today’s sunset hour (ceil of sunset time).',
     };
 
     function cloneDeep(v) {
@@ -364,7 +378,7 @@
         if (rule.value === 'empty_at_solar_charge') {
             const targetSoc = Number(rule.target_soc_percent);
             out.target_soc_percent = Number.isFinite(targetSoc) ? targetSoc : MIN_CHARGE_PERCENT;
-            out.target_anchor = 'next_netzero_plus';
+            out.target_anchor = 'next_solar_capable_netzero';
             const maxDischargePower = Number(rule.max_discharge_power);
             if (Number.isFinite(maxDischargePower) && maxDischargePower > 0) {
                 out.max_discharge_power = Math.trunc(maxDischargePower);
@@ -929,7 +943,61 @@
             valueRefSel: row.querySelector('[data-role="condition-value-ref"]'),
             badge: row.querySelector('.condition-kind-badge'),
             popover: row.querySelector('[data-role="condition-kind-help"]'),
+            valueRefBadge: row.querySelector('.condition-value-ref-badge'),
+            valueRefPopover: row.querySelector('[data-role="condition-value-ref-help"]'),
         };
+    }
+
+    function formatValueRefToday(ref) {
+        if (!TODAY_CONTEXT || !ref) return null;
+        const dateLabel = TODAY_CONTEXT.date_label || TODAY_CONTEXT.date || 'today';
+        const value = TODAY_CONTEXT[ref];
+        if (value === undefined || value === null || value === '') {
+            return 'Today (' + dateLabel + '): ' + ref + ' is unavailable.';
+        }
+        if (ref === 'sunrise_hour' || ref === 'sunset_hour') {
+            const timeKey = ref === 'sunrise_hour' ? 'sunrise_time' : 'sunset_time';
+            const clock = TODAY_CONTEXT[timeKey];
+            return 'Today (' + dateLabel + '): ' + ref + ' = ' + value
+                + (clock ? ' (from ' + clock + ')' : '') + '.';
+        }
+        if (ref === 'min_price' || ref === 'max_price' || ref === 'spread_price') {
+            return 'Today (' + dateLabel + '): ' + ref + ' = ' + value + ' ct/kWh.';
+        }
+        if (
+            ref === 'min_price_hour'
+            || ref === 'max_price_hour'
+            || ref === 'max_price_hour_am'
+            || ref === 'max_price_hour_pm'
+        ) {
+            return 'Today (' + dateLabel + '): ' + ref + ' = ' + value
+                + ' (' + formatHourLabel(Number(value)) + ').';
+        }
+        return 'Today (' + dateLabel + '): ' + ref + ' = ' + value + '.';
+    }
+
+    function buildValueRefCombinedLine(ref, valueRaw) {
+        if (!TODAY_CONTEXT || !ref) return null;
+        const base = TODAY_CONTEXT[ref];
+        if (base === undefined || base === null || base === '') return null;
+        if (valueRaw === '' || valueRaw === null || valueRaw === undefined) {
+            return 'With empty value, the right-hand side is just ' + ref + ' (' + base + ').';
+        }
+        if (!/^-?\d+(\.\d+)?$/.test(String(valueRaw).trim())) {
+            return 'Value must be numeric to preview value_ref + offset.';
+        }
+        const offset = Number(valueRaw);
+        const offsetLabel = (offset >= 0 ? '+' : '') + offset;
+        const combined = Number(base) + offset;
+        const isHourRef = /_hour$/.test(ref);
+        if (isHourRef) {
+            const hour = clampEditorHour(Math.round(combined));
+            return 'Combined: ' + ref + ' ' + offsetLabel + ' → hour ' + hour
+                + ' (' + formatHourLabel(hour) + ').';
+        }
+        const rounded = Math.round(combined * 100) / 100;
+        return 'Combined: ' + ref + ' ' + offsetLabel + ' → ' + rounded
+            + ((ref === 'min_price' || ref === 'max_price' || ref === 'spread_price') ? ' ct/kWh' : '') + '.';
     }
 
     function renderConditionKindHelp(row) {
@@ -963,6 +1031,41 @@
             + '<div class="condition-kind-help__body">' + bodyHtml + '</div>';
     }
 
+    function renderValueRefHelp(row) {
+        const parts = getConditionRowParts(row);
+        if (!parts.valueRefPopover || !parts.valueRefSel) return;
+
+        const ref = parts.valueRefSel.value;
+        const valueRaw = parts.valueInp ? parts.valueInp.value.trim() : '';
+        let bodyHtml = '<p class="condition-kind-help__kind">'
+            + escapeHtml('Dynamic right-hand side. Optional value is added as a numeric offset.')
+            + '</p>';
+
+        if (!ref) {
+            bodyHtml += '<p class="condition-kind-help__meaning">'
+                + escapeHtml('No value_ref selected. The condition uses the literal value only.')
+                + '</p>';
+        } else {
+            const meaning = valueRefHelp[ref] || 'Dynamic reference used as the comparison right-hand side.';
+            bodyHtml += '<p class="condition-kind-help__meaning">' + escapeHtml(meaning) + '</p>';
+            const todayLine = formatValueRefToday(ref);
+            const combinedLine = buildValueRefCombinedLine(ref, valueRaw);
+            const todayLines = [];
+            if (todayLine) todayLines.push(todayLine);
+            if (combinedLine) todayLines.push(combinedLine);
+            if (todayLines.length) {
+                bodyHtml += '<div class="condition-kind-help__today">'
+                    + todayLines.map(function (line) {
+                        return '<p>' + escapeHtml(line) + '</p>';
+                    }).join('')
+                    + '</div>';
+            }
+        }
+
+        parts.valueRefPopover.innerHTML = '<div class="condition-kind-help__title">Value Reference</div>'
+            + '<div class="condition-kind-help__body">' + bodyHtml + '</div>';
+    }
+
     function closeConditionKindHelp(exceptRow) {
         document.querySelectorAll('.condition-row.is-help-open').forEach(function (row) {
             if (exceptRow && row === exceptRow) return;
@@ -974,9 +1077,25 @@
         });
     }
 
+    function closeValueRefHelp(exceptRow) {
+        document.querySelectorAll('.condition-row.is-value-ref-help-open').forEach(function (row) {
+            if (exceptRow && row === exceptRow) return;
+            row.classList.remove('is-value-ref-help-open');
+            const badge = row.querySelector('.condition-value-ref-badge');
+            const popover = row.querySelector('[data-role="condition-value-ref-help"]');
+            if (badge) badge.setAttribute('aria-expanded', 'false');
+            if (popover) popover.setAttribute('hidden', '');
+        });
+    }
+
+    function closeAllConditionHelps(exceptRow, exceptKind) {
+        if (exceptKind !== 'kind') closeConditionKindHelp(exceptRow);
+        if (exceptKind !== 'value-ref') closeValueRefHelp(exceptRow);
+    }
+
     function toggleConditionKindHelp(row) {
         const isOpen = row.classList.contains('is-help-open');
-        closeConditionKindHelp();
+        closeAllConditionHelps();
         if (isOpen) return;
         renderConditionKindHelp(row);
         row.classList.add('is-help-open');
@@ -991,9 +1110,31 @@
         }
     }
 
+    function toggleValueRefHelp(row) {
+        const isOpen = row.classList.contains('is-value-ref-help-open');
+        closeAllConditionHelps();
+        if (isOpen) return;
+        renderValueRefHelp(row);
+        row.classList.add('is-value-ref-help-open');
+        const badge = row.querySelector('.condition-value-ref-badge');
+        const popover = row.querySelector('[data-role="condition-value-ref-help"]');
+        if (badge) badge.setAttribute('aria-expanded', 'true');
+        if (popover) {
+            popover.removeAttribute('hidden');
+            if (typeof popover.scrollIntoView === 'function') {
+                popover.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+    }
+
     function refreshOpenConditionKindHelp(row) {
-        if (!row || !row.classList.contains('is-help-open')) return;
-        renderConditionKindHelp(row);
+        if (!row) return;
+        if (row.classList.contains('is-help-open')) {
+            renderConditionKindHelp(row);
+        }
+        if (row.classList.contains('is-value-ref-help-open')) {
+            renderValueRefHelp(row);
+        }
     }
 
     function updateFallbackVisibility() {
@@ -1127,14 +1268,14 @@
                 '<td><button type="button" class="rule-name-button" data-action="edit" data-idx="' + idx + '"' + nameTitle + '>' + colorSwatchHtml + limitIndicatorHtml + '<code>' + escapeHtml(rule.name || '(unnamed)') + '</code>' + targetSummaryHtml + '</button></td>',
                 '<td class="table-actions">',
                 '<div class="rule-actions-menu">',
-                '<button type="button" class="rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
+                '<button type="button" class="gsd-icon-btn rule-actions-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open actions for rule #' + (idx + 1) + '" title="More actions">⋯</button>',
                 '<div class="rule-actions-popover" role="menu">',
-                '<button type="button" data-action="up" data-idx="' + idx + '" role="menuitem"' + upDisabled + '>Move Up</button>',
-                '<button type="button" data-action="down" data-idx="' + idx + '" role="menuitem"' + downDisabled + '>Move Down</button>',
-                '<button type="button" data-action="edit" data-idx="' + idx + '" role="menuitem">Edit</button>',
-                '<button type="button" data-action="dup" data-idx="' + idx + '" role="menuitem">Duplicate</button>',
+                '<button type="button" class="gsd-btn gsd-btn--quiet" data-action="up" data-idx="' + idx + '" role="menuitem"' + upDisabled + '>Move Up</button>',
+                '<button type="button" class="gsd-btn gsd-btn--quiet" data-action="down" data-idx="' + idx + '" role="menuitem"' + downDisabled + '>Move Down</button>',
+                '<button type="button" class="gsd-btn gsd-btn--quiet" data-action="edit" data-idx="' + idx + '" role="menuitem">Edit</button>',
+                '<button type="button" class="gsd-btn gsd-btn--quiet" data-action="dup" data-idx="' + idx + '" role="menuitem">Duplicate</button>',
                 '<div class="rule-actions-separator" role="separator" aria-hidden="true"></div>',
-                '<button type="button" data-action="del" data-idx="' + idx + '" class="danger" role="menuitem">Delete</button>',
+                '<button type="button" data-action="del" data-idx="' + idx + '" class="gsd-btn gsd-btn--danger danger" role="menuitem">Delete</button>',
                 '</div>',
                 '</div>',
                 '</td>',
@@ -1168,7 +1309,7 @@
         profiles.forEach(function (profile) {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'profile-filter-button';
+            button.className = 'gsd-btn gsd-btn--secondary profile-filter-button';
             if (getActiveProfileId() === profile.id) {
                 button.classList.add('is-active');
             }
@@ -1331,6 +1472,27 @@
         valueRefSel.value = condition?.value_ref || '';
         valueRefSel.title = 'Optional dynamic reference value (for example min_price or sunset_hour). Combine with value to apply a numeric offset.';
 
+        const valueRefWrap = document.createElement('div');
+        valueRefWrap.className = 'condition-value-ref-wrap';
+        const valueRefBadge = document.createElement('button');
+        valueRefBadge.type = 'button';
+        valueRefBadge.className = 'condition-value-ref-badge';
+        valueRefBadge.textContent = '?';
+        valueRefBadge.setAttribute('aria-expanded', 'false');
+        valueRefBadge.setAttribute('aria-haspopup', 'dialog');
+        valueRefBadge.setAttribute('aria-label', 'Value reference help');
+        const valueRefHelpPopover = document.createElement('div');
+        valueRefHelpPopover.className = 'condition-kind-help condition-value-ref-help';
+        valueRefHelpPopover.setAttribute('data-role', 'condition-value-ref-help');
+        valueRefHelpPopover.setAttribute('role', 'dialog');
+        valueRefHelpPopover.setAttribute('hidden', '');
+        const valueRefAnchor = document.createElement('div');
+        valueRefAnchor.className = 'condition-value-ref-anchor';
+        valueRefAnchor.appendChild(valueRefBadge);
+        valueRefAnchor.appendChild(valueRefHelpPopover);
+        valueRefWrap.appendChild(valueRefSel);
+        valueRefWrap.appendChild(valueRefAnchor);
+
         const fieldWrap = document.createElement('div');
         fieldWrap.className = 'condition-field-wrap';
         const kindBadge = document.createElement('button');
@@ -1344,13 +1506,16 @@
         helpPopover.setAttribute('data-role', 'condition-kind-help');
         helpPopover.setAttribute('role', 'dialog');
         helpPopover.setAttribute('hidden', '');
+        const kindAnchor = document.createElement('div');
+        kindAnchor.className = 'condition-kind-anchor';
+        kindAnchor.appendChild(kindBadge);
+        kindAnchor.appendChild(helpPopover);
         fieldWrap.appendChild(fieldSel);
-        fieldWrap.appendChild(kindBadge);
-        fieldWrap.appendChild(helpPopover);
+        fieldWrap.appendChild(kindAnchor);
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
-        delBtn.className = 'danger condition-remove-btn';
+        delBtn.className = 'gsd-btn gsd-btn--danger danger condition-remove-btn';
         delBtn.setAttribute('aria-label', 'Remove condition');
         delBtn.innerHTML = [
             '<svg class="condition-remove-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
@@ -1363,7 +1528,7 @@
         ].join('');
         delBtn.title = 'Remove this condition row.';
         delBtn.addEventListener('click', function () {
-            closeConditionKindHelp();
+            closeAllConditionHelps();
             row.remove();
             updateFallbackVisibility();
         });
@@ -1372,6 +1537,11 @@
             e.preventDefault();
             e.stopPropagation();
             toggleConditionKindHelp(row);
+        });
+        valueRefBadge.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleValueRefHelp(row);
         });
 
         fieldSel.addEventListener('change', function () {
@@ -1385,11 +1555,14 @@
         valueInp.addEventListener('input', function () {
             refreshOpenConditionKindHelp(row);
         });
+        valueRefSel.addEventListener('change', function () {
+            refreshOpenConditionKindHelp(row);
+        });
 
         row.appendChild(fieldWrap);
         row.appendChild(opSel);
         row.appendChild(valueInp);
-        row.appendChild(valueRefSel);
+        row.appendChild(valueRefWrap);
         row.appendChild(delBtn);
         updateConditionRowKind(row);
         return row;
@@ -1454,7 +1627,7 @@
         }
         if (els.inpMaxDischargePower) els.inpMaxDischargePower.disabled = !isTarget;
         if (els.batteryTargetPreview && isTarget) {
-            els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ start. The resolved schedule will contain calculated fixed watts.`;
+            els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ or charging-capable NZ± start. The resolved schedule will contain calculated fixed watts.`;
         }
         updateValueModeTone();
         syncLimitsState();
@@ -1598,7 +1771,7 @@
                 throw new Error(`Requested spare level must be between ${MIN_CHARGE_PERCENT}% and ${MAX_CHARGE_PERCENT}%.`);
             }
             rule.target_soc_percent = Math.round(targetSoc * 10) / 10;
-            rule.target_anchor = 'next_netzero_plus';
+            rule.target_anchor = 'next_solar_capable_netzero';
             const maxDischargeRaw = String(els.inpMaxDischargePower?.value || '').trim();
             if (maxDischargeRaw !== '') {
                 const maxDischargePower = Number(maxDischargeRaw);
@@ -2028,7 +2201,7 @@
         if (els.inpTargetSoc) {
             els.inpTargetSoc.addEventListener('input', function () {
                 if (els.batteryTargetPreview && els.inpValueMode.value === 'empty_at_solar_charge') {
-                    els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ start. The resolved schedule will contain calculated fixed watts.`;
+                    els.batteryTargetPreview.textContent = `Target ${els.inpTargetSoc.value || MIN_CHARGE_PERCENT}% at the first future NZ+ or charging-capable NZ± start. The resolved schedule will contain calculated fixed watts.`;
                 }
             });
         }
@@ -2195,15 +2368,15 @@
             if (!e.target.closest('.rule-actions-menu')) {
                 closeActionMenus();
             }
-            if (!e.target.closest('.condition-field-wrap')) {
-                closeConditionKindHelp();
+            if (!e.target.closest('.condition-field-wrap') && !e.target.closest('.condition-value-ref-wrap')) {
+                closeAllConditionHelps();
             }
         });
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 closeActionMenus();
-                closeConditionKindHelp();
+                closeAllConditionHelps();
             }
         });
 

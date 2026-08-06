@@ -4,7 +4,7 @@
 
 The target battery planner converts symbolic battery objectives into supported schedule values before the resolved schedule is returned to automation.
 
-- `empty_at_solar_charge` calculates a fixed discharge action that aims to reach a requested reserve at the first future `netzero+` slot.
+- `empty_at_solar_charge` calculates a fixed discharge action that aims to reach a requested reserve at the first future solar-capable net-zero slot.
 - `full_at_netzero_minus` continuously calculates an NZ+ minimum that aims to reach the configured maximum battery percentage at the first future `netzero-` slot.
 
 Automation does not evaluate either symbolic mode. It continues receiving integers and the existing net-zero modes.
@@ -23,7 +23,7 @@ The discharge-target source rule contains:
 
 - `value: "empty_at_solar_charge"`
 - `target_soc_percent`: required requested reserve percentage
-- `target_anchor: "next_netzero_plus"`
+- `target_anchor: "next_solar_capable_netzero"`
 - `max_discharge_power`: optional positive watt cap
 - `fallback_value`: optional existing schedule value; `netzero-` is the planner default
 - Normal static and runtime conditions
@@ -65,8 +65,8 @@ The resolved charge-target slots replace the symbolic value with:
 
 1. Resolve the base schedule and merge conditional rules for today and tomorrow.
 2. Find slots whose source rule value is `empty_at_solar_charge`.
-3. Find the first later slot whose resolved value is `netzero+`.
-4. Forecast the baseline battery percentage at that NZ+ start.
+3. Find the first later solar-capable net-zero slot. `netzero+` always qualifies; `netzero` qualifies unless its maximum power is zero or negative.
+4. Forecast the baseline battery percentage at that solar-charge start.
 5. When the baseline is above the requested target, calculate the additional output energy needed.
 6. Convert that energy to fixed discharge watts for the target-rule interval.
 7. Clamp the result to the system and optional rule discharge caps.
@@ -91,7 +91,8 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 ## Edge cases and failure modes
 
 - When live battery percentage is unavailable, then emit the fallback and `unavailable` planning status.
-- When no future NZ+ exists within today and tomorrow, then emit the fallback and explain that the anchor is unavailable.
+- When no future solar-capable net-zero slot exists within today and tomorrow, then emit the fallback and explain that the anchor is unavailable.
+- `netzero-` and `netzero` with `max_power <= 0` never qualify as solar-charge anchors.
 - When the baseline forecast is already at or below the target, then emit the fallback with `already_satisfied` status.
 - When the required discharge exceeds a power cap, then emit the capped fixed value and `best_effort` status.
 - When the target rule hour has ended, then emit the fallback with `past` status.

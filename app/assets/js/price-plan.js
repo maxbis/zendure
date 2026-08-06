@@ -665,7 +665,7 @@
         const resultLabel = document.createElement("span");
         const targetValue = document.createElement("strong");
         const resultValue = document.createElement("strong");
-        targetLabel.textContent = isChargeTarget ? "Goal at NZ−" : "Goal at NZ+";
+        targetLabel.textContent = isChargeTarget ? "Goal at NZ−" : "Goal at solar";
         resultLabel.textContent = isChargeTarget ? "Current" : "Predicted";
         targetValue.textContent = Number.isFinite(Number(planning.target_soc_percent))
             ? `${Number(planning.target_soc_percent).toFixed(1)}%`
@@ -682,7 +682,7 @@
         detail.className = "app-schedule-tooltip__forecast-detail";
         const anchor = planning.anchor_date && planning.anchor_time
             ? `${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
-            : `No ${isChargeTarget ? "NZ−" : "NZ+"} in horizon`;
+            : `No ${isChargeTarget ? "NZ−" : "solar charge"} in horizon`;
         const statuses = {
             achievable: "Target achievable",
             best_effort: "Best effort",
@@ -690,7 +690,7 @@
             unavailable: "Calculation unavailable",
             past: "Rule hour passed"
         };
-        const parts = [statuses[planning.status] || String(planning.status || "Planned"), `${isChargeTarget ? "NZ−" : "NZ+"} ${anchor}`];
+        const parts = [statuses[planning.status] || String(planning.status || "Planned"), `${isChargeTarget ? "NZ−" : "Solar"} ${anchor}`];
         if (isChargeTarget && Number.isFinite(Number(planning.calculated_min_power_w))) {
             parts.push(`minimum ${formatWatts(Number(planning.calculated_min_power_w))}`);
         } else if (Number.isFinite(Number(planning.calculated_power_w))) {

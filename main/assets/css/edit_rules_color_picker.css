@@ -21,9 +21,9 @@
     min-width: 36px;
     height: 36px;
     padding: 3px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: #1f2937;
+    border-radius: var(--gsd-radius-md, 10px);
+    border: 1px solid var(--gsd-border, var(--line));
+    background: var(--gsd-surface-3, #1f2937);
     cursor: pointer;
 }
 
@@ -46,11 +46,11 @@
     height: 10px;
     border-radius: 999px;
     flex: 0 0 auto;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    border: 1px solid color-mix(in srgb, white 35%, transparent);
+    background: color-mix(in srgb, white 16%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gsd-page-deep, #000) 20%, transparent);
 }
 
 .rule-color-picker-dot.is-active {
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: color-mix(in srgb, white 50%, transparent);
 }
