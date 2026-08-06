@@ -3,6 +3,8 @@
 // Standalone rule editor for data/charge_schedule_conditions.json
 
 require_once __DIR__ . '/includes/config_loader.php';
+require_once __DIR__ . '/includes/sun_context.php';
+require_once dirname(__DIR__) . '/common/php/system_config.php';
 
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
 $profilesFile = __DIR__ . '/data/rule_profiles.json';
@@ -83,6 +85,37 @@ function resolveRuleEditorLimits(): array
     }
 
     return ['min' => $min, 'max' => $max];
+}
+
+/**
+ * Today's sunrise/sunset anchors for condition help tooltips.
+ *
+ * @return array<string, mixed>|null
+ */
+function resolveEditorSunContext(): ?array
+{
+    try {
+        $systemConfig = loadSystemConfig();
+        $installation = $systemConfig['installation'];
+        $tz = new DateTimeZone((string) $installation['timezone']);
+        $today = new DateTimeImmutable('now', $tz);
+        $dateYmd = $today->format('Ymd');
+        $sunCtx = getSunContextForDate(
+            $dateYmd,
+            (float) $installation['latitude'],
+            (float) $installation['longitude'],
+            $tz
+        );
+        if ($sunCtx === []) {
+            return null;
+        }
+        return array_merge($sunCtx, [
+            'date' => $dateYmd,
+            'date_label' => $today->format('Y-m-d'),
+        ]);
+    } catch (Throwable $e) {
+        return null;
+    }
 }
 
 function generateRuleId(): string
@@ -480,6 +513,7 @@ if ($editorMinChargePercent < 0 || $editorMaxChargePercent > 100 || $editorMinCh
     $editorMinChargePercent = 15;
     $editorMaxChargePercent = 95;
 }
+$editorSunContext = resolveEditorSunContext();
 ?>
 <!doctype html>
 <html lang="en">
@@ -489,6 +523,7 @@ if ($editorMinChargePercent < 0 || $editorMaxChargePercent > 100 || $editorMinCh
     <title>Edit Rules</title>
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/edit-rules-icon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/edit-rules-icon-180.png">
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
     <link rel="stylesheet" href="assets/css/edit_rules.css">
     <link rel="stylesheet" href="assets/css/edit_rules_color_picker.css">
 </head>
@@ -750,6 +785,7 @@ window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'limitMax' => $editorLimitMax,
     'minChargePercent' => $editorMinChargePercent,
     'maxChargePercent' => $editorMaxChargePercent,
+    'sunToday' => $editorSunContext,
 ], JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="assets/js/edit_rules.js"></script>

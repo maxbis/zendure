@@ -137,6 +137,27 @@
     const MIN_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.minChargePercent)) ? Number(EDIT_RULES_CONFIG.minChargePercent) : 15;
     const MAX_CHARGE_PERCENT = Number.isFinite(Number(EDIT_RULES_CONFIG.maxChargePercent)) ? Number(EDIT_RULES_CONFIG.maxChargePercent) : 95;
     const SHOW_ALL_PROFILE_ID = 'show_all';
+    const SUN_TODAY = EDIT_RULES_CONFIG.sunToday && typeof EDIT_RULES_CONFIG.sunToday === 'object'
+        ? EDIT_RULES_CONFIG.sunToday
+        : null;
+    const conditionFieldHelp = {
+        price: 'Compares this hour’s electricity price to the given value or value_ref.',
+        ranking: 'Compares this hour’s price rank (1 = cheapest, 24 = most expensive) to the given value.',
+        min_price: 'Compares today’s minimum price to the given value.',
+        max_price: 'Compares today’s maximum price to the given value.',
+        min_price_hour: 'Compares the hour of today’s cheapest price to the given value.',
+        max_price_hour: 'Compares the hour of today’s most expensive price to the given value.',
+        spread_price: 'Compares today’s max−min price spread to the given value.',
+        sunrise_hour: 'Compares the current hour to today’s sunrise hour (floor of sunrise time).',
+        sunset_hour: 'Compares the current hour to today’s sunset hour (ceil of sunset time).',
+        sunrise_offset_hour: 'Compares the current hour to sunrise_hour + offset. Use value as hours before (−) or after (+) sunrise.',
+        sunset_offset_hour: 'Compares the current hour to sunset_hour + offset. Use value as hours before (−) or after (+) sunset.',
+        month: 'Checks whether the current month is in the given list or matches the comparison.',
+        hour: 'Checks the current hour, either as a list (in) or a numeric compare with optional value_ref.',
+        min_time: 'Lower hour bound: equivalent to hour ≥ value.',
+        max_time: 'Upper hour bound: equivalent to hour ≤ value.',
+        electricity_level: 'Runtime battery SoC % check. Stored on the rule and evaluated live; the static schedule resolver skips it.',
+    };
 
     function cloneDeep(v) {
         return JSON.parse(JSON.stringify(v));
@@ -792,10 +813,187 @@
         if (!fieldSel || !badge) return;
         const isRuntimeOnly = runtimeOnlyConditionFields.has(fieldSel.value);
         badge.textContent = isRuntimeOnly ? 'R' : 'S';
-        badge.title = isRuntimeOnly ? 'Runtime condition' : 'Static condition';
-        badge.setAttribute('aria-label', isRuntimeOnly ? 'Runtime condition' : 'Static condition');
+        badge.setAttribute('aria-label', isRuntimeOnly
+            ? 'Runtime condition help'
+            : 'Static condition help');
         badge.classList.toggle('is-runtime', isRuntimeOnly);
         badge.classList.toggle('is-static', !isRuntimeOnly);
+        if (badge.getAttribute('aria-expanded') === 'true') {
+            renderConditionKindHelp(row);
+        }
+    }
+
+    function clampEditorHour(hour) {
+        return Math.max(0, Math.min(23, hour));
+    }
+
+    function formatHourLabel(hour) {
+        return String(clampEditorHour(hour)).padStart(2, '0') + ':00';
+    }
+
+    function formatHourSlotRange(startHour, endHour) {
+        if (startHour > endHour) return 'none';
+        if (startHour === endHour) return String(startHour);
+        return startHour + '–' + endHour;
+    }
+
+    function describeHourOp(op, targetHour) {
+        const target = clampEditorHour(targetHour);
+        const clock = formatHourLabel(target);
+        switch (op) {
+            case '>':
+                return {
+                    clock: 'after ' + clock + ' (from ' + formatHourLabel(target + 1) + ')',
+                    slots: 'hours ' + formatHourSlotRange(target + 1, 23),
+                };
+            case '>=':
+                return {
+                    clock: 'from ' + clock + ' onward',
+                    slots: 'hours ' + formatHourSlotRange(target, 23),
+                };
+            case '<':
+                return {
+                    clock: 'before ' + clock,
+                    slots: 'hours ' + formatHourSlotRange(0, target - 1),
+                };
+            case '<=':
+                return {
+                    clock: 'until end of ' + clock.replace(':00', ':59'),
+                    slots: 'hours ' + formatHourSlotRange(0, target),
+                };
+            case '==':
+                return {
+                    clock: 'exactly during ' + clock + '–' + String(target).padStart(2, '0') + ':59',
+                    slots: 'hour ' + target,
+                };
+            case '!=':
+                return {
+                    clock: 'any time except ' + clock + '–' + String(target).padStart(2, '0') + ':59',
+                    slots: 'all hours except ' + target,
+                };
+            default:
+                return {
+                    clock: 'hour ' + op + ' ' + target,
+                    slots: 'hour ' + op + ' ' + target,
+                };
+        }
+    }
+
+    function buildSunOffsetHelp(field, op, valueRaw) {
+        if (!SUN_TODAY) {
+            return ['Today’s sunrise/sunset is unavailable.'];
+        }
+        const isSunrise = field === 'sunrise_offset_hour';
+        const anchorKey = isSunrise ? 'sunrise_hour' : 'sunset_hour';
+        const timeKey = isSunrise ? 'sunrise_time' : 'sunset_time';
+        const label = isSunrise ? 'Sunrise' : 'Sunset';
+        const anchorHour = Number(SUN_TODAY[anchorKey]);
+        const clockTime = SUN_TODAY[timeKey];
+        const dateLabel = SUN_TODAY.date_label || SUN_TODAY.date || 'today';
+        if (!Number.isFinite(anchorHour)) {
+            return ['Today’s ' + label.toLowerCase() + ' hour is unavailable.'];
+        }
+
+        const lines = [
+            'Today (' + dateLabel + '): ' + label.toLowerCase() + ' ' + (clockTime || '—')
+                + ' → ' + anchorKey + ' ' + anchorHour + '.',
+        ];
+
+        if (valueRaw === '' || valueRaw === null || valueRaw === undefined) {
+            lines.push('Enter an offset value to see the resolved threshold for today.');
+            return lines;
+        }
+        if (!/^-?\d+(\.\d+)?$/.test(String(valueRaw).trim())) {
+            lines.push('Offset must be numeric to preview today’s translation.');
+            return lines;
+        }
+
+        const offset = Number(valueRaw);
+        const targetHour = clampEditorHour(Math.round(anchorHour + offset));
+        const meaning = describeHourOp(op || '==', targetHour);
+        const offsetLabel = (offset >= 0 ? '+' : '') + offset;
+        lines.push(
+            'Threshold: ' + anchorKey + ' ' + offsetLabel + ' → hour ' + targetHour
+                + ' (' + formatHourLabel(targetHour) + ').'
+        );
+        lines.push('Clock: ' + meaning.clock + '.');
+        lines.push('Hour slots: ' + meaning.slots + '.');
+        return lines;
+    }
+
+    function getConditionRowParts(row) {
+        return {
+            fieldSel: row.querySelector('[data-role="condition-field"]'),
+            opSel: row.querySelector('[data-role="condition-op"]'),
+            valueInp: row.querySelector('[data-role="condition-value"]'),
+            valueRefSel: row.querySelector('[data-role="condition-value-ref"]'),
+            badge: row.querySelector('.condition-kind-badge'),
+            popover: row.querySelector('[data-role="condition-kind-help"]'),
+        };
+    }
+
+    function renderConditionKindHelp(row) {
+        const parts = getConditionRowParts(row);
+        if (!parts.popover || !parts.fieldSel || !parts.badge) return;
+
+        const field = parts.fieldSel.value;
+        const isRuntimeOnly = runtimeOnlyConditionFields.has(field);
+        const title = isRuntimeOnly ? 'Runtime Condition' : 'Static Condition';
+        const kindBlurb = isRuntimeOnly
+            ? 'Checked live against device state when the schedule runs.'
+            : 'Evaluated when building the static day schedule.';
+        const meaning = conditionFieldHelp[field]
+            || 'Condition field used when matching schedule hours.';
+
+        let bodyHtml = '<p class="condition-kind-help__kind">' + escapeHtml(kindBlurb) + '</p>'
+            + '<p class="condition-kind-help__meaning">' + escapeHtml(meaning) + '</p>';
+
+        if (field === 'sunrise_offset_hour' || field === 'sunset_offset_hour') {
+            const op = parts.opSel ? parts.opSel.value : '==';
+            const valueRaw = parts.valueInp ? parts.valueInp.value.trim() : '';
+            const sunLines = buildSunOffsetHelp(field, op, valueRaw);
+            bodyHtml += '<div class="condition-kind-help__today">'
+                + sunLines.map(function (line) {
+                    return '<p>' + escapeHtml(line) + '</p>';
+                }).join('')
+                + '</div>';
+        }
+
+        parts.popover.innerHTML = '<div class="condition-kind-help__title">' + escapeHtml(title) + '</div>'
+            + '<div class="condition-kind-help__body">' + bodyHtml + '</div>';
+    }
+
+    function closeConditionKindHelp(exceptRow) {
+        document.querySelectorAll('.condition-row.is-help-open').forEach(function (row) {
+            if (exceptRow && row === exceptRow) return;
+            row.classList.remove('is-help-open');
+            const badge = row.querySelector('.condition-kind-badge');
+            const popover = row.querySelector('[data-role="condition-kind-help"]');
+            if (badge) badge.setAttribute('aria-expanded', 'false');
+            if (popover) popover.setAttribute('hidden', '');
+        });
+    }
+
+    function toggleConditionKindHelp(row) {
+        const isOpen = row.classList.contains('is-help-open');
+        closeConditionKindHelp();
+        if (isOpen) return;
+        renderConditionKindHelp(row);
+        row.classList.add('is-help-open');
+        const badge = row.querySelector('.condition-kind-badge');
+        const popover = row.querySelector('[data-role="condition-kind-help"]');
+        if (badge) badge.setAttribute('aria-expanded', 'true');
+        if (popover) {
+            popover.removeAttribute('hidden');
+            if (typeof popover.scrollIntoView === 'function') {
+                popover.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+    }
+
+    function refreshOpenConditionKindHelp(row) {
+        if (!row || !row.classList.contains('is-help-open')) return;
+        renderConditionKindHelp(row);
     }
 
     function updateFallbackVisibility() {
@@ -1101,6 +1299,7 @@
         fieldSel.title = 'Condition field to evaluate (price, ranking, electricity_level, sun fields, etc.).';
 
         const opSel = document.createElement('select');
+        opSel.setAttribute('data-role', 'condition-op');
         conditionOps.forEach((o) => {
             const opt = document.createElement('option');
             opt.value = o;
@@ -1112,11 +1311,13 @@
 
         const valueInp = document.createElement('input');
         valueInp.type = 'text';
+        valueInp.setAttribute('data-role', 'condition-value');
         valueInp.placeholder = 'value / offset (optional)';
         valueInp.value = condition?.value !== undefined ? String(condition.value) : '';
         valueInp.title = 'Literal value when value_ref is empty, or numeric offset when value_ref is selected (for example -1 or +1).';
 
         const valueRefSel = document.createElement('select');
+        valueRefSel.setAttribute('data-role', 'condition-value-ref');
         const valueRefNone = document.createElement('option');
         valueRefNone.value = '';
         valueRefNone.textContent = 'value_ref (none)';
@@ -1132,10 +1333,20 @@
 
         const fieldWrap = document.createElement('div');
         fieldWrap.className = 'condition-field-wrap';
-        const kindBadge = document.createElement('div');
+        const kindBadge = document.createElement('button');
+        kindBadge.type = 'button';
         kindBadge.className = 'condition-kind-badge is-static';
+        kindBadge.setAttribute('aria-expanded', 'false');
+        kindBadge.setAttribute('aria-haspopup', 'dialog');
+        kindBadge.setAttribute('aria-label', 'Static condition help');
+        const helpPopover = document.createElement('div');
+        helpPopover.className = 'condition-kind-help';
+        helpPopover.setAttribute('data-role', 'condition-kind-help');
+        helpPopover.setAttribute('role', 'dialog');
+        helpPopover.setAttribute('hidden', '');
         fieldWrap.appendChild(fieldSel);
         fieldWrap.appendChild(kindBadge);
+        fieldWrap.appendChild(helpPopover);
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -1152,13 +1363,27 @@
         ].join('');
         delBtn.title = 'Remove this condition row.';
         delBtn.addEventListener('click', function () {
+            closeConditionKindHelp();
             row.remove();
             updateFallbackVisibility();
+        });
+
+        kindBadge.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleConditionKindHelp(row);
         });
 
         fieldSel.addEventListener('change', function () {
             updateConditionRowKind(row);
             updateFallbackVisibility();
+            refreshOpenConditionKindHelp(row);
+        });
+        opSel.addEventListener('change', function () {
+            refreshOpenConditionKindHelp(row);
+        });
+        valueInp.addEventListener('input', function () {
+            refreshOpenConditionKindHelp(row);
         });
 
         row.appendChild(fieldWrap);
@@ -1320,11 +1545,11 @@
         const rows = Array.from(els.conditionsList.querySelectorAll('.condition-row'));
         const conditions = [];
         for (const row of rows) {
-            const inputs = row.querySelectorAll('select, input');
-            const field = inputs[0].value;
-            const op = inputs[1].value;
-            const valueRaw = inputs[2].value.trim();
-            const valueRef = inputs[3].value;
+            const field = row.querySelector('[data-role="condition-field"]')?.value;
+            const op = row.querySelector('[data-role="condition-op"]')?.value;
+            const valueRaw = (row.querySelector('[data-role="condition-value"]')?.value || '').trim();
+            const valueRef = row.querySelector('[data-role="condition-value-ref"]')?.value || '';
+            if (!field || !op) continue;
             if (!valueRaw && !valueRef) {
                 continue;
             }
@@ -1970,11 +2195,15 @@
             if (!e.target.closest('.rule-actions-menu')) {
                 closeActionMenus();
             }
+            if (!e.target.closest('.condition-field-wrap')) {
+                closeConditionKindHelp();
+            }
         });
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 closeActionMenus();
+                closeConditionKindHelp();
             }
         });
 
