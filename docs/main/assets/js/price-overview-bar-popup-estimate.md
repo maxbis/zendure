@@ -19,14 +19,14 @@ These globals are **not** defined inside `price_overview_bar.js`; they are emitt
 - `CHARGE_STATUS_MIN_CHARGE_LEVEL` — from shared `battery.minChargePercent`
 - `CHARGE_STATUS_MAX_CHARGE_LEVEL` — from shared `battery.maxChargePercent`
 - `BASE_WH` — from shared `battery.capacityWh`, the battery energy base in watt-hours for percent conversion
+- `PRICE_OVERVIEW_CONFIG.popupPowerEfficiency` — from shared `battery.efficiency`
 
 Shared values are loaded by `common/php/system_config.php`. Missing or invalid values stop the estimate instead of selecting embedded battery defaults.
 
-## Constants defined in `price_overview_bar.js`
+## Local policies defined in `price_overview_bar.js`
 
 At the top of the file:
 
-- `POPUP_POWER_EFFICIENCY` (0.9) — applied when converting power to percent change per hour (usable fraction of pack energy per “percent”).
 - `POPUP_NETZERO_REFERENCE_W` (200) — discharge power in watts assumed for schedule value `netzero` in the popup model.
 - `POPUP_NETZERO_PLUS_REFERENCE_W` (300) — charge power in watts assumed for `netzero+` in the popup model.
 
@@ -86,7 +86,7 @@ Runtime rule parsing:
 
 - When `currentBatteryForecastState` is missing or SoC is not a finite number, the estimate block is omitted.
 - When there are no qualifying future bars, the forecast is null.
-- If shared capacity or charge levels are missing or invalid, the popup reports a configuration error rather than calculating with embedded defaults.
+- If shared capacity, charge levels or efficiency are missing or invalid, the popup reports a configuration error rather than calculating with embedded defaults.
 - Runtime conditions use only `>` / `>=` on battery fields for the discharge floor; other operators are ignored for this estimate.
 
 ## Related files

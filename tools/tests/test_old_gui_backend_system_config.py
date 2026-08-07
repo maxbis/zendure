@@ -93,6 +93,8 @@ def test_old_gui_javascript_has_no_shared_value_fallbacks():
     assert "getRequiredPriceOverviewChargeLevels" in sources["overview"]
     assert "Missing required shared price-conversion" in sources["conversion"]
     assert "energy graph response is missing shared battery capacity" in sources["energy"]
+    assert "popupPowerEfficiency', 0.9" not in sources["overview"]
+    assert "getRequiredPriceOverviewNumberConfig('popupPowerEfficiency')" in sources["overview"]
 
 
 def test_old_gui_javascript_accepts_the_canonical_shared_values():

@@ -1,13 +1,14 @@
 <?php
 declare(strict_types=1);
 
-date_default_timezone_set('Europe/Amsterdam');
+require_once __DIR__ . '/../common/php/system_config.php';
 
-require_once __DIR__ . '/../main/includes/config_loader.php';
+$systemConfig = loadSystemConfig();
+date_default_timezone_set($systemConfig['installation']['timezone']);
 
-$minChargeLevel = (int) ConfigLoader::get('MIN_CHARGE_LEVEL', 15);
-$maxChargeLevel = (int) ConfigLoader::get('MAX_CHARGE_LEVEL', 96);
-$baseWh = (int) ConfigLoader::get('baseWh', 5760);
+$minChargeLevel = (int) $systemConfig['battery']['minChargePercent'];
+$maxChargeLevel = (int) $systemConfig['battery']['maxChargePercent'];
+$baseWh = (int) $systemConfig['battery']['capacityWh'];
 ?>
 <!DOCTYPE html>
 <html lang="en">

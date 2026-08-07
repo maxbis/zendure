@@ -18,8 +18,10 @@ The old GUI reads installation-wide values from the same strict shared configura
 The old GUI obtains these values from the shared configuration:
 
 - Battery capacity.
+- Battery forecast efficiency.
 - Minimum charge percentage.
 - Maximum charge percentage.
+- Signed schedule power range and power step.
 - Installation timezone.
 - Supplier markup, energy tax, VAT multiplier and price precisions.
 - Shortwave-radiation location and timezone.
@@ -27,7 +29,6 @@ The old GUI obtains these values from the shared configuration:
 It continues to obtain these values from the old-GUI web configuration:
 
 - Browser-facing API URLs.
-- Minimum and maximum grid power used by the interface.
 - Price overview display and reference settings.
 - Schedule-condition and other old-GUI-only policies.
 
@@ -39,13 +40,14 @@ The page injects the validated values into the same JavaScript names used before
 2. It loads and strictly validates `common/config/system.json` through the common PHP loader.
 3. It loads the old-GUI web configuration through `ConfigLoader`.
 4. It sets PHP's timezone from `installation.timezone` in the shared configuration.
-5. It renders the page with shared battery and price-conversion values plus web-specific values from the old configuration.
+5. It renders the page with shared battery, forecast, schedule and price-conversion values plus web-specific values from the old configuration.
 6. The energy-graph proxy uses shared battery capacity and installation timezone while retaining its web-only upstream URL and cache policy.
 7. The shortwave endpoint defaults to the shared installation coordinates and timezone; explicit API query parameters may still request another location.
 8. Schedule resolver and legacy schedule endpoints use the shared installation timezone.
-9. Browser modules require the injected shared battery and price-conversion values and no longer contain duplicated operational defaults.
+9. Browser modules require the injected shared battery, efficiency, schedule-range, schedule-step and price-conversion values and no longer contain duplicated operational defaults.
+10. The PHP target-battery planner reads the shared forecast profile, efficiency, schedule range and schedule step.
 
-The configuration editor still writes `main/config/config.json`. Its duplicated battery, installation and price-conversion fields are no longer authoritative for either GUI. Editing those duplicates does not change the shared runtime values. A future settings API should make deliberate, validated and persistent writes to the shared file; that write path is outside this phase.
+The configuration editor still writes `main/config/config.json` and now only contains web-only keys. Shared battery, installation and price-conversion values are edited in `common/config/system.json`. A future settings API should make deliberate, validated and persistent writes to the shared file; that write path is outside this phase.
 
 ## Edge cases and failure modes
 
@@ -54,7 +56,7 @@ The configuration editor still writes `main/config/config.json`. Its duplicated 
 - If both configurations fail, then both errors appear in the startup error page.
 - The timezone temporarily falls back to UTC only while constructing the error response when shared configuration cannot be loaded; no operational page is rendered in that state.
 - The active old-GUI page and its shared-setting PHP consumers are migrated. Raspberry Pi automation still reads its own configuration.
-- The old configuration editor can still alter duplicated shared-looking fields, but those edits no longer affect the GUI. This is intentional until a shared write API is designed.
+- The old configuration editor only alters web-only keys. Shared operational values are owned by `common/config/system.json`.
 - Invalid shared configuration makes migrated JSON endpoints fail closed instead of returning data calculated with old capacity, location or conversion defaults.
 - Cached energy payloads keep their measured history, but the response capacity is replaced with the current shared capacity before rendering percentages.
 

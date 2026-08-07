@@ -27,11 +27,17 @@ This file reflects the currently active schedule UI entrypoint:
 7. `battery.capacityWh` from `common/config/system.json`
 - Injected into JS as `BASE_WH`
 
-8. `minGridPower`
+8. `schedule.minPowerW` from `common/config/system.json`
 - Injected into JS as `GRID_MIN_POWER`
 
-9. `maxGridPower`
+9. `schedule.maxPowerW` from `common/config/system.json`
 - Injected into JS as `GRID_MAX_POWER`
+
+10. `schedule.powerStepW` from `common/config/system.json`
+- Injected into JS as `SCHEDULE_POWER_STEP_W`
+
+11. `battery.efficiency` from `common/config/system.json`
+- Injected into `PRICE_OVERVIEW_CONFIG` for battery estimates
 
 ## Related Proxy Endpoints (Config Used Server-Side)
 

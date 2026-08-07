@@ -951,7 +951,7 @@
         elements.batteryTargetMarker.dataset.active = model.mode === "charging" ? "true" : "false";
         elements.batteryMinLabel.textContent = `Minimum ${model.minimumPercent}%`;
         elements.batteryTargetLabel.textContent = `Maximum ${model.maximumPercent}%`;
-        elements.batterySimpleRange.textContent = `Operating range ${model.minimumPercent}%–${model.maximumPercent}%`;
+        elements.batterySimpleRange.textContent = `Within useable range ${model.minimumPercent}%–${model.maximumPercent}%`;
 
         const grid = gridCopy(model.gridPowerW);
         const gridValue = model.gridPowerW ?? 0;

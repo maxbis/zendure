@@ -407,8 +407,9 @@ function normalizeRules(array $rules): array
             }
         }
         if ($normalized['value'] === 'empty_at_solar_charge') {
-            $minimumTargetSoc = (float) ConfigLoader::get('MIN_CHARGE_LEVEL', 15);
-            $maximumTargetSoc = (float) ConfigLoader::get('MAX_CHARGE_LEVEL', 95);
+            $batteryLimits = loadSystemConfig()['battery'];
+            $minimumTargetSoc = (float) $batteryLimits['minChargePercent'];
+            $maximumTargetSoc = (float) $batteryLimits['maxChargePercent'];
             $targetSoc = isset($rule['target_soc_percent']) && is_numeric($rule['target_soc_percent'])
                 ? (float) $rule['target_soc_percent']
                 : null;

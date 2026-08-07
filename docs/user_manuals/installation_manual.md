@@ -351,12 +351,9 @@ For a normal installation, verify these settings in [`main/config/config.json`](
 - `chargeStatusApi` or `allApi`
 - `wh-per-hourApi`
 - `automationStatusApi`
-- `MIN_CHARGE_LEVEL`
-- `MAX_CHARGE_LEVEL`
-- `baseWh`
-- `minGridPower`
-- `maxGridPower`
 - `include_conditions`
+
+Verify battery, installation, forecast, schedule and price-conversion values in [`common/config/system.json`]([install_dir]/common/config/system.json).
 
 ### 3.9 What the schedule editor does
 
@@ -470,8 +467,6 @@ Main web config:
 
 Important keys to set:
 
-- `MIN_CHARGE_LEVEL`, `MAX_CHARGE_LEVEL`
-- `baseWh`, `minGridPower`, `maxGridPower`
 - `priceApiUrl`
 - `scheduleApiUrl`
 - `apiBaseUrlPiControl`
@@ -482,11 +477,6 @@ Important keys to set:
 
 ```json
 {
-  "MIN_CHARGE_LEVEL": 15,
-  "MAX_CHARGE_LEVEL": 96,
-  "baseWh": 5760,
-  "minGridPower": -800,
-  "maxGridPower": 800,
   "priceApiUrl": "http://localhost/zendure/main/prices/get_prices_v6.php",
   "scheduleApiUrl": "http://localhost/zendure/main/data/api/data_api.php?type=schedule&resolved=1",
   "apiBaseUrlPiControl": "http://YOUR_PI_OR_CONTROL_HOST:1611",

@@ -66,7 +66,8 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When live battery state is stale, then the tooltip reports that the forecast is unavailable instead of showing an outdated prediction.
 - When a schedule tooltip represents an hour that has already ended, then it does not display a battery forecast section.
 - When live battery state refreshes while a schedule tooltip is open, then its forecast content is rebuilt in place.
-- When target planning is unavailable or limited, then the tooltip reports `Calculation unavailable` or `Best effort` and shows the planner reason.
+- When target planning is unavailable or limited, then the tooltip reports `Calculation unavailable` or `Best effort` and shows the planner reason directly below the target values.
+- When tomorrow's prices exist but no NZ+ or charging-capable NZ± slot exists in the loaded schedule, then the tooltip explains that prices and the solar-charge anchor are independent inputs.
 - When the five-minute schedule-only refresh fails, then keep the last rendered schedule and allow the next refresh or manual reload to recover.
 
 ## Related files

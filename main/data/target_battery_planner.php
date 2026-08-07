@@ -200,7 +200,7 @@ function tbp_forecast_to_index(
 function tbp_slot_allows_solar_charge(array $slot): bool
 {
     $mode = tbp_normalize_mode($slot['value'] ?? null);
-    if ($mode === 'netzero+') {
+    if ($mode === 'netzero+' || $mode === TARGET_CHARGE_MODE) {
         return true;
     }
     if ($mode !== 'netzero') {
@@ -376,7 +376,7 @@ function tbp_materialize_horizon(
         : (float) $sharedConfig['battery']['efficiency'];
     $defaultMaxDischargeW = isset($options['max_discharge_power_w']) && is_numeric($options['max_discharge_power_w'])
         ? max(1, (int) $options['max_discharge_power_w'])
-        : (int) $sharedConfig['battery']['maxDischargePowerW'];
+        : abs((int) $sharedConfig['schedule']['minPowerW']);
 
     foreach ($flat as $targetIndex => &$entry) {
         if (($entry['slot']['value'] ?? null) !== TARGET_BATTERY_MODE) {
@@ -401,7 +401,7 @@ function tbp_materialize_horizon(
         }
         if ($anchorIndex === null) {
             $entry['slot']['value'] = $fallback;
-            $entry['slot']['planning'] = tbp_planning_metadata($entry, null, $targetPercent, 'unavailable', null, null, null, 'No future solar-capable net-zero start was found in the planning horizon.');
+            $entry['slot']['planning'] = tbp_planning_metadata($entry, null, $targetPercent, 'unavailable', null, null, null, 'No future NZ+ or charging-capable NZ± slot was found in the loaded schedule through tomorrow. Prices may still be available because price data does not define the solar-charge anchor.');
             continue;
         }
 
@@ -562,7 +562,7 @@ function tbp_materialize_horizon(
 
         $maximumPowerW = isset($options['max_charge_power_w']) && is_numeric($options['max_charge_power_w'])
             ? max(0, (int) $options['max_charge_power_w'])
-            : (int) $sharedConfig['battery']['maxChargePowerW'];
+            : (int) $sharedConfig['schedule']['maxPowerW'];
         $stepW = isset($options['charge_power_step_w']) && is_numeric($options['charge_power_step_w'])
             ? max(1, (int) $options['charge_power_step_w'])
             : (int) $sharedConfig['schedule']['powerStepW'];

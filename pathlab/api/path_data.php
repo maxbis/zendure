@@ -1,9 +1,11 @@
 <?php
 declare(strict_types=1);
 
-date_default_timezone_set('Europe/Amsterdam');
-
 require_once __DIR__ . '/../../main/includes/config_loader.php';
+require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
+
+$pathlabSystemConfig = loadSystemConfig();
+date_default_timezone_set($pathlabSystemConfig['installation']['timezone']);
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store, max-age=0');
@@ -32,9 +34,6 @@ const SOLAR_REFERENCE_CHARGE_W = 450.0;
 const MIN_VALID_ELECTRIC_LEVEL_HOURS = 20;
 const MIN_PARTIAL_ELECTRIC_LEVEL_HOURS = 12;
 const MIN_VALID_ACTIVITY_HOURS = 3;
-const DEFAULT_SHORTWAVE_LATITUDE = 52.3;
-const DEFAULT_SHORTWAVE_LONGITUDE = 4.863;
-const DEFAULT_SHORTWAVE_TIMEZONE = 'Europe/Amsterdam';
 const SHORTWAVE_CACHE_TTL_SECONDS = 7200;
 const PATHLAB_FETCH_TIMEOUT_SECONDS = 6;
 
@@ -56,11 +55,13 @@ function buildPathPayload(): array
     $targetLookbackDays = requestPositiveInt('lookback_days', DEFAULT_LOOKBACK_DAYS, 1, MAX_LOOKBACK_DAYS);
     $graphDays = requestPositiveInt('graph_days', DEFAULT_GRAPH_DAYS, 1, MAX_GRAPH_DAYS);
 
-    $baseWh = max(1, (int) ConfigLoader::get('baseWh', 5760));
-    $minChargeLevel = clampPercent((float) ConfigLoader::get('MIN_CHARGE_LEVEL', 15));
-    $maxChargeLevelRaw = clampPercent((float) ConfigLoader::get('MAX_CHARGE_LEVEL', 96));
+    global $pathlabSystemConfig;
+
+    $baseWh = max(1, (int) $pathlabSystemConfig['battery']['capacityWh']);
+    $minChargeLevel = clampPercent((float) $pathlabSystemConfig['battery']['minChargePercent']);
+    $maxChargeLevelRaw = clampPercent((float) $pathlabSystemConfig['battery']['maxChargePercent']);
     $maxChargeLevel = max($minChargeLevel, $maxChargeLevelRaw);
-    $efficiency = (float) ConfigLoader::get('popupPowerEfficiency', POPUP_POWER_EFFICIENCY_FALLBACK);
+    $efficiency = (float) $pathlabSystemConfig['battery']['efficiency'];
     if ($efficiency <= 0) {
         $efficiency = POPUP_POWER_EFFICIENCY_FALLBACK;
     }
@@ -290,9 +291,12 @@ function fetchJson(string $url, string $label, array &$errors): ?array
 
 function fetchShortwaveData(array &$errors): ?array
 {
-    $latitude = DEFAULT_SHORTWAVE_LATITUDE;
-    $longitude = DEFAULT_SHORTWAVE_LONGITUDE;
-    $timezone = DEFAULT_SHORTWAVE_TIMEZONE;
+    global $pathlabSystemConfig;
+
+    $installation = $pathlabSystemConfig['installation'];
+    $latitude = (float) $installation['latitude'];
+    $longitude = (float) $installation['longitude'];
+    $timezone = (string) $installation['timezone'];
     $cachePath = buildShortwaveCachePath($latitude, $longitude, $timezone);
     $cached = readShortwaveCache($cachePath);
 

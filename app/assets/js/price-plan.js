@@ -774,9 +774,10 @@
 
         const detail = document.createElement("p");
         detail.className = "app-schedule-tooltip__forecast-detail";
-        const anchor = planning.anchor_date && planning.anchor_time
-            ? `${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
-            : `No ${isChargeTarget ? "NZ−" : "solar charge"} in horizon`;
+        const hasAnchor = Boolean(planning.anchor_date && planning.anchor_time);
+        const anchor = hasAnchor
+            ? `${isChargeTarget ? "NZ−" : "Solar"} ${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
+            : `${isChargeTarget ? "NZ−" : "Solar-charge"} anchor not found`;
         const statuses = {
             achievable: "Target achievable",
             best_effort: "Best effort",
@@ -784,7 +785,7 @@
             unavailable: "Calculation unavailable",
             past: "Rule hour passed"
         };
-        const parts = [statuses[planning.status] || String(planning.status || "Planned"), `${isChargeTarget ? "NZ−" : "Solar"} ${anchor}`];
+        const parts = [statuses[planning.status] || String(planning.status || "Planned"), anchor];
         if (isChargeTarget && Number.isFinite(Number(planning.calculated_min_power_w))) {
             parts.push(`minimum ${formatWatts(Number(planning.calculated_min_power_w))}`);
         } else if (Number.isFinite(Number(planning.calculated_power_w))) {
@@ -794,13 +795,17 @@
             parts.push(`${Number(planning.remaining_eligible_hours).toFixed(2)} h remaining`);
         }
         detail.textContent = parts.join(" · ");
-        section.append(values, detail);
-        if (planning.reason) {
+        section.appendChild(values);
+        const reasonText = planning.reason || (planning.status === "unavailable"
+            ? "The planner did not return a detailed reason."
+            : "");
+        if (reasonText) {
             const reason = document.createElement("p");
-            reason.className = "app-schedule-tooltip__forecast-unavailable";
-            reason.textContent = planning.reason;
+            reason.className = "app-schedule-tooltip__forecast-unavailable app-schedule-tooltip__forecast-reason";
+            reason.textContent = `Reason: ${reasonText}`;
             section.appendChild(reason);
         }
+        section.appendChild(detail);
         return section;
     }
 

@@ -87,7 +87,7 @@ Required properties:
 
 - `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, indexed by local hour 0 through 23.
 
-This is the fallback usage model shared by forecast calculations. Defining it here does not yet migrate the JavaScript or PHP forecast consumers.
+This fallback usage model is consumed by the new-GUI JavaScript forecast and the PHP target-battery planner.
 
 ### Schedule
 
@@ -133,9 +133,10 @@ Current flow after both GUI integrations:
 5. The old GUI continues loading web-only settings from `main/config/config.json`.
 6. Existing automation continues loading `automate/config/config.jsonc`.
 7. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
-8. Both GUIs' active shared-setting frontend and PHP backend paths are migrated; web-only routing, ranges and display policies remain in `main/config/config.json`.
-9. The Python loader remains available but unused by automation.
-10. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
+8. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step.
+9. Web-only routing and display policies remain in `main/config/config.json`. Shared battery, installation and price-conversion fields have been removed from that file.
+10. The Python loader remains available but unused by automation.
+11. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
 
 Run the focused Phase 4 tests with:
 
@@ -165,7 +166,7 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When direct web access is not blocked by the active web server, then the current non-secret file could be downloadable; secrets must never be added.
 - When automation eventually switches to this file, then its maximum changes from its current persistent value to the intended shared 91%; that migration needs its own controlled test phase.
 - When automation eventually reads the shared power caps, then its existing 1200 W behavior should remain unchanged because the canonical values match its current persistent values.
-- When duplicated shared-looking fields are changed through the current old configuration editor, then neither GUI changes because `system.json` is authoritative for both interfaces.
+- When shared configuration is changed in `system.json`, then both GUIs pick up the new values through the PHP loader. The old configuration editor only edits web-only keys in `main/config/config.json`.
 
 ## Phase 3 acceptance criteria
 
@@ -193,7 +194,7 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 
 - [`main/includes/config_loader.php`](../../../main/includes/config_loader.php): old-GUI loader for remaining web-specific settings.
 - [`automate/config_loader.py`](../../../automate/config_loader.py): current automation JSONC loader.
-- [`main/config/config.json`](../../../main/config/config.json): current web-specific and remaining unmigrated legacy configuration source.
+- [`main/config/config.json`](../../../main/config/config.json): web-only configuration source for routes, proxies and old-GUI display policies.
 - [`automate/config/config.jsonc`](../../../automate/config/config.jsonc): current automation source.
 - [`main/includes/price_conversion.php`](../../../main/includes/price_conversion.php): common-backed PHP price-conversion consumer.
 - [`app/index.php`](../../../app/index.php): current new-interface configuration injection.

@@ -4,7 +4,7 @@
 
 The battery forecast module predicts the battery percentage at the start and end of every remaining schedule hour shown by the new GUI. It is a display-only model for the Prices & Energy Plan tooltip and never changes the automation schedule or sends battery commands.
 
-The initial household-usage profile is deliberately isolated behind one hourly array so a future usage-prediction API can replace the data source without replacing the forecast calculation.
+The initial household-usage profile and efficiency are injected from the shared system configuration so a future usage-prediction API can replace the data source without replacing the forecast calculation.
 
 The server-side target battery planner uses the same initial hourly assumptions when it materializes `empty_at_solar_charge`. Its `full_at_netzero_minus` mode deliberately uses live SoC and remaining matching duration without a forecast or efficiency factor. Both server-side modes are separate from this display-only JavaScript module.
 
@@ -28,8 +28,9 @@ The forecast receives:
 - The resolved schedule slots for today and tomorrow.
 - The current local date and time.
 - A household-usage value for each hour of the day.
+- The shared battery efficiency factor.
 
-`DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR` contains 24 frozen values:
+`forecast.defaultHouseholdUsageWByHour` in `common/config/system.json` contains 24 validated values:
 
 - When the hour starts from 00:00 through 07:00, then expected household usage is 100 W.
 - When the hour starts from 08:00 through 23:00, then expected household usage is 220 W.
@@ -47,7 +48,7 @@ The forecast receives:
 
 ## Flow and behavior
 
-1. Validate the live battery state, capacity, operating range, and 90% efficiency factor.
+1. Validate the live battery state, capacity, operating range, and shared efficiency factor.
 2. Start the running percentage at the latest live battery percentage.
 3. Skip schedule hours that have already ended.
 4. When processing the current hour, use only the minutes remaining until the next whole hour.
@@ -89,6 +90,7 @@ percentage change = (watts × hours × efficiency ÷ capacity Wh) × 100
 
 - When the live battery reading is missing or stale, then return no predictions and let the tooltip explain that the forecast is unavailable.
 - When capacity, operating limits, or efficiency are invalid, then return no predictions.
+- When the shared configuration is invalid, then the PHP entry point does not render the normal application.
 - When the battery is already at or below its configured minimum, then do not predict additional discharge.
 - When the battery is already at or above its configured maximum, then do not predict additional charge.
 - When a discharging primary rule reaches its lower battery threshold, then switch to the configured fallback for the remaining time; only a zero-power fallback keeps the prediction at the threshold.

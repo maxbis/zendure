@@ -118,4 +118,4 @@ kwh_price = average_price_eur_mwh / 1000
 consumer = (kwh_price + supplierMarkupEurPerKwh + energyTaxEurPerKwh) * vatMultiplier
 ```
 
-Conversion values are read from `main/config/config.json` under `priceConversion`.
+Conversion values are read from `common/config/system.json` under `priceConversion`.

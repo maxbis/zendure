@@ -477,8 +477,8 @@ function handleGetData($type) {
                 $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, [
                     'usage_w_by_hour' => $dataApiSystemConfig['forecast']['defaultHouseholdUsageWByHour'],
                     'efficiency' => $dataApiSystemConfig['battery']['efficiency'],
-                    'max_discharge_power_w' => $dataApiSystemConfig['battery']['maxDischargePowerW'],
-                    'max_charge_power_w' => $dataApiSystemConfig['battery']['maxChargePowerW'],
+                    'max_discharge_power_w' => abs($dataApiSystemConfig['schedule']['minPowerW']),
+                    'max_charge_power_w' => $dataApiSystemConfig['schedule']['maxPowerW'],
                     'charge_power_step_w' => $dataApiSystemConfig['schedule']['powerStepW'],
                 ]);
             }

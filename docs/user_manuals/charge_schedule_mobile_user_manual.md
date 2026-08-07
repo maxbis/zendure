@@ -100,7 +100,7 @@ Status and schedule-related UI refresh periodically through the page scripts.
 
 ## 7. Configuration Inputs
 
-The page loads core values from:
+The page loads deployment-specific values from:
 
 - `[install_dir]/main/config/config.json`
 
@@ -108,11 +108,10 @@ Used config includes (examples):
 
 - `scheduleApiUrl`
 - `priceApiUrl`
-- `MIN_CHARGE_LEVEL`
-- `MAX_CHARGE_LEVEL`
-- `baseWh`
-- `minGridPower`
-- `maxGridPower`
+
+Battery limits, capacity, forecast efficiency, schedule range and schedule step are loaded from:
+
+- `[install_dir]/common/config/system.json`
 
 ## 8. APIs Used By This Page
 

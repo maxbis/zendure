@@ -41,10 +41,10 @@ The planner reads:
 - The merged base and conditional schedule for today and tomorrow.
 - Current live battery percentage.
 - Shared capacity and minimum/maximum battery percentages.
-- The 90% forecast efficiency factor.
-- The default household-use profile of 100 W from 00:00 through 07:00 and 220 W from 08:00 through 23:00.
-- The installation discharge limit and optional rule-specific discharge cap.
-- The installation maximum charge power and a `100 W` charge-limit step.
+- Shared `battery.efficiency`.
+- Shared `forecast.defaultHouseholdUsageWByHour`.
+- Shared signed schedule range plus an optional rule-specific discharge cap.
+- Shared `schedule.powerStepW`.
 
 The schedule API prefers a fresh local Zendure snapshot. Remote live-status results are cached for 30 seconds in ignored runtime data so repeated schedule requests do not repeatedly call the controller.
 
@@ -65,7 +65,7 @@ The resolved charge-target slots replace the symbolic value with:
 
 1. Resolve the base schedule and merge conditional rules for today and tomorrow.
 2. Find slots whose source rule value is `empty_at_solar_charge`.
-3. Find the first later solar-capable net-zero slot. `netzero+` always qualifies; `netzero` qualifies unless its maximum power is zero or negative.
+3. Find the first later solar-capable net-zero slot. `netzero+` always qualifies; `netzero` qualifies unless its maximum power is zero or negative; `full_at_netzero_minus` qualifies because it materializes to NZ+ later in the same planning run.
 4. Forecast the baseline battery percentage at that solar-charge start.
 5. When the baseline is above the requested target, calculate the additional output energy needed.
 6. Convert that energy to fixed discharge watts for the target-rule interval.
@@ -80,7 +80,7 @@ For `full_at_netzero_minus`:
 3. Add their usable duration; for the current hour, count only remaining minutes.
 4. Calculate the energy difference between live SoC and the configured maximum battery percentage.
 5. Divide that energy by remaining eligible duration without applying a solar forecast, consumption forecast, or battery-efficiency factor.
-6. Round the calculated minimum upward to the next `100 W`.
+6. Round the calculated minimum upward using the shared schedule power step.
 7. Clamp the result to the configured maximum charge power.
 8. Materialize all remaining grouped slots as NZ+ with the same calculated minimum and maximum.
 9. Recalculate when the schedule API is fetched again. Automation normally fetches every five minutes.
@@ -93,6 +93,7 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 - When live battery percentage is unavailable, then emit the fallback and `unavailable` planning status.
 - When no future solar-capable net-zero slot exists within today and tomorrow, then emit the fallback and explain that the anchor is unavailable.
 - `netzero-` and `netzero` with `max_power <= 0` never qualify as solar-charge anchors.
+- When a future slot contains `full_at_netzero_minus`, then treat its start as solar-capable before the charge-target pass materializes it to NZ+.
 - When the baseline forecast is already at or below the target, then emit the fallback with `already_satisfied` status.
 - When the required discharge exceeds a power cap, then emit the capped fixed value and `best_effort` status.
 - When the target rule hour has ended, then emit the fallback with `past` status.
@@ -103,7 +104,8 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 - When the charge target is already satisfied, then emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.
 - When the calculated minimum exceeds the configured maximum charge power, then emit the maximum and report `best_effort`.
 - When matching target-charge hours are non-contiguous, then count only those matching slots as eligible duration.
-- When repeated requests occur between automation refreshes, then the `100 W` upward quantization prevents insignificant limit changes.
+- When repeated requests occur between automation refreshes, then the shared upward quantization prevents insignificant limit changes.
+- When shared configuration is missing or invalid, then the planner fails instead of using embedded efficiency, demand-profile, power-cap or step defaults.
 
 ## Related files
 

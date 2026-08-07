@@ -178,7 +178,7 @@ Meaning:
 - These are not automatically the controller's physical command caps.
 - The power step is the shared planning and editing increment; it does not require automation to change power in 100 W steps.
 
-The current key names `minGridPower` and `maxGridPower` are misleading because the same values are also used for battery schedule controls. Phase 3 should introduce clearer names while retaining compatibility mappings during migration.
+The former `minGridPower` and `maxGridPower` keys were removed from `main/config/config.json` after both GUIs and the PHP planner migrated to the clearer shared schedule properties.
 
 ### Automation command caps
 

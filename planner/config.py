@@ -4,9 +4,16 @@ import json
 import math
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+_COMMON_PYTHON_DIR = Path(__file__).resolve().parent.parent / "common" / "python"
+if str(_COMMON_PYTHON_DIR) not in sys.path:
+    sys.path.insert(0, str(_COMMON_PYTHON_DIR))
+
+from system_config import load_system_config  # noqa: E402
 
 
 TIMEZONE = "Europe/Amsterdam"
@@ -180,10 +187,7 @@ def _derive_shortwave_url(config: Dict[str, Any]) -> str:
     return "http://localhost/zendure/main/api/shortwave_radiation_api.php"
 
 
-def _load_price_conversion(config: Dict[str, Any]) -> PriceConversionConfig:
-    conversion = config.get("priceConversion")
-    if not isinstance(conversion, dict):
-        conversion = {}
+def _load_price_conversion(conversion: Dict[str, Any]) -> PriceConversionConfig:
     return PriceConversionConfig(
         supplier_markup_eur_per_kwh=_get_float(conversion.get("supplierMarkupEurPerKwh"), 0.0219),
         energy_tax_eur_per_kwh=_get_float(conversion.get("energyTaxEurPerKwh"), 0.0898),
@@ -213,10 +217,14 @@ def load_settings() -> PlannerSettings:
     repo_root = _repo_root()
     main_config_path = repo_root / "main" / "config" / "config.json"
     config = _load_json_file(main_config_path)
+    system_config = load_system_config(repo_root / "common" / "config" / "system.json")
+    battery = system_config["battery"]
+    installation = system_config["installation"]
+    schedule = system_config["schedule"]
     data_dir = repo_root / "planner" / "data"
     load_forecast_path = data_dir / LOAD_FORECAST_FILE_NAME
     default_load_forecast_template_path = data_dir / DEFAULT_LOAD_FORECAST_TEMPLATE_FILE_NAME
-    price_conversion = _load_price_conversion(config)
+    price_conversion = _load_price_conversion(system_config["priceConversion"])
 
     price_api_url = (
         os.getenv("PLANNER_PRICE_API_URL")
@@ -232,8 +240,8 @@ def load_settings() -> PlannerSettings:
         or _derive_shortwave_url(config)
     )
 
-    raw_min_grid = _get_int(config.get("minGridPower"), -1600)
-    raw_max_grid = _get_int(config.get("maxGridPower"), 1200)
+    raw_min_grid = _get_int(schedule.get("minPowerW"), -1600)
+    raw_max_grid = _get_int(schedule.get("maxPowerW"), 1600)
 
     return PlannerSettings(
         repo_root=repo_root,
@@ -241,7 +249,7 @@ def load_settings() -> PlannerSettings:
         load_forecast_path=load_forecast_path,
         default_load_forecast_template_path=default_load_forecast_template_path,
         main_config_path=main_config_path,
-        timezone=os.getenv("PLANNER_TIMEZONE", TIMEZONE),
+        timezone=os.getenv("PLANNER_TIMEZONE", installation["timezone"] or TIMEZONE),
         service_host=os.getenv("PLANNER_SERVICE_HOST", SERVICE_HOST),
         service_port=_get_int(os.getenv("PLANNER_SERVICE_PORT"), SERVICE_PORT),
         http_timeout_seconds=_get_int(
@@ -251,13 +259,13 @@ def load_settings() -> PlannerSettings:
         price_api_url=price_api_url,
         automation_all_api_url=automation_all_api_url,
         shortwave_api_url=shortwave_api_url,
-        latitude=_get_float(config.get("latitude"), 52.3676),
-        longitude=_get_float(config.get("longitude"), 4.9041),
-        base_wh=_get_float(config.get("baseWh"), 5760.0),
-        min_charge_level=max(0, min(100, _get_int(config.get("MIN_CHARGE_LEVEL"), 15))),
+        latitude=_get_float(installation.get("latitude"), 52.3676),
+        longitude=_get_float(installation.get("longitude"), 4.9041),
+        base_wh=_get_float(battery.get("capacityWh"), 5760.0),
+        min_charge_level=max(0, min(100, _get_int(battery.get("minChargePercent"), 15))),
         max_charge_level=max(
             0,
-            min(100, _get_int(config.get("MAX_CHARGE_LEVEL"), DEFAULT_MAX_CHARGE_LEVEL)),
+            min(100, _get_int(battery.get("maxChargePercent"), DEFAULT_MAX_CHARGE_LEVEL)),
         ),
         max_charge_power_w=max(0, raw_max_grid),
         max_discharge_power_w=max(0, abs(raw_min_grid)),
@@ -269,7 +277,10 @@ def load_settings() -> PlannerSettings:
             0.01,
             min(
                 1.0,
-                _get_float(os.getenv("PLANNER_ROUND_TRIP_EFFICIENCY"), ROUND_TRIP_EFFICIENCY),
+                _get_float(
+                    os.getenv("PLANNER_ROUND_TRIP_EFFICIENCY"),
+                    _get_float(battery.get("efficiency"), ROUND_TRIP_EFFICIENCY),
+                ),
             ),
         ),
         cheap_hour_tolerance_eur_per_kwh=_get_float(

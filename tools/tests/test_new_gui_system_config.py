@@ -16,7 +16,6 @@ APP_INDEX = REPO_ROOT / "app" / "index.php"
 CURRENT_ENERGY_STATUS = REPO_ROOT / "app" / "assets" / "js" / "current-energy-status.js"
 PRICE_PLAN = REPO_ROOT / "app" / "assets" / "js" / "price-plan.js"
 SYSTEM_CONFIG = REPO_ROOT / "common" / "config" / "system.json"
-MAIN_CONFIG = REPO_ROOT / "main" / "config" / "config.json"
 VALID_KEYS = REPO_ROOT / "login" / "validkeys.txt"
 
 
@@ -61,6 +60,8 @@ def test_new_gui_source_uses_common_loader_for_shared_values():
     assert "ConfigLoader::get('MIN_CHARGE_LEVEL'" not in source
     assert "ConfigLoader::get('MAX_CHARGE_LEVEL'" not in source
     assert "ConfigLoader::get('baseWh'" not in source
+    assert "ConfigLoader::get('minGridPower'" not in source
+    assert "ConfigLoader::get('maxGridPower'" not in source
 
 
 def test_new_gui_javascript_has_no_shared_value_fallbacks():
@@ -81,12 +82,15 @@ def test_new_gui_javascript_has_no_shared_value_fallbacks():
     assert "Number(conversion.supplierMarkupEurPerKwh) || 0" not in price_source
     assert "Number(conversion.energyTaxEurPerKwh) || 0" not in price_source
     assert "shared price-conversion settings are missing or invalid" in price_source
+    assert "DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR" not in (REPO_ROOT / "app" / "assets" / "js" / "battery-forecast.js").read_text(encoding="utf-8")
+    assert "POWER_EFFICIENCY" not in (REPO_ROOT / "app" / "assets" / "js" / "battery-forecast.js").read_text(encoding="utf-8")
+    assert "Number(config.powerMinW) ||" not in price_source
+    assert "Number(config.powerMaxW) ||" not in price_source
 
 
 @pytest.mark.skipif(not VALID_KEYS.is_file(), reason="Local authentication fixture is unavailable")
-def test_new_gui_injects_common_values_and_keeps_web_values_separate():
+def test_new_gui_injects_all_shared_forecast_and_schedule_values():
     shared = json.loads(SYSTEM_CONFIG.read_text(encoding="utf-8"))
-    web = json.loads(MAIN_CONFIG.read_text(encoding="utf-8"))
     html = _render_app()
     config = _injected_config(html)
 
@@ -96,8 +100,11 @@ def test_new_gui_injects_common_values_and_keeps_web_values_separate():
     assert config["capacityWh"] == shared["battery"]["capacityWh"] == 5760
     assert config["solarLocation"] == shared["installation"]
     assert config["priceConversion"] == shared["priceConversion"]
-    assert config["powerMinW"] == web["minGridPower"] == -1600
-    assert config["powerMaxW"] == web["maxGridPower"] == 1600
+    assert config["batteryEfficiency"] == shared["battery"]["efficiency"] == 0.9
+    assert config["forecastHouseholdUsageWByHour"] == shared["forecast"]["defaultHouseholdUsageWByHour"]
+    assert config["powerMinW"] == shared["schedule"]["minPowerW"] == -1600
+    assert config["powerMaxW"] == shared["schedule"]["maxPowerW"] == 1600
+    assert config["powerStepW"] == shared["schedule"]["powerStepW"] == 100
     assert config["solarEvents"]
 
 
@@ -114,6 +121,11 @@ def test_new_gui_shows_configuration_error_instead_of_shared_fallbacks(restore_s
     assert config["minChargePercent"] is None
     assert config["maxChargePercent"] is None
     assert config["capacityWh"] is None
+    assert config["batteryEfficiency"] is None
+    assert config["forecastHouseholdUsageWByHour"] is None
+    assert config["powerMinW"] is None
+    assert config["powerMaxW"] is None
+    assert config["powerStepW"] is None
     assert config["priceConversion"] is None
     assert config["solarLocation"] is None
     assert config["solarEvents"] == []

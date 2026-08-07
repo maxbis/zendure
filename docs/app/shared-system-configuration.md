@@ -24,6 +24,9 @@ The new GUI obtains these values from `common/config/system.json`:
 - Minimum state of charge.
 - Maximum state of charge.
 - Nominal battery capacity.
+- Battery forecast efficiency.
+- Default 24-hour household-usage forecast.
+- Signed schedule power range and power step.
 - Installation name.
 - Latitude and longitude.
 - Timezone.
@@ -33,7 +36,6 @@ The new GUI obtains these values from `common/config/system.json`:
 
 The new GUI continues to obtain these values from `main/config/config.json` through `ConfigLoader`:
 
-- Signed interface and schedule-editor power range.
 - Schedule API URL.
 - Price API URLs.
 - Other deployment-specific web endpoints.
@@ -51,7 +53,7 @@ The PHP services called by the new GUI now obtain these shared values from `syst
 - Energy-history endpoint: installation timezone and battery capacity.
 - Daily-report helpers used by live energy history: installation timezone, including the explicit timezone argument passed to Python report generators.
 
-The schedule data endpoint retains `include_conditions` in `main/config/config.json`. API URLs, signed editor power limits and Dutch electricity-market timezone rules also remain outside shared system configuration because they represent web deployment or market policy rather than installation facts.
+The schedule data endpoint retains `include_conditions` in `main/config/config.json`. API URLs and Dutch electricity-market timezone rules remain outside shared system configuration because they represent web deployment or market policy rather than installation facts. Forecast efficiency, household-use assumptions, signed schedule limits and the editor step now come from `system.json`.
 
 ## Flow and behaviour
 
@@ -84,7 +86,7 @@ The GUI does not silently return to the former 20%/90%, 5760 Wh, VAT 1.21 or har
 
 - When `system.json` is synchronized incompletely, then the strict loader rejects it and the GUI shows a configuration error.
 - When the configured timezone is unsupported, then the common loader rejects it before solar calculations run.
-- When web power limits differ from automation command caps, then the GUI continues to expose its existing web/editor range; this migration does not alter that behaviour.
+- When the shared schedule range differs from automation command caps, then the GUI exposes the shared schedule range while automation applies its separate safety cap.
 - When JavaScript is reused without the PHP entry point, then battery and price components report missing required shared settings instead of operating with embedded shared-value defaults.
 - When the common configuration changes, then the next PHP page request reads the new values because the loader does not cache across requests.
 

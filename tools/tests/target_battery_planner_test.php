@@ -92,6 +92,16 @@ $boundedBidirectionalDays[1]['items'][8] = ['time' => '0800', 'value' => 'netzer
 $boundedBidirectional = tbp_materialize_horizon($boundedBidirectionalDays, $battery, $now, ['max_discharge_power_w' => 1600]);
 plannerTestAssert($boundedBidirectional[0]['items'][20]['planning']['anchor_time'] === '0800', 'NZ± with a positive maximum must qualify as a solar-charge anchor.');
 
+$chargeTargetAnchorDays = plannerTestDays();
+$chargeTargetAnchorDays[1]['items'][8] = [
+    'time' => '0800',
+    'value' => TARGET_CHARGE_MODE,
+    'rule_id' => 'future-charge-target',
+];
+$chargeTargetAnchor = tbp_materialize_horizon($chargeTargetAnchorDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+plannerTestAssert($chargeTargetAnchor[0]['items'][20]['planning']['anchor_time'] === '0800', 'Target @ next NZ- must qualify as a solar-charge anchor before it materializes to NZ+.');
+plannerTestAssert($chargeTargetAnchor[1]['items'][8]['value'] === 'netzero+', 'Target @ next NZ- must still materialize to NZ+.');
+
 $dischargeOnlyDays = plannerTestDays();
 $dischargeOnlyDays[1]['items'][8] = ['time' => '0800', 'value' => 'netzero', 'max_power' => 0];
 $dischargeOnly = tbp_materialize_horizon($dischargeOnlyDays, $battery, $now);

@@ -2125,6 +2125,14 @@
     line-height: 1.4;
 }
 
+.app-schedule-tooltip__forecast-reason {
+    padding: 6px 7px;
+    background: color-mix(in srgb, var(--gsd-warning) 10%, transparent);
+    border-left: 2px solid var(--gsd-warning);
+    border-radius: 3px;
+    color: var(--gsd-text-secondary);
+}
+
 .app-price-legend {
     display: flex;
     flex-wrap: wrap;

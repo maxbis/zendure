@@ -2,10 +2,20 @@
 
 const assert = require("node:assert/strict");
 const {
-    DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR,
-    POWER_EFFICIENCY,
-    buildForecast
+    buildForecast: buildForecastWithSettings
 } = require("../../app/assets/js/battery-forecast.js");
+const SYSTEM_CONFIG = require("../../common/config/system.json");
+
+const HOUSEHOLD_USAGE = SYSTEM_CONFIG.forecast.defaultHouseholdUsageWByHour;
+const POWER_EFFICIENCY = SYSTEM_CONFIG.battery.efficiency;
+
+function buildForecast(options) {
+    return buildForecastWithSettings({
+        ...options,
+        householdUsageWByHour: HOUSEHOLD_USAGE,
+        efficiency: POWER_EFFICIENCY
+    });
+}
 
 const DATE = "20260805";
 const BATTERY = {
@@ -24,9 +34,8 @@ function near(actual, expected, tolerance = 0.000001) {
     assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} is not within ${tolerance} of ${expected}`);
 }
 
-assert.deepEqual(DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR.slice(0, 8), Array(8).fill(100));
-assert.deepEqual(DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR.slice(8), Array(16).fill(220));
-assert.equal(Object.isFrozen(DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR), true);
+assert.deepEqual(HOUSEHOLD_USAGE.slice(0, 8), Array(8).fill(100));
+assert.deepEqual(HOUSEHOLD_USAGE.slice(8), Array(16).fill(220));
 
 {
     const forecast = buildForecast({
