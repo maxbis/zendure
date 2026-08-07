@@ -190,7 +190,7 @@ date_default_timezone_set('Europe/Amsterdam');
         <p>When a rule contains runtime-only conditions such as <code>electricity_level</code>, its effective condition relation is forced to <code>AND</code>.</p>
         <p>When present, <code>min_power</code> and <code>max_power</code> are also exposed in resolved output for <code>netzero</code> / <code>netzero+</code> rules so the Python runtime can apply them.</p>
         <p class="muted"><code>fallback_value</code> does not have its own min/max fields.</p>
-        <p>For <code>full_at_netzero_minus</code>, the planner uses the live battery percentage without a solar forecast or efficiency factor. It divides the remaining energy across the rule's remaining matching slots, rounds the NZ+ minimum upward to 100 W, and clamps it to the configured maximum charge power. If planning is unavailable, the default fallback is unbounded <code>netzero+</code>.</p>
+        <p>For <code>full_at_netzero_minus</code>, the planner forecasts the complete remaining schedule from the live battery percentage through the next NZ- start. It includes fixed actions, household-use assumptions, runtime fallbacks, battery efficiency, and partial hours, then selects the lowest 100 W stepped NZ+ minimum whose anchor prediction reaches the configured maximum battery percentage. If planning is unavailable, the default fallback is unbounded <code>netzero+</code>.</p>
     </section>
 
     <section>

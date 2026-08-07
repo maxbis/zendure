@@ -805,12 +805,18 @@
         const resultLabel = document.createElement("span");
         const targetValue = document.createElement("strong");
         const resultValue = document.createElement("strong");
+        const predictedChargePercent = Number(planning.predicted_anchor_soc_percent);
+        const hasPredictedChargePercent = Number.isFinite(predictedChargePercent);
         targetLabel.textContent = isChargeTarget ? "Goal at NZ−" : "Goal at solar";
-        resultLabel.textContent = isChargeTarget ? "Current" : "Predicted";
+        resultLabel.textContent = isChargeTarget
+            ? (hasPredictedChargePercent ? "Predicted at NZ−" : "Planner input")
+            : "Predicted";
         targetValue.textContent = Number.isFinite(Number(planning.target_soc_percent))
             ? `${Number(planning.target_soc_percent).toFixed(1)}%`
             : "Unavailable";
-        const resultPercent = isChargeTarget ? planning.current_soc_percent : planning.predicted_anchor_soc_percent;
+        const resultPercent = isChargeTarget
+            ? (hasPredictedChargePercent ? predictedChargePercent : planning.current_soc_percent)
+            : planning.predicted_anchor_soc_percent;
         resultValue.textContent = Number.isFinite(Number(resultPercent))
             ? `${Number(resultPercent).toFixed(1)}%`
             : "Unavailable";
@@ -827,7 +833,7 @@
         const statuses = {
             achievable: "Target achievable",
             best_effort: "Best effort",
-            already_satisfied: isChargeTarget ? "Target already reached" : "No extra discharge needed",
+            already_satisfied: isChargeTarget ? "Target already forecast" : "No extra discharge needed",
             unavailable: "Calculation unavailable",
             past: "Rule hour passed"
         };
@@ -842,6 +848,24 @@
         }
         detail.textContent = parts.join(" · ");
         section.appendChild(values);
+        if (isChargeTarget) {
+            const forecastFacts = [];
+            if (Number.isFinite(Number(planning.current_soc_percent))) {
+                forecastFacts.push(`planner input ${Number(planning.current_soc_percent).toFixed(1)}%`);
+            }
+            if (Number.isFinite(Number(planning.predicted_start_soc_percent))) {
+                forecastFacts.push(`predicted first-slot start ${Number(planning.predicted_start_soc_percent).toFixed(1)}%`);
+            }
+            if (Number.isFinite(Number(planning.baseline_anchor_soc_percent))) {
+                forecastFacts.push(`without minimum ${Number(planning.baseline_anchor_soc_percent).toFixed(1)}% at NZ−`);
+            }
+            if (forecastFacts.length) {
+                const forecastContext = document.createElement("p");
+                forecastContext.className = "app-schedule-tooltip__forecast-detail";
+                forecastContext.textContent = forecastFacts.join(" · ");
+                section.appendChild(forecastContext);
+            }
+        }
         const reasonText = planning.reason || (planning.status === "unavailable"
             ? "The planner did not return a detailed reason."
             : "");

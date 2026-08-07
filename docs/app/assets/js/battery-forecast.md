@@ -6,7 +6,7 @@ The battery forecast module predicts the battery percentage at the start and end
 
 The initial household-usage profile and efficiency are injected from the shared system configuration so a future usage-prediction API can replace the data source without replacing the forecast calculation.
 
-The server-side target battery planner uses the same initial hourly assumptions when it materializes `empty_at_solar_charge`. Its `full_at_netzero_minus` mode deliberately uses live SoC and remaining matching duration without a forecast or efficiency factor. Both server-side modes are separate from this display-only JavaScript module.
+The server-side target battery planner uses the same initial hourly assumptions for both symbolic target modes. For `full_at_netzero_minus`, it forecasts the complete schedule with stepped charge candidates and selects the lowest minimum whose NZ- anchor prediction reaches the target. The PHP planner remains authoritative for automation, while this JavaScript module supplies the display-only per-hour estimate.
 
 ## Location
 

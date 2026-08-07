@@ -57,9 +57,9 @@ The resolved discharge-target slot replaces the symbolic value with:
 The resolved charge-target slots replace the symbolic value with:
 
 - `value: "netzero+"`.
-- A positive `min_power` calculated from live SoC and remaining matching duration.
+- A non-negative `min_power` selected by forecasting stepped candidates through the NZ- anchor.
 - The configured maximum charge power as `max_power`.
-- A `planning` object containing live SoC, target, next NZ- anchor, remaining eligible duration, calculated minimum, cap, status, and explanation.
+- A `planning` object containing live SoC, predicted first-slot SoC, baseline and planned anchor SoC, target, next NZ- anchor, remaining eligible duration, calculated minimum, cap, status, and explanation.
 
 ## Flow and behavior
 
@@ -78,13 +78,14 @@ For `full_at_netzero_minus`:
 1. Find the first future resolved NZ- slot.
 2. Group all remaining matching slots from the same rule before that anchor.
 3. Add their usable duration; for the current hour, count only remaining minutes.
-4. Calculate the energy difference between live SoC and the configured maximum battery percentage.
-5. Divide that energy by remaining eligible duration without applying a solar forecast, consumption forecast, or battery-efficiency factor.
-6. Round the calculated minimum upward using the shared schedule power step.
-7. Clamp the result to the configured maximum charge power.
-8. Materialize all remaining grouped slots as NZ+ with the same calculated minimum and maximum.
-9. Recalculate when the schedule API is fetched again. Automation normally fetches every five minutes.
-10. Emit status `achievable`, `best_effort`, `already_satisfied`, `unavailable`, or `past` in planning metadata.
+4. Forecast the complete schedule to the first matching slot and to the NZ- anchor with the target slots represented as NZ+ with a `0 W` minimum.
+5. Test charge minimums from the shared power step through the configured maximum, applying each candidate to every remaining matching slot.
+6. Forecast each candidate through the anchor using fixed actions, household-use assumptions, runtime fallbacks, battery efficiency, partial hours, and battery limits.
+7. Select the lowest candidate whose anchor prediction reaches the configured maximum battery percentage within tolerance.
+8. Use the configured maximum and report `best_effort` when no candidate reaches the target; use `0 W` when the baseline forecast already reaches it.
+9. Materialize all remaining grouped slots as NZ+ with the selected minimum and configured maximum.
+10. Recalculate when the schedule API is fetched again. Automation normally fetches every five minutes.
+11. Emit status `achievable`, `best_effort`, `already_satisfied`, `unavailable`, or `past` plus the forecast inputs and results in planning metadata.
 
 The current hour uses only its remaining minutes. Manual exact schedule entries continue to take priority over conditional rules during the merge.
 
@@ -101,7 +102,7 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 - When household usage differs from the fixed profile, then actual battery percentage can differ from the forecast.
 - When live battery percentage is unavailable for a charge target, then emit its configured fallback or unbounded NZ+ and report `unavailable`.
 - When no future NZ- exists within today and tomorrow, then emit the charge fallback and explain that the anchor is unavailable.
-- When the charge target is already satisfied, then emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.
+- When the baseline anchor forecast already reaches the charge target, emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.
 - When the calculated minimum exceeds the configured maximum charge power, then emit the maximum and report `best_effort`.
 - When matching target-charge hours are non-contiguous, then count only those matching slots as eligible duration.
 - When repeated requests occur between automation refreshes, then the shared upward quantization prevents insignificant limit changes.

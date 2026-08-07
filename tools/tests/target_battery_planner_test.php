@@ -70,6 +70,22 @@ $battery = [
     'maximum_percent' => 91.0,
 ];
 
+$forecastUsage = tbp_system_config()['forecast']['defaultHouseholdUsageWByHour'];
+$boundedChargePower = tbp_power_for_slot([
+    'value' => 'netzero+',
+    'min_power' => 800,
+    'max_power' => 1600,
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($boundedChargePower === 800.0, 'PHP forecast must apply a primary NZ+ minimum like the browser forecast.');
+$fallbackPower = tbp_power_for_slot([
+    'value' => 'netzero+',
+    'min_power' => 800,
+    'max_power' => 1600,
+    'runtime_conditions' => [['field' => 'electricity_level', 'op' => '<', 'value' => 50]],
+    'fallback_value' => 'netzero',
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($fallbackPower === -220.0, 'Runtime fallback forecast must not inherit the primary NZ+ limits.');
+
 $planned = tbp_materialize_horizon(plannerTestDays(), $battery, $now, ['max_discharge_power_w' => 1600]);
 $targetSlot = $planned[0]['items'][20];
 plannerTestAssert(is_int($targetSlot['value']), 'Target mode must materialize to integer watts.');
@@ -154,18 +170,20 @@ $chargePlanned = tbp_materialize_horizon(plannerChargeTestDays(), $chargeBattery
 foreach ([10, 11, 13] as $hour) {
     $slot = $chargePlanned[0]['items'][$hour];
     plannerTestAssert($slot['value'] === 'netzero+', 'Target charge slots must materialize to NZ+.');
-    plannerTestAssert($slot['min_power'] === 1000, 'Three eligible hours must share a 1000 W minimum.');
+    plannerTestAssert($slot['min_power'] === 1200, 'Forecast-based charging must include battery efficiency.');
     plannerTestAssert($slot['max_power'] === 1600, 'Configured maximum charge power must be emitted.');
     plannerTestAssert($slot['planning']['anchor_time'] === '1500', 'Expected the first future NZ- anchor.');
     plannerTestAssert($slot['planning']['remaining_eligible_hours'] === 3.0, 'Only matching rule slots may count as eligible time.');
+    plannerTestAssert($slot['planning']['baseline_anchor_soc_percent'] === 60.0, 'Baseline forecast must reach the anchor without forced target charging.');
+    plannerTestAssert($slot['planning']['predicted_anchor_soc_percent'] >= 89.75, 'Selected minimum must forecast within target tolerance.');
 }
 
 $partialChargeNow = new DateTimeImmutable('2026-08-05 10:30:00', $timezone);
 $partialCharge = tbp_materialize_horizon(plannerChargeTestDays(), $chargeBattery, $partialChargeNow, [
     'max_charge_power_w' => 1600,
 ]);
-plannerTestAssert($partialCharge[0]['items'][10]['min_power'] === 1200, 'Partial current hour must reduce remaining duration to 2.5 hours.');
-plannerTestAssert($partialCharge[0]['items'][11]['min_power'] === 1200, 'All remaining grouped slots must receive the recalculated minimum.');
+plannerTestAssert($partialCharge[0]['items'][10]['min_power'] === 1400, 'Partial current hour must reduce remaining duration to 2.5 hours.');
+plannerTestAssert($partialCharge[0]['items'][11]['min_power'] === 1400, 'All remaining grouped slots must receive the recalculated minimum.');
 
 $roundedBattery = $chargeBattery;
 $roundedBattery['percent'] = 70.0;
@@ -173,7 +191,7 @@ $roundedBattery['capacity_wh'] = 5760.0;
 $roundedCharge = tbp_materialize_horizon(plannerChargeTestDays(), $roundedBattery, $chargeNow, [
     'max_charge_power_w' => 1600,
 ]);
-plannerTestAssert($roundedCharge[0]['items'][10]['min_power'] === 400, 'Calculated charge minimum must round upward to the next 100 W.');
+plannerTestAssert($roundedCharge[0]['items'][10]['min_power'] === 500, 'Calculated charge minimum must round upward to the next effective 100 W step.');
 
 $fullBattery = $chargeBattery;
 $fullBattery['percent'] = 90.0;
@@ -203,5 +221,63 @@ $noMinusDays[0]['items'][15]['value'] = 0;
 $noMinus = tbp_materialize_horizon($noMinusDays, $chargeBattery, $chargeNow, ['max_charge_power_w' => 1600]);
 plannerTestAssert($noMinus[0]['items'][10]['value'] === 'netzero+', 'Missing NZ- must use safe NZ+ fallback.');
 plannerTestAssert($noMinus[0]['items'][10]['planning']['status'] === 'unavailable', 'Missing NZ- must report unavailable.');
+
+$forecastedDays = plannerChargeTestDays();
+$forecastedDays[0]['items'][9]['value'] = -1600;
+$forecastedDays[0]['items'][10]['value'] = -1000;
+foreach ([11, 12, 13, 14, 15] as $hour) {
+    $forecastedDays[0]['items'][$hour] = [
+        'time' => sprintf('%02d00', $hour),
+        'value' => TARGET_CHARGE_MODE,
+        'target_anchor' => TARGET_CHARGE_ANCHOR,
+        'rule_id' => 'rule-solar-cycle',
+        'rule_name' => 'Solar cycle',
+    ];
+}
+$forecastedDays[0]['items'][16]['value'] = 0;
+$forecastedDays[0]['items'][17]['value'] = 'netzero-';
+$forecastedBattery = [
+    'percent' => 72.0,
+    'capacity_wh' => 5760.0,
+    'minimum_percent' => 15.0,
+    'maximum_percent' => 91.0,
+];
+$forecastedNow = new DateTimeImmutable('2026-08-05 09:00:00', $timezone);
+$forecastedCharge = tbp_materialize_horizon($forecastedDays, $forecastedBattery, $forecastedNow, [
+    'max_charge_power_w' => 1600,
+]);
+$forecastedSlot = $forecastedCharge[0]['items'][11];
+plannerTestAssert($forecastedSlot['min_power'] === 900, 'Predicted start SoC must raise the five-hour minimum to 900 W.');
+plannerTestAssert(abs($forecastedSlot['planning']['predicted_start_soc_percent'] - 21.846) < 0.001, 'Planner must expose the forecast SoC at the first matching slot.');
+plannerTestAssert($forecastedSlot['planning']['baseline_anchor_soc_percent'] < 22.0, 'Baseline anchor forecast must include preceding scheduled discharge.');
+plannerTestAssert($forecastedSlot['planning']['predicted_anchor_soc_percent'] >= 90.75, 'Forecasted target charge must reach the NZ- goal.');
+plannerTestAssert($forecastedSlot['planning']['status'] === 'achievable', 'Forecasted target charge should be achievable at 900 W.');
+
+$interveningDays = plannerChargeTestDays();
+$interveningDays[0]['items'][12]['value'] = -500;
+$interveningCharge = tbp_materialize_horizon($interveningDays, $chargeBattery, $chargeNow, [
+    'max_charge_power_w' => 1600,
+]);
+plannerTestAssert($interveningCharge[0]['items'][10]['min_power'] === 1400, 'Intervening discharge between target slots must increase the selected minimum.');
+plannerTestAssert($interveningCharge[0]['items'][10]['planning']['predicted_anchor_soc_percent'] >= 89.75, 'Non-contiguous target slots must still forecast to the goal.');
+
+$fullThenDischargeDays = plannerChargeTestDays();
+$fullThenDischargeDays[0]['items'][12]['value'] = -500;
+$fullThenDischarge = tbp_materialize_horizon($fullThenDischargeDays, $fullBattery, $chargeNow, [
+    'max_charge_power_w' => 1600,
+]);
+plannerTestAssert($fullThenDischarge[0]['items'][10]['min_power'] > 0, 'A currently full battery must still charge when later schedule actions lower the anchor forecast.');
+plannerTestAssert($fullThenDischarge[0]['items'][10]['planning']['status'] === 'achievable', 'A recoverable future discharge must not be marked already satisfied.');
+
+$prechargedDays = plannerChargeTestDays();
+foreach ([6, 7, 8, 9] as $hour) {
+    $prechargedDays[0]['items'][$hour]['value'] = 1200;
+}
+$prechargedNow = new DateTimeImmutable('2026-08-05 06:00:00', $timezone);
+$precharged = tbp_materialize_horizon($prechargedDays, $chargeBattery, $prechargedNow, [
+    'max_charge_power_w' => 1600,
+]);
+plannerTestAssert($precharged[0]['items'][10]['min_power'] === 0, 'Preceding scheduled charge that reaches the target must avoid forced target charging.');
+plannerTestAssert($precharged[0]['items'][10]['planning']['status'] === 'already_satisfied', 'Anchor forecast at the target must be marked already satisfied.');
 
 echo "target battery planner: OK\n";

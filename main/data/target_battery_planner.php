@@ -123,17 +123,30 @@ function tbp_effective_value(array $slot, float $batteryPercent)
 
 function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
 {
+    $usesPrimaryValue = ($slot['value'] ?? null) !== TARGET_BATTERY_MODE;
+    $conditions = isset($slot['runtime_conditions']) && is_array($slot['runtime_conditions'])
+        ? $slot['runtime_conditions']
+        : [];
+    foreach ($conditions as $condition) {
+        if (is_array($condition) && !tbp_runtime_condition_matches($condition, $batteryPercent)) {
+            $usesPrimaryValue = false;
+            break;
+        }
+    }
     $value = tbp_effective_value($slot, $batteryPercent);
     if (is_numeric($value)) {
         return (float) $value;
     }
     $mode = tbp_normalize_mode($value);
-    if ($mode === 'netzero' || $mode === 'netzero-') {
-        $usage = isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
-            ? max(0.0, (float) $usageByHour[$hour])
-            : 0.0;
-        $power = -$usage;
-        if (($slot['value'] ?? null) !== TARGET_BATTERY_MODE) {
+    if (in_array($mode, ['netzero', 'netzero-', 'netzero+'], true)) {
+        $power = 0.0;
+        if ($mode !== 'netzero+') {
+            $usage = isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
+                ? max(0.0, (float) $usageByHour[$hour])
+                : 0.0;
+            $power = -$usage;
+        }
+        if ($usesPrimaryValue) {
             if (isset($slot['min_power']) && is_numeric($slot['min_power'])) {
                 $power = max($power, (float) $slot['min_power']);
             }
@@ -278,7 +291,8 @@ function tbp_target_charge_metadata(
     ?float $requiredEnergyWh = null,
     ?int $calculatedMinimumW = null,
     ?int $maximumPowerW = null,
-    ?string $reason = null
+    ?string $reason = null,
+    array $forecast = []
 ): array {
     $metadata = [
         'mode' => TARGET_CHARGE_MODE,
@@ -310,6 +324,19 @@ function tbp_target_charge_metadata(
     }
     if ($reason !== null) {
         $metadata['reason'] = $reason;
+    }
+    foreach ([
+        'predicted_start_soc_percent',
+        'baseline_anchor_soc_percent',
+        'predicted_anchor_soc_percent',
+        'efficiency',
+    ] as $field) {
+        if (isset($forecast[$field]) && is_numeric($forecast[$field])) {
+            $metadata[$field] = round((float) $forecast[$field], 3);
+        }
+    }
+    if (isset($forecast['calculated_at']) && is_string($forecast['calculated_at'])) {
+        $metadata['calculated_at'] = $forecast['calculated_at'];
     }
     return $metadata;
 }
@@ -566,21 +593,91 @@ function tbp_materialize_horizon(
         $stepW = isset($options['charge_power_step_w']) && is_numeric($options['charge_power_step_w'])
             ? max(1, (int) $options['charge_power_step_w'])
             : (int) $sharedConfig['schedule']['powerStepW'];
-        $remainingPercent = max(0.0, $targetPercent - $currentPercent);
-        $requiredEnergyWh = ($remainingPercent / 100.0) * (float) $battery['capacity_wh'];
-        $rawMinimumW = $requiredEnergyWh > 0 ? $requiredEnergyWh / $remainingDurationHours : 0.0;
-        $calculatedMinimumW = tbp_round_charge_minimum($rawMinimumW, $maximumPowerW, $stepW);
-        $status = $remainingPercent <= 0.05
-            ? 'already_satisfied'
-            : ($rawMinimumW <= $maximumPowerW ? 'achievable' : 'best_effort');
+        $candidateFlat = $flat;
+        foreach ($eligibleIndexes as $index) {
+            if (!array_key_exists('fallback_value', $candidateFlat[$index]['slot'])) {
+                $candidateFlat[$index]['slot']['fallback_value'] = tbp_fallback_value($candidateFlat[$index]['slot']);
+            }
+            $candidateFlat[$index]['slot']['value'] = 'netzero+';
+            $candidateFlat[$index]['slot']['min_power'] = 0;
+            $candidateFlat[$index]['slot']['max_power'] = $maximumPowerW;
+        }
+
+        $predictedStartPercent = tbp_forecast_to_index(
+            $candidateFlat,
+            $eligibleIndexes[0],
+            $now,
+            $battery,
+            $usageByHour,
+            $efficiency
+        );
+        $baselineAnchorPercent = tbp_forecast_to_index(
+            $candidateFlat,
+            $anchorIndex,
+            $now,
+            $battery,
+            $usageByHour,
+            $efficiency
+        );
+        $requiredEnergyWh = (max(0.0, $targetPercent - $baselineAnchorPercent) / 100.0)
+            * (float) $battery['capacity_wh'];
+        $targetTolerancePercent = isset($options['target_tolerance_percent']) && is_numeric($options['target_tolerance_percent'])
+            ? max(0.0, (float) $options['target_tolerance_percent'])
+            : 0.25;
+        $targetThresholdPercent = $targetPercent - $targetTolerancePercent;
+        $calculatedMinimumW = 0;
+        $predictedAnchorPercent = $baselineAnchorPercent;
+        $status = 'already_satisfied';
+
+        if ($baselineAnchorPercent < $targetThresholdPercent) {
+            $status = 'best_effort';
+            $candidates = [];
+            for ($candidateW = $stepW; $candidateW < $maximumPowerW; $candidateW += $stepW) {
+                $candidates[] = $candidateW;
+            }
+            if ($maximumPowerW > 0) {
+                $candidates[] = $maximumPowerW;
+            }
+
+            foreach (array_values(array_unique($candidates)) as $candidateW) {
+                foreach ($eligibleIndexes as $index) {
+                    $candidateFlat[$index]['slot']['min_power'] = $candidateW;
+                }
+                $candidatePrediction = tbp_forecast_to_index(
+                    $candidateFlat,
+                    $anchorIndex,
+                    $now,
+                    $battery,
+                    $usageByHour,
+                    $efficiency
+                );
+                $calculatedMinimumW = $candidateW;
+                $predictedAnchorPercent = $candidatePrediction;
+                if ($candidatePrediction >= $targetThresholdPercent) {
+                    $status = 'achievable';
+                    break;
+                }
+            }
+        }
+
         $reason = match ($status) {
-            'already_satisfied' => 'Live battery level already reached the configured maximum.',
-            'achievable' => 'Minimum charge power is distributed across all remaining matching slots before NZ-.',
-            default => 'Required charge power exceeds the configured maximum; maximum power is scheduled.',
+            'already_satisfied' => 'The full schedule forecast already reaches the target at NZ- without a forced charge minimum.',
+            'achievable' => 'The minimum is the lowest stepped charge power whose full schedule forecast reaches the target at NZ-.',
+            default => 'The full schedule forecast cannot reach the target at NZ- within the configured maximum charge power.',
         };
+        $forecastMetadata = [
+            'predicted_start_soc_percent' => $predictedStartPercent,
+            'baseline_anchor_soc_percent' => $baselineAnchorPercent,
+            'predicted_anchor_soc_percent' => $predictedAnchorPercent,
+            'efficiency' => $efficiency,
+            'calculated_at' => $now->format(DateTimeInterface::ATOM),
+        ];
 
         foreach ($eligibleIndexes as $index) {
             $slotEntry = &$flat[$index];
+            if (!array_key_exists('fallback_value', $slotEntry['slot'])) {
+                $slotEntry['slot']['fallback_value'] = tbp_fallback_value($slotEntry['slot']);
+            }
             $slotEntry['slot']['value'] = 'netzero+';
             $slotEntry['slot']['min_power'] = $calculatedMinimumW;
             $slotEntry['slot']['max_power'] = $maximumPowerW;
@@ -594,7 +691,8 @@ function tbp_materialize_horizon(
                 $requiredEnergyWh,
                 $calculatedMinimumW,
                 $maximumPowerW,
-                $reason
+                $reason,
+                $forecastMetadata
             );
             $flat[$index]['slot'] = $slotEntry['slot'];
             unset($slotEntry);
