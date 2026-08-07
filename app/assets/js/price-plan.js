@@ -597,10 +597,55 @@
         const tooltip = document.createElement("div");
         tooltip.id = "app-price-action-tooltip";
         tooltip.className = "app-schedule-tooltip";
-        tooltip.setAttribute("role", "tooltip");
+        tooltip.setAttribute("role", "dialog");
+        tooltip.setAttribute("aria-modal", "false");
         tooltip.hidden = true;
         document.body.appendChild(tooltip);
         return tooltip;
+    }
+
+    function eventInsidePriceTooltip(target) {
+        return target instanceof Node && priceTooltip.contains(target);
+    }
+
+    function createTooltipCloseButton() {
+        const button = document.createElement("button");
+        button.className = "gsd-icon-btn app-schedule-tooltip__close";
+        button.type = "button";
+        button.setAttribute("aria-label", "Close");
+        button.title = "Close";
+        button.dataset.gsdDialogClose = "";
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+        svg.classList.add("gsd-icon");
+        svg.setAttribute("aria-hidden", "true");
+        use.setAttribute("href", "../themes/graphite-signal-dark/assets/icons/sprite.svg#close");
+        svg.appendChild(use);
+        button.appendChild(svg);
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const trigger = activeTooltipTrigger;
+            hidePriceTooltip(trigger);
+            trigger?.focus?.({ preventScroll: true });
+        });
+        return button;
+    }
+
+    function createTooltipRule(slot, runtimeConditions, ruleColor) {
+        if (!(runtimeConditions || ["empty_at_solar_charge", "full_at_netzero_minus"].includes(slot?.planning?.mode))) {
+            return null;
+        }
+        const rule = document.createElement("span");
+        rule.className = "app-schedule-tooltip__rule";
+        if (ruleColor) rule.style.setProperty("--app-rule-color", ruleColor);
+        const dot = document.createElement("i");
+        dot.setAttribute("aria-hidden", "true");
+        rule.append(
+            dot,
+            document.createTextNode(slot?.rule_name ? `Rule: ${slot.rule_name}` : runtimeConditions ? "Runtime rule" : "Planned target")
+        );
+        return rule;
     }
 
     function hidePriceTooltip(trigger = null) {
@@ -617,6 +662,7 @@
         activeTooltipTrigger = null;
         activeScheduleTooltip = null;
         priceTooltip.hidden = true;
+        priceTooltip.removeAttribute("aria-labelledby");
         priceTooltip.style.removeProperty("left");
         priceTooltip.style.removeProperty("top");
         priceTooltip.style.removeProperty("visibility");
@@ -819,9 +865,12 @@
         const nextHour = (hour + 1) % 24;
         const header = document.createElement("div");
         header.className = "app-schedule-tooltip__header";
+        const heading = document.createElement("div");
+        heading.className = "app-schedule-tooltip__heading";
         const title = document.createElement("div");
         title.className = "app-schedule-tooltip__title";
         const time = document.createElement("strong");
+        time.id = "app-price-action-tooltip-title";
         time.textContent = `${pad(hour)}:00–${pad(nextHour)}:00`;
         const dayPrices = date === state.dates.tomorrow ? state.prices.tomorrow : state.prices.today;
         const hourPrice = numericValue(dayPrices && typeof dayPrices === "object" ? dayPrices[pad(hour)] : null);
@@ -829,19 +878,14 @@
         priceMeta.className = "app-schedule-tooltip__price";
         priceMeta.textContent = `Price (${formatPriceCents(hourPrice)} / ${formatPriceCents(spotPrice(hourPrice))})`;
         title.append(time, priceMeta);
-        header.appendChild(title);
+        heading.append(title, createTooltipCloseButton());
+        header.appendChild(heading);
 
         const runtimeConditions = formatRuntimeConditions(slot);
         const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
-        if (runtimeConditions || ["empty_at_solar_charge", "full_at_netzero_minus"].includes(slot?.planning?.mode)) {
-            const rule = document.createElement("span");
-            rule.className = "app-schedule-tooltip__rule";
-            if (ruleColor) rule.style.setProperty("--app-rule-color", ruleColor);
-            const dot = document.createElement("i");
-            dot.setAttribute("aria-hidden", "true");
-            rule.append(dot, document.createTextNode(slot?.rule_name ? `Rule: ${slot.rule_name}` : runtimeConditions ? "Runtime rule" : "Planned target"));
-            header.appendChild(rule);
-        }
+        const rule = createTooltipRule(slot, runtimeConditions, ruleColor);
+        if (rule) header.appendChild(rule);
+        priceTooltip.setAttribute("aria-labelledby", time.id);
 
         const content = document.createElement("div");
         content.className = "app-schedule-tooltip__content";
@@ -883,13 +927,18 @@
 
         const header = document.createElement("div");
         header.className = "app-schedule-tooltip__header";
+        const heading = document.createElement("div");
+        heading.className = "app-schedule-tooltip__heading";
         const period = document.createElement("strong");
+        period.id = "app-price-action-tooltip-title";
         period.textContent = detail.kind === "average"
             ? detail.tomorrowAverage
                 ? "Daily average prices"
                 : `Today average · ${detail.hourCount} hourly price${detail.hourCount === 1 ? "" : "s"}`
             : `${formatDate(detail.date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
-        header.appendChild(period);
+        heading.append(period, createTooltipCloseButton());
+        header.appendChild(heading);
+        priceTooltip.setAttribute("aria-labelledby", period.id);
 
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
@@ -1370,12 +1419,21 @@
                 if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, actionElement, actionElement);
             });
             actionElement.addEventListener("mouseleave", () => {
-                if (pinnedTooltipTrigger !== actionElement && document.activeElement !== actionElement) {
+                window.setTimeout(() => {
+                    if (pinnedTooltipTrigger === actionElement) return;
+                    if (document.activeElement === actionElement || eventInsidePriceTooltip(document.activeElement)) return;
+                    if (priceTooltip.matches(":hover")) return;
                     hidePriceTooltip(actionElement);
-                }
+                }, 80);
             });
             actionElement.addEventListener("focus", () => showPriceTooltip(tooltipDetail, actionElement, actionElement));
-            actionElement.addEventListener("blur", () => hidePriceTooltip(actionElement));
+            actionElement.addEventListener("blur", () => {
+                window.setTimeout(() => {
+                    if (pinnedTooltipTrigger === actionElement) return;
+                    if (eventInsidePriceTooltip(document.activeElement)) return;
+                    hidePriceTooltip(actionElement);
+                }, 0);
+            });
             actionElement.addEventListener("click", () => {
                 setSelectedHour(selectionKey);
                 if (pinnedTooltipTrigger === actionElement && activeTooltipTrigger === actionElement && !priceTooltip.hidden) {
@@ -1662,19 +1720,31 @@
             if (wasPinned) pinnedTooltipTrigger = openTooltip.trigger;
         }
     });
+    priceTooltip.addEventListener("mouseleave", () => {
+        if (pinnedTooltipTrigger || !activeTooltipTrigger) return;
+        if (document.activeElement === activeTooltipTrigger || eventInsidePriceTooltip(document.activeElement)) return;
+        hidePriceTooltip(activeTooltipTrigger);
+    });
     window.addEventListener("resize", () => {
         hidePriceTooltip();
         updateTimelineScrollButtons();
     });
     window.addEventListener("scroll", (event) => {
         if (isProgrammaticTimelineScroll && event.target === elements.scroll) return;
+        if (eventInsidePriceTooltip(event.target)) return;
         hidePriceTooltip();
     }, true);
-    document.addEventListener("touchmove", () => hidePriceTooltip(), {
+    document.addEventListener("touchmove", (event) => {
+        if (eventInsidePriceTooltip(event.target)) return;
+        hidePriceTooltip();
+    }, {
         capture: true,
         passive: true
     });
-    window.visualViewport?.addEventListener("scroll", () => hidePriceTooltip(), { passive: true });
+    window.visualViewport?.addEventListener("scroll", () => {
+        if (priceTooltip.hidden) return;
+        hidePriceTooltip();
+    }, { passive: true });
     elements.timeline.addEventListener("click", (event) => {
         if (event.target instanceof Element && !event.target.closest(".app-price-hour")) {
             setSelectedHour(null);
@@ -1682,7 +1752,8 @@
     });
     document.addEventListener("pointerdown", (event) => {
         if (!activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
-        if (!activeTooltipTrigger.contains(event.target)) hidePriceTooltip(activeTooltipTrigger);
+        if (activeTooltipTrigger.contains(event.target) || eventInsidePriceTooltip(event.target)) return;
+        hidePriceTooltip(activeTooltipTrigger);
     });
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;

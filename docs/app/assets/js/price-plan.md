@@ -41,14 +41,16 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 5. Activating a summary metric opens the shared price tooltip.
 6. Current, low, and high tooltips identify their specific date and hour and show consumer and derived spot prices.
 7. The Daily averages tooltip identifies how many hourly prices contributed and shows both the average consumer price and average derived spot price.
-8. Activating the same metric again, clicking outside it, scrolling, resizing, or pressing `Escape` closes the tooltip. Escape returns focus to the trigger.
-9. Build one battery forecast from the live percentage through the end of tomorrow whenever schedules render or live battery state refreshes.
-10. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
-11. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
-12. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
-13. When a slot was produced by the discharge-target planner, show the requested reserve at the next solar-capable net-zero slot, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
-14. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
-15. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
+8. Activating the same metric again, clicking outside it, scrolling the page (not the tooltip body), resizing, pressing `Escape`, or using the header close control closes the tooltip. Escape and close return focus to the trigger.
+9. Schedule and summary tooltips are interactive dialogs: they accept pointer events, keep a Graphite Signal Dark close control in the header, and scroll internally when content exceeds the viewport. Touch or scroll gestures inside the tooltip do not dismiss it.
+10. Schedule tooltip headers show the hour range and consumer/spot price with the close control on the first row, then the rule name (when present) left-aligned on the second row.
+11. Build one battery forecast from the live percentage through the end of tomorrow whenever schedules render or live battery state refreshes.
+12. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
+13. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
+14. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
+15. When a slot was produced by the discharge-target planner, show the requested reserve at the next solar-capable net-zero slot, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
+16. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
+17. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 
@@ -66,6 +68,7 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When live battery state is stale, then the tooltip reports that the forecast is unavailable instead of showing an outdated prediction.
 - When a schedule tooltip represents an hour that has already ended, then it does not display a battery forecast section.
 - When live battery state refreshes while a schedule tooltip is open, then its forecast content is rebuilt in place.
+- When the tooltip content is taller than the available viewport, then the body scrolls and page-level touchmove or scroll listeners do not close it.
 - When target planning is unavailable or limited, then the tooltip reports `Calculation unavailable` or `Best effort` and shows the planner reason directly below the target values.
 - When tomorrow's prices exist but no NZ+ or charging-capable NZ± slot exists in the loaded schedule, then the tooltip explains that prices and the solar-charge anchor are independent inputs.
 - When the five-minute schedule-only refresh fails, then keep the last rendered schedule and allow the next refresh or manual reload to recover.

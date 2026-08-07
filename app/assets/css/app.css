@@ -1909,14 +1909,18 @@
 .app-schedule-tooltip {
     position: fixed;
     z-index: 1200;
+    display: flex;
+    flex-direction: column;
     width: min(340px, calc(100vw - 24px));
+    max-height: min(70dvh, calc(100dvh - 24px));
     overflow: hidden;
     background: color-mix(in srgb, var(--gsd-surface-3) 96%, var(--gsd-page-deep));
     border: 1px solid var(--gsd-border-strong);
     border-radius: 10px;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
     color: var(--gsd-text);
-    pointer-events: none;
+    pointer-events: auto;
+    overscroll-behavior: contain;
 }
 
 .app-schedule-tooltip[hidden] {
@@ -1924,13 +1928,20 @@
 }
 
 .app-schedule-tooltip__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 9px 11px;
+    display: grid;
+    flex: 0 0 auto;
+    gap: 4px;
+    padding: 8px 8px 8px 11px;
     background: var(--gsd-surface-2);
     border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.app-schedule-tooltip__heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .app-schedule-tooltip__title {
@@ -1942,11 +1953,22 @@
     gap: 0.35em;
 }
 
-.app-schedule-tooltip__header > .app-schedule-tooltip__title > strong,
-.app-schedule-tooltip__header > strong {
-    flex: 0 0 auto;
+.app-schedule-tooltip__heading > .app-schedule-tooltip__title > strong,
+.app-schedule-tooltip__heading > strong {
+    min-width: 0;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
+}
+
+.app-schedule-tooltip__close {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.app-schedule-tooltip__close .gsd-icon {
+    width: 18px;
+    height: 18px;
 }
 
 .app-schedule-tooltip__price {
@@ -1960,9 +1982,11 @@
 .app-schedule-tooltip__rule {
     display: inline-flex;
     min-width: 0;
+    max-width: 100%;
     align-items: center;
     gap: 6px;
     overflow: hidden;
+    padding-right: 3px;
     color: var(--gsd-text-secondary);
     font-size: 0.62rem;
     font-weight: 700;
@@ -1976,6 +2000,16 @@
     flex: 0 0 auto;
     background: var(--app-rule-color, var(--gsd-border-strong));
     border-radius: 50%;
+}
+
+.app-schedule-tooltip__content,
+.app-price-summary-tooltip__prices {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .app-schedule-tooltip__content {
