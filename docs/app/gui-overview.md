@@ -46,7 +46,7 @@ Important inputs include:
 It presents:
 
 - current charge or discharge status, battery level, and grid exchange
-- battery Energy and Health details, including stored and usable energy, projected energy, controller and pack temperatures, pack charge levels, and Wi-Fi signal
+- battery Energy and Health details, including stored, usable, and chargeable energy, projected usable energy, controller and pack temperatures, pack charge levels, and Wi-Fi signal
 - prices and the current energy plan for today or tomorrow
 - four days of hourly battery energy history
 - charged, discharged, and net totals for the selected day

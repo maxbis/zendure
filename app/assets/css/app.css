@@ -74,6 +74,12 @@
     color: var(--gsd-positive);
 }
 
+.app-connection-badge[data-state="pending"] {
+    background: var(--gsd-info-soft);
+    border-color: color-mix(in srgb, var(--gsd-info) 38%, transparent);
+    color: var(--gsd-info);
+}
+
 .app-connection-badge[data-state="stale"],
 .app-connection-badge[data-state="loading"] {
     background: var(--gsd-warning-soft);
@@ -241,6 +247,29 @@
     white-space: nowrap;
 }
 
+/* Keep the Live control the same size as the non-button / time pills. */
+button.app-state-pill {
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    margin: 0;
+    height: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+button.app-state-pill:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: 2px;
+}
+
 .app-target-label {
     cursor: default;
 }
@@ -268,13 +297,18 @@
 .app-battery-popover {
     position: fixed;
     z-index: 1200;
+    display: flex;
+    flex-direction: column;
     width: min(310px, calc(100vw - 24px));
+    max-height: min(70dvh, calc(100dvh - 24px));
     overflow: hidden;
     background: color-mix(in srgb, var(--gsd-surface-3) 96%, var(--gsd-page-deep));
     border: 1px solid var(--gsd-border-strong);
     border-radius: 10px;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
     color: var(--gsd-text);
+    pointer-events: auto;
+    overscroll-behavior: contain;
 }
 
 .app-battery-popover[hidden] {
@@ -283,43 +317,55 @@
 
 .app-battery-popover__header {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 9px 11px;
+    gap: 8px;
+    padding: 8px 8px 8px 11px;
     background: var(--gsd-surface-2);
     border-bottom: 1px solid var(--gsd-border-subtle);
 }
 
 .app-battery-popover__header strong {
+    min-width: 0;
     font-size: 0.75rem;
 }
 
-.app-battery-popover__navigation {
-    display: inline-flex;
+.app-battery-popover__close {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.app-battery-popover__close .gsd-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.app-battery-popover__footer {
+    display: flex;
+    flex: 0 0 auto;
     align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 6px 8px 8px;
+    background: var(--gsd-surface-2);
+    border-top: 1px solid var(--gsd-border-subtle);
+}
+
+.app-battery-popover__navigation {
+    min-width: 0;
+    min-height: 32px;
     gap: 3px;
-    min-height: 28px;
-    appearance: none;
-    padding: 3px 6px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    padding: 0 10px;
     color: var(--gsd-accent);
-    cursor: pointer;
-    font: inherit;
     font-size: 0.68rem;
     font-weight: 700;
 }
 
-.app-battery-popover__navigation:hover {
-    background: var(--gsd-accent-soft);
-    border-color: color-mix(in srgb, var(--gsd-accent) 30%, transparent);
-}
-
+.app-battery-popover__navigation:hover,
 .app-battery-popover__navigation:focus-visible {
-    outline: 2px solid var(--gsd-accent);
-    outline-offset: 1px;
+    color: var(--gsd-accent);
 }
 
 .app-battery-popover__navigation .gsd-icon {
@@ -328,7 +374,12 @@
 }
 
 .app-battery-popover__viewport {
-    overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .app-battery-popover__slider {
@@ -384,10 +435,52 @@
     color: var(--gsd-warning);
 }
 
+/* Live matches qool: default neutral pill (no green resting state). */
+.app-state-pill[data-state="live"] {
+    background: var(--gsd-surface-3);
+    border-color: var(--gsd-border);
+    color: var(--gsd-text-secondary);
+}
+
+.app-state-pill[data-state="pending"] {
+    background: var(--gsd-info-soft);
+    border-color: color-mix(in srgb, var(--gsd-info) 38%, transparent);
+    color: var(--gsd-info);
+}
+
 .app-state-pill[data-state="stale"] {
     background: var(--gsd-warning-soft);
     border-color: color-mix(in srgb, var(--gsd-warning) 38%, transparent);
     color: var(--gsd-warning);
+}
+
+.app-state-pill[data-state="offline"] {
+    background: var(--gsd-negative-soft);
+    border-color: color-mix(in srgb, var(--gsd-negative) 38%, transparent);
+    color: var(--gsd-negative);
+}
+
+/* Tick enter is quick; removing --tick fades color/scale back via the base transition. */
+.app-power-hero .app-state-pill {
+    transform-origin: center center;
+    transition:
+        transform 420ms ease,
+        background-color 420ms ease,
+        border-color 420ms ease,
+        color 420ms ease,
+        box-shadow 420ms ease;
+}
+
+.app-state-pill.app-state-pill--tick {
+    transform: scale(1.14);
+    background: color-mix(in srgb, var(--gsd-positive) 42%, var(--gsd-positive-soft)) !important;
+    border-color: var(--gsd-positive) !important;
+    color: color-mix(in srgb, var(--gsd-positive) 72%, white) !important;
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--gsd-positive) 50%, transparent),
+        0 0 14px color-mix(in srgb, var(--gsd-positive) 40%, transparent);
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
 }
 
 .app-power-reading {
@@ -787,6 +880,48 @@
     border: 0;
 }
 
+.app-power-hero.fast-refresh-active .app-power-card__face {
+    border-color: var(--gsd-info);
+    animation: app-fast-border-breathe 2.4s ease-in-out infinite;
+}
+
+.app-power-hero.fast-refresh-active .app-eyebrow__dot {
+    animation: app-fast-indicator-breathe 2.4s ease-in-out infinite;
+}
+
+.app-power-hero.power-pending .app-flow__fill,
+.app-power-hero.power-pending .app-power-flow-icon__segment[data-active="true"] {
+    opacity: 0.35;
+}
+
+@keyframes app-fast-border-breathe {
+    0%,
+    100% {
+        border-color: color-mix(in srgb, var(--gsd-info) 55%, var(--gsd-border-subtle));
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--gsd-info) 10%, transparent);
+    }
+    50% {
+        border-color: var(--gsd-info);
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--gsd-info) 28%, transparent),
+            0 0 12px color-mix(in srgb, var(--gsd-info) 22%, transparent);
+    }
+}
+
+@keyframes app-fast-indicator-breathe {
+    0%,
+    100% {
+        opacity: 0.85;
+        transform: scale(1);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--app-mode-color, var(--gsd-info)) 40%, transparent);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+        box-shadow: 0 0 16px color-mix(in srgb, var(--gsd-info) 55%, transparent);
+    }
+}
+
 .app-power-card__inner {
     position: relative;
     min-height: 100%;
@@ -827,6 +962,29 @@
 .app-power-view-toggle {
     appearance: none;
     cursor: pointer;
+}
+
+/* Keep the mode row one line tall; truncate long labels instead of wrapping. */
+.app-power-hero .app-compact-stat__top,
+.app-power-hero .app-power-simple__top {
+    align-items: center;
+}
+
+.app-power-hero .app-compact-stat__label {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.app-power-hero .app-compact-stat__label > span:not(.app-eyebrow__dot) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-power-hero .app-state-pill {
+    flex-shrink: 0;
 }
 
 .app-power-flow-display {
@@ -3296,6 +3454,14 @@
         font-size: 0.64rem;
     }
 
+    button.app-state-pill {
+        height: 23px;
+        min-height: 23px;
+        max-height: 23px;
+        padding: 0 7px;
+        font-size: 0.64rem;
+    }
+
     .app-power-simple__value,
     .app-grid-simple__value,
     .app-battery-card .app-battery-simple__percent {
@@ -3720,7 +3886,19 @@
     .app-grid-flow-icon__segment[data-active="true"],
     .app-grid-flow-icon__segment[data-active="true"] .gsd-icon,
     .app-refresh[aria-busy="true"] .gsd-icon,
-    .app-loading-orb {
+    .app-loading-orb,
+    .app-power-hero.fast-refresh-active .app-eyebrow__dot,
+    .app-power-hero.fast-refresh-active .app-power-card__face {
         animation: none;
+    }
+
+    .app-power-hero.fast-refresh-active .app-power-card__face {
+        border-color: var(--gsd-info);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--gsd-info) 14%, transparent);
+    }
+
+    .app-power-hero .app-state-pill,
+    .app-state-pill.app-state-pill--tick {
+        transition: none;
     }
 }

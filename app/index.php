@@ -86,9 +86,14 @@ function buildAppSolarEvents(array $location): array
 
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
+    'automationStatusUrl' => '../main/api/automation_status_proxy.php?type=all&limit=20',
     'refreshIntervalMs' => 20000,
+    'boostRefreshIntervalMs' => 5100,
+    'boostTickCount' => 8,
     'scheduleDisplayRefreshMs' => 300000,
     'staleAfterMs' => 90000,
+    'pendingWindowSeconds' => 35,
+    'pendingMatchToleranceW' => 50,
     'minChargePercent' => $systemConfig['battery']['minChargePercent'] ?? null,
     'maxChargePercent' => $systemConfig['battery']['maxChargePercent'] ?? null,
     'capacityWh' => $systemConfig['battery']['capacityWh'] ?? null,
@@ -236,7 +241,14 @@ $appConfig = [
                                 <span class="app-eyebrow__dot" data-role="mode-dot" aria-hidden="true"></span>
                                 <span data-role="mode-label">Standby</span>
                             </button>
-                            <span class="app-state-pill" data-role="freshness-label">Live</span>
+                            <button
+                                class="app-state-pill"
+                                type="button"
+                                data-role="freshness-label"
+                                aria-label="Start fast status refresh"
+                            >
+                                Live
+                            </button>
                         </div>
 
                         <div class="app-compact-stat__reading app-power-reading">
@@ -291,7 +303,15 @@ $appConfig = [
                                         <span class="app-eyebrow__dot" aria-hidden="true"></span>
                                         <span data-role="power-simple-mode">Standby</span>
                                     </button>
-                                    <span class="app-state-pill" data-role="power-simple-freshness">Live</span>
+                                    <button
+                                        class="app-state-pill"
+                                        type="button"
+                                        data-role="power-simple-freshness"
+                                        aria-label="Start fast status refresh"
+                                        tabindex="-1"
+                                    >
+                                        Live
+                                    </button>
                                 </span>
                                 <span class="app-power-simple__content">
                                     <strong class="app-power-simple__value" data-role="power-simple-value">0 <span class="app-simple-value__unit">W</span></strong>

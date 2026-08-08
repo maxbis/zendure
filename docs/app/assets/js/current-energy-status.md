@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The new GUI's current-energy-status component retrieves live controller data and presents the current battery, power-flow, and grid state. Its battery detail dialog provides separate Energy and Health views without leaving the monitoring page.
+The new GUI's current-energy-status component retrieves live controller data and presents the current battery, power-flow, and grid state. Its battery detail dialog provides separate Energy and Health views (footer navigation) without leaving the monitoring page.
 
 This document focuses on the battery detail interaction and its live-data contract. The new GUI remains a read-only consumer of controller status.
 
@@ -33,6 +33,7 @@ The component also uses the configured battery capacity and minimum and maximum 
 
 - Total stored energy in kWh.
 - Usable energy above the configured minimum charge percentage.
+- Chargeable energy in kWh: remaining energy that can still be charged up to the configured maximum charge percentage.
 - Projected usable energy and usable-range percentage at the next whole hour.
 
 After each successful render, the component publishes `graphite:battery-forecast-state`. The event detail and `window.GRAPHITE_BATTERY_FORECAST_STATE` snapshot contain the live battery percentage, capacity, operating limits, reading timestamp, and stale state. The Prices & Energy Plan consumes this read-only snapshot for its chained hourly forecast.
@@ -56,21 +57,24 @@ With a 1200 W directional limit, an active flow below 60 W therefore shows one c
 4. When an overall battery percentage is available, the battery icon becomes a battery-detail trigger.
 5. When a remaining charging or discharging time can be calculated, the detailed and simplified target labels also become triggers.
 6. Activating a trigger opens the non-modal dialog on its Energy view.
-7. The Energy view shows total stored energy, usable energy, battery rate, and projected energy at the next whole hour.
-8. Activating **Health** slides to the Health view.
-9. The Health view shows controller temperature, each reported battery pack's percentage and temperature, and controller Wi-Fi signal.
-10. Activating **Energy** returns to the Energy view.
-11. When live status refreshes while the dialog is open, the dialog is rebuilt with current values and keeps the selected Energy or Health view.
-12. Publish the normalized battery state so the Prices & Energy Plan can rebuild its display-only hourly forecast.
+7. The dialog header shows the current view title and a Graphite Signal Dark close control.
+8. The Energy view shows total stored energy, usable energy, chargeable energy, battery power, and projected usable energy at the next whole hour.
+9. Activating **Health** in the footer slides to the Health view.
+10. The Health view shows controller temperature, each reported battery pack's percentage and temperature, and controller Wi-Fi signal.
+11. Activating **Energy** in the footer returns to the Energy view.
+12. When live status refreshes while the dialog is open, the dialog is rebuilt with current values and keeps the selected Energy or Health view.
+13. Publish the normalized battery state so the Prices & Energy Plan can rebuild its display-only hourly forecast.
 
-The dialog is positioned below its trigger when space permits. It moves above the trigger when it would otherwise extend beyond the bottom of the viewport, and its horizontal position is constrained to the viewport.
+The dialog is positioned below its trigger when space permits. It moves above the trigger when it would otherwise extend beyond the bottom of the viewport, and its horizontal position is constrained to the viewport. When content exceeds the available viewport height, the body scrolls internally.
 
 ### Closing the dialog
 
 - Activating the same trigger again closes the dialog.
+- Activating the header close control closes the dialog and returns focus to the trigger.
 - Clicking or tapping outside both the trigger and dialog closes it.
 - Pressing `Escape` closes it and returns focus to the trigger.
-- Scrolling or resizing the window closes it.
+- Scrolling or touching outside the dialog, or resizing the window, closes it.
+- Touch or scroll gestures inside the dialog do not close it.
 
 ### Accessibility
 
@@ -78,7 +82,7 @@ The dialog is positioned below its trigger when space permits. It moves above th
 - Triggers expose `aria-controls`, `aria-haspopup="dialog"`, and their expanded state.
 - The current dialog title labels the dialog.
 - The inactive Energy or Health panel is marked `aria-hidden="true"`.
-- The Energy/Health navigation is a native button with a view-specific accessible label.
+- The Energy/Health navigation lives in the footer as a quiet Graphite Signal Dark button with a view-specific accessible label.
 - When reduced motion is requested, the sliding transition is disabled with the rest of the component animations.
 
 ## Edge cases and failure modes

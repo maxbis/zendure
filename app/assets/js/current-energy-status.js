@@ -3,8 +3,13 @@
 
     const config = Object.freeze({
         statusUrl: "../main/api/charge_status_all_proxy.php",
+        automationStatusUrl: "../main/api/automation_status_proxy.php?type=all&limit=20",
         refreshIntervalMs: 20000,
+        boostRefreshIntervalMs: 5100,
+        boostTickCount: 8,
         staleAfterMs: 90000,
+        pendingWindowSeconds: 35,
+        pendingMatchToleranceW: 50,
         powerMinW: -1200,
         powerMaxW: 1200,
         ...(window.GRAPHITE_APP_CONFIG || {})
@@ -90,6 +95,12 @@
     let hasRenderedData = false;
     let latestModel = null;
     let currentPriceEurPerKwh = null;
+    let remainingBoostTicks = 0;
+    let activeRefreshIntervalMs = Math.max(1000, Number(config.refreshIntervalMs) || 20000);
+    const boostRefreshIntervalMs = Math.max(1000, Number(config.boostRefreshIntervalMs) || 5100);
+    const boostTickCount = Math.max(1, Math.floor(Number(config.boostTickCount) || 8));
+    const pendingWindowSeconds = Math.max(1, Number(config.pendingWindowSeconds) || 35);
+    const pendingMatchToleranceW = Math.max(0, Number(config.pendingMatchToleranceW) || 50);
     const batteryPopoverDetails = new Map();
     let activeBatteryPopoverTrigger = null;
     let activeBatteryPopoverView = "energy";
@@ -332,9 +343,11 @@
 
     function batteryEnergyValues(model, batteryPercent = model.batteryPercent) {
         if (!Number.isFinite(batteryPercent)) return null;
-        const storedKwh = (batteryPercent / 100) * (model.capacityWh / 1000);
-        const usableKwh = Math.max(0, ((batteryPercent - model.minimumPercent) / 100) * (model.capacityWh / 1000));
-        return { storedKwh, usableKwh };
+        const capacityKwh = model.capacityWh / 1000;
+        const storedKwh = (batteryPercent / 100) * capacityKwh;
+        const usableKwh = Math.max(0, ((batteryPercent - model.minimumPercent) / 100) * capacityKwh);
+        const emptyKwh = Math.max(0, ((model.maximumPercent - batteryPercent) / 100) * capacityKwh);
+        return { storedKwh, usableKwh, emptyKwh };
     }
 
     function batteryHealthValues(model) {
@@ -365,6 +378,34 @@
             usablePercent: usableBatteryPercent(projectedPercent, model.minimumPercent, model.maximumPercent),
             time: `${String(nextHour.getHours()).padStart(2, "0")}:00`
         };
+    }
+
+    function eventInsideBatteryPopover(target) {
+        return target instanceof Node && batteryPopover.contains(target);
+    }
+
+    function createBatteryPopoverCloseButton() {
+        const button = document.createElement("button");
+        button.className = "gsd-icon-btn app-battery-popover__close";
+        button.type = "button";
+        button.setAttribute("aria-label", "Close");
+        button.title = "Close";
+        button.dataset.gsdDialogClose = "";
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+        svg.classList.add("gsd-icon");
+        svg.setAttribute("aria-hidden", "true");
+        use.setAttribute("href", "../themes/graphite-signal-dark/assets/icons/sprite.svg#close");
+        svg.appendChild(use);
+        button.appendChild(svg);
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const trigger = activeBatteryPopoverTrigger;
+            hideBatteryPopover(trigger);
+            trigger?.focus?.({ preventScroll: true });
+        });
+        return button;
     }
 
     function hideBatteryPopover(trigger = null) {
@@ -422,10 +463,7 @@
         header.className = "app-battery-popover__header";
         const title = document.createElement("strong");
         title.id = "app-battery-popover-title";
-        const navigation = document.createElement("button");
-        navigation.className = "app-battery-popover__navigation";
-        navigation.type = "button";
-        header.append(title, navigation);
+        header.append(title, createBatteryPopoverCloseButton());
 
         const viewport = document.createElement("div");
         viewport.className = "app-battery-popover__viewport";
@@ -438,9 +476,10 @@
         appendBatteryPopoverRows(energyDetails, [
             ["Total stored energy", formatKwh(detail.storedKwh)],
             ["Usable energy", formatKwh(detail.usableKwh)],
-            ["Battery rate", detail.rate],
+            ["Chargeable energy", formatKwh(detail.emptyKwh)],
+            ["Battery power", detail.rate],
             [
-                `Energy @ ${detail.projectionTime}`,
+                `Usable energy @ ${detail.projectionTime}`,
                 `${formatKwh(detail.projectedUsableKwh)} (${Math.round(detail.projectedUsablePercent)}%)`
             ]
         ]);
@@ -461,6 +500,13 @@
 
         slider.append(energyDetails, healthDetails);
         viewport.appendChild(slider);
+
+        const footer = document.createElement("div");
+        footer.className = "app-battery-popover__footer";
+        const navigation = document.createElement("button");
+        navigation.className = "gsd-btn gsd-btn--quiet app-battery-popover__navigation";
+        navigation.type = "button";
+        footer.appendChild(navigation);
 
         function setPopoverView(view) {
             activeBatteryPopoverView = view === "health" ? "health" : "energy";
@@ -489,7 +535,7 @@
             setPopoverView(activeBatteryPopoverView === "energy" ? "health" : "energy");
         });
 
-        batteryPopover.replaceChildren(header, viewport);
+        batteryPopover.replaceChildren(header, viewport, footer);
         batteryPopover.setAttribute("aria-labelledby", title.id);
         setPopoverView(activeBatteryPopoverView);
         batteryPopover.hidden = false;
@@ -559,6 +605,10 @@
         const packData = Array.isArray(readings.packData) ? readings.packData : [];
         const p1Readings = payload?.p1?.readings || payload?.p1?.data || null;
         const powerW = calculateBatteryPower(properties);
+        const acMode = finiteNumber(properties.acMode, 0);
+        const inputLimit = finiteNumber(properties.inputLimit, 0);
+        const outputLimit = finiteNumber(properties.outputLimit, 0);
+        const deviceCommandedW = inputLimit > 0 ? inputLimit : (outputLimit > 0 ? -outputLimit : 0);
         const batteryPercent = finiteNumber(properties.electricLevel);
         const gridPowerW = p1Readings ? finiteNumber(p1Readings.total_power) : null;
         const timestampMs = timestampToMs(zendure.timestamp);
@@ -591,10 +641,13 @@
         return {
             mode,
             powerW,
+            acMode,
+            deviceCommandedW,
             batteryPercent: batteryPercent === null ? null : clamp(batteryPercent, 0, 100),
             gridPowerW,
             timestampMs,
             stale: timestampMs !== null && Date.now() - timestampMs > config.staleAfterMs,
+            pending: false,
             remainingTime: formatDuration(remainingHours),
             capacityWh,
             minimumPercent,
@@ -603,6 +656,42 @@
             systemTemperature,
             batteryPacks
         };
+    }
+
+    function parsePendingCommandedPower(newValue) {
+        if (newValue === null || newValue === undefined) return null;
+        if (newValue === "netzero") return -250;
+        if (newValue === "netzero+") return 250;
+        const parsed = Number(newValue);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function isPowerPending(automationData, model) {
+        if (!automationData || automationData.success === false) return false;
+
+        const changes = (automationData.lastChanges || []).filter((entry) => entry.type === "change");
+        if (changes.length === 0) return false;
+
+        const latest = changes[0];
+        const entryAge = Math.floor(Date.now() / 1000) - (latest.timestamp || 0);
+        if (entryAge > pendingWindowSeconds) return false;
+
+        const commandedW = parsePendingCommandedPower(latest.newValue);
+        if (commandedW === null || !Number.isFinite(model.powerW)) return false;
+
+        const withinTolerance = Math.abs(commandedW - model.powerW) <= pendingMatchToleranceW;
+        const commandModeMatches = (
+            (commandedW > 0 && model.acMode === 1)
+            || (commandedW < 0 && model.acMode === 2)
+            || (commandedW === 0 && (model.acMode === 0 || !Number.isFinite(model.acMode)))
+        );
+        const deviceCommandMatches = (
+            Number.isFinite(model.deviceCommandedW)
+            && Math.abs(commandedW - model.deviceCommandedW) <= pendingMatchToleranceW
+            && commandModeMatches
+        );
+
+        return !(withinTolerance || deviceCommandMatches);
     }
 
     function modeCopy(model) {
@@ -724,6 +813,71 @@
         elements.connectionBadge.textContent = label;
     }
 
+    function isBurstActive() {
+        return (
+            !document.hidden
+            && remainingBoostTicks > 0
+            && activeRefreshIntervalMs === boostRefreshIntervalMs
+        );
+    }
+
+    function updateBurstVisual() {
+        if (!elements.powerHero) return;
+        elements.powerHero.classList.toggle("fast-refresh-active", isBurstActive());
+    }
+
+    function pulseFreshnessTick() {
+        [elements.freshnessLabel, elements.powerSimpleFreshness].forEach((pill) => {
+            if (!pill) return;
+            if (pill._tickClearTimer) {
+                window.clearTimeout(pill._tickClearTimer);
+                pill._tickClearTimer = null;
+            }
+            pill.classList.remove("app-state-pill--tick");
+            void pill.offsetWidth;
+            pill.classList.add("app-state-pill--tick");
+            // Hold the yellow peak briefly, then remove so the longer base transition fades out.
+            pill._tickClearTimer = window.setTimeout(() => {
+                pill.classList.remove("app-state-pill--tick");
+                pill._tickClearTimer = null;
+            }, 260);
+        });
+    }
+
+    function applyFreshnessUi(model, { updateFailed = false } = {}) {
+        if (!elements.freshnessLabel) return;
+
+        let state = "live";
+        let pillLabel = "Live";
+        let badgeLabel = "Live";
+
+        if (updateFailed) {
+            state = "offline";
+            pillLabel = "Offline";
+            badgeLabel = "Offline";
+        } else if (model.pending) {
+            state = "pending";
+            pillLabel = "Pending";
+            badgeLabel = "Pending";
+        } else if (model.stale) {
+            state = "stale";
+            pillLabel = "Stale";
+            badgeLabel = "Stale";
+        }
+
+        elements.freshnessLabel.textContent = pillLabel;
+        elements.freshnessLabel.dataset.state = state;
+        if (elements.powerSimpleFreshness) {
+            elements.powerSimpleFreshness.textContent = pillLabel;
+            elements.powerSimpleFreshness.dataset.state = state;
+        }
+        elements.powerHero.classList.toggle("power-pending", Boolean(model.pending) && !updateFailed);
+        setConnectionState(
+            updateFailed ? "offline" : state === "live" ? "online" : state,
+            badgeLabel
+        );
+    }
+
     function publishBatteryForecastState(model) {
         const detail = Object.freeze({
             percent: model.batteryPercent,
@@ -750,8 +904,10 @@
         const batteryCountdown = batteryCountdownCopy(model);
         elements.powerHero.dataset.mode = model.mode;
         elements.modeLabel.textContent = copy.label;
+        elements.modeLabel.title = copy.label;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
         elements.powerSimpleMode.textContent = copy.label;
+        elements.powerSimpleMode.title = copy.label;
         setSimpleValue(
             elements.powerSimpleValue,
             Math.abs(Math.round(model.powerW)).toLocaleString(),
@@ -880,6 +1036,7 @@
                 title: "Battery energy",
                 ...batteryHealthValues(model),
                 usableKwh: energy.usableKwh,
+                emptyKwh: energy.emptyKwh,
                 storedKwh: energy.storedKwh,
                 rate: formatSignedWatts(model.powerW),
                 projectedUsableKwh: projection.usableKwh,
@@ -889,13 +1046,14 @@
             elements.batteryIcon.disabled = false;
             elements.batteryIcon.setAttribute(
                 "aria-label",
-                `Show battery energy details. ${formatKwh(energy.storedKwh)} total stored energy, ${formatKwh(energy.usableKwh)} usable energy, and ${formatKwh(projection.usableKwh)}, ${Math.round(projection.usablePercent)} percent of the usable range, projected at ${projection.time}.`
+                `Show battery energy details. ${formatKwh(energy.storedKwh)} total stored energy, ${formatKwh(energy.usableKwh)} usable energy, ${formatKwh(energy.emptyKwh)} chargeable energy, and ${formatKwh(projection.usableKwh)}, ${Math.round(projection.usablePercent)} percent of the usable range, projected at ${projection.time}.`
             );
             if (model.remainingTime && projection) {
                 const projectionDetail = {
                     title: `Projected at ${projection.time}`,
                     ...batteryHealthValues(model),
                     usableKwh: energy.usableKwh,
+                    emptyKwh: energy.emptyKwh,
                     storedKwh: energy.storedKwh,
                     rate: formatSignedWatts(model.powerW),
                     projectedUsableKwh: projection.usableKwh,
@@ -1013,13 +1171,8 @@
         elements.gridMinLabel.textContent = formatAxisWatts(minPower);
         elements.gridMaxLabel.textContent = formatAxisWatts(maxPower);
 
-        const freshness = model.stale ? "Stale data" : "Live";
-        elements.freshnessLabel.textContent = freshness;
-        elements.freshnessLabel.dataset.state = model.stale ? "stale" : "live";
-        elements.powerSimpleFreshness.textContent = freshness;
-        elements.powerSimpleFreshness.dataset.state = model.stale ? "stale" : "live";
         elements.lastUpdate.textContent = formatRelativeTime(model.timestampMs);
-        setConnectionState(model.stale ? "stale" : "online", model.stale ? "Stale" : "Live");
+        applyFreshnessUi(model);
         publishBatteryForecastState(model);
     }
 
@@ -1035,11 +1188,9 @@
     function renderError(error) {
         component.dataset.state = "error";
         component.setAttribute("aria-busy", "false");
-        setConnectionState("offline", "Offline");
 
         if (hasRenderedData) {
-            elements.freshnessLabel.textContent = "Update failed";
-            elements.freshnessLabel.dataset.state = "stale";
+            applyFreshnessUi(latestModel || { pending: false, stale: true }, { updateFailed: true });
             elements.lastUpdate.textContent = "Live update failed";
             GraphiteFlash.warning("The latest energy reading could not be loaded. Showing the previous values.", {
                 title: "Status update failed",
@@ -1047,6 +1198,8 @@
             });
             return;
         }
+
+        setConnectionState("offline", "Offline");
 
         const isBackendError = error.status === 502;
         elements.loading.hidden = true;
@@ -1060,26 +1213,34 @@
             : error.message || "The live energy status could not be loaded.";
     }
 
-    async function fetchStatus() {
+    async function fetchJson(url, signal) {
+        const response = await fetch(url, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+            signal
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+            const error = new Error(payload?.error || `Request failed with HTTP ${response.status}.`);
+            error.status = response.status;
+            throw error;
+        }
+        return payload;
+    }
+
+    async function fetchStatusBundle() {
         if (activeController) activeController.abort();
         activeController = new AbortController();
         const timeout = window.setTimeout(() => activeController.abort(), 8000);
 
         try {
-            const response = await fetch(config.statusUrl, {
-                method: "GET",
-                headers: { Accept: "application/json" },
-                cache: "no-store",
-                signal: activeController.signal
-            });
-
-            const payload = await response.json().catch(() => null);
-            if (!response.ok) {
-                const error = new Error(payload?.error || `Status request failed with HTTP ${response.status}.`);
-                error.status = response.status;
-                throw error;
-            }
-            return payload;
+            const statusPromise = fetchJson(config.statusUrl, activeController.signal);
+            const automationPromise = config.automationStatusUrl
+                ? fetchJson(config.automationStatusUrl, activeController.signal).catch(() => null)
+                : Promise.resolve(null);
+            const [payload, automationData] = await Promise.all([statusPromise, automationPromise]);
+            return { payload, automationData };
         } catch (error) {
             if (error.name === "AbortError") {
                 throw new Error("The energy controller did not respond in time.");
@@ -1094,13 +1255,22 @@
     async function refresh({ manual = false } = {}) {
         if (elements.refresh.hasAttribute("aria-busy")) return;
 
+        // Capture before the async fetch — interval ticks used to clear burst first.
+        const shouldPulseTick = isBurstActive();
+
         elements.refresh.setAttribute("aria-busy", "true");
         elements.refresh.disabled = true;
         if (!hasRenderedData) renderLoading();
 
         try {
-            const payload = await fetchStatus();
-            renderModel(normalizePayload(payload));
+            const { payload, automationData } = await fetchStatusBundle();
+            const model = normalizePayload(payload);
+            model.pending = isPowerPending(automationData, model);
+            renderModel(model);
+            if (shouldPulseTick) {
+                // Wait a frame so the pill is painted after render/loading swap.
+                window.requestAnimationFrame(() => pulseFreshnessTick());
+            }
             if (manual) {
                 GraphiteFlash.success("Charging, battery, and grid status updated.", {
                     title: "Live status refreshed",
@@ -1117,8 +1287,29 @@
 
     function startRefreshTimer() {
         stopRefreshTimer();
-        if (document.hidden) return;
-        refreshTimer = window.setInterval(() => refresh(), config.refreshIntervalMs);
+        if (document.hidden) {
+            updateBurstVisual();
+            return;
+        }
+
+        refreshTimer = window.setInterval(() => {
+            const burstTick = remainingBoostTicks > 0;
+            Promise.resolve(refresh()).finally(() => {
+                if (!burstTick || remainingBoostTicks <= 0) {
+                    updateBurstVisual();
+                    return;
+                }
+                remainingBoostTicks -= 1;
+                if (remainingBoostTicks === 0) {
+                    activeRefreshIntervalMs = Math.max(1000, Number(config.refreshIntervalMs) || 20000);
+                    updateBurstVisual();
+                    startRefreshTimer();
+                    return;
+                }
+                updateBurstVisual();
+            });
+        }, activeRefreshIntervalMs);
+        updateBurstVisual();
     }
 
     function stopRefreshTimer() {
@@ -1126,6 +1317,20 @@
             window.clearInterval(refreshTimer);
             refreshTimer = null;
         }
+        updateBurstVisual();
+    }
+
+    function restartFastRefreshBurst(immediateRefresh = false, { manual = false } = {}) {
+        remainingBoostTicks = boostTickCount;
+        activeRefreshIntervalMs = boostRefreshIntervalMs;
+        updateBurstVisual();
+
+        if (document.hidden) return;
+
+        if (immediateRefresh) {
+            refresh({ manual });
+        }
+        startRefreshTimer();
     }
 
     const FULL_RELOAD_HOLD_MS = 900;
@@ -1170,7 +1375,13 @@
             suppressRefreshClick = false;
             return;
         }
-        refresh({ manual: true });
+        restartFastRefreshBurst(true, { manual: true });
+    });
+    [elements.freshnessLabel, elements.powerSimpleFreshness].forEach((pill) => {
+        if (!pill) return;
+        pill.addEventListener("click", () => {
+            restartFastRefreshBurst(true, { manual: true });
+        });
     });
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
     [elements.batteryIcon, elements.batteryTarget, elements.batterySimpleTarget].forEach(bindBatteryPopover);
@@ -1178,7 +1389,7 @@
         if (!activeBatteryPopoverTrigger) return;
         if (
             !activeBatteryPopoverTrigger.contains(event.target) &&
-            !batteryPopover.contains(event.target)
+            !eventInsideBatteryPopover(event.target)
         ) {
             hideBatteryPopover(activeBatteryPopoverTrigger);
         }
@@ -1190,7 +1401,17 @@
         trigger.focus({ preventScroll: true });
     });
     window.addEventListener("resize", () => hideBatteryPopover());
-    window.addEventListener("scroll", () => hideBatteryPopover(), true);
+    window.addEventListener("scroll", (event) => {
+        if (eventInsideBatteryPopover(event.target)) return;
+        hideBatteryPopover();
+    }, true);
+    document.addEventListener("touchmove", (event) => {
+        if (eventInsideBatteryPopover(event.target)) return;
+        hideBatteryPopover();
+    }, {
+        capture: true,
+        passive: true
+    });
     document.addEventListener("graphite:current-price", (event) => {
         currentPriceEurPerKwh = finiteNumber(event.detail?.eurPerKwh);
         if (latestModel) renderModel(latestModel);
@@ -1221,13 +1442,11 @@
             stopRefreshTimer();
             return;
         }
-        refresh();
-        startRefreshTimer();
+        restartFastRefreshBurst(true);
     });
     setPowerView(storedPowerViewIsSimple());
     setBatteryView(storedBatteryViewIsSimple());
     setGridView(storedGridViewIsSimple());
     renderLoading();
-    refresh();
-    startRefreshTimer();
+    restartFastRefreshBurst(true);
 })();
