@@ -26,10 +26,10 @@
         summaryPeriod: component.querySelector('[data-role="energy-summary-period"]'),
         charged: component.querySelector('[data-role="energy-total-charged"]'),
         discharged: component.querySelector('[data-role="energy-total-discharged"]'),
-        net: component.querySelector('[data-role="energy-total-net"]'),
+        pnl: component.querySelector('[data-role="energy-total-pnl"]'),
         chargedSummary: component.querySelector('[data-role="energy-charged-summary"]'),
         dischargedSummary: component.querySelector('[data-role="energy-discharged-summary"]'),
-        netSummary: component.querySelector('[data-role="energy-net-summary"]'),
+        pnlSummary: component.querySelector('[data-role="energy-pnl-summary"]'),
         status: component.querySelector('[data-role="energy-history-status"]')
     };
 
@@ -790,8 +790,9 @@
             const discharged = totals[priceType].discharged;
             charged.eur = charged.complete ? charged.eur : null;
             discharged.eur = discharged.complete ? discharged.eur : null;
-            totals[priceType].net = {
-                eur: charged.complete && discharged.complete ? charged.eur - discharged.eur : null,
+            // PnL: discharge value minus charge cost (negative spot charge is a benefit).
+            totals[priceType].pnl = {
+                eur: charged.complete && discharged.complete ? discharged.eur - charged.eur : null,
                 complete: charged.complete && discharged.complete,
                 missingHours: [...new Set([...charged.missingHours, ...discharged.missingHours])]
             };
@@ -802,8 +803,8 @@
 
     function priceWarning(totals) {
         const missingHours = [...new Set([
-            ...totals.consumer.net.missingHours,
-            ...totals.spot.net.missingHours
+            ...totals.consumer.pnl.missingHours,
+            ...totals.spot.pnl.missingHours
         ])];
         if (!missingHours.length) return "";
         const shown = missingHours.slice(0, 3).map((hour) => hour.replace(" ", " · ")).join(", ");
@@ -814,11 +815,11 @@
     function renderSummary(days) {
         const totals = totalsForDays(days);
         const money = moneyTotalsForDays(days);
-        const net = totals.charged - totals.discharged;
+        const energyNet = totals.charged - totals.discharged;
         setEnergySummaryValue(elements.charged, totals.charged);
         setEnergySummaryValue(elements.discharged, totals.discharged);
-        setEnergySummaryValue(elements.net, net, true);
-        elements.net.dataset.direction = net > 0 ? "charged" : net < 0 ? "discharged" : "idle";
+        setEnergySummaryValue(elements.pnl, energyNet, true);
+        elements.pnl.dataset.direction = energyNet > 0 ? "charged" : energyNet < 0 ? "discharged" : "idle";
         setSummaryTooltip(elements.chargedSummary, {
             label: "Charged",
             energy: totals.charged,
@@ -833,11 +834,11 @@
             spot: money.spot.discharged.eur,
             signed: false
         });
-        setSummaryTooltip(elements.netSummary, {
-            label: "Net",
-            energy: net,
-            consumer: money.consumer.net.eur,
-            spot: money.spot.net.eur,
+        setSummaryTooltip(elements.pnlSummary, {
+            label: "PnL",
+            energy: energyNet,
+            consumer: money.consumer.pnl.eur,
+            spot: money.spot.pnl.eur,
             signed: true
         });
         return priceWarning(money);
@@ -956,7 +957,7 @@
     elements.chartScrollShell?.addEventListener("pointerleave", () => {
         if (elements.chartScrollShell) delete elements.chartScrollShell.dataset.hoverEdge;
     });
-    [elements.chargedSummary, elements.dischargedSummary, elements.netSummary].forEach(bindSummaryTooltip);
+    [elements.chargedSummary, elements.dischargedSummary, elements.pnlSummary].forEach(bindSummaryTooltip);
     window.addEventListener("resize", () => {
         hideSummaryTooltip();
         hideHourTooltip();

@@ -589,9 +589,9 @@ $appConfig = [
                         <span class="app-energy-history__summary-title">Discharged</span>
                         <strong class="gsd-negative" data-role="energy-total-discharged">—</strong>
                     </button>
-                    <button type="button" data-role="energy-net-summary" aria-expanded="false">
-                        <span class="app-energy-history__summary-title">Net</span>
-                        <strong data-role="energy-total-net">—</strong>
+                    <button type="button" data-role="energy-pnl-summary" aria-expanded="false">
+                        <span class="app-energy-history__summary-title">PnL</span>
+                        <strong data-role="energy-total-pnl">—</strong>
                     </button>
                 </div>
 

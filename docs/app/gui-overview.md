@@ -49,7 +49,7 @@ It presents:
 - battery Energy and Health details, including stored, usable, and chargeable energy, projected usable energy, controller and pack temperatures, pack charge levels, and Wi-Fi signal
 - prices and the current energy plan for today or tomorrow
 - four days of hourly battery energy history
-- charged, discharged, and net totals for the selected day
+- charged, discharged, and PnL totals for the selected day
 - a link to the old GUI for functions that have not moved yet
 
 ### Old GUI

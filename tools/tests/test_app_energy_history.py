@@ -87,13 +87,13 @@ def test_hourly_payload_preserves_both_directions_and_weights_each_hour() -> Non
     assert consumer["charged"]["complete"] is True
     assert consumer["discharged"]["eur"] is None
     assert consumer["discharged"]["missingHours"] == ["2026-08-01 02:00"]
-    assert consumer["net"]["eur"] is None
+    assert consumer["pnl"]["eur"] is None
 
     spot = day["priceTotals"]["spot"]
     assert spot["charged"]["eur"] is None
     assert spot["charged"]["missingHours"] == ["2026-08-01 01:00"]
     assert spot["discharged"]["eur"] == pytest.approx(0.20)
-    assert spot["net"]["eur"] is None
+    assert spot["pnl"]["eur"] is None
 
 
 def test_missing_price_on_zero_flow_hour_does_not_invalidate_totals() -> None:
@@ -107,8 +107,25 @@ def test_missing_price_on_zero_flow_hour_does_not_invalidate_totals() -> None:
 
     assert totals["consumer"]["charged"]["eur"] == pytest.approx(0.30)
     assert totals["consumer"]["discharged"]["eur"] == pytest.approx(0)
-    assert totals["consumer"]["net"]["eur"] == pytest.approx(0.30)
-    assert totals["spot"]["net"]["eur"] == pytest.approx(0.10)
+    assert totals["consumer"]["pnl"]["eur"] == pytest.approx(-0.30)
+    assert totals["spot"]["pnl"]["eur"] == pytest.approx(-0.10)
+
+
+def test_price_pnl_is_discharged_minus_charged() -> None:
+    payload = _build_payload(
+        [
+            _row(0, charged_wh=1000, consumer=0.58, spot=0.03),
+            _row(1, discharged_wh=1000, consumer=0.50, spot=0.22),
+        ]
+    )
+    totals = payload["whPerDay"]["2026-08-01"]["priceTotals"]
+
+    assert totals["consumer"]["charged"]["eur"] == pytest.approx(0.58)
+    assert totals["consumer"]["discharged"]["eur"] == pytest.approx(0.50)
+    assert totals["consumer"]["pnl"]["eur"] == pytest.approx(-0.08)
+    assert totals["spot"]["charged"]["eur"] == pytest.approx(0.03)
+    assert totals["spot"]["discharged"]["eur"] == pytest.approx(0.22)
+    assert totals["spot"]["pnl"]["eur"] == pytest.approx(0.19)
 
 
 def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
@@ -148,24 +165,26 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
     ]
 
 
-def test_app_wires_sql_endpoint_and_all_six_price_values() -> None:
+def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     endpoint = ENDPOINT_FILE.read_text(encoding="utf-8")
 
     assert "../main/api/app_energy_history.php?days=3" in app_index
     for role in (
-        "energy-charged-consumer",
-        "energy-charged-spot",
-        "energy-discharged-consumer",
-        "energy-discharged-spot",
-        "energy-net-consumer",
-        "energy-net-spot",
+        "energy-charged-summary",
+        "energy-discharged-summary",
+        "energy-pnl-summary",
+        "energy-total-pnl",
     ):
         assert f'data-role="{role}"' in app_index
         assert role in energy_js
 
+    assert 'label: "PnL"' in energy_js
+    assert "discharged.eur - charged.eur" in energy_js
+
     helper = HELPER_FILE.read_text(encoding="utf-8")
+    assert "'pnl' =>" in helper
     assert "dailyReportGenerateLive($today)" in endpoint
     assert "appEnergyHistoryFetchPriceRows($pdo, $today)" in endpoint
     assert "appEnergyHistoryMapLiveReportRows" in endpoint

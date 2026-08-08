@@ -237,13 +237,14 @@ function appEnergyHistoryBuildPayload(
         foreach (['consumer', 'spot'] as $priceType) {
             $charged = appEnergyHistoryFinishMoneyMetric($day['money'][$priceType]['charged']);
             $discharged = appEnergyHistoryFinishMoneyMetric($day['money'][$priceType]['discharged']);
-            $netComplete = $charged['complete'] && $discharged['complete'];
+            $pnlComplete = $charged['complete'] && $discharged['complete'];
             $priceTotals[$priceType] = [
                 'charged' => $charged,
                 'discharged' => $discharged,
-                'net' => [
-                    'eur' => $netComplete ? round((float)$charged['eur'] - (float)$discharged['eur'], 6) : null,
-                    'complete' => $netComplete,
+                // PnL: discharge value minus charge cost (negative spot charge is a benefit).
+                'pnl' => [
+                    'eur' => $pnlComplete ? round((float)$discharged['eur'] - (float)$charged['eur'], 6) : null,
+                    'complete' => $pnlComplete,
                     'missingHours' => array_values(array_unique(array_merge(
                         $charged['missingHours'],
                         $discharged['missingHours']
