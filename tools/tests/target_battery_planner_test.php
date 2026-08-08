@@ -155,6 +155,7 @@ $minimumBattery['percent'] = 15.0;
 $alreadySatisfied = tbp_materialize_horizon(plannerTestDays(), $minimumBattery, $now);
 plannerTestAssert($alreadySatisfied[0]['items'][20]['value'] === 'netzero-', 'Already-satisfied target should keep the fallback action.');
 plannerTestAssert($alreadySatisfied[0]['items'][20]['planning']['status'] === 'already_satisfied', 'Minimum battery should report an already-satisfied target.');
+plannerTestAssert($alreadySatisfied[0]['items'][20]['planning']['reason'] === 'Baseline forecast is already at or below the requested target @ 15.0%.', 'Already-satisfied reason must include the requested target percentage.');
 
 $unavailable = tbp_materialize_horizon(plannerTestDays(), null, $now);
 plannerTestAssert($unavailable[0]['items'][20]['value'] === 'netzero-', 'Missing battery must use safe fallback.');

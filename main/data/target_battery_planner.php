@@ -441,7 +441,7 @@ function tbp_materialize_horizon(
             $entry['slot']['value'] = $fallback;
             $status = $baselinePercent <= $targetPercent + 0.05 ? 'already_satisfied' : 'unavailable';
             $reason = $status === 'already_satisfied'
-                ? 'Baseline forecast is already at or below the requested target.'
+                ? 'Baseline forecast is already at or below the requested target @ ' . number_format($targetPercent, 1) . '%.'
                 : 'No usable time remains in the rule slot.';
             $entry['slot']['planning'] = tbp_planning_metadata($entry, $anchor, $targetPercent, $status, $baselinePercent, $baselinePercent, null, $reason);
             continue;
