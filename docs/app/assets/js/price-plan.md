@@ -60,6 +60,7 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 17. When the header refresh runs after the component is already ready, keep the current summary and timeline visible and only mark the refresh control busy; reserve the short loading panel for the first load or retry after an error so the page does not jump.
 18. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
 19. In simulation mode, treat midnight on the selected date as the reference time, label the selected and following days explicitly, and forecast from the supplied starting battery percentage.
+20. When the display forecast processes an unbounded NZ± action, preserve battery SoC with a `0 W` estimate and label the assumption `NZ± assumed neutral`; continue applying explicit NZ± bounds when present.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 
@@ -84,7 +85,9 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When a manual refresh runs while the component is already ready, then keep the last rendered summary and timeline visible until the new data replaces it.
 - When simulation mode is active, then visibility changes and timers do not trigger live schedule refreshes.
 - When simulation prices are unavailable for either day, then show the API error and do not fall back to current prices.
-- When simulation mode shows a net-zero action, then its battery forecast uses the configured household profile rather than historical P1 measurements.
+- When simulation mode shows NZ-, then its battery forecast uses the configured household profile rather than historical P1 measurements.
+- When simulation mode shows unbounded NZ±, then its battery forecast assumes `0 W`; explicit NZ± limits can still force a non-zero estimate.
+- When simulation mode shows NZ+, then its baseline forecast is `0 W` because no solar-export forecast is available; explicit NZ+ limits can still force charging.
 
 ## Related files
 

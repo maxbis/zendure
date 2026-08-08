@@ -77,6 +77,16 @@ $boundedChargePower = tbp_power_for_slot([
     'max_power' => 1600,
 ], 12, 60.0, $forecastUsage);
 plannerTestAssert($boundedChargePower === 800.0, 'PHP forecast must apply a primary NZ+ minimum like the browser forecast.');
+$neutralBidirectionalPower = tbp_power_for_slot([
+    'value' => 'netzero',
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($neutralBidirectionalPower === 0.0, 'PHP forecast must treat unbounded NZ± as battery-neutral.');
+$boundedBidirectionalPower = tbp_power_for_slot([
+    'value' => 'netzero',
+    'min_power' => 300,
+    'max_power' => 800,
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($boundedBidirectionalPower === 300.0, 'Explicit NZ± bounds must still apply to the neutral forecast baseline.');
 $fallbackPower = tbp_power_for_slot([
     'value' => 'netzero+',
     'min_power' => 800,
@@ -84,7 +94,7 @@ $fallbackPower = tbp_power_for_slot([
     'runtime_conditions' => [['field' => 'electricity_level', 'op' => '<', 'value' => 50]],
     'fallback_value' => 'netzero',
 ], 12, 60.0, $forecastUsage);
-plannerTestAssert($fallbackPower === -220.0, 'Runtime fallback forecast must not inherit the primary NZ+ limits.');
+plannerTestAssert($fallbackPower === 0.0, 'Runtime NZ± fallback must be neutral and must not inherit the primary NZ+ limits.');
 
 $planned = tbp_materialize_horizon(plannerTestDays(), $battery, $now, ['max_discharge_power_w' => 1600]);
 $targetSlot = $planned[0]['items'][20];
@@ -268,6 +278,48 @@ $fullThenDischarge = tbp_materialize_horizon($fullThenDischargeDays, $fullBatter
 ]);
 plannerTestAssert($fullThenDischarge[0]['items'][10]['min_power'] > 0, 'A currently full battery must still charge when later schedule actions lower the anchor forecast.');
 plannerTestAssert($fullThenDischarge[0]['items'][10]['planning']['status'] === 'achievable', 'A recoverable future discharge must not be marked already satisfied.');
+
+$neutralBidirectionalDays = plannerChargeTestDays();
+foreach ([10, 11, 12, 13, 14] as $hour) {
+    $neutralBidirectionalDays[0]['items'][$hour] = [
+        'time' => sprintf('%02d00', $hour),
+        'value' => TARGET_CHARGE_MODE,
+        'target_anchor' => TARGET_CHARGE_ANCHOR,
+        'rule_id' => 'rule-neutral-before-anchor',
+        'rule_name' => 'Fill before final netzero hour',
+    ];
+}
+$neutralBidirectionalDays[0]['items'][15]['value'] = 'netzero';
+$neutralBidirectionalDays[0]['items'][16]['value'] = 'netzero-';
+$neutralBidirectionalBattery = [
+    'percent' => 15.0,
+    'capacity_wh' => 5760.0,
+    'minimum_percent' => 15.0,
+    'maximum_percent' => 91.0,
+];
+$neutralBidirectional = tbp_materialize_horizon(
+    $neutralBidirectionalDays,
+    $neutralBidirectionalBattery,
+    new DateTimeImmutable('2026-08-05 09:00:00', $timezone),
+    ['max_charge_power_w' => 1600]
+);
+$neutralBidirectionalSlot = $neutralBidirectional[0]['items'][10];
+plannerTestAssert($neutralBidirectionalSlot['min_power'] === 1000, 'A neutral NZ± hour must preserve the lowest charge minimum that reaches the target.');
+plannerTestAssert($neutralBidirectionalSlot['planning']['status'] === 'achievable', 'A neutral NZ± hour must preserve an achieved target through the NZ- anchor.');
+plannerTestAssert(abs($neutralBidirectionalSlot['planning']['predicted_anchor_soc_percent'] - 91.0) < 0.001, 'A neutral NZ± hour must preserve battery SoC through the NZ- anchor.');
+
+$saturatedBestEffortDays = $neutralBidirectionalDays;
+$saturatedBestEffortDays[0]['items'][15]['value'] = -220;
+$saturatedBestEffort = tbp_materialize_horizon(
+    $saturatedBestEffortDays,
+    $neutralBidirectionalBattery,
+    new DateTimeImmutable('2026-08-05 09:00:00', $timezone),
+    ['max_charge_power_w' => 1600]
+);
+$saturatedBestEffortSlot = $saturatedBestEffort[0]['items'][10];
+plannerTestAssert($saturatedBestEffortSlot['min_power'] === 1000, 'Best effort must retain the lowest charge minimum once higher candidates no longer improve the anchor forecast.');
+plannerTestAssert($saturatedBestEffortSlot['planning']['status'] === 'best_effort', 'A fixed post-charge discharge must leave an unreachable target in best-effort status.');
+plannerTestAssert(abs($saturatedBestEffortSlot['planning']['predicted_anchor_soc_percent'] - 86.756) < 0.001, 'Best effort must report the strongest reachable anchor forecast.');
 
 $prechargedDays = plannerChargeTestDays();
 foreach ([6, 7, 8, 9] as $hour) {

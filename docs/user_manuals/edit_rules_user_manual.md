@@ -77,17 +77,20 @@ Select this Value Mode when a price or time condition identifies a selling hour 
 
 ### Target at next NZ-
 
-Select this Value Mode for cheap or solar-rich hours when the battery should reach the configured maximum level before the first future NZ- period.
+Select this Value Mode for cheap or solar-rich hours when the battery should be at the configured maximum level at the start of the first future NZ- period.
 
 - When the rule matches multiple hours before the same NZ-, then all remaining matching hours are treated as one charging group.
 - When the current hour is part of the group, then only its remaining minutes count.
 - When planning runs, it forecasts the complete remaining schedule from the live battery percentage through the next NZ- start, including fixed actions, household-use assumptions, runtime fallbacks, battery efficiency, and partial hours.
+- When an unbounded NZ± hour occurs before the NZ- anchor, then the planner treats it as battery-neutral (`0 W`). Future solar generation and net household balance are unknown, so the forecast does not invent either charging or discharging for that hour.
+- When an NZ± hour has explicit power limits, then those limits still apply to the neutral baseline. A positive minimum or negative maximum can therefore force forecast charging or discharging.
+- NZ- hours continue to use the forecast household load as battery discharge.
 - The predicted battery percentage at the first remaining matching hour is used as the charging cycle's starting point and is exposed in the schedule tooltip.
 - The planner tests charge minimums in `100 W` steps and selects the lowest value whose anchor forecast reaches the configured maximum battery percentage within tolerance.
 - When the target is materialized, then every remaining matching slot becomes `netzero+` with the calculated `min_power` and configured `max_power`.
 - When automation refreshes its schedule, then the live calculation runs again. The normal automation refresh interval is five minutes.
 - When the complete schedule forecast reaches the target without forced charging, the minimum becomes `0 W`; NZ+ may still absorb solar surplus but cannot discharge.
-- When the required minimum exceeds the configured charge maximum, then the planner emits the maximum and reports `best_effort`.
+- When the target is unreachable, the planner reports `best_effort` and uses the lowest minimum that produces the strongest forecasted result. It does not increase the minimum when the battery has already saturated and a higher value cannot improve the NZ- prediction.
 - When battery data or the next NZ- anchor is unavailable, then the planner uses `netzero+` as the safe default fallback unless another fallback is configured.
 - When the Prices and Energy Plan is open, then it refreshes the resolved schedule every five minutes and shows the current minimum in the limit badge.
 

@@ -316,9 +316,15 @@ For `value = "empty_at_solar_charge"`, the conditional resolver also emits `targ
       - Adds metadata: `source: "condition"`, `rule_name`, `rule_index`, `runtime_conditions`, `fallback_value`, `min_power`, `max_power`
 4. Build UI entries (all raw schedule entries, sorted by key)
 5. If the merged today-and-tomorrow horizon contains `empty_at_solar_charge` or `full_at_netzero_minus`, load live battery percentage and run `target_battery_planner.php`.
-6. Replace every symbolic target value with calculated fixed watts, calculated NZ+ bounds, or its safe fallback.
-7. Attach optional `planning` metadata for the app tooltip.
-8. Return the full response.
+6. Forecast schedule actions through each target anchor:
+   - When an action is fixed power, then apply that signed wattage.
+   - When an action is NZ-, then forecast household-load discharge.
+   - When an action is unbounded NZ±, then forecast `0 W` because its future direction is unknown without a solar forecast.
+   - When NZ± has explicit limits, then clamp the neutral `0 W` baseline into those limits.
+   - When an action is NZ+, then start from a `0 W` forecast and apply explicit charging limits.
+7. Replace every symbolic target value with calculated fixed watts, calculated NZ+ bounds, or its safe fallback.
+8. Attach optional `planning` metadata for the app tooltip.
+9. Return the full response.
 
 The final `resolved` array never intentionally exposes `empty_at_solar_charge` or `full_at_netzero_minus` to automation. Automation continues consuming integer watts, `netzero`, `netzero-`, and `netzero+`. Unknown planning metadata is informational and may be ignored.
 

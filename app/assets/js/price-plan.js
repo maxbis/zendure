@@ -773,6 +773,7 @@
         const fallback = forecast.usedFallback ? "Runtime fallback · " : "";
         if (forecast.source === "scheduled_power") return `${fallback}scheduled power`;
         if (forecast.source === "household_profile") return `${fallback}household estimate`;
+        if (forecast.source === "bidirectional_neutral") return `${fallback}NZ± assumed neutral`;
         if (forecast.source === "solar_forecast_unavailable") return `${fallback}no solar forecast`;
         return `${fallback}automatic action unknown`;
     }

@@ -67,7 +67,8 @@ The forecast receives:
 
 - When the action is a fixed number, then use that signed wattage as scheduled power.
 - When the action is `netzero-`, then use negative expected household usage.
-- When the action is `netzero`, then use negative expected household usage and assume no solar generation.
+- When the action is unbounded `netzero` (NZ±), then forecast `0 W` and preserve battery SoC because future solar generation and net household balance are unknown.
+- When NZ± has explicit power bounds, apply those bounds to the neutral `0 W` baseline, so a bound that forces charging or discharging remains effective in the forecast.
 - When the action is `netzero+`, then assume 0 W because no solar/export forecast is available; explicit dynamic limits can still produce a bounded charge value.
 - When the action is standby, then use 0 W.
 - When the action is automatic or unknown, then use 0 W and label the assumption as unknown.

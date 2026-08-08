@@ -91,9 +91,12 @@
         if (numeric !== null) {
             powerW = numeric;
             source = "scheduled_power";
-        } else if (mode === "netzero" || mode === "netzero-") {
+        } else if (mode === "netzero-") {
             powerW = -householdUsageForHour(hour, householdUsageWByHour);
             source = "household_profile";
+        } else if (mode === "netzero") {
+            powerW = 0;
+            source = "bidirectional_neutral";
         } else if (mode === "netzero+") {
             powerW = 0;
             source = "solar_forecast_unavailable";

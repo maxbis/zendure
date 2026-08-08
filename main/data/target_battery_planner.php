@@ -140,7 +140,7 @@ function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array
     $mode = tbp_normalize_mode($value);
     if (in_array($mode, ['netzero', 'netzero-', 'netzero+'], true)) {
         $power = 0.0;
-        if ($mode !== 'netzero+') {
+        if ($mode === 'netzero-') {
             $usage = isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
                 ? max(0.0, (float) $usageByHour[$hour])
                 : 0.0;
@@ -631,6 +631,7 @@ function tbp_materialize_horizon(
 
         if ($baselineAnchorPercent < $targetThresholdPercent) {
             $status = 'best_effort';
+            $bestPredictionEpsilon = 0.000001;
             $candidates = [];
             for ($candidateW = $stepW; $candidateW < $maximumPowerW; $candidateW += $stepW) {
                 $candidates[] = $candidateW;
@@ -651,11 +652,15 @@ function tbp_materialize_horizon(
                     $usageByHour,
                     $efficiency
                 );
-                $calculatedMinimumW = $candidateW;
-                $predictedAnchorPercent = $candidatePrediction;
                 if ($candidatePrediction >= $targetThresholdPercent) {
+                    $calculatedMinimumW = $candidateW;
+                    $predictedAnchorPercent = $candidatePrediction;
                     $status = 'achievable';
                     break;
+                }
+                if ($candidatePrediction > $predictedAnchorPercent + $bestPredictionEpsilon) {
+                    $calculatedMinimumW = $candidateW;
+                    $predictedAnchorPercent = $candidatePrediction;
                 }
             }
         }
@@ -663,7 +668,7 @@ function tbp_materialize_horizon(
         $reason = match ($status) {
             'already_satisfied' => 'The full schedule forecast already reaches the target at NZ- without a forced charge minimum.',
             'achievable' => 'The minimum is the lowest stepped charge power whose full schedule forecast reaches the target at NZ-.',
-            default => 'The full schedule forecast cannot reach the target at NZ- within the configured maximum charge power.',
+            default => 'The full schedule forecast cannot reach the target at NZ-; the minimum is the lowest stepped charge power that produces the best forecasted result.',
         };
         $forecastMetadata = [
             'predicted_start_soc_percent' => $predictedStartPercent,

@@ -395,8 +395,94 @@ button.app-state-pill:focus-visible {
 }
 
 .app-battery-popover__panel {
+    display: grid;
     width: 50%;
     flex: 0 0 50%;
+    align-content: start;
+}
+
+.app-battery-popover__summary {
+    display: grid;
+    gap: 7px;
+    padding: 10px 11px 8px;
+    background: color-mix(in srgb, var(--gsd-surface-2) 72%, transparent);
+    border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.app-battery-popover__summary-readout {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.app-battery-popover__summary-readout strong {
+    color: var(--app-battery-color, var(--gsd-text));
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.app-battery-popover__summary-readout span {
+    color: var(--gsd-text-secondary);
+    font-size: 0.62rem;
+    font-weight: 650;
+    text-align: right;
+}
+
+.app-battery-popover__summary-track {
+    position: relative;
+    height: 10px;
+    overflow: visible;
+    background: color-mix(in srgb, var(--gsd-surface-3) 88%, var(--gsd-page-deep));
+    border: 1px solid var(--gsd-border);
+    border-radius: 999px;
+}
+
+.app-battery-popover__summary-projection {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 30%, transparent);
+    border-radius: inherit;
+}
+
+.app-battery-popover__summary-fill {
+    position: relative;
+    z-index: 1;
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--app-battery-color, var(--gsd-positive)) 72%, transparent),
+        var(--app-battery-color, var(--gsd-positive))
+    );
+    border-radius: inherit;
+}
+
+.app-battery-popover__summary-marker {
+    position: absolute;
+    z-index: 2;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--gsd-text);
+    border-radius: 1px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gsd-page-deep) 55%, transparent);
+    transform: translateX(-50%);
+}
+
+.app-battery-popover__summary-limits {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--gsd-text-muted);
+    font-size: 0.58rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
 }
 
 .app-battery-popover__details {

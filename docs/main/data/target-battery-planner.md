@@ -82,12 +82,14 @@ For `full_at_netzero_minus`:
 5. Test charge minimums from the shared power step through the configured maximum, applying each candidate to every remaining matching slot.
 6. Forecast each candidate through the anchor using fixed actions, household-use assumptions, runtime fallbacks, battery efficiency, partial hours, and battery limits.
 7. Select the lowest candidate whose anchor prediction reaches the configured maximum battery percentage within tolerance.
-8. Use the configured maximum and report `best_effort` when no candidate reaches the target; use `0 W` when the baseline forecast already reaches it.
+8. When no candidate reaches the target, report `best_effort` and select the lowest candidate that produces the strongest anchor forecast; use `0 W` when the baseline forecast already reaches it.
 9. Materialize all remaining grouped slots as NZ+ with the selected minimum and configured maximum.
 10. Recalculate when the schedule API is fetched again. Automation normally fetches every five minutes.
 11. Emit status `achievable`, `best_effort`, `already_satisfied`, `unavailable`, or `past` plus the forecast inputs and results in planning metadata.
 
 The current hour uses only its remaining minutes. Manual exact schedule entries continue to take priority over conditional rules during the merge.
+
+During target planning, unbounded NZ± slots are forecast as battery-neutral (`0 W`) because their future charge or discharge direction is unknown without a solar forecast. Explicit NZ± minimum and maximum power bounds still clamp that neutral baseline. NZ- continues to use forecast household consumption.
 
 ## Edge cases and failure modes
 
@@ -103,7 +105,7 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 - When live battery percentage is unavailable for a charge target, then emit its configured fallback or unbounded NZ+ and report `unavailable`.
 - When no future NZ- exists within today and tomorrow, then emit the charge fallback and explain that the anchor is unavailable.
 - When the baseline anchor forecast already reaches the charge target, emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.
-- When the calculated minimum exceeds the configured maximum charge power, then emit the maximum and report `best_effort`.
+- When the target is unreachable, emit the lowest stepped minimum that produces the strongest anchor forecast and report `best_effort`; do not increase the minimum when higher candidates produce the same result because the battery has already saturated.
 - When matching target-charge hours are non-contiguous, then count only those matching slots as eligible duration.
 - When repeated requests occur between automation refreshes, then the shared upward quantization prevents insignificant limit changes.
 - When shared configuration is missing or invalid, then the planner fails instead of using embedded efficiency, demand-profile, power-cap or step defaults.

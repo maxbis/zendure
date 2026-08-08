@@ -67,6 +67,23 @@ assert.deepEqual(HOUSEHOLD_USAGE.slice(8), Array(16).fill(220));
 }
 
 {
+    const neutralSlots = slots("netzero");
+    neutralSlots[13] = { value: "netzero", min_power: 300, max_power: 800 };
+    const forecast = buildForecast({
+        now: new Date(2026, 7, 5, 12, 0),
+        battery: BATTERY,
+        days: [{ date: DATE, slots: neutralSlots }]
+    });
+    const hour = forecast[`${DATE}1200`];
+    const boundedHour = forecast[`${DATE}1300`];
+    assert.equal(hour.estimatedPowerW, 0);
+    assert.equal(hour.endPercent, hour.startPercent);
+    assert.equal(hour.source, "bidirectional_neutral");
+    assert.equal(boundedHour.estimatedPowerW, 300);
+    assert.ok(boundedHour.endPercent > boundedHour.startPercent);
+}
+
+{
     const runtimeSlots = slots(0);
     runtimeSlots[12] = {
         value: "netzero-",

@@ -142,6 +142,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/power-bar-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/battery-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/grid-exchange-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/health-metric-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/battery-forecast.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

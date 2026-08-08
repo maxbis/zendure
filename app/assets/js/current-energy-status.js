@@ -358,24 +358,38 @@
         };
     }
 
+    function batteryProjectionAfterHours(model, hours) {
+        if (!Number.isFinite(model.batteryPercent) || !Number.isFinite(model.capacityWh) || model.capacityWh <= 0) {
+            return null;
+        }
+        const durationHours = Math.max(0, Number(hours) || 0);
+        const storedWh = (model.batteryPercent / 100) * model.capacityWh;
+        const lowerWh = (model.minimumPercent / 100) * model.capacityWh;
+        const upperWh = (model.maximumPercent / 100) * model.capacityWh;
+        const powerW = Number.isFinite(model.powerW) ? model.powerW : 0;
+        const projectedWh = clamp(
+            storedWh + (powerW * durationHours),
+            model.mode === "discharging" ? lowerWh : 0,
+            model.mode === "charging" ? upperWh : model.capacityWh
+        );
+        const projectedPercent = (projectedWh / model.capacityWh) * 100;
+        return {
+            ...batteryEnergyValues(model, projectedPercent),
+            percent: projectedPercent,
+            usablePercent: usableBatteryPercent(projectedPercent, model.minimumPercent, model.maximumPercent)
+        };
+    }
+
     function batteryProjectionAtHourEnd(model, now = new Date()) {
         if (!Number.isFinite(model.batteryPercent)) return null;
         const secondsIntoHour = (now.getMinutes() * 60) + now.getSeconds() + (now.getMilliseconds() / 1000);
         const hoursLeft = Math.max(0, (3600 - secondsIntoHour) / 3600);
-        const storedWh = (model.batteryPercent / 100) * model.capacityWh;
-        const lowerWh = (model.minimumPercent / 100) * model.capacityWh;
-        const upperWh = (model.maximumPercent / 100) * model.capacityWh;
-        const projectedWh = clamp(
-            storedWh + (model.powerW * hoursLeft),
-            model.mode === "discharging" ? lowerWh : 0,
-            model.mode === "charging" ? upperWh : model.capacityWh
-        );
-        const projectedPercent = model.capacityWh > 0 ? (projectedWh / model.capacityWh) * 100 : 0;
+        const projection = batteryProjectionAfterHours(model, hoursLeft);
+        if (!projection) return null;
         const nextHour = new Date(now);
         nextHour.setHours(now.getHours() + 1, 0, 0, 0);
         return {
-            ...batteryEnergyValues(model, projectedPercent),
-            usablePercent: usableBatteryPercent(projectedPercent, model.minimumPercent, model.maximumPercent),
+            ...projection,
             time: `${String(nextHour.getHours()).padStart(2, "0")}:00`
         };
     }
@@ -444,10 +458,181 @@
             const name = document.createElement("span");
             const amount = document.createElement("strong");
             name.textContent = label;
-            amount.textContent = value;
+            if (value instanceof Node) {
+                amount.appendChild(value);
+            } else if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, "text")) {
+                amount.textContent = value.text;
+                if (value.color) amount.style.color = value.color;
+            } else {
+                amount.textContent = value;
+            }
             row.append(name, amount);
             container.appendChild(row);
         });
+    }
+
+    function healthMetricColor(kind, value) {
+        const scale = window.GraphiteHealthMetricColorScale;
+        if (!scale) return null;
+        if (kind === "temperature") return scale.temperatureColor(value);
+        if (kind === "wifi") return scale.wifiRssiColor(value);
+        return null;
+    }
+
+    function coloredHealthMetric(text, color) {
+        return color ? { text, color } : text;
+    }
+
+    function packHealthValue(pack) {
+        const percentText = Number.isFinite(pack.percent) ? `${Math.round(pack.percent)}%` : "—";
+        const temperatureText = formatTemperature(pack.temperature);
+        const temperatureColor = healthMetricColor("temperature", pack.temperature);
+        if (!temperatureColor) return `${percentText} · ${temperatureText}`;
+
+        const value = document.createDocumentFragment();
+        value.appendChild(document.createTextNode(`${percentText} · `));
+        const temperature = document.createElement("span");
+        temperature.textContent = temperatureText;
+        temperature.style.color = temperatureColor;
+        value.appendChild(temperature);
+        return value;
+    }
+
+    function createBatteryPopoverSummaryShell({
+        ariaLabel,
+        color,
+        currentText,
+        secondaryText,
+        fillPercent,
+        projectedFillPercent = null,
+        minimumText,
+        maximumText
+    }) {
+        const summary = document.createElement("div");
+        summary.className = "app-battery-popover__summary";
+        summary.setAttribute("role", "img");
+        summary.setAttribute("aria-label", ariaLabel);
+        if (color) summary.style.setProperty("--app-battery-color", color);
+
+        const readout = document.createElement("div");
+        readout.className = "app-battery-popover__summary-readout";
+        const current = document.createElement("strong");
+        current.textContent = currentText;
+        const secondary = document.createElement("span");
+        secondary.textContent = secondaryText;
+        readout.append(current, secondary);
+
+        const track = document.createElement("div");
+        track.className = "app-battery-popover__summary-track";
+        track.setAttribute("aria-hidden", "true");
+        const hasProjection = Number.isFinite(projectedFillPercent)
+            && Math.abs(projectedFillPercent - fillPercent) >= 0.05;
+        if (hasProjection) {
+            const projection = document.createElement("i");
+            projection.className = "app-battery-popover__summary-projection";
+            projection.style.width = `${Math.max(fillPercent, projectedFillPercent).toFixed(2)}%`;
+            track.appendChild(projection);
+        }
+        const fill = document.createElement("i");
+        fill.className = "app-battery-popover__summary-fill";
+        fill.style.width = `${(hasProjection ? Math.min(fillPercent, projectedFillPercent) : fillPercent).toFixed(2)}%`;
+        const marker = document.createElement("i");
+        marker.className = "app-battery-popover__summary-marker";
+        marker.style.left = `${fillPercent.toFixed(2)}%`;
+        track.append(fill, marker);
+
+        const limits = document.createElement("div");
+        limits.className = "app-battery-popover__summary-limits";
+        limits.setAttribute("aria-hidden", "true");
+        const minimum = document.createElement("span");
+        minimum.textContent = minimumText;
+        const maximum = document.createElement("span");
+        maximum.textContent = maximumText;
+        limits.append(minimum, maximum);
+
+        summary.append(readout, track, limits);
+        return summary;
+    }
+
+    function createBatteryPopoverEnergySummary(detail) {
+        const batteryPercent = Number(detail?.batteryPercent);
+        const minimumPercent = Number(detail?.minimumPercent);
+        const maximumPercent = Number(detail?.maximumPercent);
+        if (
+            !Number.isFinite(batteryPercent)
+            || !Number.isFinite(minimumPercent)
+            || !Number.isFinite(maximumPercent)
+            || maximumPercent <= minimumPercent
+        ) {
+            return null;
+        }
+
+        const usablePercent = usableBatteryPercent(batteryPercent, minimumPercent, maximumPercent);
+        const color = window.GraphiteBatteryColorScale
+            ? window.GraphiteBatteryColorScale.colorFor(usablePercent)
+            : null;
+        const projectionIn60 = batteryProjectionAfterHours({
+            batteryPercent,
+            minimumPercent,
+            maximumPercent,
+            capacityWh: detail.capacityWh,
+            powerW: detail.powerW,
+            mode: detail.mode
+        }, 1);
+        const projectedUsablePercent = projectionIn60?.usablePercent;
+        const hasProjection = Number.isFinite(projectedUsablePercent)
+            && Math.abs(projectedUsablePercent - usablePercent) >= 0.05;
+        const ariaProjection = hasProjection
+            ? ` Projected ${Math.round(projectedUsablePercent)} percent of the usable range in 60 minutes at the current battery power.`
+            : "";
+
+        return createBatteryPopoverSummaryShell({
+            ariaLabel: `Battery ${Math.round(batteryPercent)} percent. ${Math.round(usablePercent)} percent of the usable range between ${Math.round(minimumPercent)} and ${Math.round(maximumPercent)} percent.${ariaProjection}`,
+            color,
+            currentText: `${Math.round(batteryPercent)}%`,
+            secondaryText: hasProjection
+                ? `${Math.round(usablePercent)}% now · ${Math.round(projectedUsablePercent)}% in 60 min`
+                : `${Math.round(usablePercent)}% of usable range`,
+            fillPercent: usablePercent,
+            projectedFillPercent: hasProjection ? projectedUsablePercent : null,
+            minimumText: `Min ${Math.round(minimumPercent)}%`,
+            maximumText: `Max ${Math.round(maximumPercent)}%`
+        });
+    }
+
+    function createBatteryPopoverTemperatureSummary(detail) {
+        const temperature = Number(detail?.systemTemperature);
+        if (!Number.isFinite(temperature)) return null;
+
+        const minimumTemp = -5;
+        const maximumTemp = 50;
+        const fillPercent = clamp(((temperature - minimumTemp) / (maximumTemp - minimumTemp)) * 100, 0, 100);
+        const color = healthMetricColor("temperature", temperature);
+
+        return createBatteryPopoverSummaryShell({
+            ariaLabel: `Controller temperature ${temperature.toFixed(1)} degrees Celsius on a scale from ${minimumTemp} to ${maximumTemp} degrees.`,
+            color,
+            currentText: formatTemperature(temperature),
+            secondaryText: "Controller temperature",
+            fillPercent,
+            minimumText: `${minimumTemp}°C`,
+            maximumText: `${maximumTemp > 0 ? "+" : ""}${maximumTemp}°C`
+        });
+    }
+
+    function createBatteryPopoverPanel(view, detail, rows) {
+        const panel = document.createElement("div");
+        panel.className = "app-battery-popover__panel";
+        panel.dataset.view = view;
+        const summary = view === "health"
+            ? createBatteryPopoverTemperatureSummary(detail)
+            : createBatteryPopoverEnergySummary(detail);
+        if (summary) panel.appendChild(summary);
+        const details = document.createElement("div");
+        details.className = "app-battery-popover__details";
+        appendBatteryPopoverRows(details, rows);
+        panel.appendChild(details);
+        return panel;
     }
 
     function showBatteryPopover(detail, trigger, initialView = "energy") {
@@ -470,10 +655,7 @@
         const slider = document.createElement("div");
         slider.className = "app-battery-popover__slider";
 
-        const energyDetails = document.createElement("div");
-        energyDetails.className = "app-battery-popover__details app-battery-popover__panel";
-        energyDetails.dataset.view = "energy";
-        appendBatteryPopoverRows(energyDetails, [
+        const energyPanel = createBatteryPopoverPanel("energy", detail, [
             ["Total stored energy", formatKwh(detail.storedKwh)],
             ["Usable energy", formatKwh(detail.usableKwh)],
             ["Chargeable energy", formatKwh(detail.emptyKwh)],
@@ -484,21 +666,30 @@
             ]
         ]);
 
-        const healthDetails = document.createElement("div");
-        healthDetails.className = "app-battery-popover__details app-battery-popover__panel";
-        healthDetails.dataset.view = "health";
         const healthRows = [
-            ["Controller temperature", formatTemperature(detail.systemTemperature)]
+            [
+                "Controller temperature",
+                coloredHealthMetric(
+                    formatTemperature(detail.systemTemperature),
+                    healthMetricColor("temperature", detail.systemTemperature)
+                )
+            ]
         ];
         healthRows.push(...detail.batteryPacks.map((pack, index) => [
             `Battery ${index + 1}`,
-            `${Number.isFinite(pack.percent) ? `${Math.round(pack.percent)}%` : "—"} · ${formatTemperature(pack.temperature)}`
+            packHealthValue(pack)
         ]));
         if (detail.batteryPacks.length === 0) healthRows.push(["Battery packs", "Unavailable"]);
-        healthRows.push(["Wi-Fi signal", Number.isFinite(detail.wifiRssi) ? `${Math.round(detail.wifiRssi)} dBm` : "—"]);
-        appendBatteryPopoverRows(healthDetails, healthRows);
+        healthRows.push([
+            "Wi-Fi signal",
+            coloredHealthMetric(
+                Number.isFinite(detail.wifiRssi) ? `${Math.round(detail.wifiRssi)} dBm` : "—",
+                healthMetricColor("wifi", detail.wifiRssi)
+            )
+        ]);
+        const healthPanel = createBatteryPopoverPanel("health", detail, healthRows);
 
-        slider.append(energyDetails, healthDetails);
+        slider.append(energyPanel, healthPanel);
         viewport.appendChild(slider);
 
         const footer = document.createElement("div");
@@ -527,8 +718,8 @@
             if (showingHealth) navigation.append(icon, label);
             else navigation.append(label, icon);
             navigation.setAttribute("aria-label", showingHealth ? "Back to battery energy" : "Show battery health");
-            energyDetails.setAttribute("aria-hidden", String(showingHealth));
-            healthDetails.setAttribute("aria-hidden", String(!showingHealth));
+            energyPanel.setAttribute("aria-hidden", String(showingHealth));
+            healthPanel.setAttribute("aria-hidden", String(!showingHealth));
         }
 
         navigation.addEventListener("click", () => {
@@ -1035,6 +1226,12 @@
             batteryPopoverDetails.set(elements.batteryIcon, {
                 title: "Battery energy",
                 ...batteryHealthValues(model),
+                batteryPercent: model.batteryPercent,
+                minimumPercent: model.minimumPercent,
+                maximumPercent: model.maximumPercent,
+                capacityWh: model.capacityWh,
+                powerW: model.powerW,
+                mode: model.mode,
                 usableKwh: energy.usableKwh,
                 emptyKwh: energy.emptyKwh,
                 storedKwh: energy.storedKwh,
@@ -1052,6 +1249,12 @@
                 const projectionDetail = {
                     title: `Projected at ${projection.time}`,
                     ...batteryHealthValues(model),
+                    batteryPercent: model.batteryPercent,
+                    minimumPercent: model.minimumPercent,
+                    maximumPercent: model.maximumPercent,
+                    capacityWh: model.capacityWh,
+                    powerW: model.powerW,
+                    mode: model.mode,
                     usableKwh: energy.usableKwh,
                     emptyKwh: energy.emptyKwh,
                     storedKwh: energy.storedKwh,
