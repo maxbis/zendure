@@ -1637,6 +1637,91 @@ button.app-state-pill:focus-visible {
     }
 }
 
+/* Historical rule backtest */
+.app-simulation-page {
+    border-top: 5px solid var(--gsd-warning);
+}
+
+.app-simulation-banner {
+    display: flex;
+    gap: var(--gsd-space-3);
+    align-items: flex-start;
+    padding: var(--gsd-space-4);
+    border: 1px solid var(--gsd-warning);
+    border-radius: var(--gsd-radius-card);
+    background: var(--gsd-warning-soft);
+    color: var(--gsd-warning);
+}
+
+.app-simulation-banner .gsd-icon {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+}
+
+.app-simulation-banner p,
+.app-simulation-controls p,
+.app-simulation-note {
+    margin: var(--gsd-space-1) 0 0;
+    color: var(--gsd-text-secondary);
+}
+
+.app-simulation-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--gsd-space-5);
+    align-items: end;
+    margin-block: var(--gsd-space-3);
+    padding: var(--gsd-space-4);
+}
+
+.app-simulation-controls h2 {
+    margin: 0;
+}
+
+.app-simulation-controls form {
+    display: flex;
+    gap: var(--gsd-space-3);
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.app-simulation-controls .gsd-field {
+    min-width: 150px;
+}
+
+.app-simulation-page .app-price-plan {
+    box-shadow: 0 0 0 1px var(--gsd-warning), var(--gsd-shadow-card);
+}
+
+.app-price-hour__edit[data-readonly="true"] {
+    cursor: default;
+}
+
+.app-simulation-note {
+    margin-top: var(--gsd-space-3);
+    padding: 0 var(--gsd-space-4) var(--gsd-space-5);
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+    .app-simulation-controls {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+        padding: var(--gsd-space-3);
+    }
+
+    .app-simulation-controls form {
+        align-items: stretch;
+    }
+
+    .app-simulation-controls .gsd-field,
+    .app-simulation-controls .gsd-btn {
+        flex: 1 1 100%;
+    }
+}
+
 .app-price-timeline-scroll {
     overflow-x: auto;
     padding: 4px 2px 8px;

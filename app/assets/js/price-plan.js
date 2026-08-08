@@ -5,6 +5,7 @@
     if (!component) return;
 
     const config = window.GRAPHITE_APP_CONFIG || {};
+    const isSimulation = config.mode === "simulation";
     const elements = {
         date: component.querySelector('[data-role="price-plan-date"]'),
         loading: component.querySelector('[data-role="price-loading"]'),
@@ -264,10 +265,28 @@
     }
 
     function localDates() {
+        if (isSimulation && /^\d{8}$/.test(String(config.scenarioDate || ""))) {
+            const selected = dateFromKey(config.scenarioDate);
+            const following = new Date(selected);
+            following.setDate(following.getDate() + 1);
+            return { today: config.scenarioDate, tomorrow: dateKey(following) };
+        }
         const today = new Date();
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         return { today: dateKey(today), tomorrow: dateKey(tomorrow) };
+    }
+
+    function referenceNow() {
+        if (!isSimulation) return new Date();
+        const scenarioStart = dateFromKey(config.scenarioDate);
+        if (scenarioStart) {
+            scenarioStart.setHours(0, 0, 0, 0);
+            return scenarioStart;
+        }
+        const configured = new Date(config.referenceTime || "");
+        if (Number.isFinite(configured.getTime())) return configured;
+        return new Date();
     }
 
     function dateFromKey(key) {
@@ -390,6 +409,24 @@
         return payload;
     }
 
+    async function fetchBacktest(signal) {
+        if (!config.backtestUrl) throw new Error("No historical simulation source is configured");
+        const url = new URL(config.backtestUrl, document.baseURI);
+        url.searchParams.set("date", String(config.scenarioDate || ""));
+        url.searchParams.set("soc", String(config.startingBatteryPercent ?? ""));
+        const response = await fetch(url.href, {
+            signal,
+            headers: { Accept: "application/json" },
+            cache: "no-store"
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const payload = contentType.includes("application/json") ? await response.json() : null;
+        if (!response.ok || !payload?.success || !payload?.prices || !payload?.schedules) {
+            throw new Error(payload?.error || "Invalid historical simulation response");
+        }
+        return payload;
+    }
+
     async function refreshAutomationSchedule() {
         if (!config.scheduleRefreshUrl) throw new Error("No automation refresh endpoint is configured.");
 
@@ -497,6 +534,7 @@
         const forecastEngine = window.GraphiteBatteryForecast;
         state.batteryForecast = forecastEngine?.buildForecast
             ? forecastEngine.buildForecast({
+                now: referenceNow(),
                 battery: state.battery,
                 days: forecastDays(),
                 householdUsageWByHour: config.forecastHouseholdUsageWByHour,
@@ -513,7 +551,7 @@
         const start = dateFromKey(date);
         if (!start) return false;
         start.setHours(hour + 1, 0, 0, 0);
-        return start > new Date();
+        return start > referenceNow();
     }
 
     function priceValues(dayPrices) {
@@ -1296,7 +1334,7 @@
             hour,
             price
         })));
-        const hour = new Date().getHours();
+        const hour = referenceNow().getHours();
         const available = entries.filter((entry) => Number.isFinite(entry.price)
             && (entry.day === "tomorrow" || (entry.day === "today" && entry.hour >= hour)));
         const current = entries.find((entry) => entry.day === "today" && entry.hour === hour) || null;
@@ -1318,7 +1356,7 @@
         const todayAverage = dailyAverage(days.find((day) => day.key === "today"));
         const tomorrowAverage = dailyAverage(days.find((day) => day.key === "tomorrow"));
         const averageDetail = todayAverage ? { ...todayAverage, tomorrowAverage } : null;
-        elements.currentLabel.textContent = "Current";
+        elements.currentLabel.textContent = isSimulation ? "Simulation start" : "Current";
         setDimmedToken(elements.current, formatPrice(current?.price), "€");
         setDimmedToken(elements.low, formatPrice(low?.price), "€");
         setDimmedToken(elements.average, formatPrice(todayAverage?.price), "€");
@@ -1330,7 +1368,8 @@
     }
 
     function publishCurrentPrice() {
-        const currentHour = new Date().getHours();
+        if (isSimulation) return;
+        const currentHour = referenceNow().getHours();
         const currentPrice = priceValues(state.prices.today)[currentHour];
         document.dispatchEvent(new CustomEvent("graphite:current-price", {
             detail: { eurPerKwh: Number.isFinite(currentPrice) ? currentPrice : null }
@@ -1343,7 +1382,7 @@
         const minimum = available.length ? Math.min(...available) : 0;
         const maximum = available.length ? Math.max(...available) : 1;
         const span = Math.max(0.0001, maximum - minimum);
-        const currentHour = new Date().getHours();
+        const currentHour = referenceNow().getHours();
         const fragment = document.createDocumentFragment();
 
         days.forEach((day, dayIndex) => {
@@ -1397,10 +1436,17 @@
                 editButton.type = "button";
                 editButton.className = "app-price-hour__edit";
                 editButton.setAttribute("aria-pressed", String(selectionKey === selectedHourKey));
-                editButton.setAttribute(
-                    "aria-label",
-                    `Create or edit hourly override for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
-                );
+            editButton.setAttribute(
+                "aria-label",
+                isSimulation
+                    ? `Historical price for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
+                    : `Create or edit hourly override for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
+            );
+            if (isSimulation) {
+                editButton.setAttribute("aria-disabled", "true");
+                editButton.tabIndex = -1;
+                editButton.dataset.readonly = "true";
+            }
 
             const barZone = document.createElement("span");
             barZone.className = "app-price-hour__bar-zone";
@@ -1470,11 +1516,13 @@
             });
 
             editButton.append(barZone, priceLabel, time);
-            editButton.addEventListener("click", () => {
-                setSelectedHour(selectionKey);
-                hidePriceTooltip();
-                openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
-            });
+            if (!isSimulation) {
+                editButton.addEventListener("click", () => {
+                    setSelectedHour(selectionKey);
+                    hidePriceTooltip();
+                    openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
+                });
+            }
             hourColumn.append(editButton, actionElement);
             fragment.appendChild(hourColumn);
             }
@@ -1520,10 +1568,12 @@
         const todayValues = priceValues(state.prices.today);
         const tomorrowValues = priceValues(state.prices.tomorrow);
         const tomorrowHasPrices = priceValues(state.prices.tomorrow).some(Number.isFinite);
-        elements.date.textContent = `Today through tomorrow · swipe or scroll for all 48 hours`;
+        elements.date.textContent = isSimulation
+            ? `${formatDate(todayDate)} through ${formatDate(tomorrowDate)} · historical simulation`
+            : "Today through tomorrow · swipe or scroll for all 48 hours";
         const days = [
-            { key: "today", label: "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
-            { key: "tomorrow", label: "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
+            { key: "today", label: isSimulation ? "Selected day" : "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
+            { key: "tomorrow", label: isSimulation ? "Following day" : "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
         ];
         rebuildBatteryForecast();
         renderSummary(days);
@@ -1532,9 +1582,16 @@
             elements.tomorrowAvailability.dataset.availability = tomorrowHasPrices ? "available" : "unavailable";
         }
         if (elements.tomorrowStatusLabel) {
-            elements.tomorrowStatusLabel.textContent = tomorrowHasPrices ? "Tomorrow ready" : "Tomorrow pending";
+            elements.tomorrowStatusLabel.textContent = isSimulation
+                ? (tomorrowHasPrices ? "Historical data ready" : "Historical data missing")
+                : (tomorrowHasPrices ? "Tomorrow ready" : "Tomorrow pending");
         }
-        elements.tomorrowStatus?.setAttribute("aria-label", tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet");
+        elements.tomorrowStatus?.setAttribute(
+            "aria-label",
+            isSimulation
+                ? (tomorrowHasPrices ? "Historical prices are available" : "Historical prices are unavailable")
+                : (tomorrowHasPrices ? "Tomorrow's prices are available" : "Tomorrow's prices are not available yet")
+        );
         if (preserveScroll) {
             elements.scroll.scrollLeft = previousScrollLeft;
             updateTimelineScrollButtons();
@@ -1648,13 +1705,54 @@
         }
     }
 
+    function beginLoad() {
+        // Keep the tall chart visible on refresh so the card does not collapse
+        // to the short loading panel and jump the page.
+        if (component.dataset.state === "ready") {
+            component.setAttribute("aria-busy", "true");
+            elements.refresh.setAttribute("aria-busy", "true");
+            elements.refresh.disabled = true;
+            return;
+        }
+        setView("loading");
+    }
+
     async function load() {
         if (state.controller) state.controller.abort();
         state.controller = new AbortController();
-        setView("loading");
+        beginLoad();
         const dates = localDates();
 
         try {
+            if (isSimulation) {
+                const [scenarioResult, rulesResult] = await Promise.allSettled([
+                    fetchBacktest(state.controller.signal),
+                    fetchRuleColors(state.controller.signal)
+                ]);
+                if (scenarioResult.status !== "fulfilled") throw scenarioResult.reason;
+                const scenario = scenarioResult.value;
+                config.referenceTime = scenario.referenceTime;
+                config.solarEvents = scenario.solarEvents || {};
+                state.prices.today = scenario.prices.today || null;
+                state.prices.tomorrow = scenario.prices.tomorrow || null;
+                state.dates.today = scenario.dates?.today || dates.today;
+                state.dates.tomorrow = scenario.dates?.tomorrow || dates.tomorrow;
+                state.schedules.today = scenario.schedules.today || [];
+                state.schedules.tomorrow = scenario.schedules.tomorrow || [];
+                state.entries.today = scenario.entries?.today || [];
+                state.entries.tomorrow = scenario.entries?.tomorrow || [];
+                state.ruleColors = rulesResult.status === "fulfilled" ? rulesResult.value : {};
+                state.battery = {
+                    percent: Number(scenario.startingBatteryPercent),
+                    capacityWh: Number(config.capacityWh),
+                    minimumPercent: Number(config.minChargePercent),
+                    maximumPercent: Number(config.maxChargePercent),
+                    stale: false
+                };
+                render();
+                setView("ready");
+                return;
+            }
             const results = await Promise.allSettled([
                 fetchPrices(state.controller.signal),
                 fetchSchedule(dates.today, state.controller.signal),
@@ -1730,9 +1828,11 @@
     editElements?.maximumRange?.addEventListener("input", () => updateLimitControls({ activeThumb: "maximum" }));
     editElements?.watts?.addEventListener("input", () => updateFixedPowerControls());
     editElements?.fixedRange?.addEventListener("input", () => updateFixedPowerControls({ fromSlider: true }));
-    document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) load();
-    });
+    if (!isSimulation) {
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) load();
+        });
+    }
     document.addEventListener("graphite:battery-forecast-state", (event) => {
         state.battery = event.detail || null;
         rebuildBatteryForecast();
@@ -1791,7 +1891,9 @@
         setSelectedHour(null);
     });
 
-    const scheduleDisplayRefreshMs = Math.max(60000, Number(config.scheduleDisplayRefreshMs) || 300000);
-    window.setInterval(refreshSchedules, scheduleDisplayRefreshMs);
+    if (!isSimulation) {
+        const scheduleDisplayRefreshMs = Math.max(60000, Number(config.scheduleDisplayRefreshMs) || 300000);
+        window.setInterval(refreshSchedules, scheduleDisplayRefreshMs);
+    }
     load();
 })();

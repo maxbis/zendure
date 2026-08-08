@@ -32,6 +32,15 @@ else
 fi
 
 echo ""
+echo "==> Running historical backtest tests"
+if php "$SCRIPT_DIR/backtest_schedule_test.php"; then
+  :
+else
+  FAILED=1
+  FAILED_SUITES+=("historical_backtest")
+fi
+
+echo ""
 echo "==> Running app battery forecast tests"
 if node "$SCRIPT_DIR/app_battery_forecast_test.js"; then
   :

@@ -6,7 +6,9 @@ The new GUI's Prices & Energy Plan component combines hourly consumer prices, re
 
 ## Location
 
-- Component markup: [`app/index.php`](../../../../app/index.php)
+- Shared component markup: [`app/partials/price-plan.php`](../../../../app/partials/price-plan.php)
+- Live page: [`app/index.php`](../../../../app/index.php)
+- Historical simulation page: [`app/test.php`](../../../../app/test.php)
 - Client-side behavior: [`app/assets/js/price-plan.js`](../../../../app/assets/js/price-plan.js)
 - Component styles: [`app/assets/css/app.css`](../../../../app/assets/css/app.css)
 - Shared application configuration: [`app/shared-system-configuration.md`](../../shared-system-configuration.md)
@@ -22,6 +24,11 @@ The component reads:
 - Sunrise and sunset events calculated by `app/index.php` for the configured installation.
 - Live battery forecast state published by `current-energy-status.js`.
 - Chained hourly predictions calculated by `battery-forecast.js`.
+
+The component has two modes:
+
+- When mode is `live`, then it uses today and tomorrow, permits hourly schedule edits, publishes the current price, and quietly refreshes resolved schedules.
+- When mode is `simulation`, then it uses the selected historical date and following date, loads one read-only scenario payload, uses the supplied starting battery level, and exposes no schedule writes or automation refresh.
 
 The price summary presents four metrics in this order:
 
@@ -50,7 +57,9 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 14. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
 15. When a slot was produced by the discharge-target planner, show the requested reserve at the next solar-capable net-zero slot, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
 16. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
-17. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
+17. When the header refresh runs after the component is already ready, keep the current summary and timeline visible and only mark the refresh control busy; reserve the short loading panel for the first load or retry after an error so the page does not jump.
+18. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
+19. In simulation mode, treat midnight on the selected date as the reference time, label the selected and following days explicitly, and forecast from the supplied starting battery percentage.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 
@@ -72,6 +81,10 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When target planning is unavailable or limited, then the tooltip reports `Calculation unavailable` or `Best effort` and shows the planner reason directly below the target values.
 - When tomorrow's prices exist but no NZ+ or charging-capable NZ± slot exists in the loaded schedule, then the tooltip explains that prices and the solar-charge anchor are independent inputs.
 - When the five-minute schedule-only refresh fails, then keep the last rendered schedule and allow the next refresh or manual reload to recover.
+- When a manual refresh runs while the component is already ready, then keep the last rendered summary and timeline visible until the new data replaces it.
+- When simulation mode is active, then visibility changes and timers do not trigger live schedule refreshes.
+- When simulation prices are unavailable for either day, then show the API error and do not fall back to current prices.
+- When simulation mode shows a net-zero action, then its battery forecast uses the configured household profile rather than historical P1 measurements.
 
 ## Related files
 
@@ -80,3 +93,4 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - [Battery level forecast](battery-forecast.md)
 - [Shared system configuration](../../shared-system-configuration.md)
 - [Target battery planner](../../../main/data/target-battery-planner.md)
+- [Historical rule backtesting](../../backtesting.md)

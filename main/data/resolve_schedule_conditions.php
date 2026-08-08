@@ -853,45 +853,59 @@ function resolveForDate(string $yyyymmdd, array $rules, array $priceByHour, arra
 }
 
 /**
- * Load conditions, resolve for today and tomorrow, return response payload.
+ * Resolve the current saved rules for explicit dates and supplied hourly prices.
  *
- * @return array{success:bool, resolved?:array, error?:string}
+ * This is the reusable, clock-independent entry point used by historical
+ * simulations. The returned groups use the same shape as the HTTP resolver.
+ *
+ * @param string[] $dates
+ * @param array<string, array> $priceMaps keyed by YYYYMMDD
  */
-function runResolve(): array
-{
-    $conditionsResult = readJsonFileWithError(CONDITIONS_FILE);
-    if ($conditionsResult['error'] !== null) {
-        return ['success' => false, 'error' => $conditionsResult['error']];
+function resolveRuleGroupsForDates(
+    array $dates,
+    array $priceMaps,
+    ?array $rawRules = null,
+    ?array $rawProfileConfig = null,
+    ?array $installation = null
+): array {
+    if ($rawRules === null) {
+        $conditionsResult = readJsonFileWithError(CONDITIONS_FILE);
+        if ($conditionsResult['error'] !== null) {
+            throw new RuntimeException($conditionsResult['error']);
+        }
+        $rawRules = $conditionsResult['data'];
     }
-    $rawRules = $conditionsResult['data'];
 
     $rules = normalizeRules($rawRules);
-    $profilesResult = readJsonFileWithError(RULE_PROFILES_FILE);
-    $profileConfig = ($profilesResult['error'] === null && is_array($profilesResult['data']))
-        ? normalizeProfileConfig($profilesResult['data'], $rules)
-        : ['active_profile_id' => SHOW_ALL_PROFILE_ID, 'profiles' => []];
-    $systemConfig = loadSystemConfig();
-    $installation = $systemConfig['installation'];
-    $tz = new DateTimeZone($installation['timezone']);
-    date_default_timezone_set($installation['timezone']);
-    $latitude = $installation['latitude'];
-    $longitude = $installation['longitude'];
-    $today = new DateTimeImmutable('now', $tz);
-    $dates = [
-        $today->format('Ymd'),
-        $today->modify('+1 day')->format('Ymd'),
-    ];
+    if ($rawProfileConfig === null) {
+        $profilesResult = readJsonFileWithError(RULE_PROFILES_FILE);
+        $rawProfileConfig = ($profilesResult['error'] === null && is_array($profilesResult['data']))
+            ? $profilesResult['data']
+            : [];
+    }
+    $profileConfig = normalizeProfileConfig($rawProfileConfig, $rules);
+
+    if ($installation === null) {
+        $installation = loadSystemConfig()['installation'];
+    }
+    $timezone = new DateTimeZone((string) $installation['timezone']);
+    $latitude = (float) $installation['latitude'];
+    $longitude = (float) $installation['longitude'];
 
     $resolved = [];
-    foreach ($dates as $dateYmd) {
-        $pricePath = buildPriceFilePath($dateYmd);
-        $priceData = readJsonFileAsArray($pricePath);
-        if ($priceData === null) {
+    foreach (array_values(array_unique($dates)) as $dateYmd) {
+        $dateYmd = (string) $dateYmd;
+        if (preg_match('/^\d{8}$/', $dateYmd) !== 1) {
+            throw new InvalidArgumentException('Invalid rule-resolution date: ' . $dateYmd);
+        }
+        $priceData = $priceMaps[$dateYmd] ?? null;
+        if (!is_array($priceData)) {
             continue;
         }
+
         $ctx = buildPriceContext($priceData);
-        $sunCtx = getSunContextForDate($dateYmd, $latitude, $longitude, $tz);
-        if (!empty($sunCtx)) {
+        $sunCtx = getSunContextForDate($dateYmd, $latitude, $longitude, $timezone);
+        if ($sunCtx !== []) {
             $ctx = array_merge($ctx, $sunCtx);
         }
         $group = [
@@ -903,54 +917,89 @@ function runResolve(): array
             'max_price_hour_am' => $ctx['max_price_hour_am'],
             'max_price_hour_pm' => $ctx['max_price_hour_pm'],
             'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
-            // ranking: key = rank (1 = cheapest), value = hour (0-23)
             'ranking' => $ctx['rank_to_hour'],
             'items' => resolveForDate($dateYmd, $rules, $priceData, $profileConfig, $ctx),
         ];
-        foreach ([
-            'sunrise_time',
-            'sunset_time',
-            'sunrise_hour',
-            'sunset_hour',
-        ] as $sunKey) {
+        foreach (['sunrise_time', 'sunset_time', 'sunrise_hour', 'sunset_hour'] as $sunKey) {
             if (array_key_exists($sunKey, $ctx)) {
                 $group[$sunKey] = $ctx[$sunKey];
             }
         }
         $resolved[] = $group;
     }
+    return $resolved;
+}
 
-    return ['success' => true, 'resolved' => $resolved];
+/**
+ * Load conditions, resolve for today and tomorrow, return response payload.
+ *
+ * @return array{success:bool, resolved?:array, error?:string}
+ */
+function runResolve(): array
+{
+    $systemConfig = loadSystemConfig();
+    $installation = $systemConfig['installation'];
+    $tz = new DateTimeZone($installation['timezone']);
+    date_default_timezone_set($installation['timezone']);
+    $today = new DateTimeImmutable('now', $tz);
+    $dates = [
+        $today->format('Ymd'),
+        $today->modify('+1 day')->format('Ymd'),
+    ];
+
+    $priceMaps = [];
+    foreach ($dates as $dateYmd) {
+        $pricePath = buildPriceFilePath($dateYmd);
+        $priceData = readJsonFileAsArray($pricePath);
+        if ($priceData !== null) {
+            $priceMaps[$dateYmd] = $priceData;
+        }
+    }
+
+    return [
+        'success' => true,
+        'resolved' => resolveRuleGroupsForDates($dates, $priceMaps, null, null, $installation),
+    ];
 }
 
 // --- Request handling ---
 
-$method = $_SERVER['REQUEST_METHOD'] ?? 'CLI';
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
-
-if ($method === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+function shouldRunScheduleConditionsEntrypoint(): bool
+{
+    $script = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    return is_string($script) && $script !== '' && realpath($script) === __FILE__;
 }
 
-if ($method !== 'GET' && $method !== 'CLI') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Method not allowed. Use GET.']);
-    exit();
-}
+if (shouldRunScheduleConditionsEntrypoint()) {
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'CLI';
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
+    header('Content-Type: application/json');
 
-try {
-    $output = runResolve();
-} catch (SystemConfigException $error) {
-    $output = [
-        'success' => false,
-        'error' => 'Shared system configuration: ' . $error->getMessage(),
-    ];
+    if ($method === 'OPTIONS') {
+        http_response_code(200);
+        exit();
+    }
+
+    if ($method !== 'GET' && $method !== 'CLI') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed. Use GET.']);
+        exit();
+    }
+
+    try {
+        $output = runResolve();
+    } catch (SystemConfigException | RuntimeException $error) {
+        $output = [
+            'success' => false,
+            'error' => $error instanceof SystemConfigException
+                ? 'Shared system configuration: ' . $error->getMessage()
+                : $error->getMessage(),
+        ];
+    }
+    if (!$output['success']) {
+        http_response_code(500);
+    }
+    echo json_encode($output, JSON_PRETTY_PRINT);
 }
-if (!$output['success']) {
-    http_response_code(500);
-}
-echo json_encode($output, JSON_PRETTY_PRINT);
