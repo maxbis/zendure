@@ -54,7 +54,7 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 11. Build one battery forecast from the live percentage through the end of tomorrow whenever schedules render or live battery state refreshes.
 12. When a current or future schedule action tooltip opens, show predicted start/now percentage, end percentage, percentage-point change, effective power, and the assumption source.
 13. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
-14. When a runtime battery threshold changes the action during an hour, show the primary-to-fallback power transition; when the hour starts on the threshold, show the fallback power directly.
+14. When a slot has a runtime battery condition, show the least-guaranteed-discharge estimate and label its source `runtime condition · least guaranteed discharge`; do not select primary or fallback from predicted SoC.
 15. When a slot was produced by the discharge-target planner, show the requested reserve at the next solar-capable net-zero slot, anchor time, calculated power, predicted anchor percentage, status, and planner explanation.
 16. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
 17. When the header refresh runs after the component is already ready, keep the current summary and timeline visible and only mark the refresh control busy; reserve the short loading panel for the first load or retry after an error so the page does not jump.
@@ -88,6 +88,7 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When simulation mode shows NZ-, then its battery forecast uses the configured household profile rather than historical P1 measurements.
 - When simulation mode shows unbounded NZ±, then its battery forecast assumes `0 W`; explicit NZ± limits can still force a non-zero estimate.
 - When simulation mode shows NZ+, then its baseline forecast is `0 W` because no solar-export forecast is available; explicit NZ+ limits can still force charging.
+- When simulation mode shows a runtime-conditioned action, then compare its primary and fallback forecast powers and use the smaller discharge magnitude, or `0 W` when either outcome does not discharge.
 
 ## Related files
 

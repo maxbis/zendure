@@ -322,6 +322,9 @@ For `value = "empty_at_solar_charge"`, the conditional resolver also emits `targ
    - When an action is unbounded NZ±, then forecast `0 W` because its future direction is unknown without a solar forecast.
    - When NZ± has explicit limits, then clamp the neutral `0 W` baseline into those limits.
    - When an action is NZ+, then start from a `0 W` forecast and apply explicit charging limits.
+   - When a slot has no runtime condition, then retain the complete statically resolved action.
+   - When a slot has a battery-level runtime condition, then forecast primary and fallback separately and use the least guaranteed discharge: choose the negative value closest to `0 W` when both discharge, otherwise use `0 W`.
+   - When forecasting a runtime fallback, then do not inherit primary `min_power` or `max_power` bounds.
 7. Replace every symbolic target value with calculated fixed watts, calculated NZ+ bounds, or its safe fallback.
 8. Attach optional `planning` metadata for the app tooltip.
 9. Return the full response.

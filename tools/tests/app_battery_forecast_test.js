@@ -95,9 +95,13 @@ assert.deepEqual(HOUSEHOLD_USAGE.slice(8), Array(16).fill(220));
         battery: { ...BATTERY, percent: 31 },
         days: [{ date: DATE, slots: runtimeSlots }]
     });
-    near(forecast[`${DATE}1200`].endPercent, 30);
-    near(forecast[`${DATE}1300`].startPercent, 30);
-    assert.equal(forecast[`${DATE}1200`].usedFallback, true);
+    const hour = forecast[`${DATE}1200`];
+    near(hour.endPercent, 31);
+    near(forecast[`${DATE}1300`].startPercent, 31);
+    assert.equal(hour.estimatedPowerW, 0);
+    assert.equal(hour.source, "runtime_condition_conservative");
+    assert.equal(hour.primaryPowerW, -220);
+    assert.equal(hour.fallbackPowerW, 0);
 }
 
 {
@@ -115,11 +119,10 @@ assert.deepEqual(HOUSEHOLD_USAGE.slice(8), Array(16).fill(220));
     const hour = forecast[`${DATE}0500`];
     near(hour.endPercent, 35 - ((100 / POWER_EFFICIENCY) / 5760) * 100);
     near(hour.estimatedPowerW, -100);
-    assert.equal(hour.source, "household_profile");
-    assert.equal(hour.usedFallback, true);
-    assert.equal(hour.transitionedToFallback, true);
-    near(hour.primaryDurationHours, 0);
-    near(hour.fallbackDurationHours, 1);
+    assert.equal(hour.source, "runtime_condition_conservative");
+    assert.equal(hour.primaryPowerW, -800);
+    assert.equal(hour.fallbackPowerW, -100);
+    assert.equal(hour.transitionedToFallback, false);
 }
 
 {
@@ -135,13 +138,29 @@ assert.deepEqual(HOUSEHOLD_USAGE.slice(8), Array(16).fill(220));
         days: [{ date: DATE, slots: thresholdSlots }]
     });
     const hour = forecast[`${DATE}0500`];
-    const primaryHours = 1 / ((800 / POWER_EFFICIENCY) / 5760 * 100);
-    const expectedEnd = 35 - (((100 * (1 - primaryHours)) / POWER_EFFICIENCY) / 5760) * 100;
-    near(hour.primaryDurationHours, primaryHours);
-    near(hour.fallbackDurationHours, 1 - primaryHours);
-    near(hour.endPercent, expectedEnd);
+    near(hour.endPercent, 36 - ((100 / POWER_EFFICIENCY) / 5760) * 100);
+    near(hour.estimatedPowerW, -100);
+    assert.equal(hour.source, "runtime_condition_conservative");
     assert.equal(hour.primaryPowerW, -800);
     assert.equal(hour.fallbackPowerW, -100);
+}
+
+{
+    const calculatedTargetSlots = slots(0);
+    calculatedTargetSlots[12] = {
+        value: -900,
+        runtime_conditions: [{ field: "electricity_level", op: ">", value: 50 }],
+        fallback_value: "netzero-",
+        planning: { mode: "empty_at_solar_charge" }
+    };
+    const forecast = buildForecast({
+        now: new Date(2026, 7, 5, 12, 0),
+        battery: BATTERY,
+        days: [{ date: DATE, slots: calculatedTargetSlots }]
+    });
+    const hour = forecast[`${DATE}1200`];
+    assert.equal(hour.estimatedPowerW, -900);
+    assert.equal(hour.source, "scheduled_power");
 }
 
 {

@@ -62,6 +62,15 @@ Notes:
 - the editor uses `100 W` steps for these inputs
 - `fallback_value` is optional and independent of `value` type
 
+Forecast treatment:
+
+- When static conditions select a rule, then planning uses the selected action exactly. Fixed discharge remains fixed, and NZ- uses the configured household prediction for that hour.
+- When a rule has a battery-level runtime condition, then planning compares its primary and fallback outcomes instead of deciding the condition from predicted SoC.
+- When both runtime outcomes discharge, then planning uses the smaller discharge magnitude, meaning the signed value closest to `0 W`.
+- When either runtime outcome does not discharge, then planning uses `0 W` and does not rely on uncertain charging.
+- When validating Target @ solar or Target @ next NZ- itself, then planning uses its calculated primary action; conservative branch selection applies to other runtime-conditioned rules before the target anchor.
+- Runtime automation is unchanged and continues evaluating the condition from the live battery level.
+
 ### Target at solar charge
 
 Select this Value Mode when a price or time condition identifies a selling hour and the battery should reach a requested reserve when solar charging starts again.

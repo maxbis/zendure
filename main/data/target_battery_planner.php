@@ -85,55 +85,8 @@ function tbp_flatten_days(array $days, DateTimeZone $timezone): array
     return $flat;
 }
 
-function tbp_runtime_condition_matches(array $condition, float $batteryPercent): bool
+function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour, bool $applyBounds): float
 {
-    $field = (string) ($condition['field'] ?? '');
-    if (!in_array($field, ['electricity_level', 'electric_level', 'electricLevel'], true)) {
-        return true;
-    }
-    if (!isset($condition['value']) || !is_numeric($condition['value'])) {
-        return true;
-    }
-    $expected = (float) $condition['value'];
-    return match ((string) ($condition['op'] ?? '==')) {
-        '>' => $batteryPercent > $expected,
-        '>=' => $batteryPercent >= $expected,
-        '<' => $batteryPercent < $expected,
-        '<=' => $batteryPercent <= $expected,
-        '!=' => $batteryPercent !== $expected,
-        default => $batteryPercent === $expected,
-    };
-}
-
-function tbp_effective_value(array $slot, float $batteryPercent)
-{
-    $conditions = isset($slot['runtime_conditions']) && is_array($slot['runtime_conditions'])
-        ? $slot['runtime_conditions']
-        : [];
-    foreach ($conditions as $condition) {
-        if (is_array($condition) && !tbp_runtime_condition_matches($condition, $batteryPercent)) {
-            return tbp_fallback_value($slot);
-        }
-    }
-    if (($slot['value'] ?? null) === TARGET_BATTERY_MODE) {
-        return tbp_fallback_value($slot);
-    }
-    return $slot['value'] ?? 0;
-}
-
-function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
-{
-    $usesPrimaryValue = ($slot['value'] ?? null) !== TARGET_BATTERY_MODE;
-    $conditions = isset($slot['runtime_conditions']) && is_array($slot['runtime_conditions'])
-        ? $slot['runtime_conditions']
-        : [];
-    foreach ($conditions as $condition) {
-        if (is_array($condition) && !tbp_runtime_condition_matches($condition, $batteryPercent)) {
-            $usesPrimaryValue = false;
-            break;
-        }
-    }
-    $value = tbp_effective_value($slot, $batteryPercent);
     if (is_numeric($value)) {
         return (float) $value;
     }
@@ -146,7 +99,7 @@ function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array
                 : 0.0;
             $power = -$usage;
         }
-        if ($usesPrimaryValue) {
+        if ($applyBounds) {
             if (isset($slot['min_power']) && is_numeric($slot['min_power'])) {
                 $power = max($power, (float) $slot['min_power']);
             }
@@ -157,6 +110,28 @@ function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array
         return $power;
     }
     return 0.0;
+}
+
+function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
+{
+    $value = $slot['value'] ?? 0;
+    if ($value === TARGET_BATTERY_MODE) {
+        return tbp_power_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
+    }
+
+    $conditions = isset($slot['runtime_conditions']) && is_array($slot['runtime_conditions'])
+        ? array_values(array_filter($slot['runtime_conditions'], 'is_array'))
+        : [];
+    if (count($conditions) === 0) {
+        return tbp_power_for_value($value, $slot, $hour, $usageByHour, true);
+    }
+
+    $primaryPower = tbp_power_for_value($value, $slot, $hour, $usageByHour, true);
+    $fallbackPower = tbp_power_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
+
+    // Runtime outcomes are uncertain during planning. Use only the least
+    // guaranteed discharge and never assume conditional charging.
+    return min(0.0, max($primaryPower, $fallbackPower));
 }
 
 function tbp_apply_power(
@@ -461,8 +436,11 @@ function tbp_materialize_horizon(
         );
 
         $entry['slot']['value'] = $calculatedPowerW;
-        $flat[$targetIndex]['slot'] = $entry['slot'];
-        $predictedPercent = tbp_forecast_to_index($flat, $anchorIndex, $now, $battery, $usageByHour, $efficiency);
+        $validationFlat = $flat;
+        $validationTargetSlot = $entry['slot'];
+        unset($validationTargetSlot['runtime_conditions']);
+        $validationFlat[$targetIndex]['slot'] = $validationTargetSlot;
+        $predictedPercent = tbp_forecast_to_index($validationFlat, $anchorIndex, $now, $battery, $usageByHour, $efficiency);
         $status = $predictedPercent <= $targetPercent + 0.25 ? 'achievable' : 'best_effort';
         $reason = $status === 'achievable'
             ? 'Calculated discharge reaches the target within forecast tolerance.'
@@ -601,6 +579,7 @@ function tbp_materialize_horizon(
             $candidateFlat[$index]['slot']['value'] = 'netzero+';
             $candidateFlat[$index]['slot']['min_power'] = 0;
             $candidateFlat[$index]['slot']['max_power'] = $maximumPowerW;
+            unset($candidateFlat[$index]['slot']['runtime_conditions']);
         }
 
         $predictedStartPercent = tbp_forecast_to_index(

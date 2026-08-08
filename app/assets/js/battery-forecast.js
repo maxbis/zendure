@@ -48,32 +48,24 @@
             .filter((condition) => condition && BATTERY_FIELDS.has(String(condition.field || "")));
     }
 
-    function conditionMatches(condition, batteryPercent) {
-        const expected = finiteNumber(condition.value);
-        if (expected === null) return true;
-        switch (String(condition.op || "==")) {
-            case ">": return batteryPercent > expected;
-            case ">=": return batteryPercent >= expected;
-            case "<": return batteryPercent < expected;
-            case "<=": return batteryPercent <= expected;
-            case "!=": return batteryPercent !== expected;
-            case "==":
-            case "=": return batteryPercent === expected;
-            default: return true;
-        }
-    }
-
-    function resolveRuntimeSlot(slot, batteryPercent) {
+    function conservativeRuntimePower(slot, hour, householdUsageWByHour) {
         const conditions = batteryConditions(slot);
-        if (!conditions.length || conditions.every((condition) => conditionMatches(condition, batteryPercent))) {
-            return { slot, primary: true, usedFallback: false, conditions };
-        }
-
+        if (!conditions.length) return null;
+        const primaryPower = effectivePower(slot, hour, householdUsageWByHour, true);
+        const fallbackSlot = {
+            value: Object.prototype.hasOwnProperty.call(slot || {}, "fallback_value")
+                ? slot.fallback_value
+                : 0
+        };
+        const fallbackPower = effectivePower(fallbackSlot, hour, householdUsageWByHour, false);
         return {
-            slot: { value: Object.prototype.hasOwnProperty.call(slot || {}, "fallback_value") ? slot.fallback_value : 0 },
-            primary: false,
-            usedFallback: true,
-            conditions
+            power: {
+                powerW: Math.min(0, Math.max(primaryPower.powerW, fallbackPower.powerW)),
+                source: "runtime_condition_conservative",
+                mode: "runtime-conservative"
+            },
+            primaryPower,
+            fallbackPower
         };
     }
 
@@ -114,24 +106,6 @@
         return { powerW, source, mode };
     }
 
-    function runtimeBoundary(conditions, powerW) {
-        if (powerW < 0) {
-            const floors = conditions
-                .filter((condition) => [">", ">="].includes(String(condition.op || "")))
-                .map((condition) => finiteNumber(condition.value))
-                .filter((value) => value !== null);
-            return floors.length ? { type: "floor", percent: Math.max(...floors) } : null;
-        }
-        if (powerW > 0) {
-            const ceilings = conditions
-                .filter((condition) => ["<", "<="].includes(String(condition.op || "")))
-                .map((condition) => finiteNumber(condition.value))
-                .filter((value) => value !== null);
-            return ceilings.length ? { type: "ceiling", percent: Math.min(...ceilings) } : null;
-        }
-        return null;
-    }
-
     function forecastDeltaPercent(powerW, durationHours, capacityWh, efficiency) {
         if (powerW < 0) return -((Math.abs(powerW) * durationHours / efficiency) / capacityWh) * 100;
         if (powerW > 0) return ((powerW * durationHours * efficiency) / capacityWh) * 100;
@@ -143,72 +117,6 @@
         if (deltaPercent > 0 && startPercent >= maximumPercent) return startPercent;
         if (deltaPercent === 0) return startPercent;
         return clamp(startPercent + deltaPercent, minimumPercent, maximumPercent);
-    }
-
-    function transitionToFallback({
-        boundary,
-        startPercent,
-        durationHours,
-        primaryPower,
-        originalSlot,
-        hour,
-        householdUsageWByHour,
-        capacityWh,
-        efficiency,
-        minimumPercent,
-        maximumPercent
-    }) {
-        if (!boundary || primaryPower.powerW === 0) return null;
-        if (boundary.type === "floor" && boundary.percent < minimumPercent) return null;
-        if (boundary.type === "ceiling" && boundary.percent > maximumPercent) return null;
-
-        const percentPerHour = forecastDeltaPercent(primaryPower.powerW, 1, capacityWh, efficiency);
-        const distancePercent = boundary.type === "floor"
-            ? startPercent - boundary.percent
-            : boundary.percent - startPercent;
-        const ratePercentPerHour = Math.abs(percentPerHour);
-        if (distancePercent < 0 || ratePercentPerHour <= 0) return null;
-
-        const primaryDurationHours = distancePercent / ratePercentPerHour;
-        if (primaryDurationHours > durationHours) return null;
-
-        const fallbackDurationHours = Math.max(0, durationHours - primaryDurationHours);
-        if (fallbackDurationHours <= 1e-9) return null;
-
-        const fallbackSlot = {
-            value: Object.prototype.hasOwnProperty.call(originalSlot || {}, "fallback_value")
-                ? originalSlot.fallback_value
-                : 0
-        };
-        const fallbackPower = effectivePower(fallbackSlot, hour, householdUsageWByHour, false);
-        const fallbackDeltaPercent = forecastDeltaPercent(
-            fallbackPower.powerW,
-            fallbackDurationHours,
-            capacityWh,
-            efficiency
-        );
-        const endPercent = constrainedEndPercent(
-            boundary.percent,
-            fallbackDeltaPercent,
-            minimumPercent,
-            maximumPercent
-        );
-
-        return {
-            endPercent,
-            estimatedPowerW: (
-                (primaryPower.powerW * primaryDurationHours)
-                + (fallbackPower.powerW * fallbackDurationHours)
-            ) / durationHours,
-            source: fallbackPower.source,
-            mode: fallbackPower.mode,
-            usedFallback: true,
-            transitionedToFallback: true,
-            primaryPowerW: primaryPower.powerW,
-            fallbackPowerW: fallbackPower.powerW,
-            primaryDurationHours,
-            fallbackDurationHours
-        };
     }
 
     function validBatteryState(battery) {
@@ -261,13 +169,13 @@
                 if (durationHours <= 0) continue;
 
                 const originalSlot = slots[hour] || { value: "auto" };
-                const resolved = resolveRuntimeSlot(originalSlot, runningPercent);
-                const power = effectivePower(
-                    resolved.slot,
-                    hour,
-                    householdUsageWByHour,
-                    resolved.primary
-                );
+                const plannedTargetMode = String(originalSlot?.planning?.mode || "");
+                const isCalculatedTarget = ["empty_at_solar_charge", "full_at_netzero_minus"].includes(plannedTargetMode);
+                const conservativeRuntime = isCalculatedTarget
+                    ? null
+                    : conservativeRuntimePower(originalSlot, hour, householdUsageWByHour);
+                const power = conservativeRuntime?.power
+                    ?? effectivePower(originalSlot, hour, householdUsageWByHour, true);
                 const startPercent = runningPercent;
                 const rawDeltaPercent = forecastDeltaPercent(
                     power.powerW,
@@ -281,22 +189,6 @@
                     normalizedBattery.minimumPercent,
                     normalizedBattery.maximumPercent
                 );
-
-                const boundary = resolved.primary ? runtimeBoundary(resolved.conditions, power.powerW) : null;
-                const fallbackTransition = resolved.primary ? transitionToFallback({
-                    boundary,
-                    startPercent,
-                    durationHours,
-                    primaryPower: power,
-                    originalSlot,
-                    hour,
-                    householdUsageWByHour,
-                    capacityWh: normalizedBattery.capacityWh,
-                    efficiency: validEfficiency,
-                    minimumPercent: normalizedBattery.minimumPercent,
-                    maximumPercent: normalizedBattery.maximumPercent
-                }) : null;
-                if (fallbackTransition) endPercent = fallbackTransition.endPercent;
                 endPercent = clamp(endPercent, 0, 100);
 
                 const key = `${day.date}${pad(hour)}00`;
@@ -309,16 +201,16 @@
                     deltaPercent: endPercent - startPercent,
                     estimatedPowerW: Math.abs(endPercent - startPercent) < 1e-9
                         ? 0
-                        : fallbackTransition?.estimatedPowerW ?? power.powerW,
+                        : power.powerW,
                     durationHours,
-                    source: fallbackTransition?.source ?? power.source,
-                    mode: fallbackTransition?.mode ?? power.mode,
-                    usedFallback: fallbackTransition?.usedFallback ?? resolved.usedFallback,
-                    transitionedToFallback: fallbackTransition?.transitionedToFallback ?? false,
-                    primaryPowerW: fallbackTransition?.primaryPowerW ?? null,
-                    fallbackPowerW: fallbackTransition?.fallbackPowerW ?? (resolved.usedFallback ? power.powerW : null),
-                    primaryDurationHours: fallbackTransition?.primaryDurationHours ?? null,
-                    fallbackDurationHours: fallbackTransition?.fallbackDurationHours ?? (resolved.usedFallback ? durationHours : null),
+                    source: power.source,
+                    mode: power.mode,
+                    usedFallback: false,
+                    transitionedToFallback: false,
+                    primaryPowerW: conservativeRuntime?.primaryPower.powerW ?? null,
+                    fallbackPowerW: conservativeRuntime?.fallbackPower.powerW ?? null,
+                    primaryDurationHours: null,
+                    fallbackDurationHours: null,
                     currentHour: slotStart <= currentTime && slotEnd > currentTime
                 };
                 runningPercent = endPercent;

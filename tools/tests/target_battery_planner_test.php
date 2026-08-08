@@ -87,6 +87,16 @@ $boundedBidirectionalPower = tbp_power_for_slot([
     'max_power' => 800,
 ], 12, 60.0, $forecastUsage);
 plannerTestAssert($boundedBidirectionalPower === 300.0, 'Explicit NZ± bounds must still apply to the neutral forecast baseline.');
+$staticDischargePower = tbp_power_for_slot([
+    'value' => -1000,
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($staticDischargePower === -1000.0, 'A deterministic fixed discharge must retain its configured forecast power.');
+$conservativeRuntimeDischargePower = tbp_power_for_slot([
+    'value' => -1000,
+    'runtime_conditions' => [['field' => 'electricity_level', 'op' => '>', 'value' => 30]],
+    'fallback_value' => 'netzero-',
+], 12, 60.0, $forecastUsage);
+plannerTestAssert($conservativeRuntimeDischargePower === -220.0, 'A runtime-conditioned discharge must use the least guaranteed discharge outcome.');
 $fallbackPower = tbp_power_for_slot([
     'value' => 'netzero+',
     'min_power' => 800,
@@ -107,6 +117,32 @@ plannerTestAssert($targetSlot['planning']['status'] === 'achievable', 'Expected 
 plannerTestAssert($targetSlot['planning']['anchor_date'] === '20260806', 'Expected tomorrow solar-charge anchor.');
 plannerTestAssert($targetSlot['planning']['anchor_time'] === '0800', 'Expected 08:00 solar-charge anchor.');
 plannerTestAssert($targetSlot['planning']['predicted_anchor_soc_percent'] <= 15.3, 'Prediction should reach target tolerance.');
+
+$conditionalCleanupDays = plannerTestDays();
+$conditionalCleanupDays[1]['items'][6] = [
+    'time' => '0600',
+    'value' => -1000,
+    'runtime_conditions' => [['field' => 'electricity_level', 'op' => '>', 'value' => 30]],
+    'fallback_value' => 'netzero-',
+];
+$conditionalCleanup = tbp_materialize_horizon($conditionalCleanupDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+$conditionalCleanupTarget = $conditionalCleanup[0]['items'][20];
+plannerTestAssert($conditionalCleanupTarget['value'] === -900, 'Target @ solar must size against the runtime rule least-discharge outcome, including the NZ- household estimate.');
+plannerTestAssert($conditionalCleanupTarget['planning']['status'] === 'achievable', 'The conservative conditional-cleanup scenario must remain achievable.');
+
+$guardedTargetDays = $conditionalCleanupDays;
+$guardedTargetDays[0]['items'][20]['runtime_conditions'] = [['field' => 'electricity_level', 'op' => '>', 'value' => 50]];
+$guardedTargetDays[0]['items'][20]['fallback_value'] = 'netzero-';
+$guardedTarget = tbp_materialize_horizon($guardedTargetDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+plannerTestAssert($guardedTarget[0]['items'][20]['value'] === -900, 'A guarded Target @ solar rule must retain its calculated primary action.');
+plannerTestAssert($guardedTarget[0]['items'][20]['planning']['status'] === 'achievable', 'Target validation must forecast its own calculated primary action while later runtime rules remain conservative.');
+
+$staticCleanupDays = plannerTestDays();
+$staticCleanupDays[1]['items'][6] = ['time' => '0600', 'value' => -1000];
+$staticCleanup = tbp_materialize_horizon($staticCleanupDays, $battery, $now, ['max_discharge_power_w' => 1600]);
+$staticCleanupTarget = $staticCleanup[0]['items'][20];
+plannerTestAssert($staticCleanupTarget['value'] === 'netzero-', 'Target @ solar must retain a deterministic future discharge instead of treating it as uncertain.');
+plannerTestAssert($staticCleanupTarget['planning']['status'] === 'already_satisfied', 'A deterministic future discharge that reaches the target must satisfy the baseline forecast.');
 
 $bidirectionalDays = plannerTestDays();
 $bidirectionalDays[1]['items'][8]['value'] = 'netzero';
@@ -188,6 +224,17 @@ foreach ([10, 11, 13] as $hour) {
     plannerTestAssert($slot['planning']['baseline_anchor_soc_percent'] === 60.0, 'Baseline forecast must reach the anchor without forced target charging.');
     plannerTestAssert($slot['planning']['predicted_anchor_soc_percent'] >= 89.75, 'Selected minimum must forecast within target tolerance.');
 }
+
+$guardedChargeDays = plannerChargeTestDays();
+foreach ([10, 11, 13] as $hour) {
+    $guardedChargeDays[0]['items'][$hour]['runtime_conditions'] = [['field' => 'electricity_level', 'op' => '<', 'value' => 95]];
+    $guardedChargeDays[0]['items'][$hour]['fallback_value'] = 'netzero';
+}
+$guardedCharge = tbp_materialize_horizon($guardedChargeDays, $chargeBattery, $chargeNow, [
+    'max_charge_power_w' => 1600,
+]);
+plannerTestAssert($guardedCharge[0]['items'][10]['min_power'] === 1200, 'Guarded Target @ next NZ- slots must forecast their calculated primary charging minimum.');
+plannerTestAssert($guardedCharge[0]['items'][10]['planning']['status'] === 'achievable', 'A runtime guard on the calculated charge target must not suppress its planning candidate.');
 
 $partialChargeNow = new DateTimeImmutable('2026-08-05 10:30:00', $timezone);
 $partialCharge = tbp_materialize_horizon(plannerChargeTestDays(), $chargeBattery, $partialChargeNow, [

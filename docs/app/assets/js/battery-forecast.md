@@ -43,8 +43,8 @@ The forecast receives:
 - Mode and assumption source.
 - Interval duration.
 - Whether it is the partial current hour.
-- Whether a runtime fallback was selected.
-- Primary and fallback powers and durations when the action changes at a battery threshold during the hour.
+- The forecast assumption source, including `runtime_condition_conservative` for runtime-conditioned slots.
+- Primary and fallback candidate powers used to select the least guaranteed discharge.
 
 ## Flow and behavior
 
@@ -53,15 +53,14 @@ The forecast receives:
 3. Skip schedule hours that have already ended.
 4. When processing the current hour, use only the minutes remaining until the next whole hour.
 5. When processing a later hour, use a one-hour duration.
-6. Evaluate battery-level runtime conditions against the predicted percentage at the start of the hour.
-7. When the runtime conditions fail, use the slot's fallback value without inheriting the primary action's power limits.
-8. Convert the effective schedule action to forecast power.
-9. Apply dynamic `min_power` and `max_power` limits to primary net-zero actions.
-10. Convert power and duration into a battery percentage change.
-11. When the primary action reaches a runtime battery threshold before the hour ends, calculate the time spent on the primary action.
-12. Apply the configured fallback action for the remainder of that hour without inheriting the primary action's power limits.
-13. Clamp the final result to the configured battery operating range.
-14. Use the predicted end percentage as the next hour's start percentage.
+6. When a slot has a battery-level runtime condition, convert its primary and fallback actions separately into forecast power.
+7. Apply dynamic `min_power` and `max_power` limits only to the primary net-zero action; the fallback does not inherit them.
+8. For a runtime-conditioned slot, use the smaller discharge magnitude when both outcomes discharge; otherwise use `0 W` so the forecast assumes neither uncertain discharge nor uncertain charging.
+9. When a resolved slot contains calculated Target @ solar or Target @ next NZ- planning metadata, use its calculated primary action even when that target rule retains a runtime guard.
+10. When a slot has no runtime condition, convert its resolved static action directly into forecast power.
+11. Convert power and duration into a battery percentage change.
+12. Clamp the final result to the configured battery operating range.
+13. Use the predicted end percentage as the next hour's start percentage.
 
 ### Action assumptions
 
@@ -72,6 +71,8 @@ The forecast receives:
 - When the action is `netzero+`, then assume 0 W because no solar/export forecast is available; explicit dynamic limits can still produce a bounded charge value.
 - When the action is standby, then use 0 W.
 - When the action is automatic or unknown, then use 0 W and label the assumption as unknown.
+- When a runtime condition can select `-1000 W` or NZ- at a `200 W` household estimate, then forecast `-200 W` as the least guaranteed discharge.
+- When a runtime condition can select charging or a neutral action, then forecast `0 W` rather than relying on uncertain charging.
 
 ### Energy conversion
 
@@ -94,10 +95,10 @@ percentage change = (watts × hours × efficiency ÷ capacity Wh) × 100
 - When the shared configuration is invalid, then the PHP entry point does not render the normal application.
 - When the battery is already at or below its configured minimum, then do not predict additional discharge.
 - When the battery is already at or above its configured maximum, then do not predict additional charge.
-- When a discharging primary rule reaches its lower battery threshold, then switch to the configured fallback for the remaining time; only a zero-power fallback keeps the prediction at the threshold.
-- When a charging primary rule reaches its upper battery threshold, then switch to the configured fallback for the remaining time; only a zero-power fallback keeps the prediction at the threshold.
-- When the predicted hour starts exactly on an inclusive threshold and the primary action would immediately cross it, then give the primary action zero duration and use the fallback for the full interval.
-- When the primary action and fallback both operate during one hour, then expose both powers and durations so the tooltip can show the transition.
+- When predicted SoC is above or below a runtime threshold, then do not select a branch from that predicted value; use the least guaranteed discharge across both possible outcomes.
+- When both runtime outcomes discharge equally, then retain that shared discharge value.
+- When primary bounds force a direction but the fallback is neutral, then use `0 W` because that forced primary action is not guaranteed to run.
+- When live automation evaluates the runtime condition, then it can still use the more aggressive primary action; the forecast policy does not change runtime control.
 - When a household profile entry is missing or invalid, then use 0 W for that hour.
 - The model does not predict solar generation, unexpected household loads, controller ramping, or schedule changes made after calculation.
 

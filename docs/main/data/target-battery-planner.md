@@ -91,6 +91,18 @@ The current hour uses only its remaining minutes. Manual exact schedule entries 
 
 During target planning, unbounded NZ± slots are forecast as battery-neutral (`0 W`) because their future charge or discharge direction is unknown without a solar forecast. Explicit NZ± minimum and maximum power bounds still clamp that neutral baseline. NZ- continues to use forecast household consumption.
 
+Static conditions are resolved before target planning. Their selected action is therefore deterministic and contributes its complete forecast power: fixed watts remain fixed, NZ- uses the household prediction for that hour, and bounded net-zero modes apply their explicit bounds.
+
+Battery-level runtime conditions are not resolved from a predicted SoC. For each runtime-conditioned slot, the planner forecasts both the primary action and its fallback, then uses the least guaranteed discharge:
+
+- When both outcomes discharge, then use the smaller discharge magnitude, which is the signed value closest to `0 W`.
+- When either outcome does not discharge, then use `0 W` and do not assume uncertain charging.
+- When the primary action has net-zero power bounds, then apply those bounds only to the primary outcome; the fallback does not inherit them.
+
+For example, a runtime rule with primary `-1000 W` and fallback NZ- at a forecast household load of `200 W` contributes `-200 W`. The same `-1000 W` action selected by static conditions contributes the full `-1000 W`. This policy prevents earlier target calculations and later SoC-dependent rules from forming a circular forecast dependency; the later runtime rule remains free to discharge more aggressively from the live SoC.
+
+When evaluating a calculated target action, the planner forecasts that target slot's calculated primary power even when the target rule itself has a runtime guard. This applies to fixed Target @ solar discharge and to stepped Target @ next NZ- charging candidates. The least-guaranteed-discharge policy applies to other runtime-conditioned slots in the remaining path. Automation still evaluates each target rule's guard from live SoC and may select its fallback at runtime.
+
 ## Edge cases and failure modes
 
 - When live battery percentage is unavailable, then emit the fallback and `unavailable` planning status.
@@ -100,7 +112,7 @@ During target planning, unbounded NZ± slots are forecast as battery-neutral (`0
 - When the baseline forecast is already at or below the target, then emit the fallback with `already_satisfied` status.
 - When the required discharge exceeds a power cap, then emit the capped fixed value and `best_effort` status.
 - When the target rule hour has ended, then emit the fallback with `past` status.
-- When a runtime condition is present, then automation can still select the rule fallback at runtime; the editor should avoid redundant battery-level conditions for this mode.
+- When a runtime condition is present, then planning uses its least guaranteed discharge while automation continues selecting the primary or fallback action from live battery data.
 - When household usage differs from the fixed profile, then actual battery percentage can differ from the forecast.
 - When live battery percentage is unavailable for a charge target, then emit its configured fallback or unbounded NZ+ and report `unavailable`.
 - When no future NZ- exists within today and tomorrow, then emit the charge fallback and explain that the anchor is unavailable.
