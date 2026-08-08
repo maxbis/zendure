@@ -313,7 +313,7 @@
         details.className = "app-price-summary-tooltip__prices app-energy-hour-tooltip__details";
         const direction = row.wh > 0 ? "charged" : row.wh < 0 ? "discharged" : "idle";
         const flowLabel = row.wh > 0 ? "Charged" : row.wh < 0 ? "Discharged" : "Energy flow";
-        const flowValue = row.wh === 0 ? "None" : formatEnergy(row.wh);
+        const flowValue = row.wh === 0 ? "None" : formatEnergy(row.wh, true);
         details.appendChild(hourTooltipRow(flowLabel, flowValue, direction));
 
         if (row.battery === null) {
@@ -462,7 +462,7 @@
 
     function hourAriaLabel(row, previousBattery) {
         const direction = row.wh > 0 ? "charged" : row.wh < 0 ? "discharged" : "no battery flow";
-        const energy = row.wh === 0 ? "" : ` ${formatEnergy(row.wh)}`;
+        const energy = row.wh === 0 ? "" : ` ${formatEnergy(row.wh, true)}`;
         const battery = row.battery === null
             ? "Battery level unavailable."
             : previousBattery === null
@@ -816,8 +816,8 @@
         const totals = totalsForDays(days);
         const money = moneyTotalsForDays(days);
         const energyNet = totals.charged - totals.discharged;
-        setEnergySummaryValue(elements.charged, totals.charged);
-        setEnergySummaryValue(elements.discharged, totals.discharged);
+        setEnergySummaryValue(elements.charged, totals.charged, true);
+        setEnergySummaryValue(elements.discharged, -totals.discharged, true);
         setEnergySummaryValue(elements.pnl, energyNet, true);
         elements.pnl.dataset.direction = energyNet > 0 ? "charged" : energyNet < 0 ? "discharged" : "idle";
         setSummaryTooltip(elements.chargedSummary, {
@@ -825,14 +825,14 @@
             energy: totals.charged,
             consumer: money.consumer.charged.eur,
             spot: money.spot.charged.eur,
-            signed: false
+            signed: true
         });
         setSummaryTooltip(elements.dischargedSummary, {
             label: "Discharged",
-            energy: totals.discharged,
+            energy: -totals.discharged,
             consumer: money.consumer.discharged.eur,
             spot: money.spot.discharged.eur,
-            signed: false
+            signed: true
         });
         setSummaryTooltip(elements.pnlSummary, {
             label: "PnL",

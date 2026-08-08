@@ -20,10 +20,11 @@ Render the `/app` four-day battery energy chart and the selected-day summary car
 ## Flow / behavior
 
 1. Load hourly energy and per-day `priceTotals`.
-2. Charged and Discharged energy are absolute Wh totals for the selected day.
-3. The PnL card energy value remains physical net: `chargedWh - dischargedWh`.
+2. Summary cards show signed energy: Charged as `+…`, Discharged as `−…`, PnL as net `+/−…`.
+3. The PnL card energy value is physical net: `chargedWh - dischargedWh`.
 4. Money PnL is `dischargedEur - chargedEur` for both consumer and spot.
-5. When charge happened at a negative spot price, charged spot euros can be negative; that increases PnL.
+5. When charge happened at a negative spot price, charged spot euros are negative; that increases PnL (`discharged - (−charged) = discharged + chargedBenefit`).
+6. Charged, Discharged, and PnL tooltips, plus hourly flow labels, all show signed euro/energy amounts so signs stay visible and the PnL arithmetic matches the parts.
 
 ## Edge cases / failure modes
 

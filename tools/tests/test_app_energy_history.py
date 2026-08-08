@@ -182,6 +182,11 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
 
     assert 'label: "PnL"' in energy_js
     assert "discharged.eur - charged.eur" in energy_js
+    assert "setEnergySummaryValue(elements.charged, totals.charged, true)" in energy_js
+    assert "setEnergySummaryValue(elements.discharged, -totals.discharged, true)" in energy_js
+    assert "formatEnergy(row.wh, true)" in energy_js
+    assert "signed: true" in energy_js
+    assert "signed: false" not in energy_js
 
     helper = HELPER_FILE.read_text(encoding="utf-8")
     assert "'pnl' =>" in helper
