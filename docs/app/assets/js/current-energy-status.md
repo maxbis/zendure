@@ -31,7 +31,8 @@ The battery detail dialog uses these Zendure status fields:
 
 The component also uses the configured battery capacity and minimum and maximum charge percentages to calculate:
 
-- Total stored energy in kWh.
+- Total stored energy in kWh (used on the battery card and accessibility text).
+- Five percent of the configured usable range and of full capacity in kWh (`usable = (max − min) × capacity × 0.05`, `real = capacity × 0.05`), shown in the Energy dialog as `usable/real kWh`.
 - Usable energy above the configured minimum charge percentage.
 - Chargeable energy in kWh: remaining energy that can still be charged up to the configured maximum charge percentage.
 - Projected usable energy and usable-range percentage at the next whole hour.
@@ -59,7 +60,7 @@ With a 1200 W directional limit, an active flow below 60 W therefore shows one c
 6. Activating a trigger opens the non-modal dialog on its Energy view.
 7. The dialog header shows the current view title and a Graphite Signal Dark close control.
 8. The Energy view opens with a usable-range summary strip: current SoC, percent of the configured min–max window, a filled track with SoC marker, and min/max labels. When current battery power would change SoC over the next 60 minutes, a dimmed fill shows the projected usable-range level (clamped to the configured min/max window).
-9. The Energy view then shows total stored energy, usable energy, chargeable energy, battery power, and projected usable energy at the next whole hour.
+9. The Energy view then shows how much energy 5% of the usable and real ranges equal, usable energy, chargeable energy, battery power, and projected usable energy at the next whole hour.
 10. Activating **Health** in the footer slides to the Health view.
 11. The Health view opens with a controller-temperature summary strip on a −5°C…+50°C scale, coloured with the same dynamic temperature colour as the value, then shows controller temperature, each reported battery pack's percentage and temperature, and controller Wi-Fi signal. Temperature and Wi-Fi values use the same dynamic colours as the old GUI battery details (`schedule_renderer.js`).
 12. Activating **Energy** in the footer returns to the Energy view.

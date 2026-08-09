@@ -655,11 +655,32 @@
         const slider = document.createElement("div");
         slider.className = "app-battery-popover__slider";
 
+        const capacityKwh = Number.isFinite(detail.capacityWh) ? detail.capacityWh / 1000 : null;
+        const usableRangeFraction = (
+            Number.isFinite(detail.minimumPercent)
+            && Number.isFinite(detail.maximumPercent)
+            && detail.maximumPercent > detail.minimumPercent
+        )
+            ? (detail.maximumPercent - detail.minimumPercent) / 100
+            : null;
+        const fivePercentUsableKwh = (
+            capacityKwh !== null
+            && usableRangeFraction !== null
+        )
+            ? capacityKwh * usableRangeFraction * 0.05
+            : null;
+        const fivePercentRealKwh = capacityKwh !== null ? capacityKwh * 0.05 : null;
+        const fivePercentCopy = (
+            Number.isFinite(fivePercentUsableKwh)
+            && Number.isFinite(fivePercentRealKwh)
+        )
+            ? `${fivePercentUsableKwh.toFixed(2)}/${fivePercentRealKwh.toFixed(2)} kWh`
+            : "—";
         const energyPanel = createBatteryPopoverPanel("energy", detail, [
-            ["Total stored energy", formatKwh(detail.storedKwh)],
-            ["Usable energy", formatKwh(detail.usableKwh)],
-            ["Chargeable energy", formatKwh(detail.emptyKwh)],
-            ["Battery power", detail.rate],
+            ["5% usable/real range equals", fivePercentCopy],
+            ["Usable energy left", formatKwh(detail.usableKwh)],
+            ["Chargeable energy available", formatKwh(detail.emptyKwh)],
+            ["Current battery flow rate", detail.rate],
             [
                 `Usable energy @ ${detail.projectionTime}`,
                 `${formatKwh(detail.projectedUsableKwh)} (${Math.round(detail.projectedUsablePercent)}%)`
@@ -1224,7 +1245,7 @@
                 segment.style.setProperty("--app-battery-segment-fill", `${fillPercent.toFixed(2)}%`);
             });
             batteryPopoverDetails.set(elements.batteryIcon, {
-                title: "Battery energy",
+                title: "Battery usable energy",
                 ...batteryHealthValues(model),
                 batteryPercent: model.batteryPercent,
                 minimumPercent: model.minimumPercent,
