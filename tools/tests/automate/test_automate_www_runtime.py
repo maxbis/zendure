@@ -2360,6 +2360,7 @@ def test_base_logger_debug_never_dedups_even_with_message_key(capsys):
     device_controller = _import_device_controller_module()
     controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
     controller.log_level = "DEBUG"
+    controller.timezone = ZoneInfo("Europe/Amsterdam")
     controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
 
     device_controller.BaseDeviceController.log(controller, "debug", "debug trace", message_key="debug_trace")
@@ -2373,6 +2374,7 @@ def test_base_logger_only_dedups_keyed_non_debug_logs(capsys):
     device_controller = _import_device_controller_module()
     controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
     controller.log_level = "DEBUG"
+    controller.timezone = ZoneInfo("Europe/Amsterdam")
     controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
 
     device_controller.BaseDeviceController.log(controller, "info", "same event", message_key="same_event")
@@ -2389,6 +2391,7 @@ def test_base_logger_dedup_is_separated_by_level(capsys):
     device_controller = _import_device_controller_module()
     controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
     controller.log_level = "DEBUG"
+    controller.timezone = ZoneInfo("Europe/Amsterdam")
     controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
 
     device_controller.BaseDeviceController.log(controller, "info", "same key", message_key="shared_key")
@@ -2402,6 +2405,7 @@ def test_base_logger_keyed_log_can_emit_again_after_window_rollover(capsys):
     device_controller = _import_device_controller_module()
     controller = device_controller.BaseDeviceController.__new__(device_controller.BaseDeviceController)
     controller.log_level = "DEBUG"
+    controller.timezone = ZoneInfo("Europe/Amsterdam")
     controller._recent_log_messages = deque(maxlen=device_controller.BaseDeviceController._RECENT_LOG_WINDOW)
 
     device_controller.BaseDeviceController.log(controller, "info", "target", message_key="target")
@@ -3343,7 +3347,7 @@ def test_api_slow_charge_max_power_validation_and_missing_controller():
         runtime.cleanup()
 
 
-def test_api_charge_level_get_and_post_normalizes_values():
+def test_api_charge_level_get_is_read_only_and_reports_shared_source():
     runtime = _start_test_api_server()
     try:
         runtime.controller.min_charge_level = 15
@@ -3353,73 +3357,57 @@ def test_api_charge_level_get_and_post_normalizes_values():
         assert get_min_response.status_code == 200
         assert get_min_response.json()["minChargeLevel"] == 15
         assert get_min_response.json()["maxChargeLevel"] == 93
+        assert get_min_response.json()["readOnly"] is True
+        assert get_min_response.json()["source"] == "common/config/system.json"
 
         get_max_response = requests.get(f"{runtime.base_url}/api/max_charge_level", timeout=2)
         assert get_max_response.status_code == 200
         assert get_max_response.json()["minChargeLevel"] == 15
         assert get_max_response.json()["maxChargeLevel"] == 93
 
-        post_min_response = requests.post(f"{runtime.base_url}/api/min_charge_level?value=93", timeout=2)
-        assert post_min_response.status_code == 200
-        assert post_min_response.json()["minChargeLevel"] == 93
-        assert post_min_response.json()["maxChargeLevel"] == 93
-        assert runtime.controller.min_charge_level == 93
+        post_min_response = requests.post(f"{runtime.base_url}/api/min_charge_level?value=20", timeout=2)
+        assert post_min_response.status_code == 405
+        assert post_min_response.json()["readOnly"] is True
+        assert post_min_response.json()["source"] == "common/config/system.json"
+        assert runtime.controller.min_charge_level == 15
         assert runtime.controller.max_charge_level == 93
 
         post_max_response = requests.post(f"{runtime.base_url}/api/max_charge_level?value=20", timeout=2)
-        assert post_max_response.status_code == 200
-        assert post_max_response.json()["minChargeLevel"] == 20
-        assert post_max_response.json()["maxChargeLevel"] == 20
-        assert runtime.controller.min_charge_level == 20
-        assert runtime.controller.max_charge_level == 20
-        assert runtime.events["controller_logs"][-1][0] == "info"
-        assert "MIN_CHARGE_LEVEL 93 -> 20%" in runtime.events["controller_logs"][-1][1]
-        assert "MAX_CHARGE_LEVEL 93 -> 20%" in runtime.events["controller_logs"][-1][1]
-
-        clamp_min_response = requests.post(f"{runtime.base_url}/api/min_charge_level?value=150", timeout=2)
-        assert clamp_min_response.status_code == 200
-        assert clamp_min_response.json()["minChargeLevel"] == 100
-        assert clamp_min_response.json()["maxChargeLevel"] == 100
-        assert runtime.controller.min_charge_level == 100
-        assert runtime.controller.max_charge_level == 100
-
-        clamp_max_response = requests.post(f"{runtime.base_url}/api/max_charge_level?value=-10", timeout=2)
-        assert clamp_max_response.status_code == 200
-        assert clamp_max_response.json()["minChargeLevel"] == 0
-        assert clamp_max_response.json()["maxChargeLevel"] == 0
-        assert runtime.controller.min_charge_level == 0
-        assert runtime.controller.max_charge_level == 0
+        assert post_max_response.status_code == 405
+        assert post_max_response.json()["readOnly"] is True
+        assert runtime.controller.min_charge_level == 15
+        assert runtime.controller.max_charge_level == 93
     finally:
         runtime.cleanup()
 
 
-def test_api_charge_level_validation_and_missing_controller():
+def test_api_charge_level_posts_remain_read_only_without_controller():
     runtime = _start_test_api_server()
     try:
         missing_min_value = requests.post(f"{runtime.base_url}/api/min_charge_level", timeout=2)
-        assert missing_min_value.status_code == 400
+        assert missing_min_value.status_code == 405
 
         invalid_min_value = requests.post(f"{runtime.base_url}/api/min_charge_level?value=abc", timeout=2)
-        assert invalid_min_value.status_code == 400
+        assert invalid_min_value.status_code == 405
 
         missing_max_value = requests.post(f"{runtime.base_url}/api/max_charge_level", timeout=2)
-        assert missing_max_value.status_code == 400
+        assert missing_max_value.status_code == 405
 
         invalid_max_value = requests.post(f"{runtime.base_url}/api/max_charge_level?value=abc", timeout=2)
-        assert invalid_max_value.status_code == 400
+        assert invalid_max_value.status_code == 405
 
         runtime.server.controller = None
         missing_controller_get_min = requests.get(f"{runtime.base_url}/api/min_charge_level", timeout=2)
         assert missing_controller_get_min.status_code == 503
 
         missing_controller_post_min = requests.post(f"{runtime.base_url}/api/min_charge_level?value=25", timeout=2)
-        assert missing_controller_post_min.status_code == 503
+        assert missing_controller_post_min.status_code == 405
 
         missing_controller_get_max = requests.get(f"{runtime.base_url}/api/max_charge_level", timeout=2)
         assert missing_controller_get_max.status_code == 503
 
         missing_controller_post_max = requests.post(f"{runtime.base_url}/api/max_charge_level?value=80", timeout=2)
-        assert missing_controller_post_max.status_code == 503
+        assert missing_controller_post_max.status_code == 405
     finally:
         runtime.cleanup()
 

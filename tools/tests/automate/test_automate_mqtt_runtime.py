@@ -655,6 +655,7 @@ def test_log_startup_includes_charge_level_limits():
     app.controller = SimpleNamespace(
         log_level="INFO",
         config_path=Path("/tmp/config.jsonc"),
+        system_config_path=Path("/tmp/common/config/system.json"),
         min_charge_level=15,
         max_charge_level=93,
         max_discharge_power=800,
@@ -675,3 +676,4 @@ def test_log_startup_includes_charge_level_limits():
         "Battery SoC limits: MIN_CHARGE_LEVEL=15%, MAX_CHARGE_LEVEL=93%" in message
         for message in captured
     )
+    assert any("Shared system config: /tmp/common/config/system.json" in message for message in captured)

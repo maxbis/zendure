@@ -357,7 +357,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
 
           <div class="command-group">
             <div class="command-group-title">Runtime Overrides</div>
-            <div class="command-group-desc">Adjust the runtime <code>NETZERO_TARGET_W</code> target and battery charge limits used by automation.</div>
+            <div class="command-group-desc">Adjust the runtime <code>NETZERO_TARGET_W</code> target used by automation.</div>
             <div class="control-form">
               <div class="control-row">
                 <div class="control-input-wrap">
@@ -367,19 +367,8 @@ foreach ($groupedCommands as $groupKey => $commands) {
                 <button id="netzeroTargetSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Target</button>
               </div>
               <div class="control-help-inline">Use negative values to prefer export, positive values to prefer import, and <code>0</code> for exact netzero.</div>
-              <div class="control-row">
-                <div class="control-input-wrap">
-                  <label class="control-label" for="minChargeLevelInput">Min Charge %</label>
-                  <input id="minChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="15">
-                </div>
-                <div class="control-input-wrap">
-                  <label class="control-label" for="maxChargeLevelInput">Max Charge %</label>
-                  <input id="maxChargeLevelInput" class="control-input" type="number" step="1" min="0" max="100" inputmode="numeric" placeholder="93">
-                </div>
-                <button id="chargeLevelSubmit" type="button" class="btn btn-refresh command-btn netzero-submit">Set Charge Limits</button>
-              </div>
             </div>
-            <div class="control-help">Charge limits are runtime-only percentages and are normalized so min never exceeds max.</div>
+            <div class="control-help">Battery charge limits are read-only here and come from <code>common/config/system.json</code>. Restart automation after changing that file.</div>
           </div>
         </div>
 
@@ -411,9 +400,6 @@ foreach ($groupedCommands as $groupKey => $commands) {
       var buttons = Array.prototype.slice.call(document.querySelectorAll('.command-btn'));
       var netzeroInput = document.getElementById('netzeroTargetInput');
       var netzeroSubmit = document.getElementById('netzeroTargetSubmit');
-      var minChargeLevelInput = document.getElementById('minChargeLevelInput');
-      var maxChargeLevelInput = document.getElementById('maxChargeLevelInput');
-      var chargeLevelSubmit = document.getElementById('chargeLevelSubmit');
       var proxyUrl = <?= json_encode($commandProxyUrl, JSON_UNESCAPED_SLASHES) ?>;
       var commands = <?= json_encode($commandUi, JSON_UNESCAPED_SLASHES) ?>;
 
@@ -507,35 +493,6 @@ foreach ($groupedCommands as $groupKey => $commands) {
           });
       }
 
-      function applyChargeLevelPayload(payload) {
-        if (typeof payload.upstreamBody === 'object' && payload.upstreamBody !== null) {
-          payload = payload.upstreamBody;
-        }
-        if (minChargeLevelInput && typeof payload.minChargeLevel !== 'undefined') {
-          minChargeLevelInput.value = String(payload.minChargeLevel);
-        }
-        if (maxChargeLevelInput && typeof payload.maxChargeLevel !== 'undefined') {
-          maxChargeLevelInput.value = String(payload.maxChargeLevel);
-        }
-      }
-
-      function loadChargeLevels() {
-        if (!minChargeLevelInput && !maxChargeLevelInput) {
-          return;
-        }
-        fetch(proxyUrl + '?command=get_min_charge_level', {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        })
-          .then(parseJsonResponse)
-          .then(applyChargeLevelPayload)
-          .catch(function () {
-            // Keep page usable if the initial value fetch fails.
-          });
-      }
-
       function submitNetzeroTarget() {
         if (!netzeroInput || !netzeroSubmit) {
           return;
@@ -574,102 +531,6 @@ foreach ($groupedCommands as $groupKey => $commands) {
           });
       }
 
-      function parseWholePercent(rawValue) {
-        var trimmed = String(rawValue || '').trim();
-        if (!/^-?\d+$/.test(trimmed)) {
-          return null;
-        }
-        return Number(trimmed);
-      }
-
-      function submitChargeLevel(commandKey, inputEl, label) {
-        if (!inputEl || !chargeLevelSubmit) {
-          return;
-        }
-        var value = parseWholePercent(inputEl.value);
-        if (value === null) {
-          setStatus(label + ' failed: enter a whole number percentage.', 'err');
-          return;
-        }
-
-        setButtonsDisabled(true);
-        setStatus('Sending command: ' + label + ' ...');
-
-        fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ command: commandKey, value: value })
-        })
-          .then(parseJsonResponse)
-          .then(function (payload) {
-            applyChargeLevelPayload(payload);
-            setStatus(payload.message || (label + ' updated.'), 'ok');
-          })
-          .catch(function (err) {
-            var msg = (err && err.message) ? String(err.message) : 'Unknown error';
-            setStatus(label + ' failed: ' + msg, 'err');
-          })
-          .finally(function () {
-            setButtonsDisabled(false);
-          });
-      }
-
-      function submitChargeLimits() {
-        if (!minChargeLevelInput || !maxChargeLevelInput || !chargeLevelSubmit) {
-          return;
-        }
-        var minValue = parseWholePercent(minChargeLevelInput.value);
-        var maxValue = parseWholePercent(maxChargeLevelInput.value);
-        if (minValue === null || maxValue === null) {
-          setStatus('Set Charge Limits failed: enter whole number percentages for min and max.', 'err');
-          return;
-        }
-
-        var normalizedMin = minValue;
-        var normalizedMax = maxValue;
-        if (normalizedMin > normalizedMax) {
-          normalizedMax = normalizedMin;
-        }
-
-        setButtonsDisabled(true);
-        setStatus('Sending command: Set Charge Limits ...');
-
-        fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ command: 'set_min_charge_level', value: normalizedMin })
-        })
-          .then(parseJsonResponse)
-          .then(function () {
-            return fetch(proxyUrl, {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ command: 'set_max_charge_level', value: normalizedMax })
-            });
-          })
-          .then(parseJsonResponse)
-          .then(function (payload) {
-            applyChargeLevelPayload(payload);
-            setStatus(payload.message || ('Charge limits set to MIN=' + normalizedMin + '% MAX=' + normalizedMax + '%'), 'ok');
-          })
-          .catch(function (err) {
-            var msg = (err && err.message) ? String(err.message) : 'Unknown error';
-            setStatus('Set Charge Limits failed: ' + msg, 'err');
-          })
-          .finally(function () {
-            setButtonsDisabled(false);
-          });
-      }
-
       function maybeConfirmAndRun(commandKey) {
         var cfg = commands[commandKey];
         if (!cfg) return;
@@ -697,30 +558,11 @@ foreach ($groupedCommands as $groupKey => $commands) {
       if (netzeroSubmit) {
         netzeroSubmit.addEventListener('click', submitNetzeroTarget);
       }
-      if (chargeLevelSubmit) {
-        chargeLevelSubmit.addEventListener('click', submitChargeLimits);
-      }
       if (netzeroInput) {
         netzeroInput.addEventListener('keydown', function (event) {
           if (event.key === 'Enter') {
             event.preventDefault();
             submitNetzeroTarget();
-          }
-        });
-      }
-      if (minChargeLevelInput) {
-        minChargeLevelInput.addEventListener('keydown', function (event) {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            submitChargeLevel('set_min_charge_level', minChargeLevelInput, 'Set Min Charge Level');
-          }
-        });
-      }
-      if (maxChargeLevelInput) {
-        maxChargeLevelInput.addEventListener('keydown', function (event) {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            submitChargeLevel('set_max_charge_level', maxChargeLevelInput, 'Set Max Charge Level');
           }
         });
       }
@@ -743,7 +585,6 @@ foreach ($groupedCommands as $groupKey => $commands) {
       });
 
       loadNetzeroTarget();
-      loadChargeLevels();
     })();
   </script>
   <?php endif; ?>

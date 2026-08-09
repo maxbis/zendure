@@ -1021,9 +1021,11 @@ class AutomationApp:
     def _log_startup(self) -> None:
         self.logger.info("🚀 Starting charge schedule automation script")
         self.logger.info(f"ℹ  LOG LEVEL: {getattr(self.controller, 'log_level', 'INFO')}")
-        # Show config path and charge level limits derived from config.jsonc
         self.logger.info(
-            f"   Config file: {os.path.abspath(str(self.controller.config_path))}"
+            f"   Automation config: {os.path.abspath(str(self.controller.config_path))}"
+        )
+        self.logger.info(
+            f"   Shared system config: {os.path.abspath(str(self.controller.system_config_path))}"
         )
         self.logger.info(
             f"   Battery SoC limits: MIN_CHARGE_LEVEL={self.controller.min_charge_level}%, "

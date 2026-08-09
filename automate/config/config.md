@@ -1,6 +1,6 @@
 # Automate config reference
 
-This file documents every key in `config.jsonc`. The config is used only by the **automate** scripts (primarily `automate_www.py`, plus `device_controller.py` and `dump_status_updates.py`).
+This file documents every automation-local key in `config.jsonc`. The config is used only by the **automate** scripts (primarily `automate_www.py`, plus `device_controller.py` and `dump_status_updates.py`). Shared battery and installation settings are documented in [`docs/common/config/system-configuration.md`](../../docs/common/config/system-configuration.md).
 
 ## Comments in config.jsonc
 
@@ -38,10 +38,10 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 ## Battery SoC limits
 
+The authoritative minimum and maximum state-of-charge limits are `battery.minChargePercent` and `battery.maxChargePercent` in `common/config/system.json`. Do not add `MIN_CHARGE_LEVEL` or `MAX_CHARGE_LEVEL` to this local file; automation ignores those legacy keys.
+
 | Key | Type | Description | Where used |
 |-----|------|-------------|------------|
-| **MIN_CHARGE_LEVEL** | number | Minimum state-of-charge (%), 0–100. Below this, discharge is prevented. | `device_controller.py`: `BaseDeviceController` (`min_charge_level`). Used in `automate_www.py` when deciding charge/discharge limits. |
-| **MAX_CHARGE_LEVEL** | number | Maximum state-of-charge (%), 0–100. Above this, charge is prevented. | Same as `MIN_CHARGE_LEVEL`. |
 | **SLOW_CHARGE_START_LEVEL** | number | Optional SoC threshold (%), 0–100, where dynamic charging starts being capped near full battery. Only applies to dynamic modes (`netzero`, `netzero+`). | `device_controller.py`: `BaseDeviceController` (`slow_charge_start_level`), applied in `_calculate_new_settings()`. |
 | **SLOW_CHARGE_MAX_POWER** | number | Optional maximum dynamic charge power (W) once `SLOW_CHARGE_START_LEVEL` is reached. Disabled unless both slow-charge keys are present and valid. Explicit fixed power commands are not affected. | `device_controller.py`: `BaseDeviceController` (`slow_charge_max_power`), applied in `_calculate_new_settings()`. |
 
@@ -49,10 +49,7 @@ Do not put block comments between a key and its value (e.g. `"key": /* comment *
 
 ## Power caps
 
-| Key | Type | Description | Where used |
-|-----|------|-------------|------------|
-| **MAX_DISCHARGE_POWER** | number | Maximum allowed discharge power in watts. Outgoing negative power-feed commands are clamped to this limit. | `device_controller.py`: `BaseDeviceController` (`max_discharge_power`) and `ZendureDeviceController.send_power_feed()`. |
-| **MAX_CHARGE_POWER** | number | Maximum allowed charge power in watts. Outgoing positive power-feed commands are clamped to this limit. | Same as `MAX_DISCHARGE_POWER`. |
+The authoritative controller caps are `battery.maxDischargePowerW` and `battery.maxChargePowerW` in `common/config/system.json`. Do not add `MAX_DISCHARGE_POWER` or `MAX_CHARGE_POWER` to this local file; automation ignores those legacy keys.
 
 ---
 

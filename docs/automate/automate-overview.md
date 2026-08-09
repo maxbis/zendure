@@ -8,7 +8,7 @@ This directory contains Python scripts for automating the control of a Zendure S
 
 This module provides object-oriented wrappers for interacting with the Zendure battery and related devices. Power-meter access is abstracted separately in `power_metere_loader.py`.
 
-- **`BaseDeviceController`**: A base class that handles common tasks like loading `automate/config/config.jsonc` and logging.
+- **`BaseDeviceController`**: A base class that loads automation-local settings plus the shared system configuration and handles logging.
 
 - **`PowerAccumulator`**: A standalone class that tracks power-feed energy (watt-hours) across multiple time periods (quarter-hour, hour, day, and manual). Automatically handles period boundary crossings and rollovers.
 
@@ -16,7 +16,7 @@ This module provides object-oriented wrappers for interacting with the Zendure b
     - Set specific charge or discharge power levels.
     - Implement a `netzero` mode that reduces grid import/export toward the configured target.
     - Implement a `netzero+` mode that only charges to reduce grid export toward the configured target.
-    - Respect battery charge level limits (e.g., not charging above 90% or discharging below 20%).
+    - Respect the shared 15% minimum and 91% maximum battery charge limits.
     - Use `PowerAccumulator` to track and log power usage over time.
     - Put the device into standby mode when appropriate.
 
@@ -47,7 +47,7 @@ Older documentation and deployments may refer to `automate.py`. In this reposito
 
 ## How it Works
 
-1.  **Configuration**: The scripts read their configuration from `automate/config/config.jsonc`. This file contains details like the Zendure device IP, typed power-meter configuration, and schedule/data API URLs.
+1.  **Configuration**: The scripts read device, meter and operational settings from `automate/config/config.jsonc`. They read battery limits, command caps and installation timezone from `common/config/system.json`.
 
 2.  **Scheduling**: An external web service provides a schedule in JSON format. The `ScheduleController` fetches this schedule. The schedule defines what the battery should be doing at different times of the day (e.g., charge at 1000W, discharge at 500W, or run in net-zero mode).
 
@@ -61,7 +61,7 @@ Dynamic mode summary:
 - `netzero` = dynamic import/export balancing mode that aims for `NETZERO_TARGET_W`; with `NETZERO_BI_DIRECTIONAL=false` it does not actively charge, with `true` it may charge and discharge
 - `netzero+` = charge-only mode that aims for `NETZERO_TARGET_W` and never actively discharges
 - signed `min_power` / `max_power` clamp the raw dynamic result before `ReversalRampGuard`
-- `MAX_DISCHARGE_POWER` / `MAX_CHARGE_POWER` are enforced inside dynamic calculation and again as final safety clamps before the device write
+- shared `battery.maxDischargePowerW` / `battery.maxChargePowerW` are enforced inside dynamic calculation and again as final safety clamps before the device write
 
 5.  **Monitoring**: The script stores status updates in a local SQLite database and exposes them through the built-in HTTP API, which the web app can read for health and activity.
 

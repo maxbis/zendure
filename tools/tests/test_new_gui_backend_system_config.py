@@ -97,7 +97,10 @@ def test_migrated_json_endpoints_fail_closed_on_invalid_shared_config(restore_sy
             '$_SERVER["REQUEST_METHOD"]="GET";'
             f'include {json.dumps(str(ENERGY_HISTORY_API))};'
         ),
-        f'include {json.dumps(str(SCHEDULE_RESOLVER))};',
+        (
+            f'$_SERVER["SCRIPT_FILENAME"]={json.dumps(str(SCHEDULE_RESOLVER))};'
+            f'include {json.dumps(str(SCHEDULE_RESOLVER))};'
+        ),
     ]
 
     for php in endpoint_calls:

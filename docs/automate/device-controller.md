@@ -2,13 +2,15 @@
 
 This file provides a set of Python classes designed to interact with and control a Zendure SuperBase V battery system and associated web APIs for scheduling. Power-meter access is handled separately through the config-driven loader in `power_metere_loader.py`.
 
-## Global Constants
+## Configuration sources
 
--   `TEST_MODE` (bool): Loaded from `automate/config/config.jsonc` (key: `"TEST_MODE"`). If `True`, control operations are simulated (logged) but not actually sent to the device. Defaults to `False` if the key is missing.
--   `MIN_CHARGE_LEVEL` (int): Config-driven minimum battery percentage below which the system will stop discharging. Falls back to `20` if the key is missing.
--   `MAX_CHARGE_LEVEL` (int): Config-driven maximum battery percentage above which the system will stop charging. Falls back to `90` if the key is missing.
--   `MAX_DISCHARGE_POWER` (int): Config-driven maximum allowed power feed in watts for discharge. Falls back to `800` if the key is missing.
--   `MAX_CHARGE_POWER` (int): Config-driven maximum allowed power feed in watts for charge. Falls back to `1200` if the key is missing.
+-   `TEST_MODE` remains local to `automate/config/config.jsonc`. If enabled, control operations are simulated but are not sent to the device.
+-   `battery.minChargePercent` from `common/config/system.json` is the lower state-of-charge boundary. The current value is 15%.
+-   `battery.maxChargePercent` from `common/config/system.json` is the upper state-of-charge boundary. The current value is 91%.
+-   `battery.maxDischargePowerW` and `battery.maxChargePowerW` from `common/config/system.json` are the final outgoing command caps. Both are currently 1200 W.
+-   `installation.timezone` from `common/config/system.json` controls timestamps and schedule-local dates.
+
+The shared loader is strict. Missing, malformed or invalid shared configuration prevents controller construction; the controller does not substitute local safety fallbacks.
 
 ## `PowerResult` Data Class
 
@@ -26,10 +28,10 @@ This is the foundational class that provides common functionality to all other c
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the controller. It finds and loads `automate/config/config.jsonc`.
+-   **Description**: Initializes the controller. It finds and loads `automate/config/config.jsonc`, then loads and validates `common/config/system.json`.
 -   **Arguments**:
     -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it uses `automate/config/config.jsonc`.
--   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.
+-   **Raises**: `FileNotFoundError` if a configuration file cannot be found. `ValueError` or `SystemConfigError` if local or shared configuration is invalid.
 
 ### `_find_config_file(self) -> Path`
 
@@ -229,7 +231,7 @@ Inherits from `BaseDeviceController`. This class is responsible for managing the
 
 ### `__init__(self, config_path: Optional[Path] = None)`
 
--   **Description**: Initializes the controller. It finds and loads `automate/config/config.jsonc` and sets up for schedule management. The timezone is set to 'Europe/Amsterdam' for schedule calculations.
+-   **Description**: Initializes the controller. It loads both configuration sources and uses shared `installation.timezone` for schedule calculations.
 -   **Arguments**:
     -   `config_path` (Optional): An explicit path to the configuration file. If not provided, it uses the standard automate config location.
 -   **Raises**: `FileNotFoundError` if the config file cannot be found. `ValueError` if the JSON is invalid.

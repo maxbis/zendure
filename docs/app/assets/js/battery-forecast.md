@@ -33,7 +33,8 @@ The forecast receives:
 `forecast.defaultHouseholdUsageWByHour` in `common/config/system.json` contains 24 validated values:
 
 - When the hour starts from 00:00 through 07:00, then expected household usage is 100 W.
-- When the hour starts from 08:00 through 23:00, then expected household usage is 220 W.
+- When the hour starts from 08:00 through 20:00, then expected household usage is 220 W.
+- When the hour starts from 21:00 through 23:00, then expected household usage is 160 W.
 
 `buildForecast()` returns an object keyed by the full schedule key `YYYYMMDDHH00`. Each predicted hour contains:
 

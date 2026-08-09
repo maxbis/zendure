@@ -18,21 +18,19 @@ from typing import Optional, Tuple, Dict, Any, Union, Literal, List
 from zoneinfo import ZoneInfo
 
 import requests
-from config_loader import load_config as load_config_json
+from config_loader import (
+    SYSTEM_CONFIG_PATH,
+    load_config as load_config_json,
+    load_system_config,
+)
 
 
 # ============================================================================
 # GLOBAL CONSTANTS
 # ============================================================================
 
-# NOTE: TEST_MODE is now configurable via config.jsonc (key: "TEST_MODE").
-# This global remains for backward compatibility, but is overridden at runtime
-# when BaseDeviceController loads the config.
+# TEST_MODE remains automation-local and is overridden from config.jsonc.
 TEST_MODE = False               # If True, operations are simulated but not applied
-MIN_CHARGE_LEVEL = 20          # Legacy default min SoC (%) (config key: MIN_CHARGE_LEVEL)
-MAX_CHARGE_LEVEL = 90          # Legacy default max SoC (%) (config key: MAX_CHARGE_LEVEL)
-MAX_DISCHARGE_POWER = 1000      # Legacy default max discharge power (config key: MAX_DISCHARGE_POWER)
-MAX_CHARGE_POWER = 1200        # Legacy default max charge power (config key: MAX_CHARGE_POWER)
 
 
 # ============================================================================
@@ -168,6 +166,10 @@ class BaseDeviceController:
         """
         self.config_path = config_path or self._find_config_file()
         self.config = self._load_config(self.config_path)
+        self.system_config = load_system_config()
+        self.system_config_path = SYSTEM_CONFIG_PATH
+        self.timezone_name = str(self.system_config["installation"]["timezone"])
+        self.timezone = ZoneInfo(self.timezone_name)
         raw_log_level = str(self.config.get("LOG_LEVEL", self._DEFAULT_LOG_LEVEL)).upper()
         self.log_level = (
             raw_log_level
@@ -181,34 +183,26 @@ class BaseDeviceController:
         self.test_mode = bool(self.config.get("TEST_MODE", TEST_MODE))
         TEST_MODE = self.test_mode
 
-        # Battery SoC limits (single source of truth: config.jsonc)
-        # Fallbacks are the legacy defaults (20/90) when keys are missing.
+        # Battery limits and power caps are authoritative in common/config/system.json.
         def _parse_int_config(key: str, default: int) -> int:
             try:
                 return int(self.config.get(key, default))
             except (TypeError, ValueError):
                 return int(default)
 
-        min_soc = _parse_int_config("MIN_CHARGE_LEVEL", MIN_CHARGE_LEVEL)
-        max_soc = _parse_int_config("MAX_CHARGE_LEVEL", MAX_CHARGE_LEVEL)
-        max_discharge_power = _parse_int_config("MAX_DISCHARGE_POWER", MAX_DISCHARGE_POWER)
-        max_charge_power = _parse_int_config("MAX_CHARGE_POWER", MAX_CHARGE_POWER)
+        battery_config = self.system_config["battery"]
+        min_soc = int(battery_config["minChargePercent"])
+        max_soc = int(battery_config["maxChargePercent"])
+        max_discharge_power = int(battery_config["maxDischargePowerW"])
+        max_charge_power = int(battery_config["maxChargePowerW"])
         netzero_target_w = _parse_int_config("NETZERO_TARGET_W", 0)
         slow_charge_start_level_raw = self.config.get("SLOW_CHARGE_START_LEVEL")
         slow_charge_max_power_raw = self.config.get("SLOW_CHARGE_MAX_POWER")
 
-        # Clamp to [0, 100]
-        min_soc = max(0, min(100, min_soc))
-        max_soc = max(0, min(100, max_soc))
-
-        # Normalize to avoid nonsensical configs
-        if min_soc > max_soc:
-            max_soc = min_soc
-
         self.min_charge_level = min_soc
         self.max_charge_level = max_soc
-        self.max_discharge_power = max(0, max_discharge_power)
-        self.max_charge_power = max(0, max_charge_power)
+        self.max_discharge_power = max_discharge_power
+        self.max_charge_power = max_charge_power
         self.netzero_target_w = netzero_target_w
         self.slow_charge_start_level = None
         self.slow_charge_max_power = None
@@ -313,8 +307,7 @@ class BaseDeviceController:
 
         # Format timestamp if needed
         if include_timestamp:
-            tz = ZoneInfo('Europe/Amsterdam')
-            timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+            timestamp = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S')
             prefix = f"[{timestamp}]"
         else:
             prefix = ""
@@ -1391,9 +1384,6 @@ class ScheduleController(BaseDeviceController):
     # Config keys
     CONFIG_KEY_SCHEDULE_API_URL = "apiUrl"
 
-    # Timezone
-    TIMEZONE = 'Europe/Amsterdam'
-
     def __init__(self, config_path: Optional[Path] = None):
         """
         Initialize the ScheduleController.
@@ -1415,13 +1405,12 @@ class ScheduleController(BaseDeviceController):
 
     def _get_current_time_str(self) -> str:
         """
-        Get current time in HHMM format using Europe/Amsterdam timezone.
+        Get current time in HHMM format using the shared installation timezone.
 
         Returns:
             Current time as string in "HHMM" format (e.g., "1902")
         """
-        tz = ZoneInfo('Europe/Amsterdam')
-        now = datetime.now(tz=tz)
+        now = datetime.now(tz=self.timezone)
         return now.strftime('%H%M')
 
     def fetch_schedule(self) -> Dict[str, Any]:
@@ -1456,8 +1445,7 @@ class ScheduleController(BaseDeviceController):
 
             # Store resolved array and date
             self.schedule_data = resolved
-            tz = ZoneInfo('Europe/Amsterdam')
-            self.schedule_date = datetime.now(tz=tz).date()
+            self.schedule_date = datetime.now(tz=self.timezone).date()
 
             current_time_str = self._get_current_time_str()
             self.log(
@@ -1567,8 +1555,7 @@ class ScheduleController(BaseDeviceController):
             ValueError: If schedule data is invalid or missing required fields
             requests.exceptions.RequestException: On network errors when refresh=True
         """
-        tz = ZoneInfo('Europe/Amsterdam')
-        today = datetime.now(tz=tz).date()
+        today = datetime.now(tz=self.timezone).date()
 
         # Invalidate the cached schedule when the local day changes so the first
         # lookup after midnight always uses the newly resolved API data.

@@ -1,5 +1,7 @@
 # Configuration consolidation: Phase 2 target values
 
+> Historical decision record: the read-only consolidation described here has now been implemented for both GUIs, their PHP consumers and Raspberry Pi automation. Persistent GUI editing of shared values remains deferred. See [`common/config/system-configuration.md`](common/config/system-configuration.md) for current behavior.
+
 ## Purpose
 
 This document defines the intended values, names and meanings for the future configuration consolidation. It resolves the value decisions needed before a common configuration file and loaders are introduced.
@@ -24,7 +26,7 @@ This decision record is based on:
 - [`main/charge_schedule_mobile.php`](../main/charge_schedule_mobile.php): current old-interface injected configuration.
 - [`automate/device_controller.py`](../automate/device_controller.py): current controller enforcement.
 
-Phase 3 introduced the read-only common file and schema described in [`common/config/system-configuration.md`](common/config/system-configuration.md). No runtime consumer uses them yet.
+Phase 3 introduced the read-only common file and schema described in [`common/config/system-configuration.md`](common/config/system-configuration.md). Subsequent phases migrated both GUIs, their supporting PHP consumers and automation.
 
 ## Inputs and outputs
 
@@ -76,7 +78,7 @@ Meaning:
 
 - The minimum is the persistent lower state-of-charge boundary.
 - The maximum is the persistent upper state-of-charge boundary.
-- Both interfaces, schedule calculations, projections and automation must eventually use the same pair.
+- Both interfaces, schedule calculations, projections and automation use the same pair.
 - The old 93% value in `automate/config/config.jsonc` is not an intended target value.
 
 Validation requirements for the future common configuration:
@@ -88,8 +90,8 @@ Validation requirements for the future common configuration:
 
 Migration rule:
 
-- When automation is eventually switched to the common file, changing its persistent maximum from 93% to 91% is a real controller behaviour change.
-- That switch must be separately visible in the deployment plan and verified against the effective controller state.
+- Switching automation to the common file changed its persistent maximum from 93% to 91%; this was treated as an explicit controller behaviour change.
+- Startup logging and the read-only API expose the effective controller state for deployment verification.
 
 ### Battery efficiency and command caps
 
@@ -112,7 +114,8 @@ Canonical value:
 
 - `forecast.defaultHouseholdUsageWByHour`: 24 local-hour watt values.
 - Hours 00 through 07 use 100 W.
-- Hours 08 through 23 use 220 W.
+- Hours 08 through 20 use 220 W.
+- Hours 21 through 23 use 160 W.
 
 Meaning:
 
@@ -191,7 +194,7 @@ Meaning:
 
 - These are non-negative magnitudes used to clamp outgoing commands.
 - Direction is determined by the command sign, not by storing a negative discharge cap.
-- The canonical declarations are shared, while runtime enforcement remains automation-owned during the initial consolidation.
+- The canonical declarations are shared, while runtime enforcement remains automation-owned.
 
 Phase 2 deliberately preserves the current 1200 W caps. Deciding whether an interface should offer values outside the controller caps is deferred as a separate behavioural and usability decision.
 

@@ -11,14 +11,19 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 from zoneinfo import ZoneInfo
 
+from config_loader import load_system_config
+
+
+_SYSTEM_TIMEZONE = load_system_config()["installation"]["timezone"]
+
 # Wh-per-hour API: timezone and default days
-WH_PER_HOUR_TIMEZONE = "Europe/Amsterdam"
+WH_PER_HOUR_TIMEZONE = _SYSTEM_TIMEZONE
 WH_PER_HOUR_DAYS_DEFAULT = 3
 WH_PER_HOUR_DAYS_MAX = 30
 WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS = 3600  # 1 hour
 
 # Shared timezone for status timestamps
-STATUS_TIMEZONE = "Europe/Amsterdam"
+STATUS_TIMEZONE = _SYSTEM_TIMEZONE
 
 EVENT_TYPE_START = "start"
 EVENT_TYPE_STOP = "stop"

@@ -10,12 +10,12 @@ import os
 import sqlite3
 import sys
 
-from config_loader import load_config
+from config_loader import load_config, load_system_config
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 DEFAULT_DB = os.path.join(os.path.dirname(__file__), "data", "status_updates.db")
-ENERGY_TIMEZONE = "Europe/Amsterdam"
+ENERGY_TIMEZONE = load_system_config()["installation"]["timezone"]
 
 
 def load_db_path() -> str:

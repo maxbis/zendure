@@ -1,5 +1,7 @@
 # Configuration consolidation: Phase 1 baseline
 
+> Historical Phase 1 snapshot: this file records the pre-migration state and intentionally retains old values and flows. For the current ownership model, see [`common/config/system-configuration.md`](common/config/system-configuration.md).
+
 ## Purpose
 
 This document records the configuration state before any consolidation work begins. It is the Phase 1 baseline for moving shared system values toward a common configuration source without changing runtime behaviour.

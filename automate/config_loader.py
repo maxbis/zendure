@@ -8,8 +8,18 @@ Supports:
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any, Dict, Union
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+COMMON_PYTHON_DIR = PROJECT_ROOT / "common" / "python"
+SYSTEM_CONFIG_PATH = PROJECT_ROOT / "common" / "config" / "system.json"
+if str(COMMON_PYTHON_DIR) not in sys.path:
+    sys.path.insert(0, str(COMMON_PYTHON_DIR))
+
+from system_config import load_system_config as load_shared_system_config  # noqa: E402
 
 
 def strip_json_comments(text: str) -> str:
@@ -47,3 +57,9 @@ def load_config(config_path: Union[Path, str]) -> Dict[str, Any]:
         return json.loads(strip_json_comments(text))
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in config file {path}: {e}")
+
+
+def load_system_config() -> Dict[str, Any]:
+    """Load the strict project-wide system configuration."""
+
+    return load_shared_system_config(SYSTEM_CONFIG_PATH)

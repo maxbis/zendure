@@ -2,9 +2,9 @@
 
 ## Purpose
 
-`system.json` is the canonical, non-secret source for system properties that must eventually agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
+`system.json` is the canonical, non-secret source for system properties that must agree across the old interface, new interface, shared PHP calculations and Raspberry Pi automation.
 
-Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers. Both GUIs now consume shared values through the PHP reader; automation still uses its existing configuration source.
+Phase 3 introduced the file and schema. Phase 4 added independently tested PHP and Python readers. Both GUIs consume shared values through the PHP reader, and Raspberry Pi automation consumes its battery limits, power caps and installation timezone through the Python reader.
 
 ## Location
 
@@ -17,7 +17,7 @@ Phase 3 introduced the file and schema. Phase 4 added independently tested PHP a
 - Phase 1 baseline: [`configuration-baseline.md`](../../configuration-baseline.md)
 - Phase 2 decisions: [`configuration-target-values.md`](../../configuration-target-values.md)
 
-The file is inside the synchronized project so the web host and Raspberry Pi can eventually read the same relative project resource.
+The file is inside the synchronized project so the web host and Raspberry Pi read the same relative project resource.
 
 ## Inputs and outputs
 
@@ -32,7 +32,7 @@ The configuration contains:
 - Battery forecast efficiency: 0.9.
 - Maximum charge command magnitude: 1200 W.
 - Maximum discharge command magnitude: 1200 W.
-- Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59 and 220 W from 08:00 through 23:59.
+- Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
 - Schedule range: -1600 through 1600 W.
 - Schedule power step: 100 W.
 - Installation: Amsterdam.
@@ -49,7 +49,7 @@ The configuration contains:
 
 The PHP `loadSystemConfig()` function and Python `load_system_config()` function return the same validated, normalized configuration structure. Both accept an optional file path for tests and otherwise locate `common/config/system.json` relative to their own source file.
 
-The base loaders do not cache the result. Both GUIs and their migrated PHP backend services use the PHP loader; request-level helpers may retain the validated array for the duration of one PHP request. The Python loader remains unused by production automation.
+The base loaders do not cache the result. Both GUIs and their migrated PHP backend services use the PHP loader; request-level helpers may retain the validated array for the duration of one PHP request. Automation loads the Python result once when each controller or timezone-dependent utility process starts.
 
 ## Contract
 
@@ -79,7 +79,7 @@ Required properties:
 
 The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare two sibling numeric properties.
 
-The power-cap properties are canonical declarations but are not automation inputs yet. Until the controlled automation migration, `/automate` continues enforcing its existing local values.
+The power-cap properties are automation inputs. Outgoing battery commands are clamped to these shared positive magnitudes.
 
 ### Forecast
 
@@ -124,24 +124,25 @@ Unknown properties are rejected inside every section.
 
 ## Flow and behaviour
 
-Current flow after both GUI integrations:
+Current flow after the GUI and automation integrations:
 
 1. `system.json` records the approved shared battery, forecast, schedule, installation and price-conversion values.
 2. `system.schema.json` defines its structural contract.
 3. The new GUI loads shared system values through the common PHP loader.
 4. The old GUI loads shared battery, installation-timezone and price-conversion values through the same PHP loader.
 5. The old GUI continues loading web-only settings from `main/config/config.json`.
-6. Existing automation continues loading `automate/config/config.jsonc`.
-7. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
-8. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step.
-9. Web-only routing and display policies remain in `main/config/config.json`. Shared battery, installation and price-conversion fields have been removed from that file.
-10. The Python loader remains available but unused by automation.
-11. Parity and GUI integration tests verify the ownership boundary and strict failure behavior.
+6. Automation loads device, meter, loop and control-tuning settings from `automate/config/config.jsonc`.
+7. Automation loads the battery minimum, battery maximum, charge cap, discharge cap and installation timezone from `system.json` through the strict Python loader.
+8. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
+9. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step.
+10. Web-only routing and display policies remain in `main/config/config.json`. Shared battery, installation and price-conversion fields have been removed from that file.
+11. Automation-local operational and connection settings remain in `automate/config/config.jsonc`. The migrated battery keys have been removed from that local file.
+12. Parity, GUI and automation integration tests verify the ownership boundary and strict failure behavior.
 
-Run the focused Phase 4 tests with:
+Run the shared-loader and automation integration tests with:
 
 ```sh
-python -m pytest -q tools/tests/test_system_config_loaders.py
+pytest -q tools/tests/test_system_config_loaders.py tools/tests/automate/test_shared_system_config.py
 ```
 
 ## Security boundary
@@ -164,9 +165,11 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.
 - When the synchronized file is stale on one host, then valid JSON does not prove both hosts use the same version.
 - When direct web access is not blocked by the active web server, then the current non-secret file could be downloadable; secrets must never be added.
-- When automation eventually switches to this file, then its maximum changes from its current persistent value to the intended shared 91%; that migration needs its own controlled test phase.
-- When automation eventually reads the shared power caps, then its existing 1200 W behavior should remain unchanged because the canonical values match its current persistent values.
-- When shared configuration is changed in `system.json`, then both GUIs pick up the new values through the PHP loader. The old configuration editor only edits web-only keys in `main/config/config.json`.
+- Automation now uses the shared 91% maximum instead of its former local 93% value. This is an intentional controller behavior change.
+- Automation uses the shared 1200 W power caps, preserving its former command-cap behavior.
+- When shared configuration is changed in `system.json`, then both GUIs pick up the new values through the PHP loader on their next request. Automation must be restarted to load the change.
+- The old configuration editor only edits web-only keys in `main/config/config.json`. Persistent editing of shared settings through either GUI remains deferred.
+- The automation API exposes the effective minimum and maximum through GET endpoints. POST requests to those endpoints return HTTP 405 so an in-memory override cannot conflict with the authoritative file.
 
 ## Phase 3 acceptance criteria
 
@@ -188,14 +191,26 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - Both reject minimum state of charge greater than or equal to maximum.
 - Both reject an unrecognized timezone.
 - Neither silently applies a fallback value.
-- Both GUIs may use the PHP loader, while automation remains on its existing source until its own migration phase.
+- Both GUIs use the PHP loader.
+
+## Automation migration acceptance criteria
+
+- Automation resolves the common Python loader without relying on its working directory.
+- Battery minimum, maximum and command caps come only from `system.json`.
+- Schedule dates, status timestamps and hourly energy grouping use `installation.timezone`.
+- Migrated keys are absent from `automate/config/config.jsonc`.
+- Invalid shared configuration prevents controller startup instead of applying fallback safety values.
+- Startup logging identifies both the automation-local and shared configuration files.
+- Charge-limit GET endpoints report that their values are read-only and shared.
+- Charge-limit POST endpoints cannot create a temporary override.
+- Existing dynamic runtime controls such as `NETZERO_TARGET_W` remain unchanged.
 
 ## Related files
 
 - [`main/includes/config_loader.php`](../../../main/includes/config_loader.php): old-GUI loader for remaining web-specific settings.
-- [`automate/config_loader.py`](../../../automate/config_loader.py): current automation JSONC loader.
+- [`automate/config_loader.py`](../../../automate/config_loader.py): automation JSONC loader and bridge to the strict common Python loader.
 - [`main/config/config.json`](../../../main/config/config.json): web-only configuration source for routes, proxies and old-GUI display policies.
-- [`automate/config/config.jsonc`](../../../automate/config/config.jsonc): current automation source.
+- `automate/config/config.jsonc`: deployment-local automation source for device, meter and operational settings; it is intentionally excluded from Git because it can contain installation-specific values.
 - [`main/includes/price_conversion.php`](../../../main/includes/price_conversion.php): common-backed PHP price-conversion consumer.
 - [`app/index.php`](../../../app/index.php): current new-interface configuration injection.
 - [`common/php/system_config.php`](../../../common/php/system_config.php): strict PHP reader.

@@ -59,8 +59,7 @@ The current repository only contains `automate_www.py`. Compared with legacy `au
   - Config override: none
   - Meaning: HTTP API listen port
 - `WH_PER_HOUR_TIMEZONE`
-  - Default: `"Europe/Amsterdam"`
-  - Config override: none
+  - Source: shared `installation.timezone`
   - Meaning: timezone for Wh-per-hour calculation
 - `WH_PER_HOUR_DAYS_DEFAULT`
   - Default: `3`
@@ -138,11 +137,24 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 15. `POST /api/restart`
 - Requests a graceful restart of the automation process.
 
+16. `GET /api/min_charge_level`
+- Returns the effective shared minimum and maximum state-of-charge limits.
+- The response includes `"readOnly": true` and `"source": "common/config/system.json"`.
+
+17. `GET /api/max_charge_level`
+- Returns the same shared read-only state-of-charge payload.
+
+18. `POST /api/min_charge_level`
+- Returns HTTP 405. Runtime state-of-charge overrides are disabled so they cannot diverge from persistent shared configuration.
+
+19. `POST /api/max_charge_level`
+- Returns HTTP 405 for the same reason.
+
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.
 
 ## How It Works
 
-1. **Configuration**: Reads `automate/config/config.jsonc`.
+1. **Configuration**: Reads automation-local settings from `automate/config/config.jsonc` and system-wide battery and timezone values from `common/config/system.json`.
 
 2. **Initialization**: Creates `AutomateController`, `ScheduleController`, `Logger`, `StatusApi` (shared SQLite store + callback), `InputHandler`, `CommandHandler`, initializes the shared power-meter reader, sets up signal handlers, and loads loop config via `_load_loop_config()`.
 
@@ -247,4 +259,4 @@ See [automate-overview.md](automate-overview.md#power-control-logic--behavior) f
 
 ## Wh-per-hour Calculation
 
-The `/api/wh_per_hour` endpoint computes charged and discharged watt-hours per calendar hour from the `status_updates` SQLite table. It uses step integration (power assumed constant between consecutive change readings). The timezone and default day window are configurable via module constants (`WH_PER_HOUR_TIMEZONE`, `WH_PER_HOUR_DAYS_DEFAULT`), and callers may optionally request a larger history window with `?days=N` up to `WH_PER_HOUR_DAYS_MAX`.
+The `/api/wh_per_hour` endpoint computes charged and discharged watt-hours per calendar hour from the `status_updates` SQLite table. It uses step integration (power assumed constant between consecutive change readings). The timezone is derived from shared `installation.timezone`. The default day window remains controlled by `WH_PER_HOUR_DAYS_DEFAULT`, and callers may optionally request a larger history window with `?days=N` up to `WH_PER_HOUR_DAYS_MAX`.
