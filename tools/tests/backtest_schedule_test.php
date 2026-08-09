@@ -107,6 +107,9 @@ if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
     backtestAssert(($scenario['startingBatteryPercent'] ?? null) === 42.5, 'Scenario should retain starting SoC.');
     backtestAssert(count($scenario['schedules']['today'] ?? []) >= 24, 'Scenario should return the selected day schedule.');
     backtestAssert(count($scenario['schedules']['tomorrow'] ?? []) >= 24, 'Scenario should return the following day schedule.');
+    backtestAssert(count($scenario['forecast'] ?? []) >= 48, 'Scenario should return the authoritative two-day forecast.');
+    backtestAssert(abs((float) ($scenario['forecast']['202401150000']['startPercent'] ?? 0) - 42.5) < 0.000001, 'Scenario forecast should start from the requested SoC.');
+    backtestAssert(($scenario['forecastAsOf'] ?? null) === '2024-01-15T00:00:00+01:00', 'Scenario should expose the forecast reference time.');
 }
 
 if ($failures !== []) {

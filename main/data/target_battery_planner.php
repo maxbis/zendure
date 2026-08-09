@@ -85,12 +85,17 @@ function tbp_flatten_days(array $days, DateTimeZone $timezone): array
     return $flat;
 }
 
-function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour, bool $applyBounds): float
+function tbp_power_details_for_value($value, array $slot, int $hour, array $usageByHour, bool $applyBounds): array
 {
-    if (is_numeric($value)) {
-        return (float) $value;
-    }
     $mode = tbp_normalize_mode($value);
+    $source = 'automatic_unavailable';
+    if (is_numeric($value)) {
+        return [
+            'power_w' => (float) $value,
+            'source' => 'scheduled_power',
+            'mode' => $mode,
+        ];
+    }
     if (in_array($mode, ['netzero', 'netzero-', 'netzero+'], true)) {
         $power = 0.0;
         if ($mode === 'netzero-') {
@@ -98,6 +103,11 @@ function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour,
                 ? max(0.0, (float) $usageByHour[$hour])
                 : 0.0;
             $power = -$usage;
+            $source = 'household_profile';
+        } elseif ($mode === 'netzero') {
+            $source = 'bidirectional_neutral';
+        } else {
+            $source = 'solar_forecast_unavailable';
         }
         if ($applyBounds) {
             if (isset($slot['min_power']) && is_numeric($slot['min_power'])) {
@@ -107,31 +117,66 @@ function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour,
                 $power = min($power, (float) $slot['max_power']);
             }
         }
-        return $power;
+        return [
+            'power_w' => $power,
+            'source' => $source,
+            'mode' => $mode,
+        ];
     }
-    return 0.0;
+    if ($mode === 'standby') {
+        $source = 'scheduled_power';
+    }
+    return [
+        'power_w' => 0.0,
+        'source' => $source,
+        'mode' => $mode,
+    ];
 }
 
-function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
+function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour, bool $applyBounds): float
+{
+    return (float) tbp_power_details_for_value($value, $slot, $hour, $usageByHour, $applyBounds)['power_w'];
+}
+
+function tbp_power_details_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): array
 {
     $value = $slot['value'] ?? 0;
     if ($value === TARGET_BATTERY_MODE) {
-        return tbp_power_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
+        return tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false) + [
+            'primary_power_w' => null,
+            'fallback_power_w' => null,
+        ];
     }
 
     $conditions = isset($slot['runtime_conditions']) && is_array($slot['runtime_conditions'])
         ? array_values(array_filter($slot['runtime_conditions'], 'is_array'))
         : [];
-    if (count($conditions) === 0) {
-        return tbp_power_for_value($value, $slot, $hour, $usageByHour, true);
+    $planningMode = isset($slot['planning']['mode']) ? (string) $slot['planning']['mode'] : '';
+    $isCalculatedTarget = in_array($planningMode, [TARGET_BATTERY_MODE, TARGET_CHARGE_MODE], true);
+    if (count($conditions) === 0 || $isCalculatedTarget) {
+        return tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true) + [
+            'primary_power_w' => null,
+            'fallback_power_w' => null,
+        ];
     }
 
-    $primaryPower = tbp_power_for_value($value, $slot, $hour, $usageByHour, true);
-    $fallbackPower = tbp_power_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
+    $primary = tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true);
+    $fallback = tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
 
     // Runtime outcomes are uncertain during planning. Use only the least
     // guaranteed discharge and never assume conditional charging.
-    return min(0.0, max($primaryPower, $fallbackPower));
+    return [
+        'power_w' => min(0.0, max((float) $primary['power_w'], (float) $fallback['power_w'])),
+        'source' => 'runtime_condition_conservative',
+        'mode' => 'runtime-conservative',
+        'primary_power_w' => (float) $primary['power_w'],
+        'fallback_power_w' => (float) $fallback['power_w'],
+    ];
+}
+
+function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
+{
+    return (float) tbp_power_details_for_slot($slot, $hour, $batteryPercent, $usageByHour)['power_w'];
 }
 
 function tbp_apply_power(
@@ -152,15 +197,16 @@ function tbp_apply_power(
     return tbp_clamp($batteryPercent + $deltaPercent, $minimumPercent, $maximumPercent);
 }
 
-function tbp_forecast_to_index(
+function tbp_forecast_flat(
     array $flat,
     int $endIndex,
     DateTimeImmutable $now,
     array $battery,
     array $usageByHour,
     float $efficiency
-): float {
+): array {
     $percent = (float) $battery['percent'];
+    $forecast = [];
     for ($index = 0; $index < $endIndex; $index++) {
         $entry = $flat[$index];
         if ($entry['end'] <= $now) {
@@ -171,18 +217,74 @@ function tbp_forecast_to_index(
             continue;
         }
         $durationHours = ($entry['end']->getTimestamp() - $segmentStart->getTimestamp()) / 3600;
-        $powerW = tbp_power_for_slot($entry['slot'], (int) $entry['start']->format('G'), $percent, $usageByHour);
+        $power = tbp_power_details_for_slot($entry['slot'], (int) $entry['start']->format('G'), $percent, $usageByHour);
+        $startPercent = $percent;
         $percent = tbp_apply_power(
-            $percent,
-            $powerW,
+            $startPercent,
+            (float) $power['power_w'],
             $durationHours,
             (float) $battery['capacity_wh'],
             $efficiency,
             (float) $battery['minimum_percent'],
             (float) $battery['maximum_percent']
         );
+        $key = $entry['date'] . $entry['time'];
+        $forecast[$key] = [
+            'key' => $key,
+            'date' => $entry['date'],
+            'hour' => (int) $entry['start']->format('G'),
+            'startPercent' => $startPercent,
+            'endPercent' => $percent,
+            'deltaPercent' => $percent - $startPercent,
+            'estimatedPowerW' => abs($percent - $startPercent) < 0.000000001 ? 0.0 : (float) $power['power_w'],
+            'durationHours' => $durationHours,
+            'source' => (string) $power['source'],
+            'mode' => (string) $power['mode'],
+            'usedFallback' => false,
+            'transitionedToFallback' => false,
+            'primaryPowerW' => $power['primary_power_w'],
+            'fallbackPowerW' => $power['fallback_power_w'],
+            'primaryDurationHours' => null,
+            'fallbackDurationHours' => null,
+            'currentHour' => $entry['start'] <= $now && $entry['end'] > $now,
+        ];
     }
-    return $percent;
+    return ['end_percent' => $percent, 'hours' => $forecast];
+}
+
+function tbp_forecast_to_index(
+    array $flat,
+    int $endIndex,
+    DateTimeImmutable $now,
+    array $battery,
+    array $usageByHour,
+    float $efficiency
+): float {
+    return (float) tbp_forecast_flat(
+        $flat,
+        $endIndex,
+        $now,
+        $battery,
+        $usageByHour,
+        $efficiency
+    )['end_percent'];
+}
+
+function tbp_build_hourly_forecast(
+    array $days,
+    array $battery,
+    DateTimeImmutable $now,
+    array $options = []
+): array {
+    $sharedConfig = tbp_system_config();
+    $usageByHour = isset($options['usage_w_by_hour']) && is_array($options['usage_w_by_hour'])
+        ? $options['usage_w_by_hour']
+        : $sharedConfig['forecast']['defaultHouseholdUsageWByHour'];
+    $efficiency = isset($options['efficiency']) && is_numeric($options['efficiency'])
+        ? tbp_clamp((float) $options['efficiency'], 0.01, 1.0)
+        : (float) $sharedConfig['battery']['efficiency'];
+    $flat = tbp_flatten_days($days, $now->getTimezone());
+    return tbp_forecast_flat($flat, count($flat), $now, $battery, $usageByHour, $efficiency)['hours'];
 }
 
 function tbp_slot_allows_solar_charge(array $slot): bool

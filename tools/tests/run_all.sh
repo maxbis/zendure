@@ -41,12 +41,12 @@ else
 fi
 
 echo ""
-echo "==> Running app battery forecast tests"
-if node "$SCRIPT_DIR/app_battery_forecast_test.js"; then
+echo "==> Running authoritative battery forecast tests"
+if php "$SCRIPT_DIR/battery_forecast_test.php"; then
   :
 else
   FAILED=1
-  FAILED_SUITES+=("app_battery_forecast")
+  FAILED_SUITES+=("battery_forecast")
 fi
 
 echo ""

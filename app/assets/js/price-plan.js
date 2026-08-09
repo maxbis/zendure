@@ -77,8 +77,9 @@
         schedules: { today: [], tomorrow: [] },
         entries: { today: [], tomorrow: [] },
         ruleColors: {},
-        battery: window.GRAPHITE_BATTERY_FORECAST_STATE || null,
         batteryForecast: {},
+        forecastAsOf: null,
+        forecastUnavailableReason: null,
         controller: null
     };
 
@@ -403,7 +404,14 @@
             url.searchParams.set("resolved", "1");
         }
         const payload = await fetchJson(url.href, signal);
-        if (!payload || payload.success === false || !Array.isArray(payload.resolved)) {
+        if (
+            !payload
+            || payload.success === false
+            || !Array.isArray(payload.resolved)
+            || !payload.forecast
+            || typeof payload.forecast !== "object"
+            || Array.isArray(payload.forecast)
+        ) {
             throw new Error(payload?.error || "Invalid schedule response");
         }
         return payload;
@@ -421,7 +429,15 @@
         });
         const contentType = response.headers.get("content-type") || "";
         const payload = contentType.includes("application/json") ? await response.json() : null;
-        if (!response.ok || !payload?.success || !payload?.prices || !payload?.schedules) {
+        if (
+            !response.ok
+            || !payload?.success
+            || !payload?.prices
+            || !payload?.schedules
+            || !payload?.forecast
+            || typeof payload.forecast !== "object"
+            || Array.isArray(payload.forecast)
+        ) {
             throw new Error(payload?.error || "Invalid historical simulation response");
         }
         return payload;
@@ -516,31 +532,14 @@
         return result;
     }
 
-    function forecastDays() {
-        const dates = localDates();
-        return [
-            {
-                date: state.dates.today || dates.today,
-                slots: scheduleMap(state.schedules.today)
-            },
-            {
-                date: state.dates.tomorrow || dates.tomorrow,
-                slots: scheduleMap(state.schedules.tomorrow)
-            }
-        ];
-    }
-
-    function rebuildBatteryForecast() {
-        const forecastEngine = window.GraphiteBatteryForecast;
-        state.batteryForecast = forecastEngine?.buildForecast
-            ? forecastEngine.buildForecast({
-                now: referenceNow(),
-                battery: state.battery,
-                days: forecastDays(),
-                householdUsageWByHour: config.forecastHouseholdUsageWByHour,
-                efficiency: requiredSharedNumber("batteryEfficiency")
-            })
-            : {};
+    function applyServerForecast(payload, date, { reset = false } = {}) {
+        if (reset) state.batteryForecast = {};
+        Object.keys(state.batteryForecast).forEach((key) => {
+            if (String(key).startsWith(String(date))) delete state.batteryForecast[key];
+        });
+        Object.assign(state.batteryForecast, payload.forecast);
+        state.forecastAsOf = payload.forecastAsOf || state.forecastAsOf;
+        state.forecastUnavailableReason = payload.forecastUnavailableReason || null;
     }
 
     function forecastKey(date, hour) {
@@ -791,9 +790,7 @@
         if (!forecast) {
             const unavailable = document.createElement("p");
             unavailable.className = "app-schedule-tooltip__forecast-unavailable";
-            unavailable.textContent = state.battery?.stale
-                ? "Unavailable because the live battery reading is stale."
-                : "Waiting for a live battery reading.";
+            unavailable.textContent = state.forecastUnavailableReason || "The server forecast is unavailable for this hour.";
             section.appendChild(unavailable);
             return section;
         }
@@ -1577,7 +1574,6 @@
             { key: "today", label: isSimulation ? "Selected day" : "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
             { key: "tomorrow", label: isSimulation ? "Following day" : "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
         ];
-        rebuildBatteryForecast();
         renderSummary(days);
         renderTimeline(days);
         if (elements.tomorrowAvailability) {
@@ -1744,13 +1740,9 @@
                 state.entries.today = scenario.entries?.today || [];
                 state.entries.tomorrow = scenario.entries?.tomorrow || [];
                 state.ruleColors = rulesResult.status === "fulfilled" ? rulesResult.value : {};
-                state.battery = {
-                    percent: Number(scenario.startingBatteryPercent),
-                    capacityWh: Number(config.capacityWh),
-                    minimumPercent: Number(config.minChargePercent),
-                    maximumPercent: Number(config.maxChargePercent),
-                    stale: false
-                };
+                state.batteryForecast = scenario.forecast;
+                state.forecastAsOf = scenario.forecastAsOf || null;
+                state.forecastUnavailableReason = scenario.forecastUnavailableReason || null;
                 render();
                 setView("ready");
                 return;
@@ -1775,6 +1767,9 @@
             state.entries.today = results[1].status === "fulfilled" ? results[1].value.entries || [] : [];
             state.entries.tomorrow = results[2].status === "fulfilled" ? results[2].value.entries || [] : [];
             state.ruleColors = results[3].status === "fulfilled" ? results[3].value : {};
+            state.batteryForecast = {};
+            if (results[1].status === "fulfilled") applyServerForecast(results[1].value, dates.today);
+            if (results[2].status === "fulfilled") applyServerForecast(results[2].value, dates.tomorrow);
             publishCurrentPrice();
             render();
             setView("ready");
@@ -1798,10 +1793,12 @@
             if (results[0].status === "fulfilled") {
                 state.schedules.today = results[0].value.resolved;
                 state.entries.today = results[0].value.entries || [];
+                applyServerForecast(results[0].value, dates.today);
             }
             if (results[1].status === "fulfilled") {
                 state.schedules.tomorrow = results[1].value.resolved;
                 state.entries.tomorrow = results[1].value.entries || [];
+                applyServerForecast(results[1].value, dates.tomorrow);
             }
             render({ preserveScroll: true });
         } finally {
@@ -1835,17 +1832,6 @@
             if (!document.hidden) load();
         });
     }
-    document.addEventListener("graphite:battery-forecast-state", (event) => {
-        state.battery = event.detail || null;
-        rebuildBatteryForecast();
-
-        if (activeScheduleTooltip && !priceTooltip.hidden) {
-            const openTooltip = activeScheduleTooltip;
-            const wasPinned = pinnedTooltipTrigger === openTooltip.trigger;
-            showPriceTooltip(openTooltip.detail, openTooltip.trigger, openTooltip.anchor);
-            if (wasPinned) pinnedTooltipTrigger = openTooltip.trigger;
-        }
-    });
     priceTooltip.addEventListener("mouseleave", () => {
         if (pinnedTooltipTrigger || !activeTooltipTrigger) return;
         if (document.activeElement === activeTooltipTrigger || eventInsidePriceTooltip(document.activeElement)) return;

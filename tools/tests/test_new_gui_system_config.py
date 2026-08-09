@@ -82,8 +82,8 @@ def test_new_gui_javascript_has_no_shared_value_fallbacks():
     assert "Number(conversion.supplierMarkupEurPerKwh) || 0" not in price_source
     assert "Number(conversion.energyTaxEurPerKwh) || 0" not in price_source
     assert "shared price-conversion settings are missing or invalid" in price_source
-    assert "DEFAULT_HOUSEHOLD_USAGE_W_BY_HOUR" not in (REPO_ROOT / "app" / "assets" / "js" / "battery-forecast.js").read_text(encoding="utf-8")
-    assert "POWER_EFFICIENCY" not in (REPO_ROOT / "app" / "assets" / "js" / "battery-forecast.js").read_text(encoding="utf-8")
+    assert not (REPO_ROOT / "app" / "assets" / "js" / "battery-forecast.js").exists()
+    assert "GraphiteBatteryForecast" not in price_source
     assert "Number(config.powerMinW) ||" not in price_source
     assert "Number(config.powerMaxW) ||" not in price_source
 
@@ -100,10 +100,10 @@ def test_new_gui_injects_all_shared_forecast_and_schedule_values():
     assert config["capacityWh"] == shared["battery"]["capacityWh"] == 5760
     assert config["solarLocation"] == shared["installation"]
     assert config["priceConversion"] == shared["priceConversion"]
-    assert config["batteryEfficiency"] == shared["battery"]["efficiency"] == 0.9
-    assert config["forecastHouseholdUsageWByHour"] == shared["forecast"]["defaultHouseholdUsageWByHour"]
+    assert "batteryEfficiency" not in config
+    assert "forecastHouseholdUsageWByHour" not in config
     assert config["powerMinW"] == shared["schedule"]["minPowerW"] == -1600
-    assert config["powerMaxW"] == shared["schedule"]["maxPowerW"] == 1600
+    assert config["powerMaxW"] == shared["schedule"]["maxPowerW"] == 1800
     assert config["powerStepW"] == shared["schedule"]["powerStepW"] == 100
     assert config["solarEvents"]
 
@@ -121,8 +121,8 @@ def test_new_gui_shows_configuration_error_instead_of_shared_fallbacks(restore_s
     assert config["minChargePercent"] is None
     assert config["maxChargePercent"] is None
     assert config["capacityWh"] is None
-    assert config["batteryEfficiency"] is None
-    assert config["forecastHouseholdUsageWByHour"] is None
+    assert "batteryEfficiency" not in config
+    assert "forecastHouseholdUsageWByHour" not in config
     assert config["powerMinW"] is None
     assert config["powerMaxW"] is None
     assert config["powerStepW"] is None

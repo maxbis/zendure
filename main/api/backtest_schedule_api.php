@@ -181,19 +181,26 @@ function buildBacktestScenario(string $dateYmd, $startingSoc, ?PDO $pdo = null):
         'maximum_percent' => (float) $systemConfig['battery']['maxChargePercent'],
     ];
     $referenceTime = $startDate->setTime(0, 0);
-    $planningDays = tbp_materialize_horizon($planningDays, $battery, $referenceTime, [
+    $forecastOptions = [
         'usage_w_by_hour' => $systemConfig['forecast']['defaultHouseholdUsageWByHour'],
         'efficiency' => $systemConfig['battery']['efficiency'],
+    ];
+    $planningDays = tbp_materialize_horizon($planningDays, $battery, $referenceTime, $forecastOptions + [
         'max_discharge_power_w' => abs((int) $systemConfig['schedule']['minPowerW']),
         'max_charge_power_w' => (int) $systemConfig['schedule']['maxPowerW'],
         'charge_power_step_w' => (int) $systemConfig['schedule']['powerStepW'],
     ]);
+    $forecast = tbp_build_hourly_forecast($planningDays, $battery, $referenceTime, $forecastOptions);
 
     return [
         'success' => true,
         'mode' => 'simulation',
         'referenceTime' => $referenceTime->format(DateTimeInterface::ATOM),
         'startingBatteryPercent' => $startingPercent,
+        'forecast' => $forecast,
+        'forecastAsOf' => $referenceTime->format(DateTimeInterface::ATOM),
+        'forecastBatteryPercent' => $startingPercent,
+        'forecastUnavailableReason' => null,
         'dates' => ['today' => $dates[0], 'tomorrow' => $dates[1]],
         'prices' => ['today' => $priceMaps[$dates[0]], 'tomorrow' => $priceMaps[$dates[1]]],
         'priceSources' => $priceSources,

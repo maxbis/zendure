@@ -159,9 +159,42 @@ def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]
         return len(failures) == 0, failures
     if not body.get("success"):
         failures.append("Expected success=true in resolved schedule response")
-    for key in ("date", "currentHour", "currentTime", "resolved", "entries"):
+    for key in (
+        "date",
+        "currentHour",
+        "currentTime",
+        "resolved",
+        "entries",
+        "forecast",
+        "forecastAsOf",
+        "forecastBatteryPercent",
+        "forecastUnavailableReason",
+    ):
         if key not in body:
             failures.append(f"Expected key '{key}' in resolved schedule response")
+    if "forecast" in body and not isinstance(body["forecast"], dict):
+        failures.append("Expected 'forecast' to be an object")
+    elif isinstance(body.get("forecast"), dict):
+        required_forecast_fields = {
+            "key",
+            "date",
+            "hour",
+            "startPercent",
+            "endPercent",
+            "deltaPercent",
+            "estimatedPowerW",
+            "durationHours",
+            "source",
+            "mode",
+            "currentHour",
+        }
+        for forecast_key, hour in body["forecast"].items():
+            if not isinstance(hour, dict):
+                failures.append(f"Expected forecast['{forecast_key}'] to be an object")
+                continue
+            missing = required_forecast_fields.difference(hour)
+            if missing:
+                failures.append(f"Expected forecast['{forecast_key}'] fields: {sorted(missing)}")
     if "entries" in body and not isinstance(body["entries"], list):
         failures.append("Expected 'entries' to be a list")
     elif isinstance(body.get("entries"), list):

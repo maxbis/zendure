@@ -76,7 +76,7 @@ $boundedChargePower = tbp_power_for_slot([
     'min_power' => 800,
     'max_power' => 1600,
 ], 12, 60.0, $forecastUsage);
-plannerTestAssert($boundedChargePower === 800.0, 'PHP forecast must apply a primary NZ+ minimum like the browser forecast.');
+plannerTestAssert($boundedChargePower === 800.0, 'The authoritative forecast must apply a primary NZ+ minimum.');
 $neutralBidirectionalPower = tbp_power_for_slot([
     'value' => 'netzero',
 ], 12, 60.0, $forecastUsage);
@@ -110,8 +110,8 @@ $planned = tbp_materialize_horizon(plannerTestDays(), $battery, $now, ['max_disc
 $targetSlot = $planned[0]['items'][20];
 plannerTestAssert(is_int($targetSlot['value']), 'Target mode must materialize to integer watts.');
 plannerTestAssert($targetSlot['value'] < 0, 'Target mode must calculate discharge power.');
-plannerTestAssert($targetSlot['value'] === -900, 'Calculated discharge power must round to the nearest 100 W.');
-plannerTestAssert($targetSlot['planning']['calculated_power_w'] === -900, 'Planning metadata must report the rounded discharge power.');
+plannerTestAssert($targetSlot['value'] === -1100, 'Calculated discharge power must round to the nearest 100 W using the configured household profile.');
+plannerTestAssert($targetSlot['planning']['calculated_power_w'] === -1100, 'Planning metadata must report the rounded discharge power.');
 plannerTestAssert($targetSlot['planning']['power_step_w'] === 100, 'Planning metadata must report the 100 W discharge step.');
 plannerTestAssert($targetSlot['planning']['status'] === 'achievable', 'Expected an achievable target.');
 plannerTestAssert($targetSlot['planning']['anchor_date'] === '20260806', 'Expected tomorrow solar-charge anchor.');
@@ -127,14 +127,14 @@ $conditionalCleanupDays[1]['items'][6] = [
 ];
 $conditionalCleanup = tbp_materialize_horizon($conditionalCleanupDays, $battery, $now, ['max_discharge_power_w' => 1600]);
 $conditionalCleanupTarget = $conditionalCleanup[0]['items'][20];
-plannerTestAssert($conditionalCleanupTarget['value'] === -900, 'Target @ solar must size against the runtime rule least-discharge outcome, including the NZ- household estimate.');
+plannerTestAssert($conditionalCleanupTarget['value'] === -1100, 'Target @ solar must size against the runtime rule least-discharge outcome, including the NZ- household estimate.');
 plannerTestAssert($conditionalCleanupTarget['planning']['status'] === 'achievable', 'The conservative conditional-cleanup scenario must remain achievable.');
 
 $guardedTargetDays = $conditionalCleanupDays;
 $guardedTargetDays[0]['items'][20]['runtime_conditions'] = [['field' => 'electricity_level', 'op' => '>', 'value' => 50]];
 $guardedTargetDays[0]['items'][20]['fallback_value'] = 'netzero-';
 $guardedTarget = tbp_materialize_horizon($guardedTargetDays, $battery, $now, ['max_discharge_power_w' => 1600]);
-plannerTestAssert($guardedTarget[0]['items'][20]['value'] === -900, 'A guarded Target @ solar rule must retain its calculated primary action.');
+plannerTestAssert($guardedTarget[0]['items'][20]['value'] === -1100, 'A guarded Target @ solar rule must retain its calculated primary action.');
 plannerTestAssert($guardedTarget[0]['items'][20]['planning']['status'] === 'achievable', 'Target validation must forecast its own calculated primary action while later runtime rules remain conservative.');
 
 $staticCleanupDays = plannerTestDays();

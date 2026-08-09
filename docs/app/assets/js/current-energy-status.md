@@ -37,7 +37,7 @@ The component also uses the configured battery capacity and minimum and maximum 
 - Chargeable energy in kWh: remaining energy that can still be charged up to the configured maximum charge percentage.
 - Projected usable energy and usable-range percentage at the next whole hour.
 
-After each successful render, the component publishes `graphite:battery-forecast-state`. The event detail and `window.GRAPHITE_BATTERY_FORECAST_STATE` snapshot contain the live battery percentage, capacity, operating limits, reading timestamp, and stale state. The Prices & Energy Plan consumes this read-only snapshot for its chained hourly forecast.
+After each successful render, the component publishes `graphite:battery-forecast-state`. The event detail and `window.GRAPHITE_BATTERY_FORECAST_STATE` snapshot contain the live battery percentage, capacity, operating limits, reading timestamp, and stale state. The Prices & Energy Plan no longer consumes this browser snapshot; its prediction comes exclusively from the server schedule response.
 
 Encoded controller and pack temperatures are converted to Celsius with `(value - 2731) / 10` and displayed to one decimal place.
 
@@ -113,6 +113,6 @@ The dialog is positioned below its trigger when space permits. It moves above th
 
 - [Old and new GUI overview](../../gui-overview.md)
 - [New GUI shared system configuration](../../shared-system-configuration.md)
-- [Battery level forecast](battery-forecast.md)
+- [Target battery planner and authoritative forecast](../../../main/data/target-battery-planner.md)
 - [Health metric colour scale](health-metric-color-scale.md)
 - [Graphite Signal Dark style guide](../../../../themes/graphite-signal-dark/style-guide.md)

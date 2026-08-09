@@ -4,6 +4,8 @@
 
 The target battery planner converts symbolic battery objectives into supported schedule values before the resolved schedule is returned to automation.
 
+The same PHP forecast engine also produces the authoritative per-hour forecast returned to the browser. Planner candidate evaluation and UI prediction therefore share one power model and one chronological SoC calculation.
+
 - `empty_at_solar_charge` calculates a fixed discharge action that aims to reach a requested reserve at the first future solar-capable net-zero slot.
 - `full_at_netzero_minus` continuously calculates an NZ+ minimum that aims to reach the configured maximum battery percentage at the first future `netzero-` slot.
 
@@ -16,6 +18,7 @@ Automation does not evaluate either symbolic mode. It continues receiving intege
 - Final schedule API: [`main/data/api/data_api.php`](../../../main/data/api/data_api.php)
 - Rule editor: [`main/edit_rules.php`](../../../main/edit_rules.php)
 - Planner tests: [`tools/tests/target_battery_planner_test.php`](../../../tools/tests/target_battery_planner_test.php)
+- Hourly forecast tests: [`tools/tests/battery_forecast_test.php`](../../../tools/tests/battery_forecast_test.php)
 
 ## Inputs and outputs
 
@@ -61,6 +64,15 @@ The resolved charge-target slots replace the symbolic value with:
 - The configured maximum charge power as `max_power`.
 - A `planning` object containing live SoC, predicted first-slot SoC, baseline and planned anchor SoC, target, next NZ- anchor, remaining eligible duration, calculated minimum, cap, status, and explanation.
 
+The resolved-schedule API also returns:
+
+- `forecast`: hourly predictions keyed by `YYYYMMDDHH00` for the requested date.
+- `forecastAsOf`: the server timestamp used as the forecast reference.
+- `forecastBatteryPercent`: the live starting battery percentage, or `null` when unavailable.
+- `forecastUnavailableReason`: `null` when forecasting succeeded, otherwise the reason no forecast was produced.
+
+Each hourly prediction includes start and end percentages, percentage-point change, effective power, duration, current-hour state, assumption source, mode, and conservative primary and fallback powers when applicable. Historical simulation returns the same forecast shape for its complete two-day scenario.
+
 ## Flow and behavior
 
 1. Resolve the base schedule and merge conditional rules for today and tomorrow.
@@ -88,6 +100,10 @@ For `full_at_netzero_minus`:
 11. Emit status `achievable`, `best_effort`, `already_satisfied`, `unavailable`, or `past` plus the forecast inputs and results in planning metadata.
 
 The current hour uses only its remaining minutes. Manual exact schedule entries continue to take priority over conditional rules during the merge.
+
+After target materialization, `tbp_build_hourly_forecast()` runs the same power model chronologically over the final resolved schedule. Fixed actions retain their signed wattage, NZ- uses the configured household profile, unbounded NZ± is neutral, NZ+ is neutral unless its positive minimum requires charging, and standby or unknown automatic actions use `0 W`. Each predicted end percentage becomes the following hour's start percentage. The schedule API returns this result to `price-plan.js`; the browser renders it without calculating or repairing a forecast.
+
+For discharge, percentage change is `-(absolute watts × hours ÷ efficiency ÷ capacity Wh) × 100`. For charge, it is `(watts × hours × efficiency ÷ capacity Wh) × 100`. Results are clamped to the configured battery operating range.
 
 During target planning, unbounded NZ± slots are forecast as battery-neutral (`0 W`) because their future charge or discharge direction is unknown without a solar forecast. Explicit NZ± minimum and maximum power bounds still clamp that neutral baseline. NZ- continues to use forecast household consumption.
 
@@ -121,10 +137,13 @@ When evaluating a calculated target action, the planner forecasts that target sl
 - When matching target-charge hours are non-contiguous, then count only those matching slots as eligible duration.
 - When repeated requests occur between automation refreshes, then the shared upward quantization prevents insignificant limit changes.
 - When shared configuration is missing or invalid, then the planner fails instead of using embedded efficiency, demand-profile, power-cap or step defaults.
+- When live battery data is unavailable, then the API returns an empty forecast with `forecastUnavailableReason`; the browser does not calculate a fallback.
+- When the current hour is partially complete, then forecast only its remaining duration; omit hours that have already ended.
+- The model does not predict solar generation, unexpected household loads, controller ramping, or future schedule changes.
 
 ## Related files
 
 - [Edit Rules user manual](../../user_manuals/edit_rules_user_manual.md)
 - [Schedule resolution technical reference](../../data/schedule-resolution-technical.md)
 - [Prices and Energy Plan](../../app/assets/js/price-plan.md)
-- [Battery level forecast](../../app/assets/js/battery-forecast.md)
+- [Current energy status and battery details](../../app/assets/js/current-energy-status.md)

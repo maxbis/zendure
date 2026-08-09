@@ -34,8 +34,6 @@ $appConfig = [
     'minChargePercent' => $systemConfig['battery']['minChargePercent'],
     'maxChargePercent' => $systemConfig['battery']['maxChargePercent'],
     'capacityWh' => $systemConfig['battery']['capacityWh'],
-    'batteryEfficiency' => $systemConfig['battery']['efficiency'],
-    'forecastHouseholdUsageWByHour' => $systemConfig['forecast']['defaultHouseholdUsageWByHour'],
     'powerMinW' => $systemConfig['schedule']['minPowerW'],
     'powerMaxW' => $systemConfig['schedule']['maxPowerW'],
     'powerStepW' => $systemConfig['schedule']['powerStepW'],
@@ -61,7 +59,6 @@ $appConfig = [
         ); ?>;
     </script>
     <script src="../themes/graphite-signal-dark/assets/js/graphite-controls.js" defer></script>
-    <script src="assets/js/battery-forecast.js" defer></script>
     <script src="assets/js/price-plan.js" defer></script>
 </head>
 <body class="app-simulation-page" data-theme="graphite-signal-dark">

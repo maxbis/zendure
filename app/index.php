@@ -97,14 +97,12 @@ $appConfig = [
     'minChargePercent' => $systemConfig['battery']['minChargePercent'] ?? null,
     'maxChargePercent' => $systemConfig['battery']['maxChargePercent'] ?? null,
     'capacityWh' => $systemConfig['battery']['capacityWh'] ?? null,
-    'batteryEfficiency' => $systemConfig['battery']['efficiency'] ?? null,
-    'forecastHouseholdUsageWByHour' => $systemConfig['forecast']['defaultHouseholdUsageWByHour'] ?? null,
     'powerMinW' => $systemConfig['schedule']['minPowerW'] ?? null,
     'powerMaxW' => $systemConfig['schedule']['maxPowerW'] ?? null,
     'powerStepW' => $systemConfig['schedule']['powerStepW'] ?? null,
     'scheduleUrl' => ConfigLoader::get(
         'scheduleApiUrl',
-        '../main/api/charge_schedule_api.php'
+        '../main/data/api/data_api.php?type=schedule&resolved=1'
     ),
     'scheduleRefreshUrl' => '../main/api/refresh_schedule_proxy.php',
     'rulesUrl' => '../main/edit_rules.php?api=1',
@@ -143,7 +141,6 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/battery-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/grid-exchange-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/health-metric-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/battery-forecast.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

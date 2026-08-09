@@ -451,41 +451,54 @@ function handleGetData($type) {
         if (!preg_match('/^\d{8}$/', $date)) {
             $date = date('Ymd');
         }
-        $resolved = resolveScheduleForDate($schedule, $date);
+        $timezone = new DateTimeZone($dataApiSystemConfig['installation']['timezone']);
+        $now = new DateTimeImmutable('now', $timezone);
+        $todayYmd = $now->format('Ymd');
+        $tomorrowYmd = $now->modify('+1 day')->format('Ymd');
+        $horizonDates = in_array($date, [$todayYmd, $tomorrowYmd], true)
+            ? [$todayYmd, $tomorrowYmd]
+            : [$date, (DateTimeImmutable::createFromFormat('!Ymd', $date, $timezone) ?: $now)->modify('+1 day')->format('Ymd')];
         $planningDays = [];
-        if (include_conditions) {
-            $timezone = new DateTimeZone($dataApiSystemConfig['installation']['timezone']);
-            $now = new DateTimeImmutable('now', $timezone);
-            $todayYmd = $now->format('Ymd');
-            $tomorrowYmd = $now->modify('+1 day')->format('Ymd');
-            $horizonDates = in_array($date, [$todayYmd, $tomorrowYmd], true)
-                ? [$todayYmd, $tomorrowYmd]
-                : [$date, (DateTimeImmutable::createFromFormat('!Ymd', $date, $timezone) ?: $now)->modify('+1 day')->format('Ymd')];
-            foreach (array_values(array_unique($horizonDates)) as $horizonDate) {
-                $dayItems = resolveScheduleForDate($schedule, $horizonDate);
+        foreach (array_values(array_unique($horizonDates)) as $horizonDate) {
+            $dayItems = resolveScheduleForDate($schedule, $horizonDate);
+            if (include_conditions) {
                 $dayItems = mergeResolvedWithConditional($dayItems, $horizonDate);
-                $planningDays[] = ['date' => $horizonDate, 'items' => $dayItems];
             }
-            if (containsTargetBatteryMode($planningDays)) {
-                $batteryPercent = fetchTargetPlannerBatteryPercent();
-                $battery = $batteryPercent === null ? null : [
-                    'percent' => $batteryPercent,
-                    'capacity_wh' => (float) $dataApiSystemConfig['battery']['capacityWh'],
-                    'minimum_percent' => (float) $dataApiSystemConfig['battery']['minChargePercent'],
-                    'maximum_percent' => (float) $dataApiSystemConfig['battery']['maxChargePercent'],
-                ];
-                $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, [
-                    'usage_w_by_hour' => $dataApiSystemConfig['forecast']['defaultHouseholdUsageWByHour'],
-                    'efficiency' => $dataApiSystemConfig['battery']['efficiency'],
-                    'max_discharge_power_w' => abs($dataApiSystemConfig['schedule']['minPowerW']),
-                    'max_charge_power_w' => $dataApiSystemConfig['schedule']['maxPowerW'],
-                    'charge_power_step_w' => $dataApiSystemConfig['schedule']['powerStepW'],
-                ]);
+            $planningDays[] = ['date' => $horizonDate, 'items' => $dayItems];
+        }
+
+        $batteryPercent = fetchTargetPlannerBatteryPercent();
+        $battery = $batteryPercent === null ? null : [
+            'percent' => $batteryPercent,
+            'capacity_wh' => (float) $dataApiSystemConfig['battery']['capacityWh'],
+            'minimum_percent' => (float) $dataApiSystemConfig['battery']['minChargePercent'],
+            'maximum_percent' => (float) $dataApiSystemConfig['battery']['maxChargePercent'],
+        ];
+        $forecastOptions = [
+            'usage_w_by_hour' => $dataApiSystemConfig['forecast']['defaultHouseholdUsageWByHour'],
+            'efficiency' => $dataApiSystemConfig['battery']['efficiency'],
+        ];
+        if (containsTargetBatteryMode($planningDays)) {
+            $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, $forecastOptions + [
+                'max_discharge_power_w' => abs($dataApiSystemConfig['schedule']['minPowerW']),
+                'max_charge_power_w' => $dataApiSystemConfig['schedule']['maxPowerW'],
+                'charge_power_step_w' => $dataApiSystemConfig['schedule']['powerStepW'],
+            ]);
+        }
+
+        $resolved = [];
+        foreach ($planningDays as $planningDay) {
+            if (($planningDay['date'] ?? null) === $date) {
+                $resolved = $planningDay['items'];
+                break;
             }
-            foreach ($planningDays as $planningDay) {
-                if (($planningDay['date'] ?? null) === $date) {
-                    $resolved = $planningDay['items'];
-                    break;
+        }
+        $forecast = [];
+        if ($battery !== null) {
+            $horizonForecast = tbp_build_hourly_forecast($planningDays, $battery, $now, $forecastOptions);
+            foreach ($horizonForecast as $key => $hourForecast) {
+                if (str_starts_with((string) $key, $date)) {
+                    $forecast[$key] = $hourForecast;
                 }
             }
         }
@@ -497,6 +510,10 @@ function handleGetData($type) {
             'currentTime' => date('Hi'),
             'resolved' => $resolved,
             'entries' => $uiEntries,
+            'forecast' => $forecast,
+            'forecastAsOf' => $now->format(DateTimeInterface::ATOM),
+            'forecastBatteryPercent' => $batteryPercent,
+            'forecastUnavailableReason' => $battery === null ? 'Live battery level is unavailable.' : null,
         ];
     }
     return [
