@@ -27,6 +27,7 @@ from status_updates_store import (
     EVENT_TYPE_RESCAN,
     EVENT_TYPE_START,
     EVENT_TYPE_STOP,
+    encode_schedule_rule,
 )
 from power_metere_loader import get_power_meter_reader
 from power_meter_mqtt_subscriber import MqttPowerMeterSubscriber
@@ -622,7 +623,13 @@ class AutomationApp:
             self.value = 0
             self.old_value = 0
             p1_w = self.last_p1_total_power
-            self._post_status_update(EVENT_TYPE_CHANGE, None, 0, p1_total_power=p1_w)
+            self._post_status_update(
+                EVENT_TYPE_CHANGE,
+                None,
+                0,
+                p1_total_power=p1_w,
+                rule=encode_schedule_rule(0),
+            )
             self.logger.info("Pause override enabled after setting power to 0.")
         else:
             self.pause_override_active = False
@@ -930,6 +937,7 @@ class AutomationApp:
                 self.old_value,
                 result.power,
                 p1_total_power=p1_w,
+                rule=encode_schedule_rule(desired_power),
             )
 
         # Update self.value with the actual power that was set (result.power)
@@ -1148,6 +1156,7 @@ class AutomationApp:
         old_value: Any = None,
         new_value: Any = None,
         p1_total_power: Optional[int] = None,
+        rule: Optional[str] = None,
     ) -> bool:
         self._update_energy_counter_state(None)
         return self.status_api.post_update(
@@ -1157,6 +1166,7 @@ class AutomationApp:
             p1_total_power=p1_total_power,
             total_act=self.last_total_act,
             total_act_ret=self.last_total_act_ret,
+            rule=rule,
         )
 
     def request_manual_schedule_refresh_control(self) -> None:

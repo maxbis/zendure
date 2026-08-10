@@ -129,3 +129,5 @@ The authoritative controller caps are `battery.maxDischargePowerW` and `battery.
 ### MQTT Shelly cumulative counters
 
 When Shelly MQTT payloads also include cumulative energy counters such as `total_act` and `total_act_ret`, `automate_mqtt.py` caches the latest valid values and attaches them to every stored status event. They are stored internally in SQLite as scaled integer columns (`total_act_x100`, `total_act_ret_x100`) and exposed through `/api/status_updates_delta` as decimal `total_act` and `total_act_ret` fields.
+
+Change events also store the schedule rule encoding in SQLite column `rule` (`NZ+`, `NZ-`, `NZ0`, or a fixed-watt string such as `400` / `-2200`). `start` / `stop` / `Rescan` rows leave `rule` null.

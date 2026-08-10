@@ -173,7 +173,7 @@ When `automate_www.py` runs, it (and the `device_controller.py` components it us
 - Used by: `StatusApi.post_update()` in `automate_www.py`
 - Purpose: persist automation lifecycle and power-change events so the built-in API can expose current and historical status.
 - When: on start (`type: 'start'`), stop (`type: 'stop'`), power change (`type: 'change'`), and schedule rescan (`type: 'Rescan'`).
-- Stored fields include event values plus optional meter context such as `p1_total_power`, `electric_level`, and cumulative Shelly counters (`total_act_x100`, `total_act_ret_x100`).
+- Stored fields include event values plus optional meter context such as `p1_total_power`, `electric_level`, cumulative Shelly counters (`total_act_x100`, `total_act_ret_x100`), and schedule rule encoding (`rule`: `NZ+`, `NZ-`, `NZ0`, or a fixed-watt string).
 - Exposed via: `/api/status`, `/api/automation_status`, `/api/wh_per_hour`, `/api/status_updates_delta`
 
 ### 3. Zendure device – read (GET)

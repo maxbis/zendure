@@ -38,6 +38,7 @@ _SCHEMA = """
         new_value TEXT,
         p1_total_power INTEGER,
         electric_level INTEGER,
+        rule TEXT,
         total_act_x100 INTEGER,
         total_act_ret_x100 INTEGER,
         timestamp INTEGER NOT NULL
@@ -49,7 +50,50 @@ _SCHEMA = """
 _OPTIONAL_COLUMNS = {
     "total_act_x100": "INTEGER",
     "total_act_ret_x100": "INTEGER",
+    "rule": "TEXT",
 }
+
+RULE_MAX_LEN = 5
+RULE_NETZERO = "NZ0"
+RULE_NETZERO_PLUS = "NZ+"
+RULE_NETZERO_MINUS = "NZ-"
+
+
+def encode_schedule_rule(desired_power: Any) -> Optional[str]:
+    """
+    Encode schedule desired_power into the short rule string stored in status_updates.rule.
+
+    NZ+ / NZ- / NZ0 for netzero modes; fixed watts as a signed integer string
+    (positive = charge, negative = discharge). Returns None when the value cannot
+    be encoded within RULE_MAX_LEN characters.
+    """
+    if desired_power is None:
+        return RULE_NETZERO
+    if desired_power == "netzero+":
+        return RULE_NETZERO_PLUS
+    if desired_power == "netzero-":
+        return RULE_NETZERO_MINUS
+    if desired_power == "netzero":
+        return RULE_NETZERO
+    if isinstance(desired_power, bool):
+        return None
+    if isinstance(desired_power, (int, float)):
+        encoded = str(int(desired_power))
+        if len(encoded) > RULE_MAX_LEN:
+            return None
+        return encoded
+    if isinstance(desired_power, str):
+        stripped = desired_power.strip()
+        if stripped in ("netzero+", "netzero-", "netzero"):
+            return encode_schedule_rule(stripped)
+        try:
+            encoded = str(int(stripped))
+        except (TypeError, ValueError):
+            return None
+        if len(encoded) > RULE_MAX_LEN:
+            return None
+        return encoded
+    return None
 
 
 def _allowed_wh_dates(now: int, days_back: int, tz: ZoneInfo) -> list[str]:
@@ -474,6 +518,7 @@ class StatusUpdatesStore:
         total_act_x100: Optional[int],
         total_act_ret_x100: Optional[int],
         timestamp: int,
+        rule: Optional[str] = None,
     ) -> bool:
         """Persist one row. Returns True if a row was inserted."""
         if not self.db_path:
@@ -481,6 +526,11 @@ class StatusUpdatesStore:
         self.ensure_db()
         old_str = json.dumps(old_value) if old_value is not None else None
         new_str = json.dumps(new_value) if new_value is not None else None
+        rule_str = None
+        if rule is not None:
+            candidate = str(rule).strip()
+            if candidate and len(candidate) <= RULE_MAX_LEN:
+                rule_str = candidate
         should_insert = False
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -490,14 +540,15 @@ class StatusUpdatesStore:
                 )
                 if should_insert:
                     conn.execute(
-                        "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, total_act_x100, total_act_ret_x100, timestamp) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO status_updates (type, old_value, new_value, p1_total_power, electric_level, rule, total_act_x100, total_act_ret_x100, timestamp) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             event_type,
                             old_str,
                             new_str,
                             p1_total_power,
                             electric_level,
+                            rule_str,
                             total_act_x100,
                             total_act_ret_x100,
                             timestamp,
@@ -536,7 +587,7 @@ class StatusUpdatesStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.execute(
-                "SELECT id, type, old_value, new_value, p1_total_power, electric_level, total_act_x100, total_act_ret_x100, timestamp "
+                "SELECT id, type, old_value, new_value, p1_total_power, electric_level, rule, total_act_x100, total_act_ret_x100, timestamp "
                 "FROM status_updates WHERE id > ? ORDER BY id ASC LIMIT ?",
                 (after_id, limit + 1),
             )
@@ -592,6 +643,7 @@ class StatusApi:
         p1_total_power: Optional[int] = None,
         total_act: Any = None,
         total_act_ret: Any = None,
+        rule: Optional[str] = None,
     ) -> bool:
         timestamp = int(datetime.now(ZoneInfo(STATUS_TIMEZONE)).timestamp())
         if self.on_update:
@@ -613,6 +665,7 @@ class StatusApi:
             self.store._normalize_counter_x100(total_act),
             self.store._normalize_counter_x100(total_act_ret),
             timestamp,
+            rule=rule,
         )
         http_server = getattr(self, "http_server", None)
         if should_insert and http_server is not None and hasattr(http_server, "wh_per_hour_cache_lock"):

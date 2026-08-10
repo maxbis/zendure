@@ -53,6 +53,86 @@ def test_ensure_db_creates_table_and_indexes(tmp_path):
         column_names = [row[1] for row in columns]
         assert "total_act_x100" in column_names
         assert "total_act_ret_x100" in column_names
+        assert "rule" in column_names
+
+
+def test_ensure_db_adds_missing_rule_column(tmp_path):
+    sus = _sus()
+    path = _db_path(tmp_path)
+    with sqlite3.connect(path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE status_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                p1_total_power INTEGER,
+                electric_level INTEGER,
+                total_act_x100 INTEGER,
+                total_act_ret_x100 INTEGER,
+                timestamp INTEGER NOT NULL
+            );
+            """
+        )
+        conn.commit()
+    store = sus.StatusUpdatesStore(
+        db_path=str(path),
+        retention_days=7,
+        log_warning=lambda _m: pytest.fail(_m),
+    )
+    store.ensure_db()
+    with sqlite3.connect(path) as conn:
+        column_names = [row[1] for row in conn.execute("PRAGMA table_info(status_updates)").fetchall()]
+    assert "rule" in column_names
+
+
+def test_encode_schedule_rule_modes_and_fixed_watts():
+    sus = _sus()
+    assert sus.encode_schedule_rule("netzero+") == "NZ+"
+    assert sus.encode_schedule_rule("netzero-") == "NZ-"
+    assert sus.encode_schedule_rule("netzero") == "NZ0"
+    assert sus.encode_schedule_rule(None) == "NZ0"
+    assert sus.encode_schedule_rule(400) == "400"
+    assert sus.encode_schedule_rule(-2200) == "-2200"
+    assert sus.encode_schedule_rule(10000) == "10000"
+    assert sus.encode_schedule_rule(-10000) is None
+    assert sus.encode_schedule_rule("not-a-rule") is None
+
+
+def test_insert_status_stores_rule(tmp_path):
+    sus = _sus()
+    path = _db_path(tmp_path)
+    store = sus.StatusUpdatesStore(
+        db_path=str(path), retention_days=7, log_warning=lambda *_a, **_k: None
+    )
+    assert store.insert_status(
+        "change", None, 400, None, 50, None, None, 1000, rule="NZ+"
+    ) is True
+    assert store.insert_status(
+        "start", None, None, None, None, None, None, 1001, rule=None
+    ) is True
+    with sqlite3.connect(path) as conn:
+        rows = conn.execute(
+            "SELECT type, rule FROM status_updates ORDER BY id ASC"
+        ).fetchall()
+    assert rows == [("change", "NZ+"), ("start", None)]
+
+
+def test_fetch_status_updates_delta_includes_rule(tmp_path):
+    sus = _sus()
+    path = _db_path(tmp_path)
+    store = sus.StatusUpdatesStore(
+        db_path=str(path), retention_days=7, log_warning=lambda *_a, **_k: None
+    )
+    assert store.insert_status(
+        "change", None, -500, None, None, None, None, 1000, rule="NZ-"
+    ) is True
+
+    payload = store.fetch_status_updates_delta(0, 10)
+
+    assert payload["rows"][0]["rule"] == "NZ-"
+    assert "total_act" in payload["rows"][0]
 
 
 def test_insert_status_change_dedup_same_hour(tmp_path):

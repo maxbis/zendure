@@ -117,7 +117,13 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 - Optional query params: `limit` (default `500`, max `2000`).
 - Optional auth: `token` query param or `X-API-Token` header (if configured).
 - Returns `{"rows": [...], "max_id_returned": int, "has_more": bool}`.
-- Each row contains: `id`, `type`, `old_value`, `new_value`, `p1_total_power`, `electric_level`, `total_act`, `total_act_ret`, `timestamp`.
+- Each row contains: `id`, `type`, `old_value`, `new_value`, `p1_total_power`, `electric_level`, `rule`, `total_act`, `total_act_ret`, `timestamp`.
+- `rule` is the schedule rule encoding when present:
+  - `NZ+` for charge-only netzero (`netzero+`)
+  - `NZ-` for discharge-only netzero (`netzero-`)
+  - `NZ0` for bidirectional netzero (`netzero`)
+  - a signed watt string for fixed rules (for example `400` or `-2200`; positive = charge, negative = discharge)
+  - `null` for `start` / `stop` / `Rescan` events and for rows written before the column existed
 - `total_act` and `total_act_ret` are returned as decimal Shelly counters; they are stored internally in SQLite as scaled integers (`total_act_x100`, `total_act_ret_x100`).
 - Returns 401 if authentication is required but not provided; 400 if `after_id` is missing or invalid; 503 if database is unavailable.
 
@@ -173,7 +179,7 @@ Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_
    - Check standby delay (time at 0 power)
    - Update `api_state.last_zendure` and `api_state.last_status` as applicable
 
-5. **Status storage**: `StatusApi` writes to `{dataDir}/status_updates.db` through the shared `status_updates_store` module and invokes `on_update`, which updates `api_state.last_status` for HTTP consumers. The SQLite table also stores optional cumulative Shelly energy counters as `total_act_x100` and `total_act_ret_x100`, while `/api/status_updates_delta` exposes them as `total_act` and `total_act_ret`. Data is retained for `statusUpdatesRetentionDays` (default 7), with cleanup performed periodically inside the runtime instead of on every insert.
+5. **Status storage**: `StatusApi` writes to `{dataDir}/status_updates.db` through the shared `status_updates_store` module and invokes `on_update`, which updates `api_state.last_status` for HTTP consumers. The SQLite table also stores optional cumulative Shelly energy counters as `total_act_x100` and `total_act_ret_x100`, and the schedule rule encoding in `rule` (`NZ+`, `NZ-`, `NZ0`, or a fixed-watt string). `/api/status_updates_delta` exposes those fields (energy counters as decimal `total_act` / `total_act_ret`). Data is retained for `statusUpdatesRetentionDays` (default 7), with cleanup performed periodically inside the runtime instead of on every insert.
 
 ## Usage
 
@@ -249,9 +255,16 @@ See [automate-overview.md](automate-overview.md#api-calls-used-by-automate_wwwpy
 
 ## Operational Notes
 
-- Existing SQLite databases are upgraded automatically on startup if `total_act_x100` and `total_act_ret_x100` are missing.
-- For manual production upgrades, use [`migrate_status_updates_add_energy_columns.py`](/D:/www/zendure/automate/tools/migrate_status_updates_add_energy_columns.py).
-- The generic replication stack under `db-replication/` can carry the new columns when the target schema also has them. Any separate hard-coded MariaDB sync scripts need their own schema and insert-list updates.
+- Existing SQLite databases are upgraded automatically on startup if `total_act_x100`, `total_act_ret_x100`, or `rule` are missing.
+- For manual production upgrades of energy counters, use [`migrate_status_updates_add_energy_columns.py`](../../automate/tools/migrate_status_updates_add_energy_columns.py).
+- For manual production upgrades of the schedule rule column, use [`migrate_status_updates_add_rule_column.py`](../../automate/tools/migrate_status_updates_add_rule_column.py):
+
+```bash
+python3 automate/tools/migrate_status_updates_add_rule_column.py /path/to/status_updates.db
+```
+
+- Before replication sees the new SQLite column, apply the MariaDB script [`db-replication/sql/add_status_updates_rule_column.sql`](../../db-replication/sql/add_status_updates_rule_column.sql) on `sqlite_replication.status_updates`.
+- The generic replication stack under `db-replication/` introspects SQLite columns live and needs no code change for `rule`, but existing MariaDB tables are not altered automatically (`CREATE TABLE IF NOT EXISTS` only).
 
 ## Power Control Logic
 

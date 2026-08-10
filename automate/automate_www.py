@@ -27,6 +27,7 @@ from status_updates_store import (
     EVENT_TYPE_RESCAN,
     EVENT_TYPE_START,
     EVENT_TYPE_STOP,
+    encode_schedule_rule,
 )
 from power_metere_loader import get_power_meter_reader
 
@@ -245,7 +246,12 @@ class CommandHandler:
             return False
 
         if self.status_api is not None:
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, power)
+            self.status_api.post_update(
+                EVENT_TYPE_CHANGE,
+                None,
+                power,
+                rule=encode_schedule_rule(mode),
+            )
         self.logger.info(f"Power set to {mode}: {power} W")
         return True
 
@@ -257,7 +263,12 @@ class CommandHandler:
 
         actual_power = getattr(result, "power", power)
         if self.status_api is not None:
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, actual_power)
+            self.status_api.post_update(
+                EVENT_TYPE_CHANGE,
+                None,
+                actual_power,
+                rule=encode_schedule_rule(power),
+            )
         self.logger.info(f"Power set to {label}: {actual_power} W")
         return True
 
@@ -603,7 +614,13 @@ class AutomationApp:
             self.value = 0
             self.old_value = 0
             p1_w = self.last_p1_total_power
-            self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0, p1_total_power=p1_w)
+            self.status_api.post_update(
+                EVENT_TYPE_CHANGE,
+                None,
+                0,
+                p1_total_power=p1_w,
+                rule=encode_schedule_rule(0),
+            )
             self.logger.info("Pause override enabled after setting power to 0.")
         else:
             self.pause_override_active = False
@@ -915,6 +932,7 @@ class AutomationApp:
                 self.old_value,
                 result.power,
                 p1_total_power=p1_w,
+                rule=encode_schedule_rule(desired_power),
             )
 
         # Update self.value with the actual power that was set (result.power)
