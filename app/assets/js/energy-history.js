@@ -241,6 +241,7 @@
         button.type = "button";
         button.className = "gsd-icon-btn app-energy-summary-tooltip__day-nav";
         button.classList.add(`app-energy-summary-tooltip__day-nav--${isPrevious ? "prev" : "next"}`);
+        button.dataset.direction = String(direction);
         button.disabled = !adjacentDay;
         button.setAttribute("aria-label", isPrevious ? "Show previous day" : "Show next day");
         button.innerHTML = `<svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-${isPrevious ? "left" : "right"}"></use></svg>`;
@@ -250,13 +251,12 @@
         button.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            if (!adjacentDay) return;
+            const targetDay = adjacentSummaryDay(direction);
+            if (!targetDay) return;
             const trigger = activeSummaryTooltipTrigger;
-            selectSummaryDay(adjacentDay);
+            selectSummaryDay(targetDay);
             if (trigger && !summaryTooltip.hidden) {
-                window.requestAnimationFrame(() => {
-                    refreshSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
-                });
+                refreshSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
             }
         });
         return button;
@@ -287,10 +287,10 @@
         const title = summaryTooltip.querySelector(".app-energy-summary-tooltip__title");
         if (title) title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
 
-        summaryTooltip.querySelector(".app-energy-summary-tooltip__day-nav--prev")
-            ?.replaceWith(createSummaryDayNavButton(-1));
-        summaryTooltip.querySelector(".app-energy-summary-tooltip__day-nav--next")
-            ?.replaceWith(createSummaryDayNavButton(1));
+        summaryTooltip.querySelectorAll(".app-energy-summary-tooltip__day-nav").forEach((button) => {
+            const direction = Number(button.dataset.direction);
+            button.disabled = !adjacentSummaryDay(direction);
+        });
 
         const prices = summaryTooltip.querySelector(".app-price-summary-tooltip__prices");
         if (prices) prices.replaceWith(buildSummaryTooltipPrices(detail));
@@ -1068,7 +1068,8 @@
         hideSummaryTooltip();
         hideHourTooltip();
     }, true);
-    document.addEventListener("touchmove", () => {
+    document.addEventListener("touchmove", (event) => {
+        if (eventInsideSummaryTooltip(event.target)) return;
         hideSummaryTooltip();
         hideHourTooltip();
     }, { capture: true, passive: true });
