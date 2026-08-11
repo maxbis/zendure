@@ -269,7 +269,6 @@
         toggle.addEventListener("click", () => {
             setOpen(!root.classList.contains("is-open"));
         });
-
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && root.classList.contains("is-open")) {
                 setOpen(false);

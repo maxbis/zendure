@@ -51,6 +51,8 @@ Current host items:
 - When an item lacks `href` or `label`, then that item is skipped.
 - When Graphite CSS/JS is not loaded on a host page, then the footer markup may appear unstyled or non-interactive.
 - When more items are added later, then only the items array needs updating; the panel layout already supports multiple rows.
+- Host pages must use `viewport-fit=cover` so `env(safe-area-inset-bottom)` lifts the More control above the iOS home indicator.
+- The menu panel is absolutely positioned above the bar and fully `display: none` when closed, so it cannot intercept mobile taps on the toggle.
 
 ## Related files
 
