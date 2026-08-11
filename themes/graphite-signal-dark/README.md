@@ -62,3 +62,13 @@ Public controls:
 - `GraphiteFlash.warning(message, options)`
 - `GraphiteFlash.info(message, options)`
 - `GraphiteFlash.dismissAll()`
+- `GraphiteFooterMore.init(scope?)`
+- `GraphiteFooterMore.open(root)`
+- `GraphiteFooterMore.close(root)`
+
+Shared expandable footer menu:
+
+- Partial: `partials/footer-more.php`
+- Pass `$gsdFooterMoreItems` (array of `href`, `label`, optional `description` / `icon`)
+- Optional `$gsdFooterMoreSpriteHref` and `$gsdFooterMorePanelId`
+- Host pages load `theme.css`, `components.css`, and `graphite-controls.js`

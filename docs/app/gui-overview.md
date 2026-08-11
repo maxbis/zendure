@@ -50,7 +50,7 @@ It presents:
 - prices and the current energy plan for today or tomorrow
 - four days of hourly battery energy history
 - charged, discharged, and PnL totals for the selected day
-- a link to the old GUI for functions that have not moved yet
+- a shared Graphite More footer menu with a link to the old GUI for functions that have not moved yet
 
 ### Old GUI
 
@@ -63,6 +63,7 @@ It presents and modifies:
 - charge and discharge schedules
 - schedule rules and conditions
 - automation status and related operational controls
+- the same shared Graphite More footer menu with a link to the new GUI
 
 ## Flow and behavior
 
@@ -72,7 +73,8 @@ It presents and modifies:
 4. When a user activates a battery detail trigger, the non-modal dialog opens on its Energy view and can switch to live battery Health details.
 5. When a user selects a day in the new GUI's four-day history, the summary cards show totals for that selected calendar day. For today, totals cover the available readings up to the current time.
 6. When schedule editing, rule editing, or an automation function is needed, the user continues in the old GUI.
-7. Backend changes to shared APIs must be tested against both GUIs.
+7. Users can move between the GUIs through the shared More footer menu.
+8. Backend changes to shared APIs must be tested against both GUIs.
 
 ## Edge cases and failure modes
 
@@ -87,6 +89,7 @@ It presents and modifies:
 - [New GUI current energy status and battery details](assets/js/current-energy-status.md)
 - [New GUI prices and energy plan](assets/js/price-plan.md)
 - [New GUI shared system configuration](shared-system-configuration.md)
+- [Shared More footer menu](../themes/graphite-signal-dark/footer-more.md)
 - [Old GUI page description](../main/page-description.md)
 - [Old GUI page layout](../main/page-layout.md)
 - [Old GUI schedule architecture](../main/schedule-overview.md)

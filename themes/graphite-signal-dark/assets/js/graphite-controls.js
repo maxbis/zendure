@@ -227,11 +227,92 @@
         }
     };
 
+    function prepareFooterMore(root) {
+        if (!(root instanceof HTMLElement) || root.dataset.gsdFooterReady === "true") {
+            return;
+        }
+
+        const toggle = root.querySelector('[data-role="gsd-footer-more-toggle"]');
+        const panel = root.querySelector('[data-role="gsd-footer-more-panel"]');
+        if (!(toggle instanceof HTMLButtonElement) || !(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        root.dataset.gsdFooterReady = "true";
+
+        let backdrop = null;
+
+        function setOpen(open) {
+            const nextOpen = Boolean(open);
+            root.classList.toggle("is-open", nextOpen);
+            toggle.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+            panel.hidden = !nextOpen;
+            panel.setAttribute("aria-hidden", nextOpen ? "false" : "true");
+
+            if (nextOpen) {
+                if (!backdrop) {
+                    backdrop = document.createElement("button");
+                    backdrop.type = "button";
+                    backdrop.className = "gsd-footer-more__backdrop";
+                    backdrop.setAttribute("aria-label", "Close more menu");
+                    backdrop.addEventListener("click", () => setOpen(false));
+                    root.insertBefore(backdrop, root.firstChild);
+                }
+            } else if (backdrop) {
+                backdrop.remove();
+                backdrop = null;
+            }
+        }
+
+        root._gsdFooterMoreSetOpen = setOpen;
+
+        toggle.addEventListener("click", () => {
+            setOpen(!root.classList.contains("is-open"));
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && root.classList.contains("is-open")) {
+                setOpen(false);
+                toggle.focus();
+            }
+        });
+    }
+
+    const GraphiteFooterMore = {
+        init(scope = document) {
+            if (scope instanceof HTMLElement && scope.matches("[data-gsd-footer-more]")) {
+                prepareFooterMore(scope);
+            }
+            if (scope && typeof scope.querySelectorAll === "function") {
+                scope.querySelectorAll("[data-gsd-footer-more]").forEach(prepareFooterMore);
+            }
+        },
+
+        open(root) {
+            const target = typeof root === "string" ? document.querySelector(root) : root;
+            if (!(target instanceof HTMLElement)) return;
+            prepareFooterMore(target);
+            if (typeof target._gsdFooterMoreSetOpen === "function") {
+                target._gsdFooterMoreSetOpen(true);
+            }
+        },
+
+        close(root) {
+            const target = typeof root === "string" ? document.querySelector(root) : root;
+            if (!(target instanceof HTMLElement)) return;
+            if (typeof target._gsdFooterMoreSetOpen === "function") {
+                target._gsdFooterMoreSetOpen(false);
+            }
+        }
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll("dialog.gsd-dialog").forEach(prepareDialog);
         ensureFlashRegion();
+        GraphiteFooterMore.init();
     });
 
     window.GraphiteDialog = GraphiteDialog;
     window.GraphiteFlash = GraphiteFlash;
+    window.GraphiteFooterMore = GraphiteFooterMore;
 })();

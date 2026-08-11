@@ -670,3 +670,183 @@
         transform: none;
     }
 }
+
+/* Expandable More footer menu (shared across GUIs) */
+.gsd-footer-more {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: grid;
+    gap: 0;
+    pointer-events: none;
+    font-family: var(--gsd-font-sans);
+    color: var(--gsd-text);
+}
+
+.gsd-footer-more__panel,
+.gsd-footer-more__bar {
+    pointer-events: auto;
+}
+
+.gsd-footer-more__panel {
+    width: min(100%, 920px);
+    margin-inline: auto;
+    padding: 0 var(--gsd-space-3) var(--gsd-space-2);
+    transform: translateY(8px);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity var(--gsd-duration-fast) ease,
+        transform var(--gsd-duration-fast) ease,
+        visibility var(--gsd-duration-fast) ease;
+}
+
+.gsd-footer-more.is-open .gsd-footer-more__panel {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.gsd-footer-more__panel[hidden] {
+    display: block !important;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.gsd-footer-more__nav {
+    display: grid;
+    gap: var(--gsd-space-2);
+    padding: var(--gsd-space-2);
+    background: var(--gsd-surface-1);
+    border: 1px solid var(--gsd-border-strong);
+    border-radius: var(--gsd-radius-card);
+    box-shadow: var(--gsd-shadow-floating);
+}
+
+.gsd-footer-more__item {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: var(--gsd-space-3);
+    min-height: 52px;
+    padding: var(--gsd-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--gsd-radius-md);
+    background: transparent;
+    color: var(--gsd-text);
+    text-decoration: none;
+    transition: background-color var(--gsd-duration-fast) ease, border-color var(--gsd-duration-fast) ease;
+}
+
+.gsd-footer-more__item:hover,
+.gsd-footer-more__item:focus-visible {
+    background: var(--gsd-surface-hover);
+    border-color: var(--gsd-border);
+    color: var(--gsd-text);
+    text-decoration: none;
+}
+
+.gsd-footer-more__item-icon,
+.gsd-footer-more__item-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gsd-text-secondary);
+}
+
+.gsd-footer-more__item-icon .gsd-icon,
+.gsd-footer-more__item-chevron .gsd-icon,
+.gsd-footer-more__toggle .gsd-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.gsd-footer-more__item-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.gsd-footer-more__item-label {
+    color: var(--gsd-text);
+    font-size: 0.9375rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.gsd-footer-more__item-description {
+    color: var(--gsd-text-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
+}
+
+.gsd-footer-more__bar {
+    display: flex;
+    justify-content: center;
+    padding: var(--gsd-space-2) var(--gsd-space-3) calc(var(--gsd-space-2) + env(safe-area-inset-bottom, 0px));
+    background:
+        linear-gradient(180deg, transparent, var(--gsd-page-deep) 28%),
+        color-mix(in srgb, var(--gsd-page-deep) 92%, transparent);
+    border-top: 1px solid var(--gsd-border);
+    backdrop-filter: blur(10px);
+}
+
+.gsd-footer-more__toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gsd-space-2);
+    min-width: min(100%, 220px);
+    min-height: 44px;
+    padding: 0 var(--gsd-space-4);
+    border: 1px solid var(--gsd-border-strong);
+    border-radius: 999px;
+    background: var(--gsd-surface-3);
+    color: var(--gsd-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 650;
+}
+
+.gsd-footer-more__toggle:hover {
+    background: var(--gsd-surface-hover);
+}
+
+.gsd-footer-more__toggle-chevron {
+    transition: transform var(--gsd-duration-fast) ease;
+}
+
+.gsd-footer-more.is-open .gsd-footer-more__toggle-chevron {
+    transform: rotate(180deg);
+}
+
+.gsd-footer-more__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: default;
+}
+
+body:has(.gsd-footer-more) {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gsd-footer-more__panel,
+    .gsd-footer-more__toggle-chevron {
+        transition: none;
+    }
+}

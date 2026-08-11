@@ -598,5 +598,18 @@ $appConfig = [
 
     </main>
 
+    <?php
+    $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
+    $gsdFooterMoreItems = [
+        [
+            'href' => '../main/',
+            'label' => 'Open Old GUI',
+            'description' => 'Schedules, rules, and automation controls',
+            'icon' => 'settings',
+        ],
+    ];
+    include dirname(__DIR__) . '/themes/graphite-signal-dark/partials/footer-more.php';
+    ?>
+
 </body>
 </html>

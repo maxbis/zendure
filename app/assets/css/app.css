@@ -1,7 +1,7 @@
 .app-shell {
     width: min(100%, 920px);
     margin-inline: auto;
-    padding: 6px 12px 72px;
+    padding: 6px 12px 24px;
 }
 
 .app-topbar {
@@ -3556,14 +3556,14 @@ button.app-state-pill:focus-visible {
 
 @media (min-width: 760px) {
     .app-shell {
-        padding: 10px 20px 84px;
+        padding: 10px 20px 28px;
     }
 }
 
 /* Keep the mobile dashboard glanceable without changing the desktop cards. */
 @media (max-width: 759px) {
     .app-shell {
-        padding: 4px 8px 56px;
+        padding: 4px 8px 16px;
     }
 
     .app-topbar {

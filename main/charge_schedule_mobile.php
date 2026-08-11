@@ -105,7 +105,10 @@ $priceConversionConfig = $systemConfig['priceConversion'];
     <link rel="stylesheet" href="assets/css/automation_status.css">
     <link rel="stylesheet" href="assets/css/charge_status_defines.css">
     <link rel="stylesheet" href="assets/css/charge_status.css">
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
+    <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/components.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="../themes/graphite-signal-dark/assets/js/graphite-controls.js" defer></script>
 </head>
 
 <body class="mobile-dark">
@@ -275,6 +278,19 @@ $priceConversionConfig = $systemConfig['priceConversion'];
         </script>
 
     </div>
+
+    <?php
+    $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
+    $gsdFooterMoreItems = [
+        [
+            'href' => '../app/',
+            'label' => 'Open New GUI',
+            'description' => 'Live monitoring and battery history',
+            'icon' => 'activity',
+        ],
+    ];
+    include dirname(__DIR__) . '/themes/graphite-signal-dark/partials/footer-more.php';
+    ?>
 
 </body>
 
