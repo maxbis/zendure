@@ -37,8 +37,8 @@
     ]
   },
   "schedule": {
-    "minPowerW": -1600,
-    "maxPowerW": 1800,
+    "minPowerW": -1800,
+    "maxPowerW": 1200,
     "powerStepW": 100
   },
   "installation": {
