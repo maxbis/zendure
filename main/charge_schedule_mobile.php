@@ -277,8 +277,6 @@ $priceConversionConfig = $systemConfig['priceConversion'];
             })();
         </script>
 
-    </div>
-
     <?php
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
@@ -291,6 +289,8 @@ $priceConversionConfig = $systemConfig['priceConversion'];
     ];
     include dirname(__DIR__) . '/themes/graphite-signal-dark/partials/footer-more.php';
     ?>
+
+    </div>
 
 </body>
 

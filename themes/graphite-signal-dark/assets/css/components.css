@@ -673,11 +673,10 @@
 
 /* Expandable More footer menu (shared across GUIs) */
 .gsd-footer-more {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
+    position: relative;
+    z-index: 20;
+    width: min(100%, 920px);
+    margin: var(--gsd-space-4) auto 0;
     font-family: var(--gsd-font-sans);
     color: var(--gsd-text);
 }
@@ -790,13 +789,11 @@
     justify-content: center;
     width: 100%;
     padding:
+        var(--gsd-space-4)
         var(--gsd-space-3)
-        var(--gsd-space-3)
-        calc(var(--gsd-space-3) + env(safe-area-inset-bottom, 0px));
-    background: color-mix(in srgb, var(--gsd-page-deep) 94%, transparent);
+        calc(var(--gsd-space-5) + env(safe-area-inset-bottom, 0px));
+    background: transparent;
     border-top: 1px solid var(--gsd-border);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 .gsd-footer-more__toggle {
@@ -847,10 +844,6 @@
     cursor: default;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-}
-
-body:has(.gsd-footer-more) {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (prefers-reduced-motion: reduce) {

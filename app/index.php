@@ -596,8 +596,6 @@ $appConfig = [
             </div>
         </section>
 
-    </main>
-
     <?php
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
@@ -610,6 +608,8 @@ $appConfig = [
     ];
     include dirname(__DIR__) . '/themes/graphite-signal-dark/partials/footer-more.php';
     ?>
+
+    </main>
 
 </body>
 </html>

@@ -27,7 +27,7 @@ Inputs before including the partial:
 
 Outputs:
 
-- Fixed footer with a More toggle
+- Page-end footer with a More toggle (in document flow, not fixed to the viewport)
 - Expandable panel listing the configured items
 - `GraphiteFooterMore` open/close helpers on `window`
 
@@ -39,11 +39,12 @@ Current host items:
 ## Flow and behavior
 
 1. Page loads Graphite `theme.css`, `components.css`, and `graphite-controls.js`.
-2. Host sets `$gsdFooterMoreItems` and includes the partial after main content.
+2. Host sets `$gsdFooterMoreItems` and includes the partial at the end of the main page content.
 3. On DOM ready, `GraphiteFooterMore.init()` binds the More toggle.
-4. Tapping More expands the panel above the bar.
-5. Escape or the transparent backdrop closes the panel.
-6. Choosing an item navigates to the linked GUI or future destination.
+4. The More control stays at the bottom of the page and is reached by scrolling.
+5. Tapping More expands the panel above the bar.
+6. Escape or the transparent backdrop closes the panel.
+7. Choosing an item navigates to the linked GUI or future destination.
 
 ## Edge cases and failure modes
 
@@ -51,8 +52,8 @@ Current host items:
 - When an item lacks `href` or `label`, then that item is skipped.
 - When Graphite CSS/JS is not loaded on a host page, then the footer markup may appear unstyled or non-interactive.
 - When more items are added later, then only the items array needs updating; the panel layout already supports multiple rows.
-- Host pages must use `viewport-fit=cover` so `env(safe-area-inset-bottom)` lifts the More control above the iOS home indicator.
-- The menu panel is absolutely positioned above the bar and fully `display: none` when closed, so it cannot intercept mobile taps on the toggle.
+- Host pages must use `viewport-fit=cover` so bottom safe-area padding remains correct on notched phones.
+- The menu panel opens upward from the page-end control and is fully `display: none` when closed, so it cannot intercept taps on the toggle.
 
 ## Related files
 
