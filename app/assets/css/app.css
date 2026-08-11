@@ -3435,6 +3435,32 @@ button.app-state-pill:focus-visible {
 .app-energy-hour-tooltip__details strong[data-direction="charged"] { color: var(--gsd-positive); }
 .app-energy-hour-tooltip__details strong[data-direction="discharged"] { color: var(--gsd-negative); }
 
+.app-energy-summary-tooltip__heading {
+    justify-content: center;
+    gap: 4px;
+}
+
+.app-energy-summary-tooltip__title {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.app-energy-summary-tooltip__day-nav {
+    width: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    flex: 0 0 auto;
+}
+
+.app-energy-summary-tooltip__day-nav .gsd-icon {
+    width: 14px;
+    height: 14px;
+}
+
 .app-energy-history__content > .app-energy-history__summary-period {
     margin: 10px 2px 4px;
     color: var(--gsd-text-secondary);
