@@ -248,7 +248,11 @@
 
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
-        [["Consumer", detail.consumer], ["Spot", detail.spot]].forEach(([label, value]) => {
+        const priceRows = [["Consumer", detail.consumer], ["Spot", detail.spot]];
+        if (Object.hasOwn(detail, "indicative")) {
+            priceRows.push(["Indicative", detail.indicative]);
+        }
+        priceRows.forEach(([label, value]) => {
             const row = document.createElement("p");
             const name = document.createElement("span");
             const amount = document.createElement("strong");
@@ -349,7 +353,10 @@
         const energy = formatEnergy(detail.energy, detail.signed);
         const consumer = formatMoney(detail.consumer, detail.signed);
         const spot = formatMoney(detail.spot, detail.signed);
-        trigger.setAttribute("aria-label", `${detail.label} ${energy}. Consumer ${consumer}. Spot ${spot}. Show price totals.`);
+        const indicative = Object.hasOwn(detail, "indicative")
+            ? ` Indicative ${formatMoney(detail.indicative, detail.signed)}.`
+            : "";
+        trigger.setAttribute("aria-label", `${detail.label} ${energy}. Consumer ${consumer}. Spot ${spot}.${indicative} Show price totals.`);
     }
 
     function bindSummaryTooltip(trigger) {
@@ -798,6 +805,22 @@
             };
         });
 
+        const indicativeCharge = totals.spot.charged;
+        const indicativeDischarge = totals.consumer.discharged;
+        totals.indicative = {
+            pnl: {
+                // Indicative value: avoided consumer cost on discharge minus spot cost on charge.
+                eur: indicativeCharge.complete && indicativeDischarge.complete
+                    ? indicativeDischarge.eur - indicativeCharge.eur
+                    : null,
+                complete: indicativeCharge.complete && indicativeDischarge.complete,
+                missingHours: [...new Set([
+                    ...indicativeCharge.missingHours,
+                    ...indicativeDischarge.missingHours
+                ])]
+            }
+        };
+
         return totals;
     }
 
@@ -839,6 +862,7 @@
             energy: energyNet,
             consumer: money.consumer.pnl.eur,
             spot: money.spot.pnl.eur,
+            indicative: money.indicative.pnl.eur,
             signed: true
         });
         return priceWarning(money);
