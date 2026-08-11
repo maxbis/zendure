@@ -6,7 +6,7 @@
     "maxChargePercent": 91,
     "efficiency": 0.9,
     "maxChargePowerW": 1200,
-    "maxDischargePowerW": 1800
+    "maxDischargePowerW": 2000
   },
   "forecast": {
     "defaultHouseholdUsageWByHour": [
