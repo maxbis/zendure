@@ -1,7 +1,7 @@
 .app-shell {
     width: min(100%, 920px);
     margin-inline: auto;
-    padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 24px;
+    padding: calc(0px + env(safe-area-inset-top, 0px)) 12px 24px;
 }
 
 .app-topbar {
@@ -3556,7 +3556,7 @@ button.app-state-pill:focus-visible {
 
 @media (min-width: 760px) {
     .app-shell {
-        padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 28px;
+        padding: calc(0px + env(safe-area-inset-top, 0px)) 20px 28px;
     }
 }
 
