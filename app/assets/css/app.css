@@ -3709,11 +3709,11 @@ button.app-state-pill:focus-visible {
 
     .app-section-heading {
         gap: 8px;
-        padding: 10px 12px;
+        padding: 10px 14px 10px 12px;
     }
 
     .app-price-plan .app-section-heading {
-        padding: 9px 10px;
+        padding: 9px 14px 9px 10px;
     }
 
     .app-price-plan [data-role="price-plan-date"] {
@@ -3856,7 +3856,7 @@ button.app-state-pill:focus-visible {
     }
 
     .app-energy-history__heading {
-        padding: 9px 10px;
+        padding: 9px 14px 9px 10px;
     }
 
     .app-energy-history [data-role="energy-history-date"] {
@@ -4001,7 +4001,7 @@ button.app-state-pill:focus-visible {
         grid-template-columns: minmax(0, 1fr) 34px;
         align-items: center;
         gap: 7px 8px;
-        padding: 9px 10px;
+        padding: 9px 14px 9px 10px;
     }
 
     .app-energy-history__heading > div:first-child {
