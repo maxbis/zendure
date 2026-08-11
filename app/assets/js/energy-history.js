@@ -179,6 +179,9 @@
         tooltip.className = "app-schedule-tooltip";
         tooltip.setAttribute("role", "tooltip");
         tooltip.hidden = true;
+        tooltip.addEventListener("pointerdown", (event) => {
+            event.stopPropagation();
+        }, true);
         document.body.appendChild(tooltip);
         return tooltip;
     }
@@ -195,6 +198,13 @@
         return tooltip;
     }
 
+    function updateSummaryTooltipChartShield() {
+        elements.chart?.classList.toggle(
+            "has-summary-tooltip-open",
+            !summaryTooltip.hidden && activeSummaryTooltipTrigger !== null
+        );
+    }
+
     function hideSummaryTooltip(trigger = null) {
         if (trigger && trigger !== activeSummaryTooltipTrigger) return;
         if (activeSummaryTooltipTrigger) {
@@ -209,6 +219,7 @@
         summaryTooltip.style.removeProperty("left");
         summaryTooltip.style.removeProperty("top");
         summaryTooltip.style.removeProperty("visibility");
+        updateSummaryTooltipChartShield();
     }
 
     function eventInsideSummaryTooltip(target) {
@@ -229,9 +240,13 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "gsd-icon-btn app-energy-summary-tooltip__day-nav";
+        button.classList.add(`app-energy-summary-tooltip__day-nav--${isPrevious ? "prev" : "next"}`);
         button.disabled = !adjacentDay;
         button.setAttribute("aria-label", isPrevious ? "Show previous day" : "Show next day");
         button.innerHTML = `<svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-${isPrevious ? "left" : "right"}"></use></svg>`;
+        button.addEventListener("pointerdown", (event) => {
+            event.stopPropagation();
+        });
         button.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -239,11 +254,49 @@
             const trigger = activeSummaryTooltipTrigger;
             selectSummaryDay(adjacentDay);
             if (trigger && !summaryTooltip.hidden) {
-                showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
-                pinnedSummaryTooltipTrigger = trigger;
+                window.requestAnimationFrame(() => {
+                    refreshSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+                });
             }
         });
         return button;
+    }
+
+    function buildSummaryTooltipPrices(detail) {
+        const prices = document.createElement("div");
+        prices.className = "app-price-summary-tooltip__prices";
+        const priceRows = [["Consumer", detail.consumer], ["Spot", detail.spot]];
+        if (Object.hasOwn(detail, "indicative")) {
+            priceRows.push(["Indicative", detail.indicative]);
+        }
+        priceRows.forEach(([label, value]) => {
+            const row = document.createElement("p");
+            const name = document.createElement("span");
+            const amount = document.createElement("strong");
+            name.textContent = label;
+            amount.textContent = formatMoney(value, detail.signed);
+            row.append(name, amount);
+            prices.appendChild(row);
+        });
+        return prices;
+    }
+
+    function refreshSummaryTooltip(detail, trigger) {
+        if (!detail || !trigger || summaryTooltip.hidden) return;
+
+        const title = summaryTooltip.querySelector(".app-energy-summary-tooltip__title");
+        if (title) title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
+
+        summaryTooltip.querySelector(".app-energy-summary-tooltip__day-nav--prev")
+            ?.replaceWith(createSummaryDayNavButton(-1));
+        summaryTooltip.querySelector(".app-energy-summary-tooltip__day-nav--next")
+            ?.replaceWith(createSummaryDayNavButton(1));
+
+        const prices = summaryTooltip.querySelector(".app-price-summary-tooltip__prices");
+        if (prices) prices.replaceWith(buildSummaryTooltipPrices(detail));
+
+        pinnedSummaryTooltipTrigger = trigger;
+        positionSummaryTooltip(trigger);
     }
 
     function positionSummaryTooltip(anchor) {
@@ -285,26 +338,11 @@
         heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1));
         header.appendChild(heading);
 
-        const prices = document.createElement("div");
-        prices.className = "app-price-summary-tooltip__prices";
-        const priceRows = [["Consumer", detail.consumer], ["Spot", detail.spot]];
-        if (Object.hasOwn(detail, "indicative")) {
-            priceRows.push(["Indicative", detail.indicative]);
-        }
-        priceRows.forEach(([label, value]) => {
-            const row = document.createElement("p");
-            const name = document.createElement("span");
-            const amount = document.createElement("strong");
-            name.textContent = label;
-            amount.textContent = formatMoney(value, detail.signed);
-            row.append(name, amount);
-            prices.appendChild(row);
-        });
-
-        summaryTooltip.replaceChildren(header, prices);
+        summaryTooltip.replaceChildren(header, buildSummaryTooltipPrices(detail));
         summaryTooltip.hidden = false;
         summaryTooltip.style.visibility = "hidden";
         positionSummaryTooltip(trigger);
+        updateSummaryTooltipChartShield();
     }
 
     function hideHourTooltip(trigger = null) {
@@ -1040,7 +1078,8 @@
             && !eventInsideSummaryTooltip(event.target)) {
             hideSummaryTooltip(activeSummaryTooltipTrigger);
         }
-        if (activeHourTooltipTrigger && !activeHourTooltipTrigger.contains(event.target)) {
+        if (activeHourTooltipTrigger && !activeHourTooltipTrigger.contains(event.target)
+            && !eventInsideSummaryTooltip(event.target)) {
             hideHourTooltip(activeHourTooltipTrigger);
         }
     });

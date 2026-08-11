@@ -3432,6 +3432,11 @@ button.app-state-pill:focus-visible {
     stroke-width: 2;
 }
 
+.app-energy-history__chart.has-summary-tooltip-open .app-energy-chart__hit,
+.app-energy-history__chart.has-summary-tooltip-open .app-energy-chart__day-select {
+    pointer-events: none;
+}
+
 .app-energy-hour-tooltip__details strong[data-direction="charged"] { color: var(--gsd-positive); }
 .app-energy-hour-tooltip__details strong[data-direction="discharged"] { color: var(--gsd-negative); }
 
@@ -3454,6 +3459,7 @@ button.app-state-pill:focus-visible {
     min-width: 28px;
     min-height: 28px;
     flex: 0 0 auto;
+    touch-action: manipulation;
 }
 
 .app-energy-summary-tooltip__day-nav .gsd-icon {
