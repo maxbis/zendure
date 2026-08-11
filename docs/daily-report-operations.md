@@ -20,6 +20,10 @@ MARIADB_PORT=3306
 MARIADB_USER=your_db_user
 MARIADB_PASSWORD=your_db_password
 MARIADB_DATABASE=sqlite_replication
+ENPHASE_HISTORY_DATABASE=enphase_history
+ENPHASE_PRODUCTION_TABLE=production_hourly
+ENPHASE_SYSTEM_ID=5053376
+ENPHASE_PRODUCTION_SOURCE=production_micro
 ```
 
 Price fetching also needs the ENTSO-E token in `main/prices/config.json`:
@@ -96,6 +100,7 @@ What it does:
 - creates `hourly_report_inputs` and `hourly_report_inputs_update_log` if missing;
 - reads raw `status_updates`;
 - reads hourly prices from `price_ticks`;
+- reads hourly production from `enphase_history.production_hourly`;
 - recomputes each day and upserts one row per local hour;
 - never deletes raw `status_updates`.
 
@@ -136,6 +141,69 @@ This is intentional:
 - yesterday is recomputed after midnight so boundary interpolation can use the first rows of the new day.
 
 Production APIs still build today live from `status_updates`, but keeping today in `hourly_report_inputs` fresh is useful for validation and for the moment today becomes yesterday.
+
+The production cron runs on the production host. MariaDB is manually replicated from production to localhost for development and validation; localhost does not run this cron.
+
+## Battery Flow PnL Migration and Backfill
+
+Apply the additive schema migration first on localhost:
+
+```bash
+mysql -h127.0.0.1 -P3306 -uUSER -p sqlite_replication \
+  < daily_report/sql/add_battery_flow_pnl_columns.sql
+```
+
+The migration adds nullable estimated-home-load and whole-Wh attribution fields, signed integer millieuro fields, a calculation status, and a method version. It does not modify existing report values.
+
+Dry-run the reconstructable historical range:
+
+```bash
+python3 daily_report/tools/update_hourly_report_inputs.py \
+  --start-date 2026-04-06 \
+  --end-date YYYY-MM-DD \
+  --pnl-only \
+  --dry-run
+```
+
+Review the per-date status counts. When the output is acceptable, populate only the new fields:
+
+```bash
+python3 daily_report/tools/update_hourly_report_inputs.py \
+  --start-date 2026-04-06 \
+  --end-date YYYY-MM-DD \
+  --pnl-only
+```
+
+The operation is idempotent and commits each date independently. Rerun the same range after corrected raw data, prices, production, or calculation code. Existing charge, discharge, grid, price, and battery values are not updated in `--pnl-only` mode. Estimated home load, battery attribution, PnL, status, and method version are overwritten; clearing them first is unnecessary.
+
+Validate the result:
+
+```sql
+SELECT
+  local_date,
+  battery_pnl_status,
+  COUNT(*) AS hours
+FROM hourly_report_inputs
+WHERE local_date >= '2026-04-06'
+GROUP BY local_date, battery_pnl_status
+ORDER BY local_date, battery_pnl_status;
+```
+
+```sql
+SELECT local_date, local_hour
+FROM hourly_report_inputs
+WHERE battery_pnl_status = 'complete'
+  AND (
+    battery_charge_grid_wh + battery_charge_surplus_wh <> ROUND(charged_wh)
+    OR battery_discharge_home_wh + battery_discharge_export_wh <> ROUND(discharged_wh)
+    OR battery_flow_pnl_milli_eur <>
+      battery_home_savings_milli_eur
+      + battery_export_revenue_milli_eur
+      - battery_charge_cost_milli_eur
+  );
+```
+
+See `docs/daily_report/battery-flow-pnl.md` for the complete formula and status contract.
 
 ## Cron Example
 

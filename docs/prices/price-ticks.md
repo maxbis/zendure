@@ -149,6 +149,16 @@ Daily reports use a hybrid data path:
 
 Historical report rows in `hourly_report_inputs` also contain the hourly price columns copied from `price_ticks` by `daily_report/tools/update_hourly_report_inputs.py`.
 
+Battery-flow PnL uses both stored price columns directly:
+
+- When battery charging is attributed to grid import, then it uses `consumer_eur_per_kwh`.
+- When battery charging is attributed to surplus, then it uses `spot_eur_per_kwh` as forgone export value.
+- When battery discharge serves the household, then it uses `consumer_eur_per_kwh` as avoided purchase value.
+- When battery discharge is exported, then it uses `spot_eur_per_kwh`.
+- When a price needed by an active flow is missing, then that hour's battery-flow PnL remains incomplete.
+
+See `docs/daily_report/battery-flow-pnl.md` for the versioned calculation and historical backfill procedure.
+
 Relevant report metadata:
 
 - `price_source`: `db:price_ticks`

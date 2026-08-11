@@ -158,7 +158,13 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
     $stmt = $pdo->prepare(
         'SELECT local_hour, hour_start_ts, hour_end_ts, charged_wh, discharged_wh,
             battery_pct_start, battery_pct_end, battery_pct_delta, grid_from_wh, grid_to_wh,
-            consumer_eur_per_kwh, spot_eur_per_kwh, price_source, source_rows, computed_at, updated_at
+            battery_charge_grid_wh, battery_charge_surplus_wh,
+            battery_discharge_home_wh, battery_discharge_export_wh,
+            consumer_eur_per_kwh, spot_eur_per_kwh, price_source,
+            battery_charge_cost_milli_eur, battery_home_savings_milli_eur,
+            battery_export_revenue_milli_eur, battery_flow_pnl_milli_eur,
+            battery_pnl_status, battery_pnl_method_version,
+            source_rows, computed_at, updated_at
          FROM hourly_report_inputs
          WHERE local_date = ?
          ORDER BY local_hour ASC'
@@ -190,6 +196,19 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
     $totalNetCost = 0.0;
     $totalSavings = 0.0;
     $totalChargeCost = 0.0;
+    $pnlTotalKeys = [
+        'battery_charge_grid_wh',
+        'battery_charge_surplus_wh',
+        'battery_discharge_home_wh',
+        'battery_discharge_export_wh',
+        'battery_charge_cost_milli_eur',
+        'battery_home_savings_milli_eur',
+        'battery_export_revenue_milli_eur',
+        'battery_flow_pnl_milli_eur',
+    ];
+    $pnlTotals = array_fill_keys($pnlTotalKeys, 0);
+    $pnlAllComplete = true;
+    $pnlMethodVersion = null;
     $priceHoursAvailable = 0;
 
     for ($hour = 0; $hour < 24; $hour++) {
@@ -208,6 +227,28 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
         $gridFromWh = dailyReportFloatValue($row['grid_from_wh'] ?? null);
         $gridToWh = dailyReportFloatValue($row['grid_to_wh'] ?? null);
         $price = dailyReportFloatValue($row['consumer_eur_per_kwh'] ?? null);
+        $spotPrice = dailyReportFloatValue($row['spot_eur_per_kwh'] ?? null);
+        $pnlStatus = is_string($row['battery_pnl_status'] ?? null)
+            ? (string)$row['battery_pnl_status']
+            : null;
+        $rowPnlMethodVersion = dailyReportIntValue($row['battery_pnl_method_version'] ?? null);
+        $pnlValues = [];
+        foreach ($pnlTotalKeys as $key) {
+            $pnlValues[$key] = dailyReportIntValue($row[$key] ?? null);
+        }
+        if (
+            $pnlStatus === 'complete'
+            && $rowPnlMethodVersion !== null
+            && ($pnlMethodVersion === null || $pnlMethodVersion === $rowPnlMethodVersion)
+            && !in_array(null, $pnlValues, true)
+        ) {
+            $pnlMethodVersion = $rowPnlMethodVersion;
+            foreach ($pnlTotalKeys as $key) {
+                $pnlTotals[$key] += (int)$pnlValues[$key];
+            }
+        } else {
+            $pnlAllComplete = false;
+        }
 
         $gridFromCost = null;
         $gridToCost = null;
@@ -254,6 +295,17 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
             'grid_from_wh' => dailyReportRoundValue($gridFromWh, 2),
             'grid_to_wh' => dailyReportRoundValue($gridToWh, 2),
             'price_eur_per_kwh' => dailyReportRoundValue($price, 4),
+            'spot_eur_per_kwh' => dailyReportRoundValue($spotPrice, 6),
+            'battery_charge_grid_wh' => $pnlValues['battery_charge_grid_wh'],
+            'battery_charge_surplus_wh' => $pnlValues['battery_charge_surplus_wh'],
+            'battery_discharge_home_wh' => $pnlValues['battery_discharge_home_wh'],
+            'battery_discharge_export_wh' => $pnlValues['battery_discharge_export_wh'],
+            'battery_charge_cost_milli_eur' => $pnlValues['battery_charge_cost_milli_eur'],
+            'battery_home_savings_milli_eur' => $pnlValues['battery_home_savings_milli_eur'],
+            'battery_export_revenue_milli_eur' => $pnlValues['battery_export_revenue_milli_eur'],
+            'battery_flow_pnl_milli_eur' => $pnlValues['battery_flow_pnl_milli_eur'],
+            'battery_pnl_status' => $pnlStatus,
+            'battery_pnl_method_version' => $rowPnlMethodVersion,
             'grid_from_cost' => dailyReportRoundValue($gridFromCost, 4),
             'grid_to_cost' => dailyReportRoundValue($gridToCost, 4),
             'net_cost' => dailyReportRoundValue($netCost, 4),
@@ -298,6 +350,11 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
                 'net_cost' => $hasPrices ? dailyReportRoundValue($totalNetCost, 4) : null,
                 'savings_eur' => $hasPrices ? dailyReportRoundValue($totalSavings, 4) : null,
                 'charge_cost_eur' => $hasPrices ? dailyReportRoundValue($totalChargeCost, 4) : null,
+                ...($pnlAllComplete
+                    ? $pnlTotals
+                    : array_fill_keys($pnlTotalKeys, null)),
+                'battery_pnl_status' => $pnlAllComplete ? 'complete' : 'incomplete',
+                'battery_pnl_method_version' => $pnlAllComplete ? $pnlMethodVersion : null,
             ],
         ],
     ];
@@ -371,6 +428,14 @@ function dailyReportFloatValue(mixed $value): ?float
         return null;
     }
     return is_numeric($value) ? (float)$value : null;
+}
+
+function dailyReportIntValue(mixed $value): ?int
+{
+    if ($value === null || $value === '' || is_bool($value) || !is_numeric($value)) {
+        return null;
+    }
+    return (int)$value;
 }
 
 function dailyReportRoundValue(?float $value, int $digits): ?float

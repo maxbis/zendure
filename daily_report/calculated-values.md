@@ -37,6 +37,8 @@ spot_price = (consumer_price / 1.21) - 0.0219 - 0.0898
 
 ## Box calculations
 
+The existing Net Cost, Savings, Charge Costs, P&L, and Spot P&L values below remain legacy report metrics. The additive battery-flow PnL fields use interval charge attribution and hourly home-first discharge attribution, as documented in `docs/daily_report/battery-flow-pnl.md`.
+
 ### Net Cost
 
 Main number:
@@ -145,9 +147,11 @@ Important: in the current implementation, `spot_pnl` still uses the normal `savi
 
 ## Where the underlying energy values come from
 
-- `charged_wh` and `discharged_wh` are calculated by integrating `p1_total_power` over each hour.
+- `charged_wh` and `discharged_wh` are calculated by integrating the signed battery power stored in `status_updates.new_value` over each hour.
 - `grid_from_wh` is calculated from the hourly delta of `total_act_x100`, divided by `100`.
 - `grid_to_wh` is calculated from the hourly delta of `total_act_ret_x100`, divided by `100`.
+
+Battery-flow PnL uses the stored `spot_eur_per_kwh` directly. It does not reconstruct spot price from consumer price.
 
 ## Rounding
 

@@ -23,8 +23,13 @@ import hourly_daily_grid_battery_report as report
 
 DEFAULT_AGGREGATE_TABLE = "hourly_report_inputs"
 DEFAULT_LOG_TABLE = "hourly_report_inputs_update_log"
+DEFAULT_PRODUCTION_DATABASE = "enphase_history"
+DEFAULT_PRODUCTION_TABLE = "production_hourly"
+DEFAULT_PRODUCTION_SYSTEM_ID = 5053376
+DEFAULT_PRODUCTION_SOURCE = "production_micro"
 RUN_TYPE_MANUAL = "manual"
 RUN_TYPE_DAILY = "daily"
+RUN_TYPE_PNL_BACKFILL = "pnl_backfill"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = REPO_ROOT / "daily_report" / ".env"
 
@@ -42,9 +47,20 @@ CREATE TABLE IF NOT EXISTS `{DEFAULT_AGGREGATE_TABLE}` (
     battery_pct_delta DECIMAL(6,2) NULL,
     grid_from_wh DECIMAL(12,3) NULL,
     grid_to_wh DECIMAL(12,3) NULL,
+    estimated_home_load_wh INT UNSIGNED NULL,
+    battery_charge_grid_wh INT UNSIGNED NULL,
+    battery_charge_surplus_wh INT UNSIGNED NULL,
+    battery_discharge_home_wh INT UNSIGNED NULL,
+    battery_discharge_export_wh INT UNSIGNED NULL,
     consumer_eur_per_kwh DECIMAL(10,6) NULL,
     spot_eur_per_kwh DECIMAL(10,6) NULL,
     price_source VARCHAR(32) NULL,
+    battery_charge_cost_milli_eur INT NULL,
+    battery_home_savings_milli_eur INT NULL,
+    battery_export_revenue_milli_eur INT NULL,
+    battery_flow_pnl_milli_eur INT NULL,
+    battery_pnl_status VARCHAR(32) NULL,
+    battery_pnl_method_version SMALLINT UNSIGNED NULL,
     source_min_id BIGINT NULL,
     source_max_id BIGINT NULL,
     source_rows INT UNSIGNED NOT NULL DEFAULT 0,
@@ -110,8 +126,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database", default=None, help="MariaDB database. Default: MARIADB_DATABASE or sqlite_replication.")
     parser.add_argument("--table", default=report.DEFAULT_TABLE, help="Raw status table.")
     parser.add_argument("--price-table", default=report.DEFAULT_PRICE_TABLE, help="Price tick table.")
+    parser.add_argument("--production-database", default=None, help="Default: ENPHASE_HISTORY_DATABASE or enphase_history.")
+    parser.add_argument("--production-table", default=None, help="Default: ENPHASE_PRODUCTION_TABLE or production_hourly.")
+    parser.add_argument("--production-system-id", type=int, default=None, help="Default: ENPHASE_SYSTEM_ID or 5053376.")
+    parser.add_argument("--production-source", default=None, help="Default: ENPHASE_PRODUCTION_SOURCE or production_micro.")
     parser.add_argument("--aggregate-table", default=DEFAULT_AGGREGATE_TABLE, help="Aggregate table.")
     parser.add_argument("--log-table", default=DEFAULT_LOG_TABLE, help="Update log table.")
+    parser.add_argument(
+        "--pnl-only",
+        action="store_true",
+        help="Update only the battery-flow attribution and PnL columns on existing hourly rows.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Calculate and report coverage without changing schema or data.",
+    )
     parser.add_argument("--timezone", default=report.DEFAULT_TIMEZONE, help="IANA timezone.")
     parser.add_argument(
         "--fallback-seconds",
@@ -206,6 +236,23 @@ def ensure_tables(connection: pymysql.connections.Connection, aggregate_table: s
             f"ALTER TABLE {quoted_aggregate_table} "
             "ADD COLUMN IF NOT EXISTS price_source VARCHAR(32) NULL AFTER spot_eur_per_kwh"
         )
+        pnl_columns = [
+            "estimated_home_load_wh INT UNSIGNED NULL",
+            "battery_charge_grid_wh INT UNSIGNED NULL",
+            "battery_charge_surplus_wh INT UNSIGNED NULL",
+            "battery_discharge_home_wh INT UNSIGNED NULL",
+            "battery_discharge_export_wh INT UNSIGNED NULL",
+            "battery_charge_cost_milli_eur INT NULL",
+            "battery_home_savings_milli_eur INT NULL",
+            "battery_export_revenue_milli_eur INT NULL",
+            "battery_flow_pnl_milli_eur INT NULL",
+            "battery_pnl_status VARCHAR(32) NULL",
+            "battery_pnl_method_version SMALLINT UNSIGNED NULL",
+        ]
+        for definition in pnl_columns:
+            cursor.execute(
+                f"ALTER TABLE {quoted_aggregate_table} ADD COLUMN IF NOT EXISTS {definition}"
+            )
 
 
 def _round(value: float | None, digits: int) -> float | None:
@@ -242,6 +289,65 @@ def load_price_ticks_for_day(
     return prices
 
 
+def load_production_for_day(
+    connection: pymysql.connections.Connection,
+    *,
+    database: str,
+    table: str,
+    system_id: int,
+    source: str,
+    target_day_start: datetime,
+) -> dict[str, float]:
+    qualified_table = f"{report._quote_identifier(database)}.{report._quote_identifier(table)}"
+    sql = (
+        f"SELECT local_hour, energy_wh FROM {qualified_table} "
+        "WHERE local_date = %s AND system_id = %s AND source = %s "
+        "ORDER BY local_hour ASC"
+    )
+    production: dict[str, float] = {}
+    with connection.cursor() as cursor:
+        cursor.execute(sql, (target_day_start.strftime("%Y-%m-%d"), system_id, source))
+        for row in cursor.fetchall():
+            try:
+                hour = int(row["local_hour"])
+            except (TypeError, ValueError):
+                continue
+            energy_wh = report._parse_numeric_value(row.get("energy_wh"))
+            if 0 <= hour <= 23 and energy_wh is not None:
+                production[f"{hour:02d}"] = energy_wh
+    return production
+
+
+def load_existing_energy_targets(
+    connection: pymysql.connections.Connection,
+    table: str,
+    target_day_start: datetime,
+) -> dict[str, dict[str, float | None]]:
+    quoted_table = report._quote_identifier(table)
+    sql = (
+        f"SELECT local_hour, charged_wh, discharged_wh, grid_from_wh, grid_to_wh FROM {quoted_table} "
+        f"WHERE local_date = %s ORDER BY local_hour ASC"
+    )
+    targets: dict[str, dict[str, float | None]] = {}
+    with connection.cursor() as cursor:
+        cursor.execute(sql, (target_day_start.strftime("%Y-%m-%d"),))
+        for row in cursor.fetchall():
+            try:
+                hour = int(row["local_hour"])
+            except (TypeError, ValueError):
+                continue
+            charged = report._parse_numeric_value(row.get("charged_wh"))
+            discharged = report._parse_numeric_value(row.get("discharged_wh"))
+            if 0 <= hour <= 23 and charged is not None and discharged is not None:
+                targets[f"{hour:02d}"] = {
+                    "charged_wh": charged,
+                    "discharged_wh": discharged,
+                    "grid_from_wh": report._parse_numeric_value(row.get("grid_from_wh")),
+                    "grid_to_wh": report._parse_numeric_value(row.get("grid_to_wh")),
+                }
+    return targets
+
+
 def _source_stats(rows: Iterable[report.StatusRow], start_ts: int, end_ts: int) -> tuple[int | None, int | None, int]:
     ids = [row.id for row in rows if start_ts <= row.timestamp <= end_ts]
     if not ids:
@@ -257,6 +363,8 @@ def build_hourly_input_rows(
     tz: ZoneInfo,
     fallback_seconds: int = report.BOUNDARY_FALLBACK_MAX_SECONDS,
     prices_by_hour: dict[str, dict[str, Any]] | None = None,
+    production_by_hour: dict[str, float] | None = None,
+    energy_targets_by_hour: dict[str, dict[str, float | None]] | None = None,
     computed_at: datetime | None = None,
 ) -> list[dict[str, Any]]:
     day_start_ts = report._dt_to_ts(target_day_start)
@@ -332,6 +440,41 @@ def build_hourly_input_rows(
             effective_bucket_end_ts,
         )
         price_row = prices_by_hour.get(hour_key, {}) if prices_by_hour is not None else {}
+        energy_target = energy_targets_by_hour.get(hour_key, {}) if energy_targets_by_hour is not None else {}
+        charged_for_pnl = energy_target.get("charged_wh", round(charged_wh, 3))
+        discharged_for_pnl = energy_target.get("discharged_wh", round(discharged_wh, 3))
+        grid_from_for_home = energy_target.get("grid_from_wh", grid_from_wh)
+        grid_to_for_home = energy_target.get("grid_to_wh", grid_to_wh)
+        production_wh = production_by_hour.get(hour_key) if production_by_hour is not None else None
+        estimated_home_load_wh = None
+        if production_wh is not None and grid_from_for_home is not None and grid_to_for_home is not None:
+            estimated_home_load_wh = report._round_wh(
+                production_wh + grid_from_for_home - grid_to_for_home + discharged_for_pnl - charged_for_pnl
+            )
+        pnl_values = report.build_battery_flow_pnl_window(
+            power_points=power_points,
+            grid_from_samples=grid_from_samples,
+            grid_to_samples=grid_to_samples,
+            start_ts=bucket_start_ts,
+            end_ts=effective_bucket_end_ts,
+            consumer_eur_per_kwh=price_row.get("consumer_eur_per_kwh"),
+            spot_eur_per_kwh=price_row.get("spot_eur_per_kwh"),
+            estimated_home_load_wh=estimated_home_load_wh,
+            expected_charged_wh=charged_for_pnl,
+            expected_discharged_wh=discharged_for_pnl,
+            fallback_seconds=fallback_seconds,
+        ) if is_elapsed else {
+            "battery_charge_grid_wh": None,
+            "battery_charge_surplus_wh": None,
+            "battery_discharge_home_wh": None,
+            "battery_discharge_export_wh": None,
+            "battery_charge_cost_milli_eur": None,
+            "battery_home_savings_milli_eur": None,
+            "battery_export_revenue_milli_eur": None,
+            "battery_flow_pnl_milli_eur": None,
+            "battery_pnl_status": "not_calculated",
+            "battery_pnl_method_version": None,
+        }
 
         hourly_rows.append(
             {
@@ -346,9 +489,11 @@ def build_hourly_input_rows(
                 "battery_pct_delta": _round(battery_delta, 2),
                 "grid_from_wh": _round(grid_from_wh, 3),
                 "grid_to_wh": _round(grid_to_wh, 3),
+                "estimated_home_load_wh": estimated_home_load_wh,
                 "consumer_eur_per_kwh": _round(price_row.get("consumer_eur_per_kwh"), 6),
                 "spot_eur_per_kwh": _round(price_row.get("spot_eur_per_kwh"), 6),
                 "price_source": price_row.get("price_source"),
+                **pnl_values,
                 "source_min_id": source_min_id,
                 "source_max_id": source_max_id,
                 "source_rows": source_rows,
@@ -366,12 +511,20 @@ def upsert_hourly_rows(connection: pymysql.connections.Connection, table: str, r
         f"INSERT INTO {quoted_table} ("
         "local_date, local_hour, hour_start_ts, hour_end_ts, charged_wh, discharged_wh, "
         "battery_pct_start, battery_pct_end, battery_pct_delta, grid_from_wh, grid_to_wh, "
+        "estimated_home_load_wh, "
         "consumer_eur_per_kwh, spot_eur_per_kwh, price_source, "
+        "battery_charge_grid_wh, battery_charge_surplus_wh, battery_discharge_home_wh, battery_discharge_export_wh, "
+        "battery_charge_cost_milli_eur, battery_home_savings_milli_eur, battery_export_revenue_milli_eur, "
+        "battery_flow_pnl_milli_eur, battery_pnl_status, battery_pnl_method_version, "
         "source_min_id, source_max_id, source_rows, computed_at"
         ") VALUES ("
         "%(local_date)s, %(local_hour)s, %(hour_start_ts)s, %(hour_end_ts)s, %(charged_wh)s, %(discharged_wh)s, "
         "%(battery_pct_start)s, %(battery_pct_end)s, %(battery_pct_delta)s, %(grid_from_wh)s, %(grid_to_wh)s, "
+        "%(estimated_home_load_wh)s, "
         "%(consumer_eur_per_kwh)s, %(spot_eur_per_kwh)s, %(price_source)s, "
+        "%(battery_charge_grid_wh)s, %(battery_charge_surplus_wh)s, %(battery_discharge_home_wh)s, %(battery_discharge_export_wh)s, "
+        "%(battery_charge_cost_milli_eur)s, %(battery_home_savings_milli_eur)s, %(battery_export_revenue_milli_eur)s, "
+        "%(battery_flow_pnl_milli_eur)s, %(battery_pnl_status)s, %(battery_pnl_method_version)s, "
         "%(source_min_id)s, %(source_max_id)s, %(source_rows)s, %(computed_at)s"
         ") ON DUPLICATE KEY UPDATE "
         "hour_start_ts = VALUES(hour_start_ts), "
@@ -383,13 +536,48 @@ def upsert_hourly_rows(connection: pymysql.connections.Connection, table: str, r
         "battery_pct_delta = VALUES(battery_pct_delta), "
         "grid_from_wh = VALUES(grid_from_wh), "
         "grid_to_wh = VALUES(grid_to_wh), "
+        "estimated_home_load_wh = VALUES(estimated_home_load_wh), "
         "consumer_eur_per_kwh = VALUES(consumer_eur_per_kwh), "
         "spot_eur_per_kwh = VALUES(spot_eur_per_kwh), "
         "price_source = VALUES(price_source), "
+        "battery_charge_grid_wh = VALUES(battery_charge_grid_wh), "
+        "battery_charge_surplus_wh = VALUES(battery_charge_surplus_wh), "
+        "battery_discharge_home_wh = VALUES(battery_discharge_home_wh), "
+        "battery_discharge_export_wh = VALUES(battery_discharge_export_wh), "
+        "battery_charge_cost_milli_eur = VALUES(battery_charge_cost_milli_eur), "
+        "battery_home_savings_milli_eur = VALUES(battery_home_savings_milli_eur), "
+        "battery_export_revenue_milli_eur = VALUES(battery_export_revenue_milli_eur), "
+        "battery_flow_pnl_milli_eur = VALUES(battery_flow_pnl_milli_eur), "
+        "battery_pnl_status = VALUES(battery_pnl_status), "
+        "battery_pnl_method_version = VALUES(battery_pnl_method_version), "
         "source_min_id = VALUES(source_min_id), "
         "source_max_id = VALUES(source_max_id), "
         "source_rows = VALUES(source_rows), "
         "computed_at = VALUES(computed_at)"
+    )
+    with connection.cursor() as cursor:
+        cursor.executemany(sql, rows)
+    return len(rows)
+
+
+def update_pnl_rows(connection: pymysql.connections.Connection, table: str, rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    quoted_table = report._quote_identifier(table)
+    sql = (
+        f"UPDATE {quoted_table} SET "
+        "estimated_home_load_wh = %(estimated_home_load_wh)s, "
+        "battery_charge_grid_wh = %(battery_charge_grid_wh)s, "
+        "battery_charge_surplus_wh = %(battery_charge_surplus_wh)s, "
+        "battery_discharge_home_wh = %(battery_discharge_home_wh)s, "
+        "battery_discharge_export_wh = %(battery_discharge_export_wh)s, "
+        "battery_charge_cost_milli_eur = %(battery_charge_cost_milli_eur)s, "
+        "battery_home_savings_milli_eur = %(battery_home_savings_milli_eur)s, "
+        "battery_export_revenue_milli_eur = %(battery_export_revenue_milli_eur)s, "
+        "battery_flow_pnl_milli_eur = %(battery_flow_pnl_milli_eur)s, "
+        "battery_pnl_status = %(battery_pnl_status)s, "
+        "battery_pnl_method_version = %(battery_pnl_method_version)s "
+        "WHERE local_date = %(local_date)s AND local_hour = %(local_hour)s"
     )
     with connection.cursor() as cursor:
         cursor.executemany(sql, rows)
@@ -456,6 +644,24 @@ def update_day(
             end_ts=fetch_end_ts,
         )
         prices_by_hour = load_price_ticks_for_day(connection, args.price_table, target_day_start)
+        production_by_hour = load_production_for_day(
+            connection,
+            database=args.production_database or os.getenv("ENPHASE_HISTORY_DATABASE", DEFAULT_PRODUCTION_DATABASE),
+            table=args.production_table or os.getenv("ENPHASE_PRODUCTION_TABLE", DEFAULT_PRODUCTION_TABLE),
+            system_id=args.production_system_id
+            or int(os.getenv("ENPHASE_SYSTEM_ID", str(DEFAULT_PRODUCTION_SYSTEM_ID))),
+            source=args.production_source or os.getenv("ENPHASE_PRODUCTION_SOURCE", DEFAULT_PRODUCTION_SOURCE),
+            target_day_start=target_day_start,
+        )
+        energy_targets = (
+            load_existing_energy_targets(connection, args.aggregate_table, target_day_start)
+            if args.pnl_only
+            else None
+        )
+        if args.pnl_only and len(energy_targets or {}) != 24:
+            raise RuntimeError(
+                f"PnL-only update requires 24 existing hourly rows; found {len(energy_targets or {})}."
+            )
         hourly_rows = build_hourly_input_rows(
             rows,
             target_day_start=target_day_start,
@@ -463,31 +669,52 @@ def update_day(
             tz=ZoneInfo(args.timezone),
             fallback_seconds=args.fallback_seconds,
             prices_by_hour=prices_by_hour,
+            production_by_hour=production_by_hour,
+            energy_targets_by_hour=energy_targets,
             computed_at=started_at,
         )
-        upserted = upsert_hourly_rows(connection, args.aggregate_table, hourly_rows)
-        log_update(
-            connection,
-            args.log_table,
-            target_date=date_str,
-            run_type=run_type,
-            success=True,
-            hours_upserted=upserted,
-            started_at=started_at,
-            error_text=None,
-        )
-        return {"date": date_str, "success": True, "hours_upserted": upserted, "source_rows": len(rows)}
+        status_counts: dict[str, int] = {}
+        for hourly_row in hourly_rows:
+            status = str(hourly_row.get("battery_pnl_status") or "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+        if args.dry_run:
+            upserted = 0
+        elif args.pnl_only:
+            upserted = update_pnl_rows(connection, args.aggregate_table, hourly_rows)
+        else:
+            upserted = upsert_hourly_rows(connection, args.aggregate_table, hourly_rows)
+
+        if not args.dry_run:
+            log_update(
+                connection,
+                args.log_table,
+                target_date=date_str,
+                run_type=run_type,
+                success=True,
+                hours_upserted=upserted,
+                started_at=started_at,
+                error_text=None,
+            )
+        return {
+            "date": date_str,
+            "success": True,
+            "hours_upserted": upserted,
+            "source_rows": len(rows),
+            "status_counts": status_counts,
+        }
     except Exception as exc:
-        log_update(
-            connection,
-            args.log_table,
-            target_date=date_str,
-            run_type=run_type,
-            success=False,
-            hours_upserted=0,
-            started_at=started_at,
-            error_text=str(exc),
-        )
+        if not args.dry_run:
+            log_update(
+                connection,
+                args.log_table,
+                target_date=date_str,
+                run_type=run_type,
+                success=False,
+                hours_upserted=0,
+                started_at=started_at,
+                error_text=str(exc),
+            )
         return {"date": date_str, "success": False, "hours_upserted": 0, "source_rows": 0, "error": str(exc)}
 
 
@@ -498,10 +725,15 @@ def main() -> int:
     try:
         target_days = resolve_target_days(args, tz)
         config = db_config(args)
-        run_type = RUN_TYPE_MANUAL if args.date or args.start_date or args.days_back is not None else RUN_TYPE_DAILY
+        run_type = (
+            RUN_TYPE_PNL_BACKFILL
+            if args.pnl_only
+            else (RUN_TYPE_MANUAL if args.date or args.start_date or args.days_back is not None else RUN_TYPE_DAILY)
+        )
         connection = connect(config)
         try:
-            ensure_tables(connection, args.aggregate_table, args.log_table)
+            if not args.dry_run:
+                ensure_tables(connection, args.aggregate_table, args.log_table)
             results = [
                 update_day(connection, target_day_start=day, args=args, config=config, run_type=run_type)
                 for day in target_days
@@ -517,7 +749,7 @@ def main() -> int:
         if result["success"]:
             print(
                 f"{result['date']} ok hours_upserted={result['hours_upserted']} "
-                f"source_rows={result['source_rows']}"
+                f"source_rows={result['source_rows']} statuses={result['status_counts']}"
             )
         else:
             exit_code = 1

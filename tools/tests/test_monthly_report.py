@@ -137,6 +137,16 @@ def _zero_price_report(date: str) -> dict[str, object]:
         "net_cost": 0.0,
         "savings_eur": 0.0,
         "charge_cost_eur": 0.0,
+        "battery_charge_grid_wh": 0,
+        "battery_charge_surplus_wh": 0,
+        "battery_discharge_home_wh": 0,
+        "battery_discharge_export_wh": 0,
+        "battery_charge_cost_milli_eur": 0,
+        "battery_home_savings_milli_eur": 0,
+        "battery_export_revenue_milli_eur": 0,
+        "battery_flow_pnl_milli_eur": 0,
+        "battery_pnl_status": "complete",
+        "battery_pnl_method_version": 2,
     }
     return _build_report(date, hours=hours, totals=totals)
 
@@ -371,6 +381,44 @@ def test_monthly_api_aggregates_saved_daily_reports_and_keeps_partial_cost_total
     assert report["days"][1]["spot_net_cost_eur"] == pytest.approx(round(day2_spot_net, 4))
     assert report["days"][2]["spot_net_cost_eur"] is None
     assert report["days"][2]["price_file_found"] is False
+
+
+def test_monthly_api_sums_complete_battery_flow_pnl_integers():
+    month = "1999-03"
+    dates = _month_dates(month)
+    reports = {date: _zero_price_report(date) for date in dates}
+    reports[dates[0]]["totals"].update({
+        "battery_charge_grid_wh": 300,
+        "battery_charge_surplus_wh": 200,
+        "battery_discharge_home_wh": 300,
+        "battery_discharge_export_wh": 200,
+        "battery_charge_cost_milli_eur": 110,
+        "battery_home_savings_milli_eur": 90,
+        "battery_export_revenue_milli_eur": 20,
+        "battery_flow_pnl_milli_eur": 0,
+    })
+
+    with _temporary_reports(reports):
+        php_code = (
+            f'putenv("DAILY_REPORT_SMART_FIXTURE_DIR={DAILY_REPORT_DATA_DIR.as_posix()}");'
+            '$_SERVER["REQUEST_METHOD"] = "GET";'
+            f'$_GET["month"] = "{month}";'
+            f'require "{MONTHLY_REPORT_API_FILE.as_posix()}";'
+        )
+        payload = _run_php_json(["php", "-r", php_code])
+
+    totals = payload["report"]["totals"]
+    assert totals["battery_charge_grid_wh"] == 300
+    assert totals["battery_charge_surplus_wh"] == 200
+    assert totals["battery_discharge_home_wh"] == 300
+    assert totals["battery_discharge_export_wh"] == 200
+    assert totals["battery_charge_cost_milli_eur"] == 110
+    assert totals["battery_home_savings_milli_eur"] == 90
+    assert totals["battery_export_revenue_milli_eur"] == 20
+    assert totals["battery_flow_pnl_milli_eur"] == 0
+    assert totals["battery_flow_pnl_eur"] == pytest.approx(0.0)
+    assert totals["battery_pnl_status"] == "complete"
+    assert totals["battery_pnl_method_version"] == 2
 
 
 def test_monthly_api_current_month_stops_at_today_and_regenerates_only_today():

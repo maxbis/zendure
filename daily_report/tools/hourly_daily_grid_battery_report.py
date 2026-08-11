@@ -38,7 +38,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
@@ -53,10 +53,15 @@ DEFAULT_PASSWORD = os.getenv("MARIADB_PASSWORD", "")
 DEFAULT_DATABASE = os.getenv("MARIADB_DATABASE", "sqlite_replication")
 DEFAULT_TABLE = "status_updates"
 DEFAULT_PRICE_TABLE = "price_ticks"
+DEFAULT_PRODUCTION_DATABASE = os.getenv("ENPHASE_HISTORY_DATABASE", "enphase_history")
+DEFAULT_PRODUCTION_TABLE = os.getenv("ENPHASE_PRODUCTION_TABLE", "production_hourly")
+DEFAULT_PRODUCTION_SYSTEM_ID = int(os.getenv("ENPHASE_SYSTEM_ID", "5053376"))
+DEFAULT_PRODUCTION_SOURCE = os.getenv("ENPHASE_PRODUCTION_SOURCE", "production_micro")
 DEFAULT_TIMEZONE = "Europe/Amsterdam"
 EVENT_TYPE_CHANGE = "change"
 BOUNDARY_FALLBACK_MAX_SECONDS = 3600
 COUNTER_DELTA_EPSILON_WH = 1e-9
+BATTERY_PNL_METHOD_VERSION = 2
 
 # This file lives in daily_report/tools/; canonical paths for data and repo assets.
 DAILY_REPORT_TOOLS_DIR = Path(__file__).resolve().parent
@@ -116,6 +121,10 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_PRICE_TABLE,
         help=f"Price tick table (default: {DEFAULT_PRICE_TABLE})",
     )
+    parser.add_argument("--production-database", default=DEFAULT_PRODUCTION_DATABASE)
+    parser.add_argument("--production-table", default=DEFAULT_PRODUCTION_TABLE)
+    parser.add_argument("--production-system-id", type=int, default=DEFAULT_PRODUCTION_SYSTEM_ID)
+    parser.add_argument("--production-source", default=DEFAULT_PRODUCTION_SOURCE)
     parser.add_argument(
         "--timezone",
         default=DEFAULT_TIMEZONE,
@@ -270,11 +279,11 @@ def load_price_map_for_day_from_db(
     database: str,
     table: str,
     target_day_start: datetime,
-) -> tuple[dict[str, float | None] | None, bool, int]:
+) -> tuple[dict[str, float | None] | None, dict[str, float | None] | None, bool, int]:
     quoted_table = _quote_identifier(table)
     local_date = target_day_start.strftime("%Y-%m-%d")
     sql = (
-        f"SELECT local_hour, consumer_eur_per_kwh "
+        f"SELECT local_hour, consumer_eur_per_kwh, spot_eur_per_kwh "
         f"FROM {quoted_table} "
         f"WHERE local_date = %s "
         f"ORDER BY local_hour ASC"
@@ -293,11 +302,72 @@ def load_price_map_for_day_from_db(
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql, (local_date,))
-            prices_by_hour, loaded = _price_rows_to_hour_map(cursor.fetchall())
+            rows = cursor.fetchall()
     finally:
         connection.close()
 
-    return (prices_by_hour if loaded > 0 else None), loaded > 0, loaded
+    consumer_prices, loaded = _price_rows_to_hour_map(rows)
+    spot_prices: dict[str, float | None] = {f"{hour:02d}": None for hour in range(24)}
+    for row in rows:
+        try:
+            hour = int(row.get("local_hour"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= hour <= 23:
+            spot_prices[f"{hour:02d}"] = _parse_numeric_value(row.get("spot_eur_per_kwh"))
+    return (
+        consumer_prices if loaded > 0 else None,
+        spot_prices if loaded > 0 else None,
+        loaded > 0,
+        loaded,
+    )
+
+
+def load_production_map_for_day_from_db(
+    *,
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    database: str,
+    table: str,
+    system_id: int,
+    source: str,
+    target_day_start: datetime,
+) -> dict[str, float]:
+    qualified_table = f"{_quote_identifier(database)}.{_quote_identifier(table)}"
+    sql = (
+        f"SELECT local_hour, energy_wh FROM {qualified_table} "
+        "WHERE local_date = %s AND system_id = %s AND source = %s "
+        "ORDER BY local_hour ASC"
+    )
+    connection = pymysql.connect(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=database,
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True,
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, (target_day_start.strftime("%Y-%m-%d"), system_id, source))
+            rows = cursor.fetchall()
+    finally:
+        connection.close()
+
+    production: dict[str, float] = {}
+    for row in rows:
+        try:
+            hour = int(row.get("local_hour"))
+        except (TypeError, ValueError):
+            continue
+        energy_wh = _parse_numeric_value(row.get("energy_wh"))
+        if 0 <= hour <= 23 and energy_wh is not None:
+            production[f"{hour:02d}"] = energy_wh
+    return production
 
 
 def fetch_status_rows(
@@ -327,6 +397,14 @@ def fetch_status_rows(
         f"ORDER BY timestamp DESC, id DESC "
         f"LIMIT 1"
     )
+    prev_change_sql = (
+        f"SELECT id, type, old_value, new_value, p1_total_power, electric_level, timestamp, "
+        f"total_act_x100, total_act_ret_x100 "
+        f"FROM {quoted_table} "
+        f"WHERE timestamp < %s AND type = %s "
+        f"ORDER BY timestamp DESC, id DESC "
+        f"LIMIT 1"
+    )
     next_sql = (
         f"SELECT id, type, old_value, new_value, p1_total_power, electric_level, timestamp, "
         f"total_act_x100, total_act_ret_x100 "
@@ -353,6 +431,11 @@ def fetch_status_rows(
             prev_row = cursor.fetchone()
             if prev_row is not None:
                 rows.append(_row_from_db(prev_row))
+
+            cursor.execute(prev_change_sql, (start_ts, EVENT_TYPE_CHANGE))
+            prev_change_row = cursor.fetchone()
+            if prev_change_row is not None:
+                rows.append(_row_from_db(prev_change_row))
 
             cursor.execute(main_sql, (start_ts, end_ts))
             rows.extend(_row_from_db(row) for row in cursor.fetchall())
@@ -517,6 +600,171 @@ def _compute_counter_delta_wh(start_value: float | None, end_value: float | None
     return delta_wh
 
 
+def _power_at(points: list[tuple[int, float]], target_ts: int) -> float | None:
+    power: float | None = None
+    for point_ts, point_power in points:
+        if point_ts > target_ts:
+            break
+        power = point_power
+    return power
+
+
+def _round_wh(value: float) -> int:
+    return int(Decimal(str(max(0.0, value))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _round_split(total_exact: float, primary_exact: float) -> tuple[int, int]:
+    total = _round_wh(total_exact)
+    primary = max(0, min(total, _round_wh(primary_exact)))
+    return primary, total - primary
+
+
+def _round_milli_eur(value: Decimal) -> int:
+    return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def build_battery_flow_pnl_window(
+    *,
+    power_points: list[tuple[int, float]],
+    grid_from_samples: list[NumericSample],
+    grid_to_samples: list[NumericSample],
+    start_ts: int,
+    end_ts: int,
+    consumer_eur_per_kwh: float | None,
+    spot_eur_per_kwh: float | None,
+    estimated_home_load_wh: float | None = None,
+    expected_charged_wh: float | None = None,
+    expected_discharged_wh: float | None = None,
+    fallback_seconds: int = BOUNDARY_FALLBACK_MAX_SECONDS,
+) -> dict[str, Any]:
+    empty = {
+        "battery_charge_grid_wh": None,
+        "battery_charge_surplus_wh": None,
+        "battery_discharge_home_wh": None,
+        "battery_discharge_export_wh": None,
+        "battery_charge_cost_milli_eur": None,
+        "battery_home_savings_milli_eur": None,
+        "battery_export_revenue_milli_eur": None,
+        "battery_flow_pnl_milli_eur": None,
+        "battery_pnl_status": "not_calculated",
+        "battery_pnl_method_version": None,
+    }
+    if end_ts <= start_ts:
+        return empty
+
+    if _power_at(power_points, start_ts) is None:
+        return {
+            **empty,
+            "battery_pnl_status": "missing_boundary_sample",
+            "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+        }
+
+    breakpoints = {start_ts, end_ts}
+    breakpoints.update(ts for ts, _power in power_points if start_ts < ts < end_ts)
+    breakpoints.update(sample.ts for sample in grid_from_samples if start_ts < sample.ts < end_ts)
+    breakpoints.update(sample.ts for sample in grid_to_samples if start_ts < sample.ts < end_ts)
+    ordered = sorted(breakpoints)
+
+    charged_exact = 0.0
+    discharged_exact = 0.0
+    charge_grid_exact = 0.0
+    missing_grid_counters = False
+
+    for index in range(len(ordered) - 1):
+        segment_start = ordered[index]
+        segment_end = ordered[index + 1]
+        if segment_end <= segment_start:
+            continue
+        power = _power_at(power_points, segment_start)
+        if power is None or power == 0:
+            continue
+
+        energy_wh = abs(power) * ((segment_end - segment_start) / 3600.0)
+        if power > 0:
+            charged_exact += energy_wh
+            counter_start = interpolate_boundary_value(
+                grid_from_samples, segment_start, fallback_seconds=fallback_seconds
+            )
+            counter_end = interpolate_boundary_value(
+                grid_from_samples, segment_end, fallback_seconds=fallback_seconds
+            )
+            import_wh = _compute_counter_delta_wh(counter_start, counter_end)
+            if import_wh is None:
+                missing_grid_counters = True
+            else:
+                charge_grid_exact += min(energy_wh, import_wh)
+        else:
+            discharged_exact += energy_wh
+
+    if missing_grid_counters:
+        return {
+            **empty,
+            "battery_pnl_status": "missing_grid_counters",
+            "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+        }
+
+    if (
+        (expected_charged_wh is not None and abs(charged_exact - expected_charged_wh) > 1.0)
+        or (expected_discharged_wh is not None and abs(discharged_exact - expected_discharged_wh) > 1.0)
+    ):
+        return {
+            **empty,
+            "battery_pnl_status": "energy_total_mismatch",
+            "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+        }
+
+    charged_total = expected_charged_wh if expected_charged_wh is not None else charged_exact
+    discharged_total = expected_discharged_wh if expected_discharged_wh is not None else discharged_exact
+    charge_grid_wh, charge_surplus_wh = _round_split(charged_total, charge_grid_exact)
+    discharged_total_wh = _round_wh(discharged_total)
+    if discharged_total_wh > 0 and estimated_home_load_wh is None:
+        return {
+            **empty,
+            "battery_charge_grid_wh": charge_grid_wh,
+            "battery_charge_surplus_wh": charge_surplus_wh,
+            "battery_pnl_status": "missing_home_load",
+            "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+        }
+    discharge_home_wh = min(discharged_total_wh, _round_wh(estimated_home_load_wh or 0.0))
+    discharge_export_wh = discharged_total_wh - discharge_home_wh
+
+    if (charge_grid_wh > 0 or discharge_home_wh > 0) and consumer_eur_per_kwh is None:
+        status = "missing_consumer_price"
+    elif (charge_surplus_wh > 0 or discharge_export_wh > 0) and spot_eur_per_kwh is None:
+        status = "missing_spot_price"
+    else:
+        status = "complete"
+
+    result = {
+        **empty,
+        "battery_charge_grid_wh": charge_grid_wh,
+        "battery_charge_surplus_wh": charge_surplus_wh,
+        "battery_discharge_home_wh": discharge_home_wh,
+        "battery_discharge_export_wh": discharge_export_wh,
+        "battery_pnl_status": status,
+        "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+    }
+    if status != "complete":
+        return result
+
+    consumer = Decimal(str(consumer_eur_per_kwh or 0.0))
+    spot = Decimal(str(spot_eur_per_kwh or 0.0))
+    charge_cost = _round_milli_eur(
+        (Decimal(charge_grid_wh) * consumer) + (Decimal(charge_surplus_wh) * spot)
+    )
+    home_savings = _round_milli_eur(Decimal(discharge_home_wh) * consumer)
+    export_revenue = _round_milli_eur(Decimal(discharge_export_wh) * spot)
+    result.update(
+        {
+            "battery_charge_cost_milli_eur": charge_cost,
+            "battery_home_savings_milli_eur": home_savings,
+            "battery_export_revenue_milli_eur": export_revenue,
+            "battery_flow_pnl_milli_eur": home_savings + export_revenue - charge_cost,
+        }
+    )
+    return result
+
+
 def build_daily_report(
     rows: list[StatusRow],
     *,
@@ -525,6 +773,8 @@ def build_daily_report(
     tz: ZoneInfo,
     fallback_seconds: int = BOUNDARY_FALLBACK_MAX_SECONDS,
     prices_by_hour: dict[str, float | None] | None = None,
+    spot_prices_by_hour: dict[str, float | None] | None = None,
+    production_by_hour: dict[str, float] | None = None,
     price_file_path: Path | None = None,
     price_file_found: bool | None = None,
     price_source: str | None = None,
@@ -549,6 +799,19 @@ def build_daily_report(
     total_net_cost = 0.0
     total_savings = 0.0
     total_charge_cost = 0.0
+    pnl_total_keys = (
+        "battery_charge_grid_wh",
+        "battery_charge_surplus_wh",
+        "battery_discharge_home_wh",
+        "battery_discharge_export_wh",
+        "battery_charge_cost_milli_eur",
+        "battery_home_savings_milli_eur",
+        "battery_export_revenue_milli_eur",
+        "battery_flow_pnl_milli_eur",
+    )
+    pnl_totals = {key: 0 for key in pnl_total_keys}
+    pnl_all_complete = True
+    pnl_elapsed_hours = 0
 
     if price_file_found is None:
         price_file_found = prices_by_hour is not None
@@ -572,6 +835,7 @@ def build_daily_report(
         grid_from_wh = None
         grid_to_wh = None
         price_eur_per_kwh = prices_by_hour.get(hour_key) if prices_by_hour is not None else None
+        spot_eur_per_kwh = spot_prices_by_hour.get(hour_key) if spot_prices_by_hour is not None else None
         grid_from_cost = None
         grid_to_cost = None
         net_cost = None
@@ -579,6 +843,7 @@ def build_daily_report(
         charge_cost_eur = None
 
         if is_elapsed:
+            pnl_elapsed_hours += 1
             charged_wh, discharged_wh = _integrate_power_window(
                 power_points,
                 bucket_start_ts,
@@ -640,6 +905,51 @@ def build_daily_report(
                     net_cost = (grid_from_cost or 0.0) + (grid_to_cost or 0.0)
                     total_net_cost += net_cost
 
+            pnl_values = build_battery_flow_pnl_window(
+                power_points=power_points,
+                grid_from_samples=grid_from_samples,
+                grid_to_samples=grid_to_samples,
+                start_ts=bucket_start_ts,
+                end_ts=effective_bucket_end_ts,
+                consumer_eur_per_kwh=price_eur_per_kwh,
+                spot_eur_per_kwh=spot_eur_per_kwh,
+                estimated_home_load_wh=(
+                    _round_wh(
+                        production_by_hour[hour_key]
+                        + grid_from_wh
+                        - grid_to_wh
+                        + discharged_wh
+                        - charged_wh
+                    )
+                    if production_by_hour is not None
+                    and hour_key in production_by_hour
+                    and grid_from_wh is not None
+                    and grid_to_wh is not None
+                    else None
+                ),
+                expected_charged_wh=round(charged_wh, 2),
+                expected_discharged_wh=round(discharged_wh, 2),
+                fallback_seconds=fallback_seconds,
+            )
+            if pnl_values["battery_pnl_status"] == "complete":
+                for key in pnl_total_keys:
+                    pnl_totals[key] += int(pnl_values[key] or 0)
+            else:
+                pnl_all_complete = False
+        else:
+            pnl_values = {
+                "battery_charge_grid_wh": None,
+                "battery_charge_surplus_wh": None,
+                "battery_discharge_home_wh": None,
+                "battery_discharge_export_wh": None,
+                "battery_charge_cost_milli_eur": None,
+                "battery_home_savings_milli_eur": None,
+                "battery_export_revenue_milli_eur": None,
+                "battery_flow_pnl_milli_eur": None,
+                "battery_pnl_status": "not_calculated",
+                "battery_pnl_method_version": None,
+            }
+
         hours.append(
             {
                 "hour": hour_key,
@@ -651,6 +961,8 @@ def build_daily_report(
                 "grid_from_wh": _round_or_none(grid_from_wh),
                 "grid_to_wh": _round_or_none(grid_to_wh),
                 "price_eur_per_kwh": _round_or_none(price_eur_per_kwh, digits=4),
+                "spot_eur_per_kwh": _round_or_none(spot_eur_per_kwh, digits=6),
+                **pnl_values,
                 "grid_from_cost": _round_or_none(grid_from_cost, digits=4),
                 "grid_to_cost": _round_or_none(grid_to_cost, digits=4),
                 "net_cost": _round_or_none(net_cost, digits=4),
@@ -702,6 +1014,16 @@ def build_daily_report(
             "net_cost": _round_or_none(total_net_cost, digits=4) if price_file_found else None,
             "savings_eur": _round_or_none(total_savings, digits=4) if price_file_found else None,
             "charge_cost_eur": _round_or_none(total_charge_cost, digits=4) if price_file_found else None,
+            **(
+                {key: value for key, value in pnl_totals.items()}
+                if pnl_all_complete and pnl_elapsed_hours > 0
+                else {key: None for key in pnl_total_keys}
+            ),
+            "battery_pnl_status": (
+                "complete" if pnl_all_complete and pnl_elapsed_hours > 0
+                else ("not_calculated" if pnl_elapsed_hours == 0 else "incomplete")
+            ),
+            "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION if pnl_elapsed_hours > 0 else None,
         },
     }
 
@@ -717,13 +1039,24 @@ def main() -> int:
     fetch_end_ts = max(analysis_end_ts, day_start_ts)
 
     try:
-        prices_by_hour, price_file_found, _price_rows_loaded = load_price_map_for_day_from_db(
+        prices_by_hour, spot_prices_by_hour, price_file_found, _price_rows_loaded = load_price_map_for_day_from_db(
             host=args.host,
             port=args.port,
             user=args.user,
             password=args.password,
             database=args.database,
             table=args.price_table,
+            target_day_start=target_day_start,
+        )
+        production_by_hour = load_production_map_for_day_from_db(
+            host=args.host,
+            port=args.port,
+            user=args.user,
+            password=args.password,
+            database=args.production_database,
+            table=args.production_table,
+            system_id=args.production_system_id,
+            source=args.production_source,
             target_day_start=target_day_start,
         )
         rows = fetch_status_rows(
@@ -743,6 +1076,8 @@ def main() -> int:
             tz=tz,
             fallback_seconds=args.fallback_seconds,
             prices_by_hour=prices_by_hour,
+            spot_prices_by_hour=spot_prices_by_hour,
+            production_by_hour=production_by_hour,
             price_file_path=None,
             price_file_found=price_file_found,
             price_source="db:price_ticks",

@@ -114,6 +114,159 @@ def test_normalize_monotonic_counter_samples_stitches_multiple_resets():
     assert [sample.value for sample in normalized] == pytest.approx([100.0, 110.0, 110.0, 120.0, 120.0, 130.0])
 
 
+def test_battery_flow_pnl_splits_energy_and_uses_integer_millieuros():
+    start = _ts(2025, 1, 1, 0, 0)
+    middle = _ts(2025, 1, 1, 0, 30)
+    end = _ts(2025, 1, 1, 1, 0)
+
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, 1000.0), (middle, -1000.0), (end, 0.0)],
+        grid_from_samples=[
+            report.NumericSample(start, 0.0),
+            report.NumericSample(middle, 30000.0),
+            report.NumericSample(end, 30000.0),
+        ],
+        grid_to_samples=[
+            report.NumericSample(start, 0.0),
+            report.NumericSample(middle, 0.0),
+            report.NumericSample(end, 20000.0),
+        ],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.30,
+        spot_eur_per_kwh=0.10,
+        estimated_home_load_wh=300.0,
+    )
+
+    assert values == {
+        "battery_charge_grid_wh": 300,
+        "battery_charge_surplus_wh": 200,
+        "battery_discharge_home_wh": 300,
+        "battery_discharge_export_wh": 200,
+        "battery_charge_cost_milli_eur": 110,
+        "battery_home_savings_milli_eur": 90,
+        "battery_export_revenue_milli_eur": 20,
+        "battery_flow_pnl_milli_eur": 0,
+        "battery_pnl_status": "complete",
+        "battery_pnl_method_version": 2,
+    }
+
+
+def test_battery_flow_pnl_negative_spot_rounds_half_away_from_zero():
+    start = _ts(2025, 1, 1, 0, 0)
+    end = start + 18  # 1000 W for 18 seconds = 5 Wh.
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, 1000.0)],
+        grid_from_samples=[report.NumericSample(start, 0.0), report.NumericSample(end, 0.0)],
+        grid_to_samples=[report.NumericSample(start, 0.0), report.NumericSample(end, 0.0)],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.30,
+        spot_eur_per_kwh=-0.10,
+    )
+
+    assert values["battery_charge_surplus_wh"] == 5
+    assert values["battery_charge_cost_milli_eur"] == -1
+    assert values["battery_flow_pnl_milli_eur"] == 1
+
+
+def test_battery_flow_pnl_allocates_discharge_home_first():
+    start = _ts(2025, 1, 1, 20, 0)
+    end = start + 3600
+
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, -999.0)],
+        grid_from_samples=[],
+        grid_to_samples=[],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.422,
+        spot_eur_per_kwh=0.2371,
+        estimated_home_load_wh=101.0,
+    )
+
+    assert values["battery_discharge_home_wh"] == 101
+    assert values["battery_discharge_export_wh"] == 898
+    assert values["battery_home_savings_milli_eur"] == 43
+    assert values["battery_export_revenue_milli_eur"] == 213
+    assert values["battery_flow_pnl_milli_eur"] == 256
+    assert values["battery_pnl_method_version"] == 2
+
+
+def test_battery_flow_pnl_requires_home_load_only_during_discharge():
+    start = _ts(2025, 1, 1, 0, 0)
+    end = start + 3600
+
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, -100.0)],
+        grid_from_samples=[],
+        grid_to_samples=[],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.30,
+        spot_eur_per_kwh=0.10,
+    )
+
+    assert values["battery_pnl_status"] == "missing_home_load"
+    assert values["battery_discharge_home_wh"] is None
+    assert values["battery_flow_pnl_milli_eur"] is None
+
+
+def test_battery_flow_pnl_reports_missing_inputs_only_when_used():
+    start = _ts(2025, 1, 1, 0, 0)
+    end = start + 3600
+
+    missing_counter = report.build_battery_flow_pnl_window(
+        power_points=[(start, -100.0)],
+        grid_from_samples=[],
+        grid_to_samples=[],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.30,
+        spot_eur_per_kwh=0.10,
+    )
+    assert missing_counter["battery_pnl_status"] == "missing_home_load"
+
+    idle = report.build_battery_flow_pnl_window(
+        power_points=[(start, 0.0)],
+        grid_from_samples=[],
+        grid_to_samples=[],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=None,
+        spot_eur_per_kwh=None,
+    )
+    assert idle["battery_pnl_status"] == "complete"
+    assert idle["battery_flow_pnl_milli_eur"] == 0
+
+
+def test_battery_flow_pnl_rejects_material_existing_energy_mismatch():
+    start = _ts(2025, 1, 1, 0, 0)
+    end = start + 3600
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, -100.0)],
+        grid_from_samples=[report.NumericSample(start, 0.0), report.NumericSample(end, 0.0)],
+        grid_to_samples=[report.NumericSample(start, 0.0), report.NumericSample(end, 0.0)],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.30,
+        spot_eur_per_kwh=0.10,
+        expected_charged_wh=0.0,
+        expected_discharged_wh=50.0,
+    )
+
+    assert values["battery_pnl_status"] == "energy_total_mismatch"
+    assert values["battery_flow_pnl_milli_eur"] is None
+
+
+def test_round_split_reconciles_to_rounded_total():
+    primary, remainder = report._round_split(21.2, 10.6)
+
+    assert primary == 11
+    assert remainder == 10
+    assert primary + remainder == 21
+
+
 def test_build_daily_report_full_day_metrics_and_totals():
     day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
     rows = [
@@ -249,6 +402,36 @@ def test_hourly_report_inputs_match_daily_report_hourly_metrics():
     assert aggregate_rows[2]["spot_eur_per_kwh"] is None
     assert aggregate_rows[2]["price_source"] is None
     assert aggregate_rows[23]["source_rows"] == 1
+
+
+def test_hourly_report_inputs_derive_home_load_and_apply_home_first_pnl():
+    day_start = datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ)
+    rows = [
+        _row(1, "change", _ts(2025, 1, 1, 0, 0), new_value="-100", total_act_x100=0, total_act_ret_x100=0),
+        _row(2, "Rescan", _ts(2025, 1, 1, 1, 0), total_act_x100=0, total_act_ret_x100=0),
+    ]
+
+    aggregate_rows = hourly_inputs.build_hourly_input_rows(
+        rows,
+        target_day_start=day_start,
+        analysis_end_ts=_ts(2025, 1, 1, 1, 0),
+        tz=TZ,
+        production_by_hour={"00": 0.0},
+        prices_by_hour={
+            "00": {
+                "consumer_eur_per_kwh": 0.42,
+                "spot_eur_per_kwh": 0.24,
+                "price_source": "test",
+            }
+        },
+    )
+
+    assert aggregate_rows[0]["estimated_home_load_wh"] == 100
+    assert aggregate_rows[0]["battery_discharge_home_wh"] == 100
+    assert aggregate_rows[0]["battery_discharge_export_wh"] == 0
+    assert aggregate_rows[0]["battery_home_savings_milli_eur"] == 42
+    assert aggregate_rows[0]["battery_pnl_status"] == "complete"
+    assert aggregate_rows[0]["battery_pnl_method_version"] == 2
 
 
 def test_build_daily_report_partial_day_future_hours_are_empty():
@@ -625,6 +808,10 @@ def test_hourly_report_inputs_ddl_contains_expected_unique_key_and_log_table():
     assert "ADD COLUMN IF NOT EXISTS consumer_eur_per_kwh" in sql
     assert "ADD COLUMN IF NOT EXISTS spot_eur_per_kwh" in sql
     assert "ADD COLUMN IF NOT EXISTS price_source" in sql
+    assert "ADD COLUMN IF NOT EXISTS estimated_home_load_wh INT UNSIGNED NULL" in sql
+    assert "ADD COLUMN IF NOT EXISTS battery_charge_grid_wh INT UNSIGNED NULL" in sql
+    assert "ADD COLUMN IF NOT EXISTS battery_flow_pnl_milli_eur INT NULL" in sql
+    assert "ADD COLUMN IF NOT EXISTS battery_pnl_status VARCHAR(32) NULL" in sql
 
 
 def test_hourly_report_inputs_upsert_is_idempotent_by_date_hour():
@@ -642,9 +829,20 @@ def test_hourly_report_inputs_upsert_is_idempotent_by_date_hour():
             "battery_pct_delta": 1.0,
             "grid_from_wh": 2.0,
             "grid_to_wh": 0.0,
+            "estimated_home_load_wh": 1,
             "consumer_eur_per_kwh": 0.25,
             "spot_eur_per_kwh": 0.11,
             "price_source": "entsoe_v6",
+            "battery_charge_grid_wh": 1,
+            "battery_charge_surplus_wh": 0,
+            "battery_discharge_home_wh": 0,
+            "battery_discharge_export_wh": 0,
+            "battery_charge_cost_milli_eur": 0,
+            "battery_home_savings_milli_eur": 0,
+            "battery_export_revenue_milli_eur": 0,
+            "battery_flow_pnl_milli_eur": 0,
+            "battery_pnl_status": "complete",
+            "battery_pnl_method_version": 2,
             "source_min_id": 10,
             "source_max_id": 11,
             "source_rows": 2,
@@ -661,6 +859,36 @@ def test_hourly_report_inputs_upsert_is_idempotent_by_date_hour():
     assert "consumer_eur_per_kwh = VALUES(consumer_eur_per_kwh)" in sql
     assert "spot_eur_per_kwh = VALUES(spot_eur_per_kwh)" in sql
     assert "price_source = VALUES(price_source)" in sql
+    assert "battery_flow_pnl_milli_eur = VALUES(battery_flow_pnl_milli_eur)" in sql
+    assert bound_rows == rows
+
+
+def test_hourly_report_inputs_pnl_only_update_does_not_touch_legacy_fields():
+    connection = _FakeConnection()
+    rows = [{
+        "local_date": "2025-01-01",
+        "local_hour": 0,
+        "estimated_home_load_wh": 100,
+        "battery_charge_grid_wh": 100,
+        "battery_charge_surplus_wh": 0,
+        "battery_discharge_home_wh": 0,
+        "battery_discharge_export_wh": 0,
+        "battery_charge_cost_milli_eur": 30,
+        "battery_home_savings_milli_eur": 0,
+        "battery_export_revenue_milli_eur": 0,
+        "battery_flow_pnl_milli_eur": -30,
+        "battery_pnl_status": "complete",
+        "battery_pnl_method_version": 2,
+    }]
+
+    updated = hourly_inputs.update_pnl_rows(connection, "hourly_report_inputs", rows)
+    sql, bound_rows = connection.cursor_obj.executed[0]
+
+    assert updated == 1
+    assert "WHERE local_date = %(local_date)s AND local_hour = %(local_hour)s" in sql
+    assert "charged_wh =" not in sql
+    assert "grid_from_wh =" not in sql
+    assert "estimated_home_load_wh = %(estimated_home_load_wh)s" in sql
     assert bound_rows == rows
 
 
@@ -695,6 +923,53 @@ def test_hourly_report_inputs_loads_prices_from_price_ticks():
     }
     sql, params = connection.cursor_obj.executed[0]
     assert "FROM `price_ticks`" in sql
+    assert params == ("2025-01-01",)
+
+
+def test_hourly_report_inputs_loads_configured_enphase_production():
+    connection = _FakeConnection([
+        {"local_hour": 0, "energy_wh": "12.500"},
+        {"local_hour": 20, "energy_wh": "380.000"},
+        {"local_hour": 24, "energy_wh": "999.000"},
+    ])
+
+    production = hourly_inputs.load_production_for_day(
+        connection,
+        database="enphase_history",
+        table="production_hourly",
+        system_id=5053376,
+        source="production_micro",
+        target_day_start=datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ),
+    )
+
+    assert production == {"00": 12.5, "20": 380.0}
+    sql, params = connection.cursor_obj.executed[0]
+    assert "FROM `enphase_history`.`production_hourly`" in sql
+    assert params == ("2025-01-01", 5053376, "production_micro")
+
+
+def test_hourly_report_inputs_loads_existing_energy_targets_for_pnl_only():
+    connection = _FakeConnection([
+        {"local_hour": 0, "charged_wh": "123.500", "discharged_wh": "45.250"},
+        {"local_hour": 25, "charged_wh": "1.000", "discharged_wh": "1.000"},
+    ])
+
+    targets = hourly_inputs.load_existing_energy_targets(
+        connection,
+        "hourly_report_inputs",
+        datetime(2025, 1, 1, 0, 0, 0, tzinfo=TZ),
+    )
+
+    assert targets == {
+        "00": {
+            "charged_wh": 123.5,
+            "discharged_wh": 45.25,
+            "grid_from_wh": None,
+            "grid_to_wh": None,
+        }
+    }
+    sql, params = connection.cursor_obj.executed[0]
+    assert "SELECT local_hour, charged_wh, discharged_wh, grid_from_wh, grid_to_wh" in sql
     assert params == ("2025-01-01",)
 
 

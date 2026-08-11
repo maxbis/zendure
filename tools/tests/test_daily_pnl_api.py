@@ -271,6 +271,49 @@ def test_pnl_api_returns_requested_range_oldest_to_newest():
     assert payload["days"][1]["pnl_eur"] == pytest.approx(0.10)
 
 
+def test_pnl_api_exposes_complete_battery_flow_pnl_components():
+    date = "2026-05-04"
+    report = _build_report(
+        date,
+        hours=[_hour("00")],
+        totals={
+            "charged_wh": 500.0,
+            "discharged_wh": 500.0,
+            "grid_from_wh": 300.0,
+            "grid_to_wh": 200.0,
+            "grid_from_cost": 0.0,
+            "grid_to_cost": 0.0,
+            "net_cost": 0.0,
+            "savings_eur": 0.0,
+            "charge_cost_eur": 0.0,
+            "battery_charge_grid_wh": 300,
+            "battery_charge_surplus_wh": 200,
+            "battery_discharge_home_wh": 300,
+            "battery_discharge_export_wh": 200,
+            "battery_charge_cost_milli_eur": 110,
+            "battery_home_savings_milli_eur": 90,
+            "battery_export_revenue_milli_eur": 20,
+            "battery_flow_pnl_milli_eur": 0,
+            "battery_pnl_status": "complete",
+            "battery_pnl_method_version": 2,
+        },
+    )
+
+    with _temporary_reports({date: report}) as data_dir:
+        payload = _invoke_pnl_api(data_dir, date=date)
+
+    day = payload["days"][0]
+    assert day["battery_charge_grid_wh"] == 300
+    assert day["battery_discharge_export_wh"] == 200
+    assert day["battery_charge_cost_milli_eur"] == 110
+    assert day["battery_home_savings_milli_eur"] == 90
+    assert day["battery_export_revenue_milli_eur"] == 20
+    assert day["battery_flow_pnl_milli_eur"] == 0
+    assert day["battery_flow_pnl_eur"] == pytest.approx(0.0)
+    assert day["battery_pnl_status"] == "complete"
+    assert day["battery_pnl_method_version"] == 2
+
+
 def test_pnl_api_missing_price_data_keeps_cost_and_pnl_fields_null():
     date = "2026-05-04"
     report = _build_report(

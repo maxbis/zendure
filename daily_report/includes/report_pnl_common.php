@@ -27,6 +27,14 @@ function dailyReportRound(?float $value, int $digits): ?float
     return $value === null ? null : round($value, $digits);
 }
 
+function dailyReportPnlInt(mixed $value): ?int
+{
+    if ($value === null || is_bool($value) || !is_numeric($value)) {
+        return null;
+    }
+    return (int)$value;
+}
+
 /**
  * @param array<int, mixed> $hours
  */
@@ -131,6 +139,10 @@ function dailyReportBuildPnlDayPayload(string $date, array $loaded, string $sour
     $chargeCost = dailyReportFloat($totals['charge_cost_eur'] ?? null);
     $spotNetCost = dailyReportComputeSpotNetCostFromHours($hours);
     $spotChargeCost = dailyReportComputeSpotChargeCostFromHours($hours);
+    $batteryChargeCostMilliEur = dailyReportPnlInt($totals['battery_charge_cost_milli_eur'] ?? null);
+    $batteryHomeSavingsMilliEur = dailyReportPnlInt($totals['battery_home_savings_milli_eur'] ?? null);
+    $batteryExportRevenueMilliEur = dailyReportPnlInt($totals['battery_export_revenue_milli_eur'] ?? null);
+    $batteryFlowPnlMilliEur = dailyReportPnlInt($totals['battery_flow_pnl_milli_eur'] ?? null);
 
     return [
         'date' => $date,
@@ -145,5 +157,20 @@ function dailyReportBuildPnlDayPayload(string $date, array $loaded, string $sour
         'savings_eur' => dailyReportRound($savings, 4),
         'charge_cost_eur' => dailyReportRound($chargeCost, 4),
         'spot_charge_cost_eur' => dailyReportRound($spotChargeCost, 4),
+        'battery_charge_grid_wh' => dailyReportPnlInt($totals['battery_charge_grid_wh'] ?? null),
+        'battery_charge_surplus_wh' => dailyReportPnlInt($totals['battery_charge_surplus_wh'] ?? null),
+        'battery_discharge_home_wh' => dailyReportPnlInt($totals['battery_discharge_home_wh'] ?? null),
+        'battery_discharge_export_wh' => dailyReportPnlInt($totals['battery_discharge_export_wh'] ?? null),
+        'battery_charge_cost_milli_eur' => $batteryChargeCostMilliEur,
+        'battery_home_savings_milli_eur' => $batteryHomeSavingsMilliEur,
+        'battery_export_revenue_milli_eur' => $batteryExportRevenueMilliEur,
+        'battery_flow_pnl_milli_eur' => $batteryFlowPnlMilliEur,
+        'battery_flow_pnl_eur' => $batteryFlowPnlMilliEur === null
+            ? null
+            : dailyReportRound($batteryFlowPnlMilliEur / 1000.0, 3),
+        'battery_pnl_status' => is_string($totals['battery_pnl_status'] ?? null)
+            ? $totals['battery_pnl_status']
+            : null,
+        'battery_pnl_method_version' => dailyReportPnlInt($totals['battery_pnl_method_version'] ?? null),
     ];
 }

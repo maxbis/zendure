@@ -81,6 +81,19 @@ function buildMonthlyReportPayload(): array
     $totalChargeCost = 0.0;
     $totalSpotNetCost = 0.0;
     $totalSpotChargeCost = 0.0;
+    $batteryPnlTotalKeys = [
+        'battery_charge_grid_wh',
+        'battery_charge_surplus_wh',
+        'battery_discharge_home_wh',
+        'battery_discharge_export_wh',
+        'battery_charge_cost_milli_eur',
+        'battery_home_savings_milli_eur',
+        'battery_export_revenue_milli_eur',
+        'battery_flow_pnl_milli_eur',
+    ];
+    $batteryPnlTotals = array_fill_keys($batteryPnlTotalKeys, 0);
+    $batteryPnlAllComplete = true;
+    $batteryPnlMethodVersion = null;
 
     $hasGridFromCost = false;
     $hasGridToCost = false;
@@ -141,6 +154,24 @@ function buildMonthlyReportPayload(): array
             $loaded,
             (string)($loaded['source'] ?? 'aggregate_saved')
         );
+        $dayPnlMethodVersion = dailyReportPnlInt($pnlDay['battery_pnl_method_version'] ?? null);
+        if (
+            ($pnlDay['battery_pnl_status'] ?? null) === 'complete'
+            && $dayPnlMethodVersion !== null
+            && ($batteryPnlMethodVersion === null || $batteryPnlMethodVersion === $dayPnlMethodVersion)
+        ) {
+            $batteryPnlMethodVersion = $dayPnlMethodVersion;
+            foreach ($batteryPnlTotalKeys as $key) {
+                $value = dailyReportPnlInt($pnlDay[$key] ?? null);
+                if ($value === null) {
+                    $batteryPnlAllComplete = false;
+                    break;
+                }
+                $batteryPnlTotals[$key] += $value;
+            }
+        } else {
+            $batteryPnlAllComplete = false;
+        }
 
         monthlyReportAccumulate($gridFromCost, $totalGridFromCost, $hasGridFromCost);
         monthlyReportAccumulate($gridToCost, $totalGridToCost, $hasGridToCost);
@@ -169,6 +200,17 @@ function buildMonthlyReportPayload(): array
             'spot_charge_cost_eur' => $pnlDay['spot_charge_cost_eur'],
             'pnl_eur' => $pnlDay['pnl_eur'],
             'spot_pnl_eur' => $pnlDay['spot_pnl_eur'],
+            'battery_charge_grid_wh' => $pnlDay['battery_charge_grid_wh'],
+            'battery_charge_surplus_wh' => $pnlDay['battery_charge_surplus_wh'],
+            'battery_discharge_home_wh' => $pnlDay['battery_discharge_home_wh'],
+            'battery_discharge_export_wh' => $pnlDay['battery_discharge_export_wh'],
+            'battery_charge_cost_milli_eur' => $pnlDay['battery_charge_cost_milli_eur'],
+            'battery_home_savings_milli_eur' => $pnlDay['battery_home_savings_milli_eur'],
+            'battery_export_revenue_milli_eur' => $pnlDay['battery_export_revenue_milli_eur'],
+            'battery_flow_pnl_milli_eur' => $pnlDay['battery_flow_pnl_milli_eur'],
+            'battery_flow_pnl_eur' => $pnlDay['battery_flow_pnl_eur'],
+            'battery_pnl_status' => $pnlDay['battery_pnl_status'],
+            'battery_pnl_method_version' => $pnlDay['battery_pnl_method_version'],
             'battery_pct_delta_total' => dailyReportRound(dailyReportFloat($totals['battery_pct_delta_total'] ?? null), 2),
             'battery_start_pct' => dailyReportRound($batteryStats['start'], 2),
             'battery_end_pct' => dailyReportRound($batteryStats['end'], 2),
@@ -209,6 +251,14 @@ function buildMonthlyReportPayload(): array
         ),
         4
     );
+    foreach ($batteryPnlTotalKeys as $key) {
+        $totals[$key] = $batteryPnlAllComplete ? $batteryPnlTotals[$key] : null;
+    }
+    $totals['battery_flow_pnl_eur'] = $batteryPnlAllComplete
+        ? dailyReportRound($batteryPnlTotals['battery_flow_pnl_milli_eur'] / 1000.0, 3)
+        : null;
+    $totals['battery_pnl_status'] = $batteryPnlAllComplete ? 'complete' : 'incomplete';
+    $totals['battery_pnl_method_version'] = $batteryPnlAllComplete ? $batteryPnlMethodVersion : null;
 
     return [
         'success' => true,
