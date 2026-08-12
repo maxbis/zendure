@@ -202,3 +202,17 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert "'todaySource' => $todaySource" in helper
     assert "source.complete !== true" in energy_js
     assert 'return "—"' in energy_js
+
+
+def test_summary_tooltip_blocks_ios_compatibility_events_from_chart() -> None:
+    energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
+
+    assert "CHART_TOUCH_SUPPRESSION_MS = 700" in energy_js
+    assert 'event.pointerType && event.pointerType !== "mouse"' in energy_js
+    assert "suppressChartInteractionUntil = performance.now() + CHART_TOUCH_SUPPRESSION_MS" in energy_js
+    assert 'event.pointerType !== "mouse" || chartInteractionIsSuppressed()' in energy_js
+    assert "if (chartInteractionIsSuppressed()) return;" in energy_js
+    assert '}, true);' not in energy_js[
+        energy_js.index('tooltip.addEventListener("pointerdown"'):
+        energy_js.index("document.body.appendChild(tooltip)")
+    ]

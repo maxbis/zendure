@@ -53,6 +53,9 @@
     let pinnedHourTooltipTrigger = null;
     let isProgrammaticChartScroll = false;
     let programmaticChartScrollTimer = null;
+    let suppressChartInteractionUntil = 0;
+
+    const CHART_TOUCH_SUPPRESSION_MS = 700;
 
     function localDateKey(date = new Date()) {
         const year = date.getFullYear();
@@ -180,8 +183,11 @@
         tooltip.setAttribute("role", "tooltip");
         tooltip.hidden = true;
         tooltip.addEventListener("pointerdown", (event) => {
+            if (event.pointerType && event.pointerType !== "mouse") {
+                suppressChartInteractionUntil = performance.now() + CHART_TOUCH_SUPPRESSION_MS;
+            }
             event.stopPropagation();
-        }, true);
+        });
         document.body.appendChild(tooltip);
         return tooltip;
     }
@@ -203,6 +209,14 @@
             "has-summary-tooltip-open",
             !summaryTooltip.hidden && activeSummaryTooltipTrigger !== null
         );
+    }
+
+    function summaryTooltipIsOpen() {
+        return !summaryTooltip.hidden && activeSummaryTooltipTrigger !== null;
+    }
+
+    function chartInteractionIsSuppressed() {
+        return summaryTooltipIsOpen() || performance.now() < suppressChartInteractionUntil;
     }
 
     function hideSummaryTooltip(trigger = null) {
@@ -245,9 +259,6 @@
         button.disabled = !adjacentDay;
         button.setAttribute("aria-label", isPrevious ? "Show previous day" : "Show next day");
         button.innerHTML = `<svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chevron-${isPrevious ? "left" : "right"}"></use></svg>`;
-        button.addEventListener("pointerdown", (event) => {
-            event.stopPropagation();
-        });
         button.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -785,19 +796,25 @@
                 "aria-label": hourAriaLabel(row, previousBattery)
             });
             const bar = bars[index];
-            hit.addEventListener("pointerenter", () => {
+            hit.addEventListener("pointerenter", (event) => {
+                if (event.pointerType !== "mouse" || chartInteractionIsSuppressed()) return;
                 bar.classList.add("is-hover");
                 if (!pinnedHourTooltipTrigger) showHourTooltip(row, previousBattery, hit, bar);
             });
-            hit.addEventListener("pointerleave", () => {
+            hit.addEventListener("pointerleave", (event) => {
                 bar.classList.remove("is-hover");
+                if (event.pointerType !== "mouse" || chartInteractionIsSuppressed()) return;
                 if (pinnedHourTooltipTrigger !== hit && document.activeElement !== hit) hideHourTooltip(hit);
             });
-            hit.addEventListener("focus", () => showHourTooltip(row, previousBattery, hit, bar));
+            hit.addEventListener("focus", () => {
+                if (chartInteractionIsSuppressed()) return;
+                showHourTooltip(row, previousBattery, hit, bar);
+            });
             hit.addEventListener("blur", () => {
                 if (pinnedHourTooltipTrigger !== hit) hideHourTooltip(hit);
             });
             hit.addEventListener("click", () => {
+                if (chartInteractionIsSuppressed()) return;
                 if (pinnedHourTooltipTrigger === hit && activeHourTooltipTrigger === hit && !hourTooltip.hidden) {
                     hideHourTooltip(hit);
                     return;
