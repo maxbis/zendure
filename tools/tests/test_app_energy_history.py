@@ -204,15 +204,15 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert 'return "—"' in energy_js
 
 
-def test_summary_tooltip_blocks_ios_compatibility_events_from_chart() -> None:
+def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
 
-    assert "CHART_TOUCH_SUPPRESSION_MS = 700" in energy_js
-    assert 'event.pointerType && event.pointerType !== "mouse"' in energy_js
-    assert "suppressChartInteractionUntil = performance.now() + CHART_TOUCH_SUPPRESSION_MS" in energy_js
+    assert 'document.createElement("dialog")' in energy_js
+    assert "if (compactChartMedia.matches) summaryTooltip.showModal();" in energy_js
+    assert "else summaryTooltip.show();" in energy_js
+    assert 'tooltip.matches(":modal") && event.target === tooltip' in energy_js
+    assert 'if (summaryTooltip.open) summaryTooltip.close();' in energy_js
+    assert 'aria-label", "Close price totals"' in energy_js
     assert 'event.pointerType !== "mouse" || chartInteractionIsSuppressed()' in energy_js
     assert "if (chartInteractionIsSuppressed()) return;" in energy_js
-    assert '}, true);' not in energy_js[
-        energy_js.index('tooltip.addEventListener("pointerdown"'):
-        energy_js.index("document.body.appendChild(tooltip)")
-    ]
+    assert "CHART_TOUCH_SUPPRESSION_MS" not in energy_js

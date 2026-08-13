@@ -53,9 +53,6 @@
     let pinnedHourTooltipTrigger = null;
     let isProgrammaticChartScroll = false;
     let programmaticChartScrollTimer = null;
-    let suppressChartInteractionUntil = 0;
-
-    const CHART_TOUCH_SUPPRESSION_MS = 700;
 
     function localDateKey(date = new Date()) {
         const year = date.getFullYear();
@@ -177,16 +174,20 @@
     function ensureSummaryTooltip() {
         const existing = document.getElementById("app-energy-summary-tooltip");
         if (existing) return existing;
-        const tooltip = document.createElement("div");
+        const tooltip = document.createElement("dialog");
         tooltip.id = "app-energy-summary-tooltip";
         tooltip.className = "app-schedule-tooltip";
-        tooltip.setAttribute("role", "tooltip");
+        tooltip.setAttribute("aria-labelledby", "app-energy-summary-tooltip-title");
         tooltip.hidden = true;
         tooltip.addEventListener("pointerdown", (event) => {
-            if (event.pointerType && event.pointerType !== "mouse") {
-                suppressChartInteractionUntil = performance.now() + CHART_TOUCH_SUPPRESSION_MS;
-            }
             event.stopPropagation();
+        });
+        tooltip.addEventListener("click", (event) => {
+            if (tooltip.matches(":modal") && event.target === tooltip) hideSummaryTooltip();
+        });
+        tooltip.addEventListener("cancel", (event) => {
+            event.preventDefault();
+            hideSummaryTooltip();
         });
         document.body.appendChild(tooltip);
         return tooltip;
@@ -207,16 +208,16 @@
     function updateSummaryTooltipChartShield() {
         elements.chart?.classList.toggle(
             "has-summary-tooltip-open",
-            !summaryTooltip.hidden && activeSummaryTooltipTrigger !== null
+            summaryTooltip.open && activeSummaryTooltipTrigger !== null
         );
     }
 
     function summaryTooltipIsOpen() {
-        return !summaryTooltip.hidden && activeSummaryTooltipTrigger !== null;
+        return summaryTooltip.open && activeSummaryTooltipTrigger !== null;
     }
 
     function chartInteractionIsSuppressed() {
-        return summaryTooltipIsOpen() || performance.now() < suppressChartInteractionUntil;
+        return summaryTooltipIsOpen();
     }
 
     function hideSummaryTooltip(trigger = null) {
@@ -229,6 +230,7 @@
             pinnedSummaryTooltipTrigger = null;
         }
         activeSummaryTooltipTrigger = null;
+        if (summaryTooltip.open) summaryTooltip.close();
         summaryTooltip.hidden = true;
         summaryTooltip.style.removeProperty("left");
         summaryTooltip.style.removeProperty("top");
@@ -266,7 +268,7 @@
             if (!targetDay) return;
             const trigger = activeSummaryTooltipTrigger;
             selectSummaryDay(targetDay);
-            if (trigger && !summaryTooltip.hidden) {
+            if (trigger && summaryTooltip.open) {
                 refreshSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
             }
         });
@@ -293,7 +295,7 @@
     }
 
     function refreshSummaryTooltip(detail, trigger) {
-        if (!detail || !trigger || summaryTooltip.hidden) return;
+        if (!detail || !trigger || !summaryTooltip.open) return;
 
         const title = summaryTooltip.querySelector(".app-energy-summary-tooltip__title");
         if (title) title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
@@ -311,6 +313,13 @@
     }
 
     function positionSummaryTooltip(anchor) {
+        if (summaryTooltip.matches(":modal")) {
+            summaryTooltip.style.removeProperty("left");
+            summaryTooltip.style.removeProperty("top");
+            summaryTooltip.style.visibility = "visible";
+            return;
+        }
+
         const gap = 8;
         const viewportPadding = 12;
         const anchorRect = anchor.getBoundingClientRect();
@@ -331,11 +340,12 @@
         summaryTooltip.style.visibility = "visible";
     }
 
-    function showSummaryTooltip(detail, trigger) {
+    function showSummaryTooltip(detail, trigger, pinned = false) {
         if (!detail) return;
         hideHourTooltip();
         hideSummaryTooltip();
         activeSummaryTooltipTrigger = trigger;
+        pinnedSummaryTooltipTrigger = pinned ? trigger : null;
         trigger.setAttribute("aria-describedby", summaryTooltip.id);
         trigger.setAttribute("aria-expanded", "true");
 
@@ -344,14 +354,23 @@
         const heading = document.createElement("div");
         heading.className = "app-schedule-tooltip__heading app-energy-summary-tooltip__heading";
         const title = document.createElement("strong");
+        title.id = "app-energy-summary-tooltip-title";
         title.className = "app-energy-summary-tooltip__title";
         title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
-        heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1));
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "gsd-icon-btn app-energy-summary-tooltip__close";
+        close.setAttribute("aria-label", "Close price totals");
+        close.innerHTML = '<svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>';
+        close.addEventListener("click", () => hideSummaryTooltip(trigger));
+        heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1), close);
         header.appendChild(heading);
 
         summaryTooltip.replaceChildren(header, buildSummaryTooltipPrices(detail));
         summaryTooltip.hidden = false;
         summaryTooltip.style.visibility = "hidden";
+        if (compactChartMedia.matches) summaryTooltip.showModal();
+        else summaryTooltip.show();
         positionSummaryTooltip(trigger);
         updateSummaryTooltipChartShield();
     }
@@ -449,6 +468,7 @@
 
     function bindSummaryTooltip(trigger) {
         trigger.addEventListener("mouseenter", () => {
+            if (compactChartMedia.matches) return;
             if (!pinnedSummaryTooltipTrigger) showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
         });
         trigger.addEventListener("mouseleave", () => {
@@ -456,18 +476,18 @@
                 hideSummaryTooltip(trigger);
             }
         });
-        trigger.addEventListener("focus", () => showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger));
+        trigger.addEventListener("focus", () => {
+            if (!compactChartMedia.matches) showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+        });
         trigger.addEventListener("blur", () => {
             if (pinnedSummaryTooltipTrigger !== trigger) hideSummaryTooltip(trigger);
         });
         trigger.addEventListener("click", () => {
-            if (pinnedSummaryTooltipTrigger === trigger && activeSummaryTooltipTrigger === trigger && !summaryTooltip.hidden) {
+            if (pinnedSummaryTooltipTrigger === trigger && activeSummaryTooltipTrigger === trigger && summaryTooltip.open) {
                 hideSummaryTooltip(trigger);
                 return;
             }
-            pinnedSummaryTooltipTrigger = trigger;
-            showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
-            pinnedSummaryTooltipTrigger = trigger;
+            showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger, true);
         });
     }
 
