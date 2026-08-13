@@ -2574,6 +2574,10 @@ dialog.app-schedule-tooltip {
     white-space: normal;
 }
 
+.app-schedule-edit-dialog__mobile-break {
+    display: none;
+}
+
 .app-schedule-edit-dialog__price {
     margin: 0;
     color: var(--gsd-text-secondary);
@@ -3750,6 +3754,14 @@ dialog.app-schedule-tooltip {
 }
 
 @media (max-width: 600px) {
+    .app-schedule-edit-dialog__desktop-separator {
+        display: none;
+    }
+
+    .app-schedule-edit-dialog__mobile-break {
+        display: initial;
+    }
+
     .app-schedule-edit-dialog[open] {
         inset: 0;
         width: 100%;

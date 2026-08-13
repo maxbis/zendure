@@ -1312,7 +1312,17 @@
 
         editDialog.dataset.scheduleKey = key;
         editDialog.dataset.originalKey = exact?.key || "";
-        editElements.title.textContent = `Edit ${formatDate(date)} · ${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`;
+        editElements.title.replaceChildren(
+            document.createTextNode(`Edit ${formatDate(date)}`),
+            Object.assign(document.createElement("span"), {
+                className: "app-schedule-edit-dialog__desktop-separator",
+                textContent: " · "
+            }),
+            Object.assign(document.createElement("br"), {
+                className: "app-schedule-edit-dialog__mobile-break"
+            }),
+            document.createTextNode(`${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`)
+        );
         editElements.priceSummary.textContent = `Price (${formatPriceCents(detail.price)} / ${formatPriceCents(spotPrice(detail.price))})`;
         editElements.modeInputs.forEach((input) => { input.checked = input.value === mode; });
         editElements.watts.value = rawNumeric !== null ? String(rawNumeric) : "0";
