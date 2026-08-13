@@ -783,7 +783,7 @@
 
         const section = document.createElement("div");
         section.className = "app-schedule-tooltip__forecast";
-        const title = tooltipSectionLabel("Estimated battery");
+        const title = tooltipSectionLabel("Estimated real battery level");
         const forecast = state.batteryForecast[forecastKey(date, hour)];
         section.appendChild(title);
 

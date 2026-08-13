@@ -2738,6 +2738,10 @@ button.app-state-pill:focus-visible {
     font-size: 0.62rem;
 }
 
+.app-edit-controls {
+    min-height: 0;
+}
+
 .app-input-with-unit {
     position: relative;
 }
@@ -3729,8 +3733,51 @@ button.app-state-pill:focus-visible {
 
 @media (max-width: 600px) {
     .app-schedule-edit-dialog[open] {
-        --app-schedule-dialog-top: 12px;
-        max-height: calc(100dvh - 24px);
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        margin: 0;
+        border-width: 0;
+        border-radius: 0;
+    }
+
+    .app-schedule-edit-dialog .gsd-dialog__header {
+        padding-top: max(var(--gsd-space-3), env(safe-area-inset-top));
+    }
+
+    .app-schedule-edit-dialog .gsd-dialog__body {
+        overflow-y: auto;
+        overflow-anchor: none;
+        scrollbar-width: none;
+        touch-action: pan-y;
+    }
+
+    .app-schedule-edit-dialog .gsd-dialog__body::-webkit-scrollbar {
+        display: none;
+    }
+
+    .app-schedule-edit-dialog .gsd-dialog__footer {
+        padding-bottom: max(var(--gsd-space-3), env(safe-area-inset-bottom));
+    }
+
+    .app-edit-controls {
+        min-height: 292px;
+    }
+
+    .app-fixed-power-panel,
+    .app-limit-editor__fields {
+        position: sticky;
+        z-index: 1;
+        bottom: 0;
+    }
+
+    .app-fixed-slider input[type="range"],
+    .app-limit-slider input[type="range"] {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
     }
 
     .app-mode-options > label > span {
