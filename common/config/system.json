@@ -5,7 +5,7 @@
     "minChargePercent": 15,
     "maxChargePercent": 91,
     "efficiency": 0.9,
-    "maxChargePowerW": 1200,
+    "maxChargePowerW": 1300,
     "maxDischargePowerW": 2000
   },
   "forecast": {
