@@ -720,7 +720,9 @@
 }
 
 .gsd-footer-more__item {
+    appearance: none;
     display: grid;
+    width: 100%;
     grid-template-columns: 28px minmax(0, 1fr) 16px;
     align-items: center;
     gap: var(--gsd-space-2);
@@ -730,6 +732,9 @@
     border-radius: var(--gsd-radius-sm);
     background: transparent;
     color: var(--gsd-text);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;

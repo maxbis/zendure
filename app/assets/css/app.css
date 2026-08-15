@@ -2548,6 +2548,217 @@ dialog.app-schedule-tooltip {
     color: var(--gsd-text-on-signal);
 }
 
+/* Shortwave radiation dialog */
+.app-shortwave-dialog {
+    width: min(calc(100% - 24px), 880px);
+}
+
+.app-shortwave-dialog__unit {
+    color: var(--gsd-text-muted);
+    font-size: 0.78em;
+    font-weight: 560;
+}
+
+.app-shortwave-dialog__body {
+    min-height: min(420px, 58dvh);
+    padding: var(--gsd-space-4);
+    background: var(--gsd-surface-1);
+}
+
+.app-shortwave-dialog__loading {
+    display: flex;
+    min-height: 280px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gsd-space-3);
+    color: var(--gsd-text-secondary);
+    font-size: 0.875rem;
+}
+
+.app-shortwave-dialog__error {
+    display: grid;
+    min-height: 220px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-content: center;
+    align-items: start;
+    gap: var(--gsd-space-3);
+    padding: var(--gsd-space-5);
+    background: var(--gsd-negative-soft);
+    border: 1px solid color-mix(in srgb, var(--gsd-negative) 34%, var(--gsd-border));
+    border-radius: var(--gsd-radius-md);
+}
+
+.app-shortwave-dialog__error[hidden],
+.app-shortwave-dialog__loading[hidden],
+.app-shortwave-dialog__content[hidden] {
+    display: none;
+}
+
+.app-shortwave-dialog__error > .gsd-icon {
+    color: var(--gsd-negative);
+}
+
+.app-shortwave-dialog__error strong {
+    color: var(--gsd-text);
+}
+
+.app-shortwave-dialog__error p {
+    margin: 4px 0 0;
+    color: var(--gsd-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.app-shortwave-dialog__error .gsd-btn {
+    grid-column: 2;
+    justify-self: start;
+}
+
+.app-shortwave-dialog__content {
+    display: grid;
+    gap: var(--gsd-space-2);
+}
+
+.app-shortwave-dialog__meta {
+    min-height: 1.25rem;
+    margin: 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-shortwave-dialog__viewport {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--gsd-surface-2);
+    border: 1px solid var(--gsd-border);
+    border-radius: var(--gsd-radius-md);
+    scrollbar-color: color-mix(in srgb, var(--gsd-accent) 55%, transparent) var(--gsd-surface-3);
+    scrollbar-width: thin;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.app-shortwave-dialog__viewport:focus-visible {
+    outline: 3px solid var(--gsd-focus-ring);
+    outline-offset: 2px;
+}
+
+.app-shortwave-dialog__viewport::-webkit-scrollbar {
+    height: 8px;
+}
+
+.app-shortwave-dialog__viewport::-webkit-scrollbar-track {
+    background: var(--gsd-surface-3);
+}
+
+.app-shortwave-dialog__viewport::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--gsd-accent) 55%, transparent);
+    border-radius: 999px;
+}
+
+.app-shortwave-dialog__chart {
+    min-width: 100%;
+}
+
+.app-shortwave-dialog__chart svg {
+    display: block;
+    width: auto;
+    max-width: none;
+    height: 300px;
+}
+
+.app-shortwave-chart__grid {
+    stroke: color-mix(in srgb, var(--gsd-text) 12%, transparent);
+    stroke-width: 1;
+}
+
+.app-shortwave-chart__axis {
+    stroke: color-mix(in srgb, var(--gsd-text) 24%, transparent);
+    stroke-width: 1;
+}
+
+.app-shortwave-chart__hour-guide {
+    stroke: color-mix(in srgb, var(--gsd-accent) 35%, transparent);
+    stroke-dasharray: 5 5;
+    stroke-width: 1;
+}
+
+.app-shortwave-chart__day-separator {
+    stroke: var(--gsd-border-strong);
+    stroke-width: 1;
+}
+
+.app-shortwave-chart__area {
+    fill: color-mix(in srgb, var(--gsd-accent) 22%, transparent);
+}
+
+.app-shortwave-chart__line {
+    fill: none;
+    stroke: var(--gsd-accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+}
+
+.app-shortwave-chart__axis-label,
+.app-shortwave-chart__x-label,
+.app-shortwave-chart__unit {
+    fill: var(--gsd-text-muted);
+    font-family: var(--gsd-font-sans);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-shortwave-chart__x-label--date {
+    fill: var(--gsd-accent);
+    font-weight: 650;
+}
+
+.app-shortwave-chart__day-label {
+    fill: var(--gsd-text);
+    font-family: var(--gsd-font-sans);
+    font-size: 12px;
+    font-weight: 650;
+    paint-order: stroke;
+    stroke: var(--gsd-surface-2);
+    stroke-width: 3px;
+}
+
+.app-shortwave-dialog__footer {
+    align-items: center;
+}
+
+.app-shortwave-dialog__footer .gsd-btn {
+    max-width: 220px;
+}
+
+.app-shortwave-dialog__footer .gsd-icon {
+    width: 17px;
+    height: 17px;
+}
+
+@media (max-width: 600px) {
+    .app-shortwave-dialog[open] {
+        width: calc(100% - 16px);
+        max-height: calc(100dvh - 16px);
+    }
+
+    .app-shortwave-dialog__body {
+        min-height: min(390px, 62dvh);
+        padding: var(--gsd-space-3);
+    }
+
+    .app-shortwave-dialog__chart svg {
+        height: 280px;
+    }
+
+    .app-shortwave-dialog__footer .gsd-btn {
+        max-width: none;
+    }
+}
+
 .app-schedule-edit-dialog form {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto;

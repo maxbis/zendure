@@ -18,7 +18,8 @@ Shared expandable footer menu used by the new GUI (`/app`) and old GUI (`/main`)
 Inputs before including the partial:
 
 - `$gsdFooterMoreItems` — required array of menu entries
-  - `href` — destination URL
+  - `href` — destination URL; required unless `dialogId` is provided
+  - `dialogId` — optional dialog element id; renders the entry as a semantic button with `aria-haspopup="dialog"`
   - `label` — primary text
   - `description` — optional supporting text
   - `icon` — optional sprite symbol id (default `bidirectional`)
@@ -33,7 +34,7 @@ Outputs:
 
 Current host items:
 
-- New GUI → Old GUI (`../main/`)
+- New GUI → Shortwave Radiation dialog and Old GUI (`../main/`)
 - Old GUI → New GUI (`../app/`)
 
 ## Flow and behavior
@@ -44,12 +45,13 @@ Current host items:
 4. The More control stays at the bottom of the page and is reached by scrolling.
 5. Tapping More expands the panel above the bar.
 6. Escape or the transparent backdrop closes the panel.
-7. Choosing an item navigates to the linked GUI or future destination.
+7. Choosing a link item navigates to its destination.
+8. Choosing a dialog item is handled by its host component, which closes the More menu before opening the dialog.
 
 ## Edge cases and failure modes
 
 - When `$gsdFooterMoreItems` is missing or empty, then the partial renders nothing.
-- When an item lacks `href` or `label`, then that item is skipped.
+- When an item lacks both `href` and `dialogId`, or lacks `label`, then that item is skipped.
 - When Graphite CSS/JS is not loaded on a host page, then the footer markup may appear unstyled or non-interactive.
 - When more items are added later, then only the items array needs updating; the panel layout already supports multiple rows.
 - Host pages must use `viewport-fit=cover` so bottom safe-area padding remains correct on notched phones.

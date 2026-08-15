@@ -50,7 +50,8 @@ It presents:
 - prices and the current energy plan for today or tomorrow
 - four days of hourly battery energy history
 - charged, discharged, and PnL totals for the selected day
-- a shared Graphite More footer menu with a link to the old GUI for functions that have not moved yet
+- shortwave radiation forecast data in a Graphite dialog opened from the shared More menu
+- a shared Graphite More footer menu with the radiation dialog and a link to the old GUI for functions that have not moved yet
 
 ### Old GUI
 
@@ -73,8 +74,9 @@ It presents and modifies:
 4. When a user activates a battery detail trigger, the non-modal dialog opens on its Energy view and can switch to live battery Health details.
 5. When a user selects a day in the new GUI's four-day history, the summary cards show totals for that selected calendar day. For today, totals cover the available readings up to the current time.
 6. When schedule editing, rule editing, or an automation function is needed, the user continues in the old GUI.
-7. Users can move between the GUIs through the shared More footer menu.
-8. Backend changes to shared APIs must be tested against both GUIs.
+7. When Shortwave Radiation is selected from More, the menu closes and a dialog loads the shared cached forecast on demand.
+8. Users can move between the GUIs through the shared More footer menu.
+9. Backend changes to shared APIs must be tested against both GUIs.
 
 ## Edge cases and failure modes
 
@@ -82,12 +84,14 @@ It presents and modifies:
 - When a deployment updates HTML and JavaScript at different times, then a browser can temporarily run mismatched new-GUI assets. A forced refresh clears the stale asset combination.
 - When documentation mentions only `/main/`, then readers should treat it as the old GUI because `main/index.php` redirects there.
 - When a feature exists only in the old GUI, then calling the new GUI a complete replacement is incorrect.
+- When the shortwave endpoint is unavailable or returns invalid data, then the dialog keeps its controls usable and presents a retryable error.
 - When the old GUI is eventually retired, then its routes, feature ownership, migration status, and all references in this document must be updated together.
 
 ## Related files
 
 - [New GUI current energy status and battery details](assets/js/current-energy-status.md)
 - [New GUI prices and energy plan](assets/js/price-plan.md)
+- [New GUI shortwave radiation dialog](assets/js/shortwave-radiation.md)
 - [New GUI shared system configuration](shared-system-configuration.md)
 - [Shared More footer menu](../themes/graphite-signal-dark/footer-more.md)
 - [Old GUI page description](../main/page-description.md)

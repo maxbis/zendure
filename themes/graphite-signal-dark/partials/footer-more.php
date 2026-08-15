@@ -4,7 +4,8 @@
  *
  * Expected variables:
  * - $gsdFooterMoreItems (array): list of menu entries. Each entry:
- *   - href (string, required)
+ *   - href (string, required unless dialogId is provided)
+ *   - dialogId (string, optional): renders a button targeting a dialog
  *   - label (string, required)
  *   - description (string, optional)
  *   - icon (string, optional sprite symbol id; default "bidirectional")
@@ -38,8 +39,9 @@ $gsdFooterMorePanelId = $gsdFooterMorePanelId ?? 'gsd-footer-more-panel';
                     continue;
                 }
                 $href = isset($item['href']) ? (string) $item['href'] : '';
+                $dialogId = isset($item['dialogId']) ? trim((string) $item['dialogId']) : '';
                 $label = isset($item['label']) ? (string) $item['label'] : '';
-                if ($href === '' || $label === '') {
+                if (($href === '' && $dialogId === '') || $label === '') {
                     continue;
                 }
                 $description = isset($item['description']) ? (string) $item['description'] : '';
@@ -47,10 +49,19 @@ $gsdFooterMorePanelId = $gsdFooterMorePanelId ?? 'gsd-footer-more-panel';
                     ? (string) $item['icon']
                     : 'bidirectional';
                 ?>
-                <a
-                    class="gsd-footer-more__item"
-                    href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"
-                >
+                <?php if ($dialogId !== ''): ?>
+                    <button
+                        class="gsd-footer-more__item"
+                        type="button"
+                        aria-haspopup="dialog"
+                        data-gsd-dialog-target="<?= htmlspecialchars($dialogId, ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                <?php else: ?>
+                    <a
+                        class="gsd-footer-more__item"
+                        href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                <?php endif; ?>
                     <span class="gsd-footer-more__item-icon" aria-hidden="true">
                         <svg class="gsd-icon">
                             <use href="<?= htmlspecialchars($gsdFooterMoreSpriteHref . '#' . $icon, ENT_QUOTES, 'UTF-8'); ?>"></use>
@@ -67,7 +78,11 @@ $gsdFooterMorePanelId = $gsdFooterMorePanelId ?? 'gsd-footer-more-panel';
                             <use href="<?= htmlspecialchars($gsdFooterMoreSpriteHref . '#chevron-right', ENT_QUOTES, 'UTF-8'); ?>"></use>
                         </svg>
                     </span>
-                </a>
+                <?php if ($dialogId !== ''): ?>
+                    </button>
+                <?php else: ?>
+                    </a>
+                <?php endif; ?>
             <?php endforeach; ?>
         </nav>
     </div>

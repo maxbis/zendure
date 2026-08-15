@@ -109,6 +109,7 @@ $appConfig = [
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),
     'priceConversion' => $systemConfig['priceConversion'] ?? null,
     'energyHistoryUrl' => '../main/api/app_energy_history.php?days=3',
+    'shortwaveRadiationUrl' => '../main/api/shortwave_radiation_api.php',
     'solarLocation' => $systemConfig['installation'] ?? null,
     'solarEvents' => $systemConfig === null ? [] : buildAppSolarEvents($systemConfig['installation']),
 ];
@@ -144,6 +145,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/shortwave-radiation.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body data-theme="graphite-signal-dark">
     <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
@@ -596,9 +598,68 @@ $appConfig = [
             </div>
         </section>
 
+        <dialog
+            class="gsd-dialog app-shortwave-dialog"
+            id="app-shortwave-radiation-dialog"
+            aria-labelledby="app-shortwave-radiation-title"
+            data-component="shortwave-radiation"
+        >
+            <header class="gsd-dialog__header gsd-dialog__header--simple">
+                <h2 class="gsd-dialog__title" id="app-shortwave-radiation-title">
+                    Shortwave Radiation <span class="app-shortwave-dialog__unit">(W/m²)</span>
+                </h2>
+                <button class="gsd-icon-btn" type="button" aria-label="Close shortwave radiation" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </header>
+
+            <div class="gsd-dialog__body app-shortwave-dialog__body">
+                <div class="app-shortwave-dialog__loading" data-role="shortwave-loading" role="status">
+                    <span class="app-loading-orb" aria-hidden="true"></span>
+                    <span>Loading shortwave radiation</span>
+                </div>
+
+                <div class="app-shortwave-dialog__error" data-role="shortwave-error" role="alert" hidden>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#error"></use></svg>
+                    <div>
+                        <strong>Shortwave radiation unavailable</strong>
+                        <p data-role="shortwave-error-message">The forecast could not be loaded.</p>
+                    </div>
+                    <button class="gsd-btn gsd-btn--secondary" type="button" data-role="shortwave-retry">Try again</button>
+                </div>
+
+                <div class="app-shortwave-dialog__content" data-role="shortwave-content" hidden>
+                    <p class="app-shortwave-dialog__meta" data-role="shortwave-meta" aria-live="polite"></p>
+                    <div
+                        class="app-shortwave-dialog__viewport"
+                        data-role="shortwave-viewport"
+                        tabindex="0"
+                        aria-label="Scrollable shortwave radiation forecast chart. Use left and right arrow keys to scroll"
+                    >
+                        <div class="app-shortwave-dialog__chart" data-role="shortwave-chart"></div>
+                    </div>
+                    <p class="gsd-sr-only" data-role="shortwave-summary"></p>
+                </div>
+            </div>
+
+            <footer class="gsd-dialog__footer app-shortwave-dialog__footer">
+                <button class="gsd-btn gsd-btn--secondary" type="button" data-role="shortwave-refresh">
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
+                    Refresh
+                </button>
+                <button class="gsd-btn gsd-btn--primary" type="button" data-gsd-dialog-close="done" data-gsd-initial-focus>Done</button>
+            </footer>
+        </dialog>
+
     <?php
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
+        [
+            'dialogId' => 'app-shortwave-radiation-dialog',
+            'label' => 'Shortwave Radiation',
+            'description' => 'Hourly solar radiation and daily totals',
+            'icon' => 'sun',
+        ],
         [
             'href' => '../main/',
             'label' => 'Open Old GUI',
