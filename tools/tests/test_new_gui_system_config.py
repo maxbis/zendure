@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_INDEX = REPO_ROOT / "app" / "index.php"
 CURRENT_ENERGY_STATUS = REPO_ROOT / "app" / "assets" / "js" / "current-energy-status.js"
 PRICE_PLAN = REPO_ROOT / "app" / "assets" / "js" / "price-plan.js"
+APP_CSS = REPO_ROOT / "app" / "assets" / "css" / "app.css"
 SYSTEM_CONFIG = REPO_ROOT / "common" / "config" / "system.json"
 VALID_KEYS = REPO_ROOT / "login" / "validkeys.txt"
 
@@ -86,6 +87,19 @@ def test_new_gui_javascript_has_no_shared_value_fallbacks():
     assert "GraphiteBatteryForecast" not in price_source
     assert "Number(config.powerMinW) ||" not in price_source
     assert "Number(config.powerMaxW) ||" not in price_source
+
+
+def test_price_plan_identifies_rule_generated_hours_in_tooltips_and_accessible_labels():
+    price_source = PRICE_PLAN.read_text(encoding="utf-8")
+    app_css = APP_CSS.read_text(encoding="utf-8")
+
+    assert 'if (slot?.rule_name) return `Rule: ${slot.rule_name}`;' in price_source
+    assert 'if (slot?.rule_id) return "Rule";' in price_source
+    assert "function isRuleResult(slot)" in price_source
+    assert 'actionElement.dataset.ruleResult = "true";' in price_source
+    assert ', source ${sourceFor(slot)}. Show schedule details.`' in price_source
+    assert '.app-price-hour__action[data-rule-result="true"]' in app_css
+    assert app_css.count("background-origin: border-box;") >= 3
 
 
 @pytest.mark.skipif(not VALID_KEYS.is_file(), reason="Local authentication fixture is unavailable")

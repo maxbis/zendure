@@ -587,11 +587,22 @@
 
     function sourceFor(slot) {
         if (slot?.rule_name) return `Rule: ${slot.rule_name}`;
+        if (Number.isFinite(Number(slot?.rule_index)) && Number(slot.rule_index) > 0) return `Rule #${Number(slot.rule_index)}`;
+        if (slot?.rule_id) return "Rule";
         if (Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length) return "Conditional rule";
         const key = String(slot?.key || "");
         if (key.includes("*")) return "Recurring schedule";
         if (key) return "Manual schedule";
         return "Automatic resolution";
+    }
+
+    function isRuleResult(slot) {
+        return Boolean(
+            slot?.rule_name ||
+            slot?.rule_id ||
+            (Number.isFinite(Number(slot?.rule_index)) && Number(slot.rule_index) > 0) ||
+            (Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length)
+        );
     }
 
     function formatRuntimeConditions(slot) {
@@ -669,8 +680,11 @@
         return button;
     }
 
-    function createTooltipRule(slot, runtimeConditions, ruleColor) {
-        if (!(runtimeConditions || ["empty_at_solar_charge", "full_at_netzero_minus"].includes(slot?.planning?.mode))) {
+    function createTooltipRule(slot, ruleColor) {
+        const source = sourceFor(slot);
+        const hasRuleResult = isRuleResult(slot);
+        const isPlannedTarget = ["empty_at_solar_charge", "full_at_netzero_minus"].includes(slot?.planning?.mode);
+        if (!(hasRuleResult || isPlannedTarget)) {
             return null;
         }
         const rule = document.createElement("span");
@@ -680,7 +694,7 @@
         dot.setAttribute("aria-hidden", "true");
         rule.append(
             dot,
-            document.createTextNode(slot?.rule_name ? `Rule: ${slot.rule_name}` : runtimeConditions ? "Runtime rule" : "Planned target")
+            document.createTextNode(hasRuleResult ? source : "Planned target")
         );
         return rule;
     }
@@ -944,7 +958,7 @@
 
         const runtimeConditions = formatRuntimeConditions(slot);
         const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
-        const rule = createTooltipRule(slot, runtimeConditions, ruleColor);
+        const rule = createTooltipRule(slot, ruleColor);
         if (rule) header.appendChild(rule);
         priceTooltip.setAttribute("aria-labelledby", time.id);
 
@@ -1479,9 +1493,12 @@
             actionElement.dataset.limited = limited ? "true" : "false";
             const hasRuntimeRule = Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length > 0;
             const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
+            if (isRuleResult(slot)) {
+                actionElement.dataset.ruleResult = "true";
+                if (ruleColor) actionElement.style.setProperty("--app-rule-color", ruleColor);
+            }
             if (hasRuntimeRule) {
                 actionElement.dataset.runtimeRule = "true";
-                if (ruleColor) actionElement.style.setProperty("--app-rule-color", ruleColor);
                 if (Object.prototype.hasOwnProperty.call(slot, "fallback_value") && slot.fallback_value !== null) {
                     actionElement.dataset.fallbackTone = actionTone(runtimeFallbackAction(slot));
                 }
@@ -1492,7 +1509,7 @@
             actionElement.setAttribute("aria-expanded", "false");
             actionElement.setAttribute(
                 "aria-label",
-                `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}. Show schedule details.`
+                `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}, source ${sourceFor(slot)}. Show schedule details.`
             );
             actionElement.addEventListener("mouseenter", () => {
                 if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, actionElement, actionElement);

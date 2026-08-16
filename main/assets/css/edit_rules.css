@@ -86,6 +86,60 @@ code {
     flex-wrap: wrap;
 }
 
+.global-actions-menu {
+    position: relative;
+    display: inline-block;
+}
+
+.global-actions-toggle span {
+    display: inline-block;
+    margin-left: 3px;
+    transition: transform var(--gsd-duration-fast) ease;
+}
+
+.global-actions-menu.open .global-actions-toggle span {
+    transform: rotate(180deg);
+}
+
+.global-actions-popover {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    min-width: 230px;
+    padding: 5px;
+    display: none;
+    background: var(--gsd-surface-1);
+    border: 1px solid var(--gsd-border-strong);
+    border-radius: var(--gsd-radius-md);
+    box-shadow: var(--gsd-shadow-floating);
+}
+
+.global-actions-menu.open .global-actions-popover {
+    display: grid;
+    gap: 4px;
+}
+
+.global-actions-popover .gsd-btn {
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 10px;
+    text-align: left;
+    transform: none;
+}
+
+.global-actions-popover .gsd-btn:hover {
+    transform: none;
+}
+
+.global-actions-popover .gsd-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: none;
+}
+
 .rule-profiles-box {
     display: grid;
     gap: 14px;
@@ -1338,6 +1392,40 @@ form {
 
 #unsaved-rule-dialog .gsd-dialog__footer {
     flex-wrap: wrap;
+}
+
+#delete-unused-rules-dialog {
+    width: min(calc(100% - 24px), 520px);
+}
+
+#delete-unused-rules-dialog .gsd-dialog__lead {
+    margin: 0;
+}
+
+.delete-unused-rules-scope {
+    margin: var(--gsd-space-2) 0 var(--gsd-space-4);
+    line-height: 1.45;
+}
+
+.delete-unused-rules-list {
+    max-height: 240px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+    border: 1px solid var(--gsd-border-subtle);
+    border-radius: var(--gsd-radius-md);
+    background: var(--gsd-surface-2);
+}
+
+.delete-unused-rules-list li {
+    padding: 9px 12px;
+    color: var(--gsd-text-secondary);
+    border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.delete-unused-rules-list li:last-child {
+    border-bottom: 0;
 }
 
 .condition-kind-help {

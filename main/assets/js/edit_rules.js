@@ -16,6 +16,7 @@
         isRefreshingForFreshData: false,
         editorBaseline: null,
         unsavedDialogResolver: null,
+        deleteUnusedDialogResolver: null,
     };
 
     const els = {
@@ -35,6 +36,15 @@
         btnCopyFilePath: document.getElementById('btn-copy-file-path'),
         btnCloseRawJson: document.getElementById('btn-close-raw-json'),
         btnReload: document.getElementById('btn-reload'),
+        globalActionsMenu: document.getElementById('global-actions-menu'),
+        btnGlobalActions: document.getElementById('btn-global-actions'),
+        btnDeleteUnusedRules: document.getElementById('btn-delete-unused-rules'),
+        deleteUnusedDialog: document.getElementById('delete-unused-rules-dialog'),
+        deleteUnusedDialogMessage: document.getElementById('delete-unused-rules-dialog-message'),
+        deleteUnusedRulesList: document.getElementById('delete-unused-rules-list'),
+        deleteUnusedDialogCancel: document.getElementById('delete-unused-rules-dialog-cancel'),
+        deleteUnusedDialogConfirm: document.getElementById('delete-unused-rules-dialog-confirm'),
+        deleteUnusedDialogClose: document.getElementById('delete-unused-rules-dialog-close'),
         btnNew: document.getElementById('btn-new'),
         btnAddCondition: document.getElementById('btn-add-condition'),
         btnCancel: document.getElementById('btn-cancel'),
@@ -205,6 +215,34 @@
     function setStatus(text, type) {
         els.status.className = 'status ' + (type || '');
         els.status.textContent = text || '';
+    }
+
+    function getUnusedRuleEntries() {
+        const assignedRuleIds = new Set();
+        (state.ruleProfiles.profiles || []).forEach(function (profile) {
+            (Array.isArray(profile.rule_ids) ? profile.rule_ids : []).forEach(function (ruleId) {
+                const normalizedRuleId = String(ruleId || '').trim();
+                if (normalizedRuleId) assignedRuleIds.add(normalizedRuleId);
+            });
+        });
+
+        return state.rules
+            .map(function (rule, idx) { return { rule: rule, idx: idx }; })
+            .filter(function (entry) {
+                return entry.rule && entry.rule.rule_id && !assignedRuleIds.has(String(entry.rule.rule_id));
+            });
+    }
+
+    function updateDeleteUnusedRulesAction() {
+        if (!els.btnDeleteUnusedRules) return;
+        const count = getUnusedRuleEntries().length;
+        els.btnDeleteUnusedRules.disabled = count === 0;
+        els.btnDeleteUnusedRules.textContent = count > 0
+            ? ('Delete unused rules (' + count + ')')
+            : 'Delete unused rules';
+        els.btnDeleteUnusedRules.title = count > 0
+            ? (count + ' rule' + (count === 1 ? ' is' : 's are') + ' not assigned to any profile.')
+            : 'Every rule is assigned to at least one profile.';
     }
 
     function updatePendingImportState() {
@@ -1228,6 +1266,7 @@
 
     function renderTable() {
         els.rulesTbody.innerHTML = '';
+        updateDeleteUnusedRulesAction();
         const visibleRules = getVisibleRules();
         if (state.rules.length === 0) {
             const tr = document.createElement('tr');
@@ -1308,6 +1347,28 @@
                 toggle.setAttribute('aria-expanded', 'false');
             }
         });
+    }
+
+    function closeGlobalActionsMenu(options) {
+        if (!els.globalActionsMenu || !els.btnGlobalActions) return;
+        els.globalActionsMenu.classList.remove('open');
+        els.btnGlobalActions.setAttribute('aria-expanded', 'false');
+        if (options && options.restoreFocus && typeof els.btnGlobalActions.focus === 'function') {
+            els.btnGlobalActions.focus();
+        }
+    }
+
+    function toggleGlobalActionsMenu() {
+        if (!els.globalActionsMenu || !els.btnGlobalActions) return;
+        const willOpen = !els.globalActionsMenu.classList.contains('open');
+        closeGlobalActionsMenu();
+        if (!willOpen) return;
+        els.globalActionsMenu.classList.add('open');
+        els.btnGlobalActions.setAttribute('aria-expanded', 'true');
+        const firstAction = els.globalActionsMenu.querySelector('[role="menuitem"]:not(:disabled)');
+        if (firstAction && typeof firstAction.focus === 'function') {
+            firstAction.focus();
+        }
     }
 
     function renderProfileButtons() {
@@ -1651,6 +1712,57 @@
                 els.unsavedDialog.setAttribute('open', '');
             }
             const focusTarget = els.unsavedDialogCancel || els.unsavedDialog.querySelector('[data-gsd-initial-focus]');
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                focusTarget.focus();
+            }
+        });
+    }
+
+    function resolveDeleteUnusedRulesDialog(confirmed) {
+        const resolver = state.deleteUnusedDialogResolver;
+        state.deleteUnusedDialogResolver = null;
+        if (els.deleteUnusedDialog && els.deleteUnusedDialog.open) {
+            els.deleteUnusedDialog.close();
+        }
+        if (typeof resolver === 'function') {
+            resolver(!!confirmed);
+        }
+    }
+
+    function showDeleteUnusedRulesDialog(unusedEntries) {
+        if (!els.deleteUnusedDialog) {
+            return Promise.resolve(window.confirm('Delete ' + unusedEntries.length + ' rules that are not assigned to any profile?'));
+        }
+        if (state.deleteUnusedDialogResolver) {
+            resolveDeleteUnusedRulesDialog(false);
+        }
+
+        const count = unusedEntries.length;
+        if (els.deleteUnusedDialogMessage) {
+            els.deleteUnusedDialogMessage.textContent = 'Delete ' + count + ' rule' + (count === 1 ? '' : 's') + ' that ' + (count === 1 ? 'is' : 'are') + ' not assigned to any profile? This cannot be undone.';
+        }
+        if (els.deleteUnusedRulesList) {
+            els.deleteUnusedRulesList.innerHTML = '';
+            unusedEntries.forEach(function (entry) {
+                const item = document.createElement('li');
+                const ruleName = String(entry.rule?.name || '').trim() || ('Rule #' + (entry.idx + 1));
+                item.textContent = ruleName;
+                item.title = String(entry.rule?.rule_id || '');
+                els.deleteUnusedRulesList.appendChild(item);
+            });
+        }
+        if (els.deleteUnusedDialogConfirm) {
+            els.deleteUnusedDialogConfirm.textContent = 'Delete ' + count + ' rule' + (count === 1 ? '' : 's');
+        }
+
+        return new Promise(function (resolve) {
+            state.deleteUnusedDialogResolver = resolve;
+            if (typeof els.deleteUnusedDialog.showModal === 'function') {
+                els.deleteUnusedDialog.showModal();
+            } else {
+                els.deleteUnusedDialog.setAttribute('open', '');
+            }
+            const focusTarget = els.deleteUnusedDialogCancel || els.deleteUnusedDialog.querySelector('[data-gsd-initial-focus]');
             if (focusTarget && typeof focusTarget.focus === 'function') {
                 focusTarget.focus();
             }
@@ -2245,6 +2357,7 @@
     function attachEvents() {
         applyEditorHelpTooltips();
         updatePendingImportState();
+        updateDeleteUnusedRulesAction();
 
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'hidden') {
@@ -2260,12 +2373,14 @@
 
         if (els.btnExportJson) {
             els.btnExportJson.addEventListener('click', function () {
+                closeGlobalActionsMenu();
                 downloadRulesJson();
             });
         }
 
         if (els.btnImportJson && els.importJsonInput) {
             els.btnImportJson.addEventListener('click', function () {
+                closeGlobalActionsMenu();
                 els.importJsonInput.click();
             });
             els.importJsonInput.addEventListener('change', function (e) {
@@ -2278,6 +2393,40 @@
             els.btnSaveImported.addEventListener('click', async function () {
                 if (!state.hasPendingImportedRules) return;
                 await saveRulesToFile('Imported rules saved.');
+            });
+        }
+
+        if (els.btnGlobalActions) {
+            els.btnGlobalActions.addEventListener('click', function () {
+                toggleGlobalActionsMenu();
+            });
+        }
+
+        if (els.btnDeleteUnusedRules) {
+            els.btnDeleteUnusedRules.addEventListener('click', async function () {
+                closeGlobalActionsMenu();
+                if (!(await confirmLeaveEditorIfDirty())) return;
+                persistProfileEditorChanges();
+                const unusedEntries = getUnusedRuleEntries();
+                updateDeleteUnusedRulesAction();
+                if (unusedEntries.length === 0) {
+                    setStatus('Every rule is assigned to at least one profile.', 'ok');
+                    return;
+                }
+                if (!(await showDeleteUnusedRulesDialog(unusedEntries))) return;
+
+                const unusedRuleIds = new Set(unusedEntries.map(function (entry) {
+                    return String(entry.rule.rule_id);
+                }));
+                const deleteCount = unusedRuleIds.size;
+                const ok = await mutateAndPersist(function () {
+                    state.rules = state.rules.filter(function (rule) {
+                        return !unusedRuleIds.has(String(rule?.rule_id || ''));
+                    });
+                }, deleteCount + ' unused rule' + (deleteCount === 1 ? '' : 's') + ' deleted and saved.');
+                if (ok) {
+                    clearEditor();
+                }
             });
         }
 
@@ -2348,6 +2497,7 @@
         }
 
         els.btnRawJson.addEventListener('click', function () {
+            closeGlobalActionsMenu();
             renderRawJson();
             els.rawJsonCard.hidden = false;
         });
@@ -2379,6 +2529,7 @@
         }
 
         els.btnReload.addEventListener('click', async function () {
+            closeGlobalActionsMenu();
             if (!(await confirmLeaveEditorIfDirty())) return;
             loadRules();
         });
@@ -2497,6 +2648,22 @@
             });
         }
 
+        if (els.deleteUnusedDialog) {
+            const bindDeleteUnusedChoice = function (button, confirmed) {
+                if (!button) return;
+                button.addEventListener('click', function () {
+                    resolveDeleteUnusedRulesDialog(confirmed);
+                });
+            };
+            bindDeleteUnusedChoice(els.deleteUnusedDialogCancel, false);
+            bindDeleteUnusedChoice(els.deleteUnusedDialogClose, false);
+            bindDeleteUnusedChoice(els.deleteUnusedDialogConfirm, true);
+            els.deleteUnusedDialog.addEventListener('cancel', function (e) {
+                e.preventDefault();
+                resolveDeleteUnusedRulesDialog(false);
+            });
+        }
+
         els.rulesTbody.addEventListener('click', async function (e) {
             const toggleBtn = e.target.closest('button[data-menu-toggle]');
             if (toggleBtn) {
@@ -2583,6 +2750,9 @@
             if (!e.target.closest('.rule-actions-menu')) {
                 closeActionMenus();
             }
+            if (!e.target.closest('.global-actions-menu')) {
+                closeGlobalActionsMenu();
+            }
             if (!e.target.closest('.condition-field-wrap') && !e.target.closest('.condition-value-ref-wrap')) {
                 closeAllConditionHelps();
             }
@@ -2591,6 +2761,9 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
                 closeActionMenus();
+                if (els.globalActionsMenu && els.globalActionsMenu.classList.contains('open')) {
+                    closeGlobalActionsMenu({ restoreFocus: true });
+                }
                 closeAllConditionHelps();
             }
         });

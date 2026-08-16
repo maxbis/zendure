@@ -544,7 +544,7 @@ $editorTodayContext = resolveEditorTodayContext();
     <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/edit-rules-icon-180.png">
     <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/theme.css">
     <link rel="stylesheet" href="../themes/graphite-signal-dark/assets/css/components.css">
-    <link rel="stylesheet" href="assets/css/edit_rules.css">
+    <link rel="stylesheet" href="assets/css/edit_rules.css?v=<?php echo (int) filemtime(__DIR__ . '/assets/css/edit_rules.css'); ?>">
     <link rel="stylesheet" href="assets/css/edit_rules_color_picker.css">
 </head>
 <body data-theme="graphite-signal-dark">
@@ -554,11 +554,20 @@ $editorTodayContext = resolveEditorTodayContext();
             <h1>⚡ Zendure Rules Editor</h1>
             <div class="actions">
                 <a class="gsd-btn gsd-btn--quiet btn-link" href="./">Back to /main</a>
-                <button id="btn-export-json" class="gsd-btn gsd-btn--secondary" type="button">Export JSON</button>
-                <button id="btn-import-json" class="gsd-btn gsd-btn--secondary" type="button">Import JSON</button>
                 <button id="btn-save-imported" class="gsd-btn gsd-btn--primary" type="button" hidden disabled>Save Imported Rules</button>
-                <button id="btn-raw-json" class="gsd-btn gsd-btn--secondary" type="button">Raw JSON</button>
-                <button id="btn-reload" class="gsd-btn gsd-btn--secondary" type="button">Reload</button>
+                <div class="global-actions-menu" id="global-actions-menu">
+                    <button id="btn-global-actions" class="gsd-btn gsd-btn--secondary global-actions-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="global-actions-popover">
+                        Actions <span aria-hidden="true">▾</span>
+                    </button>
+                    <div class="global-actions-popover" id="global-actions-popover" role="menu">
+                        <button id="btn-reload" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Reload rules</button>
+                        <button id="btn-raw-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">View raw JSON</button>
+                        <button id="btn-export-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Export JSON</button>
+                        <button id="btn-import-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Import JSON…</button>
+                        <div class="rule-actions-separator" role="separator" aria-hidden="true"></div>
+                        <button id="btn-delete-unused-rules" class="gsd-btn gsd-btn--danger danger" type="button" role="menuitem">Delete unused rules</button>
+                    </div>
+                </div>
                 <a class="gsd-btn gsd-btn--quiet btn-link btn-link-icon" href="edit_rules_help.php" target="_blank" rel="noopener" title="Help" aria-label="Help">ℹ️</a>
             </div>
         </div>
@@ -815,6 +824,24 @@ $editorTodayContext = resolveEditorTodayContext();
     </footer>
 </dialog>
 
+<dialog class="gsd-dialog" id="delete-unused-rules-dialog" role="alertdialog" aria-labelledby="delete-unused-rules-dialog-title" aria-describedby="delete-unused-rules-dialog-message">
+    <header class="gsd-dialog__header gsd-dialog__header--simple">
+        <h2 class="gsd-dialog__title" id="delete-unused-rules-dialog-title">Delete unused rules?</h2>
+        <button class="gsd-icon-btn" type="button" id="delete-unused-rules-dialog-close" aria-label="Close dialog">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </header>
+    <div class="gsd-dialog__body">
+        <p class="gsd-dialog__lead" id="delete-unused-rules-dialog-message"></p>
+        <p class="muted delete-unused-rules-scope">Every profile is checked, regardless of which profile is currently selected.</p>
+        <ul id="delete-unused-rules-list" class="delete-unused-rules-list"></ul>
+    </div>
+    <footer class="gsd-dialog__footer">
+        <button class="gsd-btn gsd-btn--secondary" type="button" id="delete-unused-rules-dialog-cancel" data-gsd-initial-focus>Cancel</button>
+        <button class="gsd-btn gsd-btn--danger" type="button" id="delete-unused-rules-dialog-confirm">Delete unused rules</button>
+    </footer>
+</dialog>
+
 <script>
 window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8'); ?>?api=1';
 window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
@@ -828,7 +855,7 @@ window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'todayContext' => $editorTodayContext,
 ], JSON_UNESCAPED_SLASHES); ?>;
 </script>
-<script src="assets/js/edit_rules.js"></script>
+<script src="assets/js/edit_rules.js?v=<?php echo (int) filemtime(__DIR__ . '/assets/js/edit_rules.js'); ?>"></script>
 <script src="assets/js/edit_rules_color_picker.js"></script>
 </body>
 </html>

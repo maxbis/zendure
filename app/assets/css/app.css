@@ -2184,13 +2184,13 @@ button.app-state-pill:focus-visible {
 
 .app-price-hour__action[data-tone="positive"] {
     background: var(--gsd-positive);
-    border-color: var(--gsd-positive);
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
 .app-price-hour__action[data-tone="negative"] {
     background: var(--gsd-negative);
-    border-color: var(--gsd-negative);
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
@@ -2200,7 +2200,8 @@ button.app-state-pill:focus-visible {
         var(--gsd-negative) 0 50%,
         var(--gsd-positive) 50% 100%
     );
-    border-color: var(--gsd-neutral);
+    background-origin: border-box;
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
@@ -2210,19 +2211,19 @@ button.app-state-pill:focus-visible {
     color: var(--gsd-text-secondary);
 }
 
-.app-price-hour__action[data-runtime-rule="true"] {
-    border-width: 3px;
-    border-color: var(--app-rule-color, var(--gsd-border-strong));
+.app-price-hour__action[data-rule-result="true"] {
+    border-bottom-width: 2px;
+    border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
 }
 
 .app-price-hour__action[data-fallback-tone]::after {
     content: "";
     position: absolute;
     z-index: 1;
-    right: -3px;
-    bottom: -3px;
-    left: -3px;
-    height: 7px;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    height: 4px;
     pointer-events: none;
 }
 
@@ -2425,25 +2426,26 @@ dialog.app-schedule-tooltip {
 
 .app-schedule-tooltip__badge[data-tone="positive"] {
     background: var(--gsd-positive);
-    border-color: var(--gsd-positive);
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
 .app-schedule-tooltip__badge[data-tone="negative"] {
     background: var(--gsd-negative);
-    border-color: var(--gsd-negative);
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
 .app-schedule-tooltip__badge[data-tone="mixed"] {
     background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%);
-    border-color: var(--gsd-neutral);
+    background-origin: border-box;
+    border-color: transparent;
     color: var(--gsd-text-on-signal);
 }
 
 .app-schedule-tooltip__badge[data-runtime-rule="true"] {
-    border-width: 3px;
-    border-color: var(--app-rule-color, var(--gsd-border-strong));
+    border-bottom-width: 2px;
+    border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
 }
 
 .app-schedule-tooltip__limits {
@@ -4128,7 +4130,7 @@ dialog.app-schedule-tooltip {
 
     .app-price-hour__action {
         height: 21px;
-        border-color: color-mix(in srgb, currentColor 35%, var(--gsd-border-subtle));
+        border-color: transparent;
     }
 
     .app-price-hour__action[data-tone="positive"] {
@@ -4145,10 +4147,16 @@ dialog.app-schedule-tooltip {
             color-mix(in srgb, var(--gsd-negative) 68%, var(--gsd-surface-2)) 0 50%,
             color-mix(in srgb, var(--gsd-positive) 68%, var(--gsd-surface-2)) 50% 100%
         );
+        background-origin: border-box;
     }
 
-    .app-price-hour__action[data-runtime-rule="true"] {
-        border-width: 2px;
+    .app-price-hour__action[data-tone="neutral"] {
+        border-color: var(--gsd-border-subtle);
+    }
+
+    .app-price-hour__action[data-rule-result="true"] {
+        border-bottom-width: 2px;
+        border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
     }
 
     .app-price-timeline-scroll {
