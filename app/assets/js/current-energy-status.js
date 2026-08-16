@@ -290,6 +290,27 @@
         return `${sign}${Math.abs(rounded).toLocaleString()} W`;
     }
 
+    function formatBatteryPercentagePointRate(powerW, capacityWh, minimumPercent, maximumPercent) {
+        const usableRangePercent = maximumPercent - minimumPercent;
+        if (
+            !Number.isFinite(powerW)
+            || !Number.isFinite(capacityWh)
+            || capacityWh <= 0
+            || !Number.isFinite(usableRangePercent)
+            || usableRangePercent <= 0
+        ) {
+            return "—";
+        }
+
+        const usablePercentagePointsPerHour = (powerW / capacityWh) * (10000 / usableRangePercent);
+        const sign = usablePercentagePointsPerHour > 0
+            ? "+"
+            : usablePercentagePointsPerHour < 0
+                ? "−"
+                : "";
+        return `${sign}${Math.abs(usablePercentagePointsPerHour).toFixed(1)} pp/h`;
+    }
+
     function formatAbsoluteWatts(value) {
         return `${Math.abs(Math.round(value)).toLocaleString()} W`;
     }
@@ -680,7 +701,8 @@
             ["5% usable/real range equals", fivePercentCopy],
             ["Usable energy left", formatKwh(detail.usableKwh)],
             ["Chargeable energy available", formatKwh(detail.emptyKwh)],
-            ["Current battery flow rate", detail.rate],
+            ["Current battery flow", detail.rate],
+            ["Usable range flow", detail.percentagePointRate],
             [
                 `Usable energy @ ${detail.projectionTime}`,
                 `${formatKwh(detail.projectedUsableKwh)} (${Math.round(detail.projectedUsablePercent)}%)`
@@ -1257,6 +1279,12 @@
                 emptyKwh: energy.emptyKwh,
                 storedKwh: energy.storedKwh,
                 rate: formatSignedWatts(model.powerW),
+                percentagePointRate: formatBatteryPercentagePointRate(
+                    model.powerW,
+                    model.capacityWh,
+                    model.minimumPercent,
+                    model.maximumPercent
+                ),
                 projectedUsableKwh: projection.usableKwh,
                 projectedUsablePercent: projection.usablePercent,
                 projectionTime: projection.time
@@ -1280,6 +1308,12 @@
                     emptyKwh: energy.emptyKwh,
                     storedKwh: energy.storedKwh,
                     rate: formatSignedWatts(model.powerW),
+                    percentagePointRate: formatBatteryPercentagePointRate(
+                        model.powerW,
+                        model.capacityWh,
+                        model.minimumPercent,
+                        model.maximumPercent
+                    ),
                     projectedUsableKwh: projection.usableKwh,
                     projectedUsablePercent: projection.usablePercent,
                     projectionTime: projection.time
