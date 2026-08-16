@@ -416,6 +416,13 @@ button.app-state-pill:focus-visible {
     gap: 10px;
 }
 
+.app-battery-popover__summary-current {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: baseline;
+    gap: 6px;
+}
+
 .app-battery-popover__summary-readout strong {
     color: var(--app-battery-color, var(--gsd-text));
     font-size: 1.05rem;

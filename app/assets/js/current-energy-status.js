@@ -523,6 +523,7 @@
         ariaLabel,
         color,
         currentText,
+        currentLabel = null,
         secondaryText,
         fillPercent,
         projectedFillPercent = null,
@@ -539,9 +540,17 @@
         readout.className = "app-battery-popover__summary-readout";
         const current = document.createElement("strong");
         current.textContent = currentText;
+        const currentGroup = document.createElement("div");
+        currentGroup.className = "app-battery-popover__summary-current";
+        currentGroup.appendChild(current);
+        if (currentLabel) {
+            const label = document.createElement("span");
+            label.textContent = currentLabel;
+            currentGroup.appendChild(label);
+        }
         const secondary = document.createElement("span");
         secondary.textContent = secondaryText;
-        readout.append(current, secondary);
+        readout.append(currentGroup, secondary);
 
         const track = document.createElement("div");
         track.className = "app-battery-popover__summary-track";
@@ -611,6 +620,7 @@
             ariaLabel: `Battery ${Math.round(batteryPercent)} percent. ${Math.round(usablePercent)} percent of the usable range between ${Math.round(minimumPercent)} and ${Math.round(maximumPercent)} percent.${ariaProjection}`,
             color,
             currentText: `${Math.round(batteryPercent)}%`,
+            currentLabel: "Battery SoC",
             secondaryText: hasProjection
                 ? `${Math.round(usablePercent)}% now · ${Math.round(projectedUsablePercent)}% in 60 min`
                 : `${Math.round(usablePercent)}% of usable range`,
@@ -1267,7 +1277,7 @@
                 segment.style.setProperty("--app-battery-segment-fill", `${fillPercent.toFixed(2)}%`);
             });
             batteryPopoverDetails.set(elements.batteryIcon, {
-                title: "Battery usable energy",
+                title: "Battery energy",
                 ...batteryHealthValues(model),
                 batteryPercent: model.batteryPercent,
                 minimumPercent: model.minimumPercent,
