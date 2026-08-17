@@ -24,7 +24,7 @@
 // - When both condition.value_ref and numeric condition.value are present,
 //   condition.value is used as an additive offset
 // - Supports sun context for static conditions:
-//   sunrise_hour (floor), sunset_hour (ceil), and dynamic offset fields
+//   sunrise_hour and sunset_hour (nearest full hour), plus dynamic offset fields
 
 require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 require_once dirname(__DIR__) . '/includes/sun_context.php';

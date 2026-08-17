@@ -8,6 +8,15 @@ function clampHour(int $hour): int
     return max(0, min(23, $hour));
 }
 
+function roundSunTimeToNearestHour(DateTimeInterface $dateTime): int
+{
+    $floatHour = ((int) $dateTime->format('H'))
+        + (((int) $dateTime->format('i')) / 60.0)
+        + (((int) $dateTime->format('s')) / 3600.0);
+
+    return clampHour((int) round($floatHour, 0, PHP_ROUND_HALF_UP));
+}
+
 /**
  * @return array{
  *   sunrise_ts?: int,
@@ -38,11 +47,8 @@ function getSunContextForDate(string $yyyymmdd, float $latitude, float $longitud
 
     $sunriseDt = (new DateTimeImmutable('@' . $sunriseTs))->setTimezone($tz);
     $sunsetDt = (new DateTimeImmutable('@' . $sunsetTs))->setTimezone($tz);
-    $sunriseFloatHour = ((int) $sunriseDt->format('H')) + (((int) $sunriseDt->format('i')) / 60.0);
-    $sunsetFloatHour = ((int) $sunsetDt->format('H')) + (((int) $sunsetDt->format('i')) / 60.0);
-
-    $sunriseHour = clampHour((int) floor($sunriseFloatHour));
-    $sunsetHour = clampHour((int) ceil($sunsetFloatHour));
+    $sunriseHour = roundSunTimeToNearestHour($sunriseDt);
+    $sunsetHour = roundSunTimeToNearestHour($sunsetDt);
 
     return [
         'sunrise_ts' => $sunriseTs,

@@ -35,6 +35,7 @@ SCHEDULE_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_bak.json"
 CONDITIONS_BAK_FILE = MAIN_DATA_DIR / "charge_schedule_conditions_bak.json"
 RULE_PROFILES_FILE = MAIN_DATA_DIR / "rule_profiles.json"
 RESOLVER_FILE = MAIN_DATA_DIR / "resolve_schedule_conditions.php"
+SUN_CONTEXT_FILE = REPO_ROOT / "main" / "includes" / "sun_context.php"
 DATA_API_FILE = MAIN_DATA_DIR / "api" / "data_api.php"
 MAIN_CONFIG_FILE = REPO_ROOT / "main" / "config" / "config.json"
 SYSTEM_CONFIG_FILE = REPO_ROOT / "common" / "config" / "system.json"
@@ -53,7 +54,8 @@ TEST_DESCRIPTIONS = [
     ("test_resolver_emits_signed_power_bounds_from_netzero_minus_rules", "Checks resolver includes min_power and max_power for netzero- rules."),
     ("test_resolver_emits_runtime_condition_metadata", "Checks resolver includes runtime_conditions and fallback_value in output."),
     ("test_resolver_emits_target_charge_at_next_netzero_minus_metadata", "Checks resolver preserves the symbolic target-charge mode, anchor, and stable rule id."),
-    ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and follow floor/ceil policy."),
+    ("test_resolver_emits_sun_context_with_expected_rounding", "Checks sunrise/sunset fields exist and use nearest-hour rounding."),
+    ("test_sun_hour_rounding_boundaries", "Checks nearest-hour sun rounding changes at 30 minutes and remains clamped to valid schedule hours."),
     ("test_resolver_price_condition_supports_max_price_negative_offset", "Checks price conditions support value_ref with a negative numeric offset."),
     ("test_resolver_price_condition_supports_min_price_positive_offset", "Checks price conditions support value_ref with a positive numeric offset."),
     ("test_resolver_hour_condition_supports_value_ref_positive_offset", "Checks hour comparisons support value_ref with a numeric offset."),
@@ -123,10 +125,10 @@ def _php_expected_sun_hours(yyyymmdd: str, lat: float, lon: float, timezone: str
         f'$info=date_sun_info($dt->getTimestamp(),{lat},{lon});'
         '$sunrise=(new DateTimeImmutable("@".$info["sunrise"]))->setTimezone($tz);'
         '$sunset=(new DateTimeImmutable("@".$info["sunset"]))->setTimezone($tz);'
-        '$sunriseFloat=((int)$sunrise->format("H"))+((int)$sunrise->format("i"))/60.0;'
-        '$sunsetFloat=((int)$sunset->format("H"))+((int)$sunset->format("i"))/60.0;'
-        '$sunriseHour=max(0,min(23,(int)floor($sunriseFloat)));'
-        '$sunsetHour=max(0,min(23,(int)ceil($sunsetFloat)));'
+        '$sunriseFloat=((int)$sunrise->format("H"))+((int)$sunrise->format("i"))/60.0+((int)$sunrise->format("s"))/3600.0;'
+        '$sunsetFloat=((int)$sunset->format("H"))+((int)$sunset->format("i"))/60.0+((int)$sunset->format("s"))/3600.0;'
+        '$sunriseHour=max(0,min(23,(int)round($sunriseFloat,0,PHP_ROUND_HALF_UP)));'
+        '$sunsetHour=max(0,min(23,(int)round($sunsetFloat,0,PHP_ROUND_HALF_UP)));'
         'echo json_encode(['
         '"sunrise_time"=>$sunrise->format("H:i"),'
         '"sunset_time"=>$sunset->format("H:i"),'
@@ -794,6 +796,27 @@ def test_resolver_emits_sun_context_with_expected_rounding(backup_and_restore_pr
     assert today_group.get("sunset_time") == expected["sunset_time"]
     assert today_group.get("sunrise_hour") == expected["sunrise_hour"]
     assert today_group.get("sunset_hour") == expected["sunset_hour"]
+
+
+@pytest.mark.parametrize(
+    ("time_value", "expected_hour"),
+    [
+        ("06:29:59", 6),
+        ("06:30:00", 7),
+        ("00:30:00", 1),
+        ("23:30:00", 23),
+    ],
+)
+def test_sun_hour_rounding_boundaries(time_value, expected_hour):
+    php_code = (
+        f'require {json.dumps(str(SUN_CONTEXT_FILE))};'
+        f'$dt=new DateTimeImmutable("2026-01-01 {time_value}",new DateTimeZone("UTC"));'
+        'echo json_encode(["hour"=>roundSunTimeToNearestHour($dt)]);'
+    )
+
+    payload = _run_php_json(["php", "-r", php_code])
+
+    assert payload["hour"] == expected_hour
 
 
 def test_sun_offset_condition_matches_from_dynamic_offset_field(backup_and_restore_price_files):

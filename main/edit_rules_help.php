@@ -164,8 +164,8 @@ date_default_timezone_set('Europe/Amsterdam');
                 <tr><td><code>max_price_hour</code></td><td>Hour (0-23) when max price occurs (first occurrence).</td></tr>
                 <tr><td><code>max_price_hour_am</code></td><td>Hour (0-11) when the AM half-day max price occurs (first occurrence).</td></tr>
                 <tr><td><code>max_price_hour_pm</code></td><td>Hour (12-23) when the PM half-day max price occurs (first occurrence).</td></tr>
-                <tr><td><code>sunrise_hour</code></td><td>Sunrise hour derived per rendered date using configured latitude/longitude. Rounded with <code>floor</code>.</td></tr>
-                <tr><td><code>sunset_hour</code></td><td>Sunset hour derived per rendered date using configured latitude/longitude. Rounded with <code>ceil</code>.</td></tr>
+                <tr><td><code>sunrise_hour</code></td><td>Sunrise hour derived per rendered date using configured latitude/longitude. Rounded to the nearest full hour.</td></tr>
+                <tr><td><code>sunset_hour</code></td><td>Sunset hour derived per rendered date using configured latitude/longitude. Rounded to the nearest full hour.</td></tr>
                 <tr><td><code>sunrise_offset_hour</code></td><td>Compares current hour to <code>sunrise_hour + offset</code>. Provide offset as numeric <code>value</code> (e.g. <code>-2</code>, <code>+1</code>).</td></tr>
                 <tr><td><code>sunset_offset_hour</code></td><td>Compares current hour to <code>sunset_hour + offset</code>. Provide offset as numeric <code>value</code>.</td></tr>
                 <tr><td><code>month</code></td><td>Current month number check, usually with <code>in</code>.</td></tr>
@@ -209,7 +209,7 @@ date_default_timezone_set('Europe/Amsterdam');
 
     <section>
         <h2>Sun Rules</h2>
-        <p>Sunrise/sunset are calculated in the resolver for each rendered date using the installation latitude, longitude, and timezone from <code>common/config/system.json</code>. Rounding policy: <code>sunrise_hour = floor</code>, <code>sunset_hour = ceil</code>.</p>
+        <p>Sunrise/sunset are calculated in the resolver for each rendered date using the installation latitude, longitude, and timezone from <code>common/config/system.json</code>. Both values are rounded to the nearest full hour; times at exactly 30 minutes round upward.</p>
         <p><code>sunrise_offset_hour</code> and <code>sunset_offset_hour</code> use the condition <code>value</code> as an offset in hours relative to sunrise/sunset:</p>
         <ul>
             <li><strong>Negative value</strong>: hours <em>before</em> sunrise/sunset (example: <code>-2</code> means 2 hours before).</li>
