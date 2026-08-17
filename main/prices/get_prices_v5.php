@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/price_conversion.php';
 
-const JEROEN_BASE_URL = 'https://jeroen.nl/api/dynamische-energieprijzen/v2/?period=morgen&type=json';
+const JEROEN_BASE_URL = 'https://jeroen.nl/api/dynamische-energieprijzen/v2/?type=json';
 const TIMEZONE_NL = 'Europe/Amsterdam';
 const TOMORROW_FETCH_HOUR = 14;
 
