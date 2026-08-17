@@ -26,6 +26,9 @@
         average: component.querySelector('[data-role="price-average"]'),
         highKpi: component.querySelector('[data-role="price-high-kpi"]'),
         high: component.querySelector('[data-role="price-high"]'),
+        viewToggle: component.querySelector('[data-role="price-view-toggle"]'),
+        viewIcon: component.querySelector('[data-role="price-view-icon"]'),
+        viewStatus: component.querySelector('[data-role="price-view-status"]'),
         scrollShell: component.querySelector('[data-role="price-scroll-shell"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
         scrollPrev: component.querySelector('[data-role="price-scroll-prev"]'),
@@ -69,6 +72,10 @@
     let programmaticTimelineScrollTimer = null;
     let activeScheduleTooltip = null;
     let scheduleRefreshInFlight = false;
+    const TIMELINE_VIEW_STORAGE_KEY = "zendure.priceTimelineView";
+    const TIMELINE_VIEW_DETAIL = "detail";
+    const TIMELINE_VIEW_OVERVIEW = "overview";
+    let timelineView = savedTimelineView();
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -108,6 +115,109 @@
         { key: "afternoon", label: "Afternoon", start: 12, end: 18 },
         { key: "evening", label: "Evening", start: 18, end: 24 }
     ];
+
+    function savedTimelineView() {
+        try {
+            return window.localStorage.getItem(TIMELINE_VIEW_STORAGE_KEY) === TIMELINE_VIEW_OVERVIEW
+                ? TIMELINE_VIEW_OVERVIEW
+                : TIMELINE_VIEW_DETAIL;
+        } catch (_error) {
+            return TIMELINE_VIEW_DETAIL;
+        }
+    }
+
+    function isTimelineOverview() {
+        return timelineView === TIMELINE_VIEW_OVERVIEW;
+    }
+
+    function timelineCenterSnapshot() {
+        const hours = Array.from(elements.timeline.querySelectorAll(".app-price-hour"));
+        if (!hours.length) return null;
+        const visibleCenter = elements.scroll.scrollLeft + (elements.scroll.clientWidth / 2);
+        let closest = hours[0];
+        let closestDistance = Number.POSITIVE_INFINITY;
+        hours.forEach((hour) => {
+            const center = hour.offsetLeft + (hour.offsetWidth / 2);
+            const distance = Math.abs(center - visibleCenter);
+            if (distance < closestDistance) {
+                closest = hour;
+                closestDistance = distance;
+            }
+        });
+        return closest.dataset.selectionKey || null;
+    }
+
+    function syncTimelineInteractivity() {
+        const overview = isTimelineOverview();
+        elements.timeline.querySelectorAll(".app-price-hour__edit").forEach((button) => {
+            button.disabled = overview;
+            button.tabIndex = overview || isSimulation ? -1 : 0;
+            if (overview || isSimulation) {
+                button.setAttribute("aria-disabled", "true");
+            } else {
+                button.removeAttribute("aria-disabled");
+            }
+        });
+        elements.timeline.querySelectorAll(".app-price-hour__action").forEach((button) => {
+            button.disabled = overview;
+            button.tabIndex = overview ? -1 : 0;
+            if (overview) {
+                button.setAttribute("aria-disabled", "true");
+                button.setAttribute("aria-expanded", "false");
+            } else {
+                button.removeAttribute("aria-disabled");
+            }
+        });
+    }
+
+    function restoreTimelineCenter(selectionKey) {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                const target = selectionKey
+                    ? elements.timeline.querySelector(`[data-selection-key="${selectionKey}"]`)
+                    : null;
+                if (target) {
+                    centerTimelineHour(target);
+                } else {
+                    updateTimelineScrollButtons();
+                }
+            });
+        });
+    }
+
+    function setTimelineView(view, { announce = true, persist = true, preserveCenter = true } = {}) {
+        const nextView = view === TIMELINE_VIEW_OVERVIEW ? TIMELINE_VIEW_OVERVIEW : TIMELINE_VIEW_DETAIL;
+        const centerKey = preserveCenter ? timelineCenterSnapshot() : null;
+        timelineView = nextView;
+        component.dataset.timelineView = nextView;
+        const overviewActive = nextView === TIMELINE_VIEW_OVERVIEW;
+        const toggleLabel = overviewActive
+            ? "Show detailed interactive timeline"
+            : "Show 48-hour overview";
+        elements.viewToggle?.setAttribute("aria-pressed", String(overviewActive));
+        elements.viewToggle?.setAttribute("aria-label", toggleLabel);
+        elements.viewToggle?.setAttribute("title", toggleLabel);
+        elements.viewIcon?.setAttribute(
+            "href",
+            `../themes/graphite-signal-dark/assets/icons/sprite.svg#chart-bars-${overviewActive ? "overview" : "detail"}`
+        );
+        hidePriceTooltip();
+        setSelectedHour(null);
+        syncTimelineInteractivity();
+        if (persist) {
+            try {
+                window.localStorage.setItem(TIMELINE_VIEW_STORAGE_KEY, nextView);
+            } catch (_error) {
+                // The view still works when browser storage is unavailable.
+            }
+        }
+        if (announce && elements.viewStatus) {
+            elements.viewStatus.textContent = nextView === TIMELINE_VIEW_OVERVIEW
+                ? "Overview enabled. The timeline is read-only and shows more hours."
+                : "Detail view enabled. Hourly price and schedule controls are interactive.";
+        }
+        if (preserveCenter) restoreTimelineCenter(centerKey);
+    }
 
     function pad(value) {
         return String(value).padStart(2, "0");
@@ -303,6 +413,13 @@
             day: "numeric",
             month: "long"
         }).format(date);
+    }
+
+    function formatTimelineDate(key) {
+        const date = dateFromKey(key);
+        if (!date) return "-- -- --";
+        const weekdays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+        return `${weekdays[date.getDay()]} ${pad(date.getDate())}-${pad(date.getMonth() + 1)}`;
     }
 
     function formatPrice(value) {
@@ -1416,7 +1533,8 @@
             dayHeading.style.setProperty("--app-day-start", String(dayIndex * 24 + 1));
             dayHeading.style.setProperty("--app-day-end", String((dayIndex + 1) * 24 + 1));
             dayHeadingLabel.className = "app-price-day-heading__label";
-            dayHeadingLabel.textContent = `${day.label} · ${formatDate(day.date)}`;
+            dayHeadingLabel.textContent = formatTimelineDate(day.date);
+            dayHeading.setAttribute("aria-label", `${day.label}, ${formatDate(day.date)}`);
             dayHeading.appendChild(dayHeadingLabel);
             fragment.appendChild(dayHeading);
 
@@ -1455,6 +1573,7 @@
                 hourColumn.dataset.daypartStart = hour === dayPart.start && hour !== 0 ? "true" : "false";
                 hourColumn.dataset.dayStart = hour === 0 ? "true" : "false";
                 hourColumn.dataset.day = day.key;
+                hourColumn.dataset.overviewTick = hour % 3 === 0 ? "true" : "false";
                 hourColumn.style.gridColumn = String(dayIndex * 24 + hour + 1);
                 editButton.type = "button";
                 editButton.className = "app-price-hour__edit";
@@ -1485,6 +1604,7 @@
             const time = document.createElement("span");
             time.className = "app-price-hour__time";
             time.textContent = `${pad(hour)}:00`;
+            time.dataset.compactTime = pad(hour);
             const actionElement = document.createElement("button");
             actionElement.type = "button";
             actionElement.className = "app-price-hour__action";
@@ -1512,6 +1632,7 @@
                 `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}, source ${sourceFor(slot)}. Show schedule details.`
             );
             actionElement.addEventListener("mouseenter", () => {
+                if (isTimelineOverview()) return;
                 if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, actionElement, actionElement);
             });
             actionElement.addEventListener("mouseleave", () => {
@@ -1531,6 +1652,7 @@
                 }, 0);
             });
             actionElement.addEventListener("click", () => {
+                if (isTimelineOverview()) return;
                 setSelectedHour(selectionKey);
                 if (pinnedTooltipTrigger === actionElement && activeTooltipTrigger === actionElement && !priceTooltip.hidden) {
                     hidePriceTooltip(actionElement);
@@ -1544,6 +1666,7 @@
             editButton.append(barZone, priceLabel, time);
             if (!isSimulation) {
                 editButton.addEventListener("click", () => {
+                    if (isTimelineOverview()) return;
                     setSelectedHour(selectionKey);
                     hidePriceTooltip();
                     openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
@@ -1555,6 +1678,7 @@
         });
 
         elements.timeline.replaceChildren(fragment);
+        syncTimelineInteractivity();
         if (selectedHourKey && !setSelectedHour(selectedHourKey)) {
             selectedHourKey = null;
         }
@@ -1837,6 +1961,9 @@
     elements.retry.addEventListener("click", load);
     elements.scrollPrev?.addEventListener("click", () => scrollTimelineByPage(-1));
     elements.scrollNext?.addEventListener("click", () => scrollTimelineByPage(1));
+    elements.viewToggle?.addEventListener("click", () => {
+        setTimelineView(isTimelineOverview() ? TIMELINE_VIEW_DETAIL : TIMELINE_VIEW_OVERVIEW);
+    });
     elements.scroll.addEventListener("scroll", updateTimelineScrollButtons, { passive: true });
     elements.scrollShell?.addEventListener("pointermove", (event) => {
         if (event.pointerType && event.pointerType !== "mouse") return;
@@ -1910,5 +2037,6 @@
         const scheduleDisplayRefreshMs = Math.max(60000, Number(config.scheduleDisplayRefreshMs) || 300000);
         window.setInterval(refreshSchedules, scheduleDisplayRefreshMs);
     }
+    setTimelineView(timelineView, { announce: false, persist: false, preserveCenter: false });
     load();
 })();

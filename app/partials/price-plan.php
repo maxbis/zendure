@@ -19,9 +19,20 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
                         <span class="app-day-availability" data-role="tomorrow-availability" data-availability="loading" aria-hidden="true"></span>
                         <span data-role="tomorrow-status-label">Checking tomorrow</span>
                     </span>
+                    <button
+                        class="gsd-icon-btn app-price-view-toggle"
+                        type="button"
+                        data-role="price-view-toggle"
+                        aria-label="Show 48-hour overview"
+                        title="Show 48-hour overview"
+                        aria-pressed="false"
+                    >
+                        <svg class="gsd-icon" aria-hidden="true"><use data-role="price-view-icon" href="../themes/graphite-signal-dark/assets/icons/sprite.svg#chart-bars-detail"></use></svg>
+                    </button>
                     <button class="gsd-icon-btn app-price-refresh" type="button" aria-label="Refresh prices and energy plan" data-role="price-refresh">
                         <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
                     </button>
+                    <span class="gsd-sr-only" data-role="price-view-status" aria-live="polite"></span>
                 </div>
             </header>
 
