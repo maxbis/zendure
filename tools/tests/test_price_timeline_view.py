@@ -89,3 +89,18 @@ def test_mobile_header_reserves_full_width_for_both_icon_buttons():
 
     assert "grid-template-columns: minmax(0, 1fr) auto 44px 44px;" in source
     assert "gap: 4px 8px;" in source
+
+
+def test_timeline_density_change_uses_a_short_reduced_motion_safe_transition():
+    js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "const TIMELINE_TRANSITION_OUT_MS = 70;" in js_source
+    assert "const TIMELINE_TRANSITION_IN_MS = 100;" in js_source
+    assert 'component.dataset.timelineTransition = "out";' in js_source
+    assert 'component.dataset.timelineTransition = "in";' in js_source
+    assert 'window.matchMedia("(prefers-reduced-motion: reduce)").matches' in js_source
+    assert "transitionTimelineView(isTimelineOverview()" in js_source
+    assert '.app-price-plan[data-timeline-transition="out"] .app-price-timeline' in css_source
+    assert "opacity: 0.55;" in css_source
+    assert "transform: scale(0.995);" in css_source

@@ -75,7 +75,10 @@
     const TIMELINE_VIEW_STORAGE_KEY = "zendure.priceTimelineView";
     const TIMELINE_VIEW_DETAIL = "detail";
     const TIMELINE_VIEW_OVERVIEW = "overview";
+    const TIMELINE_TRANSITION_OUT_MS = 70;
+    const TIMELINE_TRANSITION_IN_MS = 100;
     let timelineView = savedTimelineView();
+    let timelineViewTransitioning = false;
     const summaryTooltipDetails = new Map();
 
     const state = {
@@ -171,18 +174,14 @@
     }
 
     function restoreTimelineCenter(selectionKey) {
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-                const target = selectionKey
-                    ? elements.timeline.querySelector(`[data-selection-key="${selectionKey}"]`)
-                    : null;
-                if (target) {
-                    centerTimelineHour(target);
-                } else {
-                    updateTimelineScrollButtons();
-                }
-            });
-        });
+        const target = selectionKey
+            ? elements.timeline.querySelector(`[data-selection-key="${selectionKey}"]`)
+            : null;
+        if (target) {
+            centerTimelineHour(target);
+        } else {
+            window.requestAnimationFrame(updateTimelineScrollButtons);
+        }
     }
 
     function setTimelineView(view, { announce = true, persist = true, preserveCenter = true } = {}) {
@@ -217,6 +216,35 @@
                 : "Detail view enabled. Hourly price and schedule controls are interactive.";
         }
         if (preserveCenter) restoreTimelineCenter(centerKey);
+    }
+
+    function transitionTimelineView(view) {
+        const nextView = view === TIMELINE_VIEW_OVERVIEW ? TIMELINE_VIEW_OVERVIEW : TIMELINE_VIEW_DETAIL;
+        if (timelineViewTransitioning || nextView === timelineView) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            setTimelineView(nextView);
+            return;
+        }
+
+        const centerKey = timelineCenterSnapshot();
+        timelineViewTransitioning = true;
+        component.dataset.timelineTransition = "out";
+        elements.viewToggle.disabled = true;
+
+        window.setTimeout(() => {
+            setTimelineView(nextView, { preserveCenter: false });
+            restoreTimelineCenter(centerKey);
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    component.dataset.timelineTransition = "in";
+                    window.setTimeout(() => {
+                        delete component.dataset.timelineTransition;
+                        elements.viewToggle.disabled = false;
+                        timelineViewTransitioning = false;
+                    }, TIMELINE_TRANSITION_IN_MS);
+                });
+            });
+        }, TIMELINE_TRANSITION_OUT_MS);
     }
 
     function pad(value) {
@@ -1962,7 +1990,7 @@
     elements.scrollPrev?.addEventListener("click", () => scrollTimelineByPage(-1));
     elements.scrollNext?.addEventListener("click", () => scrollTimelineByPage(1));
     elements.viewToggle?.addEventListener("click", () => {
-        setTimelineView(isTimelineOverview() ? TIMELINE_VIEW_DETAIL : TIMELINE_VIEW_OVERVIEW);
+        transitionTimelineView(isTimelineOverview() ? TIMELINE_VIEW_DETAIL : TIMELINE_VIEW_OVERVIEW);
     });
     elements.scroll.addEventListener("scroll", updateTimelineScrollButtons, { passive: true });
     elements.scrollShell?.addEventListener("pointermove", (event) => {

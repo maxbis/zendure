@@ -1841,6 +1841,16 @@ button.app-state-pill:focus-visible {
     color: var(--gsd-accent);
 }
 
+.app-price-view-toggle:disabled {
+    opacity: 1;
+}
+
+.app-price-view-toggle .gsd-icon {
+    transition:
+        opacity 70ms ease,
+        transform 100ms ease-out;
+}
+
 .app-price-timeline {
     position: relative;
     display: grid;
@@ -1850,11 +1860,27 @@ button.app-state-pill:focus-visible {
     min-width: 1584px;
     min-height: 220px;
     align-items: stretch;
+    transform-origin: center;
+    transition:
+        opacity 100ms ease-out,
+        transform 100ms ease-out;
     background: linear-gradient(
         to right,
         transparent 0 50%,
         color-mix(in srgb, var(--gsd-surface-2) 20%, transparent) 50% 100%
     );
+}
+
+.app-price-plan[data-timeline-transition="out"] .app-price-timeline {
+    opacity: 0.55;
+    transform: scale(0.995);
+    transition-duration: 70ms;
+    transition-timing-function: ease-in;
+}
+
+.app-price-plan[data-timeline-transition="out"] .app-price-view-toggle .gsd-icon {
+    opacity: 0.55;
+    transform: scale(0.82);
 }
 
 .app-price-plan[data-timeline-view="overview"] .app-price-timeline {
@@ -4491,6 +4517,8 @@ dialog.app-schedule-tooltip {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .app-price-timeline,
+    .app-price-view-toggle .gsd-icon,
     .app-battery-popover__slider,
     .app-battery-card__inner,
     .app-battery-icon__segment,
