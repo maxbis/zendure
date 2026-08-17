@@ -4405,7 +4405,7 @@ dialog.app-schedule-tooltip {
 
     .app-price-plan .app-section-heading {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto 34px 34px;
+        grid-template-columns: minmax(0, 1fr) auto 44px 44px;
         grid-template-rows: auto auto;
         align-items: center;
         gap: 4px 8px;

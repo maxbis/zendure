@@ -82,3 +82,10 @@ def test_overview_bar_row_expands_without_changing_timeline_height():
 
     assert "--app-price-bar-row: minmax(0, 1fr);" in source
     assert "min-height: 220px;" in source
+
+
+def test_mobile_header_reserves_full_width_for_both_icon_buttons():
+    source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "grid-template-columns: minmax(0, 1fr) auto 44px 44px;" in source
+    assert "gap: 4px 8px;" in source
