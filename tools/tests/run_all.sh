@@ -23,6 +23,15 @@ else
 fi
 
 echo ""
+echo "==> Running automatic profile evaluator tests"
+if python3 "$SCRIPT_DIR/test_auto_profiles.py" && php "$SCRIPT_DIR/rule_profile_auto_test.php"; then
+  :
+else
+  FAILED=1
+  FAILED_SUITES+=("automatic_profiles")
+fi
+
+echo ""
 echo "==> Running target battery planner tests"
 if php "$SCRIPT_DIR/target_battery_planner_test.php"; then
   :

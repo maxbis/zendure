@@ -4,9 +4,11 @@
     const state = {
         rules: [],
         ruleProfiles: {
+            selection_mode: 'manual',
             active_profile_id: 'show_all',
             profiles: [],
         },
+        ruleProfileAutoState: {},
         editIndex: null,
         selectedProfileId: 'show_all',
         editingProfileId: null,
@@ -39,6 +41,7 @@
         globalActionsMenu: document.getElementById('global-actions-menu'),
         btnGlobalActions: document.getElementById('btn-global-actions'),
         btnDeleteUnusedRules: document.getElementById('btn-delete-unused-rules'),
+        btnReevaluateProfiles: document.getElementById('btn-reevaluate-profiles'),
         deleteUnusedDialog: document.getElementById('delete-unused-rules-dialog'),
         deleteUnusedDialogMessage: document.getElementById('delete-unused-rules-dialog-message'),
         deleteUnusedRulesList: document.getElementById('delete-unused-rules-list'),
@@ -89,8 +92,18 @@
         profileEditor: document.getElementById('profile-editor'),
         inpProfileShortName: document.getElementById('inp-profile-short-name'),
         inpProfileDescription: document.getElementById('inp-profile-description'),
+        inpProfileSwrMin: document.getElementById('inp-profile-swr-min'),
+        inpProfileSwrMax: document.getElementById('inp-profile-swr-max'),
+        profileSwrHelp: document.getElementById('profile-swr-help'),
+        btnProfileLeft: document.getElementById('btn-profile-left'),
+        btnProfileRight: document.getElementById('btn-profile-right'),
         profileRuleMembership: document.getElementById('profile-rule-membership'),
         profileSelectionStatus: document.getElementById('profile-selection-status'),
+        profileModeManual: document.getElementById('profile-mode-manual'),
+        profileModeAuto: document.getElementById('profile-mode-auto'),
+        profileAutoStatus: document.getElementById('profile-auto-status'),
+        profileAutoPreview: document.getElementById('profile-auto-preview'),
+        profileAutoPreviewBody: document.getElementById('profile-auto-preview-body'),
         btnActivateProfile: document.getElementById('btn-activate-profile'),
         btnSaveProfile: document.getElementById('btn-save-profile'),
     };
@@ -268,11 +281,11 @@
             return rule && rule.rule_id ? String(rule.rule_id) : '';
         }).filter(Boolean));
         const defaultProfiles = [
-            { id: 'profile_a', short_name: 'A', description: '', rule_ids: [] },
-            { id: 'profile_b', short_name: 'B', description: '', rule_ids: [] },
-            { id: 'profile_c', short_name: 'C', description: '', rule_ids: [] },
-            { id: 'profile_d', short_name: 'D', description: '', rule_ids: [] },
-            { id: 'profile_e', short_name: 'E', description: '', rule_ids: [] },
+            { id: 'profile_a', short_name: 'A', description: '', swr_min_wh_m2: null, swr_max_wh_m2: null, rule_ids: [] },
+            { id: 'profile_b', short_name: 'B', description: '', swr_min_wh_m2: null, swr_max_wh_m2: null, rule_ids: [] },
+            { id: 'profile_c', short_name: 'C', description: '', swr_min_wh_m2: null, swr_max_wh_m2: null, rule_ids: [] },
+            { id: 'profile_d', short_name: 'D', description: '', swr_min_wh_m2: null, swr_max_wh_m2: null, rule_ids: [] },
+            { id: 'profile_e', short_name: 'E', description: '', swr_min_wh_m2: null, swr_max_wh_m2: null, rule_ids: [] },
         ];
         const incoming = config && Array.isArray(config.profiles) ? config.profiles : [];
         const profilesById = {};
@@ -296,6 +309,8 @@
                 id: id,
                 short_name: String(profile.short_name || '').trim() || id,
                 description: String(profile.description || '').trim(),
+                swr_min_wh_m2: Number.isFinite(Number(profile.swr_min_wh_m2)) && profile.swr_min_wh_m2 !== null && profile.swr_min_wh_m2 !== '' ? Math.round(Number(profile.swr_min_wh_m2)) : null,
+                swr_max_wh_m2: Number.isFinite(Number(profile.swr_max_wh_m2)) && profile.swr_max_wh_m2 !== null && profile.swr_max_wh_m2 !== '' ? Math.round(Number(profile.swr_max_wh_m2)) : null,
                 rule_ids: ruleIds,
             };
         });
@@ -308,15 +323,7 @@
             }
         });
 
-        const orderedProfiles = defaultProfiles.map(function (profile) {
-            return profilesById[profile.id];
-        });
-
-        Object.keys(profilesById).forEach(function (id) {
-            if (!orderedProfiles.some(function (profile) { return profile.id === id; })) {
-                orderedProfiles.push(profilesById[id]);
-            }
-        });
+        const orderedProfiles = Object.keys(profilesById).map(function (id) { return profilesById[id]; });
 
         const activeProfileId = config && typeof config.active_profile_id === 'string'
             ? String(config.active_profile_id).trim()
@@ -327,6 +334,7 @@
             : SHOW_ALL_PROFILE_ID;
 
         return {
+            selection_mode: config && config.selection_mode === 'auto' ? 'auto' : 'manual',
             active_profile_id: normalizedActiveId,
             profiles: orderedProfiles,
         };
@@ -1381,7 +1389,9 @@
             description: 'Show all rules. Individually disabled rules remain off.',
         }].concat(state.ruleProfiles.profiles || []);
 
-        profiles.forEach(function (profile) {
+        const todayKey = new Date().toLocaleDateString('sv-SE');
+        const todayAuto = state.ruleProfileAutoState?.days?.[todayKey];
+        profiles.forEach(function (profile, index) {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'gsd-btn gsd-btn--secondary profile-filter-button';
@@ -1389,11 +1399,16 @@
                 button.classList.add('is-active');
             }
             if (getRuntimeActiveProfileId() === profile.id) {
-                button.classList.add('is-live');
+                button.classList.add(state.ruleProfiles.selection_mode === 'auto' ? 'is-manual-fallback' : 'is-live');
+            }
+            if (state.ruleProfiles.selection_mode === 'auto' && todayAuto?.profile_id === profile.id) {
+                button.classList.add('is-effective');
             }
             button.setAttribute('data-profile-id', profile.id);
             button.title = profile.description || profile.short_name || profile.id;
-            button.textContent = profile.short_name || profile.id;
+            button.textContent = profile.id === SHOW_ALL_PROFILE_ID
+                ? (profile.short_name || profile.id)
+                : ((state.ruleProfiles.selection_mode === 'auto' ? ((index) + ' · ') : '') + (profile.short_name || profile.id));
             els.profileButtonBar.appendChild(button);
         });
     }
@@ -1404,6 +1419,12 @@
         const runtimeActiveProfileId = getRuntimeActiveProfileId();
         const selectedLabel = getProfileLabel(selectedProfileId);
         const runtimeLabel = getProfileLabel(runtimeActiveProfileId);
+        if (state.ruleProfiles.selection_mode === 'auto') {
+            els.profileSelectionStatus.textContent = selectedProfileId === runtimeActiveProfileId
+                ? 'Editing manual fallback: ' + selectedLabel + '.'
+                : 'Editing profile: ' + selectedLabel + '. Manual fallback: ' + runtimeLabel + '.';
+            return;
+        }
         if (selectedProfileId === runtimeActiveProfileId) {
             els.profileSelectionStatus.textContent = 'Editing live profile: ' + selectedLabel + '.';
             return;
@@ -1418,9 +1439,9 @@
         const isLiveSelection = selectedProfileId === runtimeActiveProfileId;
         els.btnActivateProfile.hidden = isLiveSelection;
         els.btnActivateProfile.disabled = isLiveSelection;
-        els.btnActivateProfile.textContent = selectedProfileId === SHOW_ALL_PROFILE_ID
-            ? 'Activate Show All'
-            : 'Activate Profile';
+        els.btnActivateProfile.textContent = state.ruleProfiles.selection_mode === 'auto'
+            ? 'Set Manual Fallback'
+            : (selectedProfileId === SHOW_ALL_PROFILE_ID ? 'Activate Show All' : 'Activate Profile');
         els.btnActivateProfile.title = isLiveSelection
             ? 'Selected profile is already live.'
             : ('Make ' + getProfileLabel(selectedProfileId) + ' the live profile.');
@@ -1437,6 +1458,8 @@
             els.profileEditor.hidden = true;
             els.inpProfileShortName.value = '';
             els.inpProfileDescription.value = '';
+            if (els.inpProfileSwrMin) els.inpProfileSwrMin.value = '';
+            if (els.inpProfileSwrMax) els.inpProfileSwrMax.value = '';
             els.profileRuleMembership.innerHTML = '';
             return;
         }
@@ -1450,6 +1473,11 @@
         els.profileEditor.hidden = false;
         els.inpProfileShortName.value = profile.short_name || '';
         els.inpProfileDescription.value = profile.description || '';
+        if (els.inpProfileSwrMin) els.inpProfileSwrMin.value = profile.swr_min_wh_m2 ?? '';
+        if (els.inpProfileSwrMax) els.inpProfileSwrMax.value = profile.swr_max_wh_m2 ?? '';
+        if (els.btnProfileLeft) els.btnProfileLeft.disabled = state.ruleProfiles.profiles.indexOf(profile) <= 0;
+        if (els.btnProfileRight) els.btnProfileRight.disabled = state.ruleProfiles.profiles.indexOf(profile) >= state.ruleProfiles.profiles.length - 1;
+        renderProfileSwrHelp(profile);
         els.profileRuleMembership.innerHTML = '';
 
         state.rules.forEach(function (rule, idx) {
@@ -1478,6 +1506,97 @@
         renderProfileSelectionStatus();
         renderProfileActivationControl();
         renderProfileEditor();
+        renderProfileAutoPanel();
+    }
+
+    function renderProfileSwrHelp(profile) {
+        if (!els.profileSwrHelp || !profile) return;
+        const lower = profile.swr_min_wh_m2;
+        const upper = profile.swr_max_wh_m2;
+        let message = '';
+        if (lower == null && upper == null) {
+            message = 'Matches every valid SWR value; later profiles will not be reached.';
+        } else if (lower == null) {
+            message = 'Matches predicted SWR below ' + upper + ' Wh/m².';
+        } else if (upper == null) {
+            message = 'Matches predicted SWR of at least ' + lower + ' Wh/m².';
+        } else {
+            message = 'Matches ' + lower + ' ≤ predicted SWR < ' + upper + ' Wh/m².';
+        }
+        const index = state.ruleProfiles.profiles.indexOf(profile);
+        const currentLow = lower == null ? -Infinity : Number(lower);
+        const currentHigh = upper == null ? Infinity : Number(upper);
+        const earlier = state.ruleProfiles.profiles.slice(0, Math.max(index, 0)).find(function (candidate) {
+            const candidateLow = candidate.swr_min_wh_m2 == null ? -Infinity : Number(candidate.swr_min_wh_m2);
+            const candidateHigh = candidate.swr_max_wh_m2 == null ? Infinity : Number(candidate.swr_max_wh_m2);
+            return Math.max(currentLow, candidateLow) < Math.min(currentHigh, candidateHigh);
+        });
+        if (earlier) {
+            message += ' Overlaps earlier profile “' + (earlier.short_name || earlier.id) + '”; the earlier profile wins where they overlap.';
+        }
+        els.profileSwrHelp.textContent = message;
+    }
+
+    function profileReasonLabel(reason) {
+        return ({
+            matched: 'Fresh match',
+            default_no_match: 'Default · no match',
+            stale_forecast_matched: 'Stale forecast',
+            stale_forecast_default_no_match: 'Stale · default',
+            retained_selection: 'Retained selection',
+            carried_forward: 'Carried forward',
+        })[reason] || String(reason || 'Unknown');
+    }
+
+    function renderProfileAutoPanel() {
+        const isAuto = state.ruleProfiles.selection_mode === 'auto';
+        if (els.profileModeManual) els.profileModeManual.checked = !isAuto;
+        if (els.profileModeAuto) els.profileModeAuto.checked = isAuto;
+        if (els.profileAutoPreview) els.profileAutoPreview.hidden = !isAuto;
+        const autoState = state.ruleProfileAutoState || {};
+        const days = autoState.days && typeof autoState.days === 'object' ? autoState.days : {};
+        const todayKey = new Date().toLocaleDateString('sv-SE');
+        const today = days[todayKey];
+        const lastEvaluation = autoState.last_evaluation_at
+            ? new Date(autoState.last_evaluation_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+            : 'never';
+        if (els.profileAutoStatus) {
+            if (!isAuto) {
+                els.profileAutoStatus.textContent = 'Manual mode is active. Saved SWR selections are not applied.';
+            } else if (today && today.profile_id) {
+                const swr = Number.isFinite(Number(today.swr_wh_m2)) ? Number(today.swr_wh_m2).toLocaleString() + ' Wh/m²' : 'no stored SWR';
+                els.profileAutoStatus.textContent = 'Automatic mode · Today: ' + getProfileLabel(today.profile_id) + ' · ' + swr + ' · ' + profileReasonLabel(today.reason) + '. Last evaluated: ' + lastEvaluation + ' · scheduled daily at 23:55.';
+            } else {
+                els.profileAutoStatus.textContent = 'Automatic mode · No stored selection for today; the manual fallback remains effective. Last evaluated: ' + lastEvaluation + ' · scheduled daily at 23:55.';
+            }
+        }
+        if (!els.profileAutoPreviewBody) return;
+        els.profileAutoPreviewBody.innerHTML = '';
+        Object.keys(days).sort().filter(function (date) { return date >= todayKey; }).slice(0, 7).forEach(function (date) {
+            const day = days[date] || {};
+            const row = document.createElement('tr');
+            const values = [
+                date,
+                Number.isFinite(Number(day.swr_wh_m2)) && day.swr_wh_m2 !== null ? Number(day.swr_wh_m2).toLocaleString() + ' Wh/m²' : '—',
+                getProfileLabel(day.profile_id),
+                profileReasonLabel(day.reason),
+            ];
+            values.forEach(function (value) {
+                const cell = document.createElement('td');
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+            els.profileAutoPreviewBody.appendChild(row);
+        });
+        if (!els.profileAutoPreviewBody.children.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 4;
+            cell.className = 'muted';
+            cell.textContent = 'No automatic forecast selections have been stored yet.';
+            row.appendChild(cell);
+            els.profileAutoPreviewBody.appendChild(row);
+        }
     }
 
     function persistProfileEditorChanges() {
@@ -1488,9 +1607,14 @@
 
         profile.short_name = String(els.inpProfileShortName?.value || '').trim() || profile.short_name || profile.id;
         profile.description = String(els.inpProfileDescription?.value || '').trim();
+        const minText = String(els.inpProfileSwrMin?.value || '').trim();
+        const maxText = String(els.inpProfileSwrMax?.value || '').trim();
+        profile.swr_min_wh_m2 = minText === '' ? null : Number(minText);
+        profile.swr_max_wh_m2 = maxText === '' ? null : Number(maxText);
         profile.rule_ids = Array.from(els.profileRuleMembership?.querySelectorAll('input[data-profile-rule-id]:checked') || [])
             .map(function (input) { return String(input.value || '').trim(); })
             .filter(Boolean);
+        renderProfileSwrHelp(profile);
     }
 
     function escapeHtml(s) {
@@ -2202,6 +2326,7 @@
                 state.rules = result.rules.map(normalizeRule);
             }
             state.ruleProfiles = normalizeRuleProfiles(result.rule_profiles || state.ruleProfiles, state.rules);
+            state.ruleProfileAutoState = result.rule_profile_auto_state || state.ruleProfileAutoState || {};
             state.selectedProfileId = selectedProfileIdBeforeSave;
             ensureSelectedProfileId();
             state.hasPendingImportedRules = false;
@@ -2235,6 +2360,7 @@
             const rules = Array.isArray(data.rules) ? data.rules : [];
             state.rules = rules.map(normalizeRule);
             state.ruleProfiles = normalizeRuleProfiles(data.rule_profiles || {}, state.rules);
+            state.ruleProfileAutoState = data.rule_profile_auto_state || {};
             state.selectedProfileId = state.ruleProfiles.active_profile_id || SHOW_ALL_PROFILE_ID;
             state.hasPendingImportedRules = false;
             updatePendingImportState();
@@ -2280,6 +2406,61 @@
             URL.revokeObjectURL(url);
         }, 0);
         setStatus('Exported ' + state.rules.length + ' rules to JSON.', 'ok');
+    }
+
+    async function reevaluateAutomaticProfiles() {
+        closeGlobalActionsMenu();
+        persistProfileEditorChanges();
+        if (!window.confirm('Save the current profile settings and re-evaluate today plus all available future SWR forecast dates? Today’s effective schedule may change.')) {
+            return;
+        }
+        const saved = await saveRulesToFile('Profile settings saved. Re-evaluating automatic profiles…');
+        if (!saved) return;
+        try {
+            if (els.btnReevaluateProfiles) els.btnReevaluateProfiles.disabled = true;
+            const response = await fetch(window.EDIT_AUTO_PROFILES_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ include_today: true }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Automatic profile evaluation failed.');
+            }
+            state.ruleProfileAutoState = {
+                last_evaluation_at: result.evaluated_at,
+                forecast_status: result.forecast_status,
+                refresh_error: result.refresh_error,
+                days: result.days || {},
+            };
+            renderProfiles();
+            const count = Object.keys(result.days || {}).length;
+            let refreshWarning = '';
+            try {
+                const refreshResponse = await fetch(window.EDIT_SCHEDULE_REFRESH_URL, { method: 'POST' });
+                if (!refreshResponse.ok) refreshWarning = ' Automation schedule refresh failed.';
+            } catch (refreshError) {
+                refreshWarning = ' Automation schedule refresh failed.';
+            }
+            setStatus('Automatic profiles evaluated for ' + count + ' date' + (count === 1 ? '' : 's') + (result.forecast_status === 'stale' ? ' using stale forecast data.' : '.') + refreshWarning, result.refresh_error || refreshWarning ? 'warning' : 'ok');
+        } catch (error) {
+            setStatus(error.message || 'Automatic profile evaluation failed.', 'error');
+        } finally {
+            if (els.btnReevaluateProfiles) els.btnReevaluateProfiles.disabled = false;
+        }
+    }
+
+    function moveSelectedProfile(offset) {
+        persistProfileEditorChanges();
+        const profileId = getActiveProfileId();
+        const index = state.ruleProfiles.profiles.findIndex(function (profile) { return profile.id === profileId; });
+        const next = index + offset;
+        if (index < 0 || next < 0 || next >= state.ruleProfiles.profiles.length) return;
+        const profiles = state.ruleProfiles.profiles;
+        const temporary = profiles[index];
+        profiles[index] = profiles[next];
+        profiles[next] = temporary;
+        renderProfiles();
     }
 
     function normalizeImportedRules(rawRules) {
@@ -2430,6 +2611,19 @@
             });
         }
 
+        if (els.btnReevaluateProfiles) {
+            els.btnReevaluateProfiles.addEventListener('click', reevaluateAutomaticProfiles);
+        }
+
+        [els.profileModeManual, els.profileModeAuto].forEach(function (input) {
+            if (!input) return;
+            input.addEventListener('change', function () {
+                if (!input.checked) return;
+                state.ruleProfiles.selection_mode = input.value === 'auto' ? 'auto' : 'manual';
+                renderProfiles();
+            });
+        });
+
         if (els.profileButtonBar) {
             els.profileButtonBar.addEventListener('click', function (e) {
                 const button = e.target.closest('button[data-profile-id]');
@@ -2494,6 +2688,20 @@
                 renderProfileSelectionStatus();
                 renderProfileActivationControl();
             });
+        }
+
+        [els.inpProfileSwrMin, els.inpProfileSwrMax].forEach(function (input) {
+            if (!input) return;
+            input.addEventListener('input', function () {
+                persistProfileEditorChanges();
+            });
+        });
+
+        if (els.btnProfileLeft) {
+            els.btnProfileLeft.addEventListener('click', function () { moveSelectedProfile(-1); });
+        }
+        if (els.btnProfileRight) {
+            els.btnProfileRight.addEventListener('click', function () { moveSelectedProfile(1); });
         }
 
         els.btnRawJson.addEventListener('click', function () {

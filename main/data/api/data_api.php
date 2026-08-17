@@ -514,6 +514,9 @@ function handleGetData($type) {
             'forecastAsOf' => $now->format(DateTimeInterface::ATOM),
             'forecastBatteryPercent' => $batteryPercent,
             'forecastUnavailableReason' => $battery === null ? 'Live battery level is unavailable.' : null,
+            'profileSelection' => include_conditions && function_exists('resolveProfileSelectionForDate')
+                ? resolveProfileSelectionForDate($date)
+                : null,
         ];
     }
     return [

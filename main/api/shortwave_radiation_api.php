@@ -55,23 +55,36 @@ $apiUrl = sprintf(
 
 try {
     $responsePayload = readShortwaveCache($cachePath);
-    if ($responsePayload === null || isCacheExpired($responsePayload, $cacheTtlSeconds)) {
-        $payload = fetchOpenMeteoJson($apiUrl);
-        $hourlySeries = extractHourlyShortwaveSeries($payload);
-        $responsePayload = [
-            'success' => true,
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'timezone' => isset($payload['timezone']) ? (string) $payload['timezone'] : $timezone,
-            'unit' => dailyShortwaveUnit(),
-            'days' => extractDailyShortwaveTotals($hourlySeries['time'], $hourlySeries['shortwave_radiation']),
-            'hourly' => $hourlySeries,
-            'hourly_units' => [
-                'shortwave_radiation' => hourlyShortwaveUnit($payload),
-            ],
-            'cachedAt' => time(),
-        ];
-        writeShortwaveCache($cachePath, $responsePayload);
+    $cacheStatus = $responsePayload === null ? 'missing' : (isCacheExpired($responsePayload, $cacheTtlSeconds) ? 'stale' : 'fresh');
+    $refreshAttemptedAt = null;
+    $refreshError = null;
+    if ($cacheStatus !== 'fresh') {
+        $refreshAttemptedAt = time();
+        try {
+            $payload = fetchOpenMeteoJson($apiUrl);
+            $hourlySeries = extractHourlyShortwaveSeries($payload);
+            $responsePayload = [
+                'success' => true,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'timezone' => isset($payload['timezone']) ? (string) $payload['timezone'] : $timezone,
+                'unit' => dailyShortwaveUnit(),
+                'days' => extractDailyShortwaveTotals($hourlySeries['time'], $hourlySeries['shortwave_radiation']),
+                'hourly' => $hourlySeries,
+                'hourly_units' => [
+                    'shortwave_radiation' => hourlyShortwaveUnit($payload),
+                ],
+                'cachedAt' => time(),
+            ];
+            writeShortwaveCache($cachePath, $responsePayload);
+            $cacheStatus = 'fresh';
+        } catch (Throwable $refreshFailure) {
+            if ($responsePayload === null) {
+                throw $refreshFailure;
+            }
+            $refreshError = $refreshFailure->getMessage();
+            $cacheStatus = 'stale';
+        }
     }
 
     echo json_encode([
@@ -84,6 +97,9 @@ try {
         'hourly' => $responsePayload['hourly'],
         'hourly_units' => $responsePayload['hourly_units'],
         'cachedAt' => $responsePayload['cachedAt'],
+        'cacheStatus' => $cacheStatus,
+        'refreshAttemptedAt' => $refreshAttemptedAt,
+        'refreshError' => $refreshError,
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(resolveStatusCode($e->getMessage()));

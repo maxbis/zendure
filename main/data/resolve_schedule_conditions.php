@@ -29,6 +29,7 @@
 require_once dirname(__DIR__, 2) . '/common/php/system_config.php';
 require_once dirname(__DIR__) . '/includes/sun_context.php';
 require_once dirname(__DIR__) . '/includes/price_context.php';
+require_once dirname(__DIR__) . '/includes/rule_profile_auto.php';
 
 const CONDITIONS_FILE = __DIR__ . '/charge_schedule_conditions.json';
 const RULE_PROFILES_FILE = __DIR__ . '/rule_profiles.json';
@@ -182,6 +183,8 @@ function normalizeProfileConfig(array $raw, array $rules): array
                 'id' => $profileId,
                 'short_name' => isset($profile['short_name']) ? trim((string) $profile['short_name']) : '',
                 'description' => isset($profile['description']) ? trim((string) $profile['description']) : '',
+                'swr_min_wh_m2' => isset($profile['swr_min_wh_m2']) && is_numeric($profile['swr_min_wh_m2']) ? (int) $profile['swr_min_wh_m2'] : null,
+                'swr_max_wh_m2' => isset($profile['swr_max_wh_m2']) && is_numeric($profile['swr_max_wh_m2']) ? (int) $profile['swr_max_wh_m2'] : null,
                 'rule_ids' => $ruleIds,
             ];
         }
@@ -195,9 +198,21 @@ function normalizeProfileConfig(array $raw, array $rules): array
     }
 
     return [
+        'selection_mode' => ($raw['selection_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
         'active_profile_id' => $activeProfileId,
         'profiles' => $profiles,
     ];
+}
+
+function resolveProfileSelectionForDate(string $dateYmd): array
+{
+    $conditions = readJsonFileAsArray(CONDITIONS_FILE) ?? [];
+    $profiles = readJsonFileAsArray(RULE_PROFILES_FILE) ?? [];
+    return effectiveRuleProfileForDate(
+        normalizeProfileConfig($profiles, normalizeRules($conditions)),
+        $dateYmd,
+        readRuleProfileAutoState()
+    );
 }
 
 function matchesKeyPattern(string $ruleKey, string $slotKey): bool
@@ -884,6 +899,7 @@ function resolveRuleGroupsForDates(
             : [];
     }
     $profileConfig = normalizeProfileConfig($rawProfileConfig, $rules);
+    $autoState = readRuleProfileAutoState();
 
     if ($installation === null) {
         $installation = loadSystemConfig()['installation'];
@@ -908,6 +924,9 @@ function resolveRuleGroupsForDates(
         if ($sunCtx !== []) {
             $ctx = array_merge($ctx, $sunCtx);
         }
+        $profileSelection = effectiveRuleProfileForDate($profileConfig, $dateYmd, $autoState);
+        $dateProfileConfig = $profileConfig;
+        $dateProfileConfig['active_profile_id'] = $profileSelection['effective_profile_id'];
         $group = [
             'date' => $dateYmd,
             'min_price' => $ctx['min_price'],
@@ -918,7 +937,8 @@ function resolveRuleGroupsForDates(
             'max_price_hour_pm' => $ctx['max_price_hour_pm'],
             'spread_price' => ($ctx['spread_price'] === null) ? null : round((float) $ctx['spread_price'], 2),
             'ranking' => $ctx['rank_to_hour'],
-            'items' => resolveForDate($dateYmd, $rules, $priceData, $profileConfig, $ctx),
+            'profile_selection' => $profileSelection,
+            'items' => resolveForDate($dateYmd, $rules, $priceData, $dateProfileConfig, $ctx),
         ];
         foreach (['sunrise_time', 'sunset_time', 'sunrise_hour', 'sunset_hour'] as $sunKey) {
             if (array_key_exists($sunKey, $ctx)) {

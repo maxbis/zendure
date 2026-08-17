@@ -31,6 +31,28 @@ Rules are evaluated top-to-bottom.
 - First matching rule wins for that hour.
 - Reorder with `Up` / `Down` to change priority.
 
+## Rule Profiles and Automatic SWR Selection
+
+The Rule Profiles card supports two global modes:
+
+- When Manual is selected, then the saved manual profile controls rule membership.
+- When Automatic · SWR is selected, then a profile is selected separately for each date from the predicted daily shortwave-radiation total.
+
+Each profile can define an optional minimum and maximum in Wh/m²:
+
+- The minimum is inclusive.
+- The maximum is exclusive.
+- An empty minimum or maximum is unbounded.
+- Profiles are evaluated from left to right and the first match wins.
+- When a valid SWR matches no profile, then the first profile is used.
+- `Show All` is not an automatic candidate.
+
+Use Move left and Move right to change automatic priority. The upcoming-selection list shows stored forecast dates, selected profiles, and whether the decision used fresh, stale, retained, or carried-forward information.
+
+Use `Actions > Re-evaluate automatic profiles…` to save the current configuration, refresh the forecast when needed, evaluate today and the available future dates, and request an immediate automation schedule refresh.
+
+When forecast retrieval fails, then stored SWR values are reused. When no SWR exists for a date, then the existing selection is retained or the current profile is carried forward; the editor does not make a new large profile change without forecast evidence.
+
 ## 4. Rule Form Fields
 
 Each rule has:

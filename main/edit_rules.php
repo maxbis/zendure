@@ -6,11 +6,11 @@ require_once __DIR__ . '/includes/config_loader.php';
 require_once __DIR__ . '/includes/sun_context.php';
 require_once __DIR__ . '/includes/price_context.php';
 require_once dirname(__DIR__) . '/common/php/system_config.php';
+require_once __DIR__ . '/includes/rule_profile_auto.php';
 
 $rulesFile = __DIR__ . '/data/charge_schedule_conditions.json';
 $profilesFile = __DIR__ . '/data/rule_profiles.json';
 const SHOW_ALL_PROFILE_ID = 'show_all';
-const DEFAULT_PROFILE_IDS = ['profile_a', 'profile_b', 'profile_c', 'profile_d', 'profile_e'];
 
 function jsonResponse(array $payload, int $status = 200): void
 {
@@ -162,15 +162,31 @@ function normalizeRuleId($value, array &$usedIds): string
 function defaultRuleProfilesConfig(): array
 {
     return [
+        'selection_mode' => 'manual',
         'active_profile_id' => SHOW_ALL_PROFILE_ID,
         'profiles' => [
-            ['id' => 'profile_a', 'short_name' => 'A', 'description' => '', 'rule_ids' => []],
-            ['id' => 'profile_b', 'short_name' => 'B', 'description' => '', 'rule_ids' => []],
-            ['id' => 'profile_c', 'short_name' => 'C', 'description' => '', 'rule_ids' => []],
-            ['id' => 'profile_d', 'short_name' => 'D', 'description' => '', 'rule_ids' => []],
-            ['id' => 'profile_e', 'short_name' => 'E', 'description' => '', 'rule_ids' => []],
+            ['id' => 'profile_a', 'short_name' => 'A', 'description' => '', 'swr_min_wh_m2' => null, 'swr_max_wh_m2' => null, 'rule_ids' => []],
+            ['id' => 'profile_b', 'short_name' => 'B', 'description' => '', 'swr_min_wh_m2' => null, 'swr_max_wh_m2' => null, 'rule_ids' => []],
+            ['id' => 'profile_c', 'short_name' => 'C', 'description' => '', 'swr_min_wh_m2' => null, 'swr_max_wh_m2' => null, 'rule_ids' => []],
+            ['id' => 'profile_d', 'short_name' => 'D', 'description' => '', 'swr_min_wh_m2' => null, 'swr_max_wh_m2' => null, 'rule_ids' => []],
+            ['id' => 'profile_e', 'short_name' => 'E', 'description' => '', 'swr_min_wh_m2' => null, 'swr_max_wh_m2' => null, 'rule_ids' => []],
         ],
     ];
+}
+
+function normalizeProfileSwrBound($value, string $label): ?int
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+    if (is_bool($value) || !is_numeric($value)) {
+        throw new InvalidArgumentException($label . ' must be a non-negative number or empty.');
+    }
+    $number = (float) $value;
+    if ($number < 0 || floor($number) !== $number) {
+        throw new InvalidArgumentException($label . ' must be a non-negative whole number or empty.');
+    }
+    return (int) $number;
 }
 
 function normalizeProfileRuleIds($value, array $validRuleIds): array
@@ -217,10 +233,17 @@ function normalizeProfiles(array $config, array $rules): array
         }
         $shortName = isset($profile['short_name']) ? trim((string) $profile['short_name']) : '';
         $description = isset($profile['description']) ? trim((string) $profile['description']) : '';
+        $swrMin = normalizeProfileSwrBound($profile['swr_min_wh_m2'] ?? null, 'SWR minimum for ' . $profileId);
+        $swrMax = normalizeProfileSwrBound($profile['swr_max_wh_m2'] ?? null, 'SWR maximum for ' . $profileId);
+        if ($swrMin !== null && $swrMax !== null && $swrMin >= $swrMax) {
+            throw new InvalidArgumentException('SWR minimum must be lower than maximum for ' . $profileId . '.');
+        }
         $profilesById[$profileId] = [
             'id' => $profileId,
             'short_name' => $shortName !== '' ? $shortName : strtoupper(substr($profileId, -1)),
             'description' => $description,
+            'swr_min_wh_m2' => $swrMin,
+            'swr_max_wh_m2' => $swrMax,
             'rule_ids' => normalizeProfileRuleIds($profile['rule_ids'] ?? [], $validRuleIds),
         ];
     }
@@ -236,16 +259,8 @@ function normalizeProfiles(array $config, array $rules): array
         }
     }
 
-    $orderedProfiles = [];
-    foreach (DEFAULT_PROFILE_IDS as $profileId) {
-        if (isset($profilesById[$profileId])) {
-            $orderedProfiles[] = $profilesById[$profileId];
-            unset($profilesById[$profileId]);
-        }
-    }
-    foreach ($profilesById as $profile) {
-        $orderedProfiles[] = $profile;
-    }
+    // PHP arrays preserve insertion order, which is the automatic-selection priority.
+    $orderedProfiles = array_values($profilesById);
 
     $activeProfileId = isset($config['active_profile_id']) && is_string($config['active_profile_id'])
         ? trim($config['active_profile_id'])
@@ -258,6 +273,7 @@ function normalizeProfiles(array $config, array $rules): array
     }
 
     return [
+        'selection_mode' => ($config['selection_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
         'active_profile_id' => $activeProfileId,
         'profiles' => array_values($orderedProfiles),
     ];
@@ -495,6 +511,7 @@ if ($isApi) {
                 'success' => true,
                 'rules' => $rules,
                 'rule_profiles' => $profiles,
+                'rule_profile_auto_state' => readRuleProfileAutoState(),
             ]);
         }
 
@@ -516,6 +533,7 @@ if ($isApi) {
                 'count' => count($normalized),
                 'rules' => $normalized,
                 'rule_profiles' => $normalizedProfiles,
+                'rule_profile_auto_state' => readRuleProfileAutoState(),
             ]);
         }
 
@@ -564,6 +582,7 @@ $editorTodayContext = resolveEditorTodayContext();
                         <button id="btn-raw-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">View raw JSON</button>
                         <button id="btn-export-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Export JSON</button>
                         <button id="btn-import-json" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Import JSON…</button>
+                        <button id="btn-reevaluate-profiles" class="gsd-btn gsd-btn--quiet" type="button" role="menuitem">Re-evaluate automatic profiles…</button>
                         <div class="rule-actions-separator" role="separator" aria-hidden="true"></div>
                         <button id="btn-delete-unused-rules" class="gsd-btn gsd-btn--danger danger" type="button" role="menuitem">Delete unused rules</button>
                     </div>
@@ -598,6 +617,17 @@ $editorTodayContext = resolveEditorTodayContext();
             </div>
         </div>
         <div class="rule-profiles-box">
+            <div class="profile-mode-panel">
+                <div>
+                    <strong>Profile selection</strong>
+                    <p class="muted">Manual uses the selected fallback profile. Automatic uses the first SWR range that matches from left to right.</p>
+                </div>
+                <div class="profile-mode-toggle" role="radiogroup" aria-label="Profile selection mode">
+                    <label><input id="profile-mode-manual" type="radio" name="profile-selection-mode" value="manual"> <span>Manual</span></label>
+                    <label><input id="profile-mode-auto" type="radio" name="profile-selection-mode" value="auto"> <span>Automatic · SWR</span></label>
+                </div>
+            </div>
+            <div id="profile-auto-status" class="profile-auto-status" aria-live="polite"></div>
             <div id="profile-selection-status" class="profile-selection-status" aria-live="polite"></div>
             <div id="profile-button-bar" class="profile-button-bar" aria-label="Rule profiles"></div>
             <div id="profile-editor" class="profile-editor" hidden>
@@ -610,10 +640,38 @@ $editorTodayContext = resolveEditorTodayContext();
                         <label for="inp-profile-description">Description</label>
                         <input id="inp-profile-description" type="text" maxlength="120" placeholder="Profile description">
                     </div>
+                    <div class="profile-swr-fields">
+                        <strong>Automatic SWR range</strong>
+                        <div class="profile-swr-grid">
+                            <label>Minimum
+                                <span><input id="inp-profile-swr-min" type="number" min="0" step="1" placeholder="No minimum"> Wh/m²</span>
+                            </label>
+                            <label>Maximum
+                                <span><input id="inp-profile-swr-max" type="number" min="0" step="1" placeholder="No maximum"> Wh/m²</span>
+                            </label>
+                        </div>
+                        <p id="profile-swr-help" class="muted"></p>
+                        <div class="profile-order-actions">
+                            <button id="btn-profile-left" class="gsd-btn gsd-btn--quiet" type="button">Move left</button>
+                            <button id="btn-profile-right" class="gsd-btn gsd-btn--quiet" type="button">Move right</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="profile-editor-column profile-editor-column-rules">
                     <label>Rules In Profile</label>
                     <div id="profile-rule-membership" class="profile-rule-membership"></div>
+                </div>
+            </div>
+            <div id="profile-auto-preview" class="profile-auto-preview" hidden>
+                <div class="profile-auto-preview-heading">
+                    <strong>Upcoming automatic selections</strong>
+                    <span class="muted">Fresh, stale, retained, or carried forward per date</span>
+                </div>
+                <div class="profile-auto-table-wrap">
+                    <table class="profile-auto-table">
+                        <thead><tr><th>Date</th><th>SWR</th><th>Profile</th><th>Status</th></tr></thead>
+                        <tbody id="profile-auto-preview-body"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -844,6 +902,8 @@ $editorTodayContext = resolveEditorTodayContext();
 
 <script>
 window.EDIT_RULES_API_URL = '<?php echo htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8'); ?>?api=1';
+window.EDIT_AUTO_PROFILES_API_URL = 'api/evaluate_auto_profiles_api.php';
+window.EDIT_SCHEDULE_REFRESH_URL = 'api/refresh_schedule_proxy.php';
 window.EDIT_RULES_INITIAL_RULE = <?php echo $initialRule !== null ? $initialRule : 'null'; ?>;
 window.EDIT_RULES_CONFIG = <?php echo json_encode([
     'limitMin' => $editorLimitMin,
