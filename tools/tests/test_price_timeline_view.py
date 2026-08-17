@@ -50,6 +50,13 @@ def test_overview_uses_half_width_columns_and_compact_header_control():
     assert "pointer-events: none;" in source
 
 
+def test_detail_timeline_width_matches_its_48_minimum_width_columns():
+    source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "grid-template-columns: repeat(48, minmax(36px, 1fr));" in source
+    assert "min-width: 1728px;" in source
+
+
 def test_mobile_overview_is_denser_and_uses_distinct_bar_chart_icons():
     css_source = APP_CSS.read_text(encoding="utf-8")
     icon_source = ICON_SPRITE.read_text(encoding="utf-8")

@@ -1857,7 +1857,7 @@ button.app-state-pill:focus-visible {
     grid-template-columns: repeat(48, minmax(36px, 1fr));
     grid-template-rows: 22px 20px auto;
     row-gap: 4px;
-    min-width: 1584px;
+    min-width: 1728px;
     min-height: 220px;
     align-items: stretch;
     transform-origin: center;
