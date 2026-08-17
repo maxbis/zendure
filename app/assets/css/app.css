@@ -2240,15 +2240,18 @@ button.app-state-pill:focus-visible {
 }
 
 .app-price-plan[data-timeline-view="overview"] .app-price-hour__time {
+    position: relative;
+    z-index: 2;
     align-self: center;
     font-size: 0;
+    transform: translateY(6px);
 }
 
 .app-price-plan[data-timeline-view="overview"] .app-price-hour[data-overview-tick="true"] .app-price-hour__time::after {
-    color: var(--gsd-text-muted);
+    color: var(--gsd-text-secondary);
     content: attr(data-compact-time);
-    font-size: 0.5rem;
-    font-weight: 550;
+    font-size: 0.52rem;
+    font-weight: 650;
 }
 
 .app-price-plan[data-timeline-view="overview"] .app-price-hour__action {
@@ -4086,6 +4089,10 @@ dialog.app-schedule-tooltip {
     .app-price-plan[data-timeline-view="overview"] .app-price-timeline {
         grid-template-columns: repeat(48, minmax(12px, 1fr));
         min-width: 576px;
+    }
+
+    .app-price-plan[data-timeline-view="overview"] .app-price-hour__time {
+        transform: translateY(9px);
     }
 
     .app-schedule-edit-dialog__desktop-separator {

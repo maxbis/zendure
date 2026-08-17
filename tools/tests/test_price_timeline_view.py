@@ -104,3 +104,19 @@ def test_timeline_density_change_uses_a_short_reduced_motion_safe_transition():
     assert '.app-price-plan[data-timeline-transition="out"] .app-price-timeline' in css_source
     assert "opacity: 0.55;" in css_source
     assert "transform: scale(0.995);" in css_source
+
+
+def test_overview_time_labels_are_lower_and_higher_contrast():
+    source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "transform: translateY(6px);" in source
+    assert "color: var(--gsd-text-secondary);" in source
+    assert "font-size: 0.52rem;" in source
+    assert "font-weight: 650;" in source
+
+
+def test_mobile_overview_moves_time_labels_lower_than_desktop():
+    source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "transform: translateY(6px);" in source
+    assert "transform: translateY(9px);" in source
