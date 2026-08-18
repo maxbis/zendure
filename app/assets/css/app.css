@@ -2318,8 +2318,8 @@ button.app-state-pill:focus-visible {
 }
 
 .app-price-hour__action[data-rule-result="true"] {
-    border-bottom-width: 2px;
-    border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
+    border-top-width: 2px;
+    border-top-color: var(--app-rule-color, var(--gsd-border-strong));
 }
 
 .app-price-hour__action[data-fallback-tone]::after {
@@ -2327,7 +2327,7 @@ button.app-state-pill:focus-visible {
     position: absolute;
     z-index: 1;
     right: 0;
-    bottom: 2px;
+    bottom: 0;
     left: 0;
     height: 4px;
     pointer-events: none;
@@ -4276,8 +4276,17 @@ dialog.app-schedule-tooltip {
     }
 
     .app-price-hour__action[data-rule-result="true"] {
-        border-bottom-width: 2px;
-        border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
+        border-top-width: 2px;
+        border-top-color: var(--app-rule-color, var(--gsd-border-strong));
+    }
+
+    .app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-rule-result="true"] {
+        border-top-width: 1px;
+        border-top-color: transparent;
+    }
+
+    .app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-fallback-tone]::after {
+        height: 2px;
     }
 
     .app-price-timeline-scroll {
