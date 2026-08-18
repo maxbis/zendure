@@ -1633,6 +1633,8 @@
             time.className = "app-price-hour__time";
             time.textContent = `${pad(hour)}:00`;
             time.dataset.compactTime = pad(hour);
+            const actionStack = document.createElement("div");
+            actionStack.className = "app-price-hour__action-stack";
             const actionElement = document.createElement("button");
             actionElement.type = "button";
             actionElement.className = "app-price-hour__action";
@@ -1641,9 +1643,13 @@
             actionElement.dataset.limited = limited ? "true" : "false";
             const hasRuntimeRule = Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length > 0;
             const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
+            let ruleIndicator = null;
             if (isRuleResult(slot)) {
                 actionElement.dataset.ruleResult = "true";
-                if (ruleColor) actionElement.style.setProperty("--app-rule-color", ruleColor);
+                ruleIndicator = document.createElement("span");
+                ruleIndicator.className = "app-price-hour__rule-indicator";
+                ruleIndicator.setAttribute("aria-hidden", "true");
+                if (ruleColor) ruleIndicator.style.setProperty("--app-rule-color", ruleColor);
             }
             if (hasRuntimeRule) {
                 actionElement.dataset.runtimeRule = "true";
@@ -1700,7 +1706,10 @@
                     openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
                 });
             }
-            hourColumn.append(editButton, actionElement);
+            hourColumn.append(editButton);
+            if (ruleIndicator) actionStack.append(ruleIndicator);
+            actionStack.append(actionElement);
+            hourColumn.append(actionStack);
             fragment.appendChild(hourColumn);
             }
         });

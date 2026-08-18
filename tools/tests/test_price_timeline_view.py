@@ -98,6 +98,17 @@ def test_mobile_header_reserves_full_width_for_both_icon_buttons():
     assert "gap: 4px 8px;" in source
 
 
+def test_mobile_legend_uses_compact_labels():
+    partial_source = PRICE_PLAN_PARTIAL.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
+
+    assert 'class="app-price-legend__label--mobile">Low</span>' in partial_source
+    assert "'Start' : 'Now'" in partial_source
+    assert 'class="app-price-legend__label--mobile">Plan</span>' in partial_source
+    assert ".app-price-legend__label--desktop" in css_source
+    assert ".app-price-legend__label--mobile" in css_source
+
+
 def test_timeline_density_change_uses_a_short_reduced_motion_safe_transition():
     js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
     css_source = APP_CSS.read_text(encoding="utf-8")

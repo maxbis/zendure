@@ -96,11 +96,11 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
                 </div>
 
                 <div class="app-price-legend" aria-label="Timeline legend">
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--low"></i>Low price</span>
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--current"></i><?= $appPricePlanReadOnly ? 'Simulation start' : 'Current hour'; ?></span>
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--high"></i>High price</span>
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--plan"></i>Scheduled action</span>
-                    <span><i class="app-price-legend__swatch app-price-legend__swatch--limited" aria-hidden="true"></i>Limit value</span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--low"></i><span class="app-price-legend__label--desktop">Low price</span><span class="app-price-legend__label--mobile">Low</span></span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--current"></i><span class="app-price-legend__label--desktop"><?= $appPricePlanReadOnly ? 'Simulation start' : 'Current hour'; ?></span><span class="app-price-legend__label--mobile"><?= $appPricePlanReadOnly ? 'Start' : 'Now'; ?></span></span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--high"></i><span class="app-price-legend__label--desktop">High price</span><span class="app-price-legend__label--mobile">High</span></span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--plan"></i><span class="app-price-legend__label--desktop">Scheduled action</span><span class="app-price-legend__label--mobile">Plan</span></span>
+                    <span><i class="app-price-legend__swatch app-price-legend__swatch--limited" aria-hidden="true"></i><span class="app-price-legend__label--desktop">Limit value</span><span class="app-price-legend__label--mobile">Limit</span></span>
                 </div>
 
             </div>
