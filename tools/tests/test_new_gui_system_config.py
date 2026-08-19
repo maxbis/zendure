@@ -104,6 +104,20 @@ def test_price_plan_identifies_rule_generated_hours_in_tooltips_and_accessible_l
     assert app_css.count("background-origin: border-box;") >= 3
 
 
+def test_price_plan_explains_target_fallbacks_and_collapses_identical_condition_outcomes():
+    price_source = PRICE_PLAN.read_text(encoding="utf-8")
+    app_css = APP_CSS.read_text(encoding="utf-8")
+
+    assert '"Target could not be planned"' in price_source
+    assert '"Expected at target"' in price_source
+    assert '"Next solar-charging period"' in price_source
+    assert "the planner cannot calculate how much to discharge" in price_source
+    assert "This hour uses the rule fallback" in price_source
+    assert 'tooltipSectionLabel("Action this hour")' in price_source
+    assert "actionsMatch(action, fallbackAction)" in price_source
+    assert 'data-runtime-rule="true"' not in app_css
+
+
 @pytest.mark.skipif(not VALID_KEYS.is_file(), reason="Local authentication fixture is unavailable")
 def test_new_gui_injects_all_shared_forecast_and_schedule_values():
     shared = json.loads(SYSTEM_CONFIG.read_text(encoding="utf-8"))

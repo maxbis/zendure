@@ -888,17 +888,13 @@
         priceTooltip.style.visibility = "visible";
     }
 
-    function tooltipActionRow(slot, action, ruleColor = "") {
+    function tooltipActionRow(slot, action) {
         const row = document.createElement("div");
         row.className = "app-schedule-tooltip__action";
 
         const badge = document.createElement("span");
         badge.className = "app-schedule-tooltip__badge";
         badge.dataset.tone = actionTone(action);
-        if (ruleColor) {
-            badge.dataset.runtimeRule = "true";
-            badge.style.setProperty("--app-rule-color", ruleColor);
-        }
         setActionBadgeContent(badge, slot, action);
 
         const copy = document.createElement("span");
@@ -911,6 +907,10 @@
         copy.append(label, description);
         row.append(badge, copy);
         return row;
+    }
+
+    function actionsMatch(primary, fallback) {
+        return Boolean(primary?.signature && primary.signature === fallback?.signature);
     }
 
     function tooltipSectionLabel(text) {
@@ -991,7 +991,19 @@
 
         const section = document.createElement("div");
         section.className = "app-schedule-tooltip__forecast app-schedule-tooltip__target-plan";
-        section.appendChild(tooltipSectionLabel("Battery target"));
+        section.appendChild(tooltipSectionLabel(isChargeTarget ? "Target @ next NZ−" : "Target @ solar"));
+
+        const status = document.createElement("strong");
+        status.className = "app-schedule-tooltip__target-status";
+        const statuses = {
+            achievable: "Target can be reached",
+            best_effort: "Target may not be reached",
+            already_satisfied: isChargeTarget ? "Target is already forecast" : "No extra discharge is needed",
+            unavailable: "Target could not be planned",
+            past: "Rule hour has passed"
+        };
+        status.textContent = statuses[planning.status] || "Target plan";
+        section.appendChild(status);
 
         const values = document.createElement("div");
         values.className = "app-schedule-tooltip__forecast-values";
@@ -1003,10 +1015,10 @@
         const resultValue = document.createElement("strong");
         const predictedChargePercent = Number(planning.predicted_anchor_soc_percent);
         const hasPredictedChargePercent = Number.isFinite(predictedChargePercent);
-        targetLabel.textContent = isChargeTarget ? "Goal at NZ−" : "Goal at solar";
+        targetLabel.textContent = "Target level";
         resultLabel.textContent = isChargeTarget
-            ? (hasPredictedChargePercent ? "Predicted at NZ−" : "Planner input")
-            : "Predicted";
+            ? (hasPredictedChargePercent ? "Expected at NZ−" : "Current level")
+            : "Expected at target";
         targetValue.textContent = Number.isFinite(Number(planning.target_soc_percent))
             ? `${Number(planning.target_soc_percent).toFixed(1)}%`
             : "Unavailable";
@@ -1024,16 +1036,9 @@
         detail.className = "app-schedule-tooltip__forecast-detail";
         const hasAnchor = Boolean(planning.anchor_date && planning.anchor_time);
         const anchor = hasAnchor
-            ? `${isChargeTarget ? "NZ−" : "Solar"} ${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
-            : `${isChargeTarget ? "NZ−" : "Solar-charge"} anchor not found`;
-        const statuses = {
-            achievable: "Target achievable",
-            best_effort: "Best effort",
-            already_satisfied: isChargeTarget ? "Target already forecast" : "No extra discharge needed",
-            unavailable: "Calculation unavailable",
-            past: "Rule hour passed"
-        };
-        const parts = [statuses[planning.status] || String(planning.status || "Planned"), anchor];
+            ? `${isChargeTarget ? "Next NZ− period" : "Next solar-charging period"}: ${formatDate(planning.anchor_date)} ${String(planning.anchor_time).slice(0, 2)}:${String(planning.anchor_time).slice(2, 4)}`
+            : `${isChargeTarget ? "Next NZ− period" : "Next solar-charging period"}: not found`;
+        const parts = [anchor];
         if (isChargeTarget && Number.isFinite(Number(planning.calculated_min_power_w))) {
             parts.push(`minimum ${formatWatts(Number(planning.calculated_min_power_w))}`);
         } else if (Number.isFinite(Number(planning.calculated_power_w))) {
@@ -1044,6 +1049,7 @@
         }
         detail.textContent = parts.join(" · ");
         section.appendChild(values);
+        section.appendChild(detail);
         if (isChargeTarget) {
             const forecastFacts = [];
             if (Number.isFinite(Number(planning.current_soc_percent))) {
@@ -1062,16 +1068,26 @@
                 section.appendChild(forecastContext);
             }
         }
-        const reasonText = planning.reason || (planning.status === "unavailable"
+        let reasonText = planning.reason || (planning.status === "unavailable"
             ? "The planner did not return a detailed reason."
             : "");
+        if (!hasAnchor && planning.mode === "empty_at_solar_charge") {
+            reasonText = "No future solar-charging period is scheduled through tomorrow, so the planner cannot calculate how much to discharge.";
+        } else if (reasonText === "Live battery level is unavailable.") {
+            reasonText = "The live battery level is unavailable, so the planner cannot calculate the target action.";
+        }
         if (reasonText) {
             const reason = document.createElement("p");
             reason.className = "app-schedule-tooltip__forecast-unavailable app-schedule-tooltip__forecast-reason";
             reason.textContent = `Reason: ${reasonText}`;
             section.appendChild(reason);
         }
-        section.appendChild(detail);
+        if (["unavailable", "past", "already_satisfied"].includes(planning.status)) {
+            const fallback = document.createElement("p");
+            fallback.className = "app-schedule-tooltip__target-fallback";
+            fallback.textContent = `This hour uses the rule fallback: ${actionFor(slot).label}.`;
+            section.appendChild(fallback);
+        }
         return section;
     }
 
@@ -1109,26 +1125,36 @@
 
         const content = document.createElement("div");
         content.className = "app-schedule-tooltip__content";
+        const targetPlanning = tooltipTargetPlanning(slot);
+        if (targetPlanning) content.appendChild(targetPlanning);
         if (runtimeConditions) {
-            content.appendChild(tooltipSectionLabel("When"));
-            const condition = document.createElement("p");
-            condition.className = "app-schedule-tooltip__condition";
-            condition.textContent = runtimeConditions.charAt(0).toUpperCase() + runtimeConditions.slice(1);
-            content.append(condition, tooltipActionRow(slot, action, ruleColor));
-            if (limited) content.appendChild(tooltipLimits(slot, true));
-
-            const otherwise = tooltipSectionLabel("Otherwise");
-            otherwise.classList.add("app-schedule-tooltip__section-label--otherwise");
             const fallbackValue = Object.prototype.hasOwnProperty.call(slot, "fallback_value") ? slot.fallback_value : 0;
             const fallbackSlot = { value: fallbackValue };
-            content.append(otherwise, tooltipActionRow(fallbackSlot, runtimeFallbackAction(slot)));
+            const fallbackAction = runtimeFallbackAction(slot);
+            if (!limited && actionsMatch(action, fallbackAction)) {
+                content.appendChild(tooltipSectionLabel("Action this hour"));
+                content.appendChild(tooltipActionRow(slot, action));
+                const conditionNote = document.createElement("p");
+                conditionNote.className = "app-schedule-tooltip__condition-note";
+                conditionNote.textContent = `The action is ${action.label} whether or not ${runtimeConditions}.`;
+                content.appendChild(conditionNote);
+            } else {
+                content.appendChild(tooltipSectionLabel("When"));
+                const condition = document.createElement("p");
+                condition.className = "app-schedule-tooltip__condition";
+                condition.textContent = runtimeConditions.charAt(0).toUpperCase() + runtimeConditions.slice(1);
+                content.append(condition, tooltipActionRow(slot, action));
+                if (limited) content.appendChild(tooltipLimits(slot, true));
+
+                const otherwise = tooltipSectionLabel("Otherwise");
+                otherwise.classList.add("app-schedule-tooltip__section-label--otherwise");
+                content.append(otherwise, tooltipActionRow(fallbackSlot, fallbackAction));
+            }
         } else {
             content.appendChild(tooltipActionRow(slot, action));
             if (limited) content.appendChild(tooltipLimits(slot));
         }
 
-        const targetPlanning = tooltipTargetPlanning(slot);
-        if (targetPlanning) content.appendChild(targetPlanning);
         const batteryForecast = tooltipBatteryForecast(date, hour);
         if (batteryForecast) content.appendChild(batteryForecast);
 

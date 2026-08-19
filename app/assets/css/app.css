@@ -2566,11 +2566,6 @@ dialog.app-schedule-tooltip {
     color: var(--gsd-text-on-signal);
 }
 
-.app-schedule-tooltip__badge[data-runtime-rule="true"] {
-    border-bottom-width: 2px;
-    border-bottom-color: var(--app-rule-color, var(--gsd-border-strong));
-}
-
 .app-schedule-tooltip__limits {
     margin-left: 43px;
     padding: 5px 7px;
@@ -2587,6 +2582,17 @@ dialog.app-schedule-tooltip {
     margin-top: 3px;
     padding-top: 9px;
     border-top: 1px solid var(--gsd-border-subtle);
+}
+
+.app-schedule-tooltip__target-status {
+    color: var(--gsd-text);
+    font-size: 0.7rem;
+}
+
+.app-schedule-tooltip__content > .app-schedule-tooltip__target-plan:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
 }
 
 .app-schedule-tooltip__forecast-values {
@@ -2631,6 +2637,18 @@ dialog.app-schedule-tooltip {
     border-left: 2px solid var(--gsd-warning);
     border-radius: 3px;
     color: var(--gsd-text-secondary);
+}
+
+.app-schedule-tooltip__target-fallback,
+.app-schedule-tooltip__condition-note {
+    margin: 0;
+    color: var(--gsd-text-secondary);
+    font-size: 0.59rem;
+    line-height: 1.4;
+}
+
+.app-schedule-tooltip__target-fallback {
+    font-weight: 700;
 }
 
 .app-price-legend {
