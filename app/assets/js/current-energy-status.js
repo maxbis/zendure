@@ -474,7 +474,12 @@
     }
 
     function appendBatteryPopoverRows(container, rows) {
-        rows.forEach(([label, value]) => {
+        rows.forEach((rowData) => {
+            if (rowData instanceof Node) {
+                container.appendChild(rowData);
+                return;
+            }
+            const [label, value] = rowData;
             const row = document.createElement("p");
             const name = document.createElement("span");
             const amount = document.createElement("strong");
@@ -500,10 +505,6 @@
         return null;
     }
 
-    function coloredHealthMetric(text, color) {
-        return color ? { text, color } : text;
-    }
-
     function packHealthValue(pack) {
         const percentText = Number.isFinite(pack.percent) ? `${Math.round(pack.percent)}%` : "—";
         const temperatureText = formatTemperature(pack.temperature);
@@ -517,6 +518,54 @@
         temperature.style.color = temperatureColor;
         value.appendChild(temperature);
         return value;
+    }
+
+    function createBatteryWifiSignalRow(rssi) {
+        const scale = window.GraphiteHealthMetricColorScale;
+        const details = scale?.wifiRssiDetails?.(rssi) ?? null;
+        const numericRssi = Number(rssi);
+        const hasRssi = rssi !== null && rssi !== undefined && rssi !== "" && Number.isFinite(numericRssi);
+        const rawText = hasRssi ? `${Math.round(numericRssi)} dBm` : "— dBm";
+
+        const row = document.createElement("div");
+        row.className = "app-battery-popover__wifi";
+        row.style.setProperty("--app-wifi-color", details?.color ?? "var(--gsd-text-muted)");
+        row.setAttribute("role", "img");
+        row.setAttribute(
+            "aria-label",
+            details
+                ? `Wi-Fi signal: ${details.score} out of 10, ${details.description}, ${rawText}.`
+                : "Wi-Fi signal unavailable."
+        );
+        row.title = details
+            ? `${details.score}/10 · ${details.description} · ${rawText}`
+            : "Wi-Fi signal unavailable";
+
+        const heading = document.createElement("div");
+        heading.className = "app-battery-popover__wifi-heading";
+        const label = document.createElement("span");
+        label.textContent = "Wi-Fi signal";
+        const score = document.createElement("strong");
+        score.textContent = details ? `${details.score}/10 · ${details.description}` : "Unavailable";
+        heading.append(label, score);
+
+        const reading = document.createElement("div");
+        reading.className = "app-battery-popover__wifi-reading";
+        const meter = document.createElement("span");
+        meter.className = "app-battery-popover__wifi-meter";
+        meter.setAttribute("aria-hidden", "true");
+        for (let index = 0; index < 10; index += 1) {
+            const segment = document.createElement("span");
+            segment.className = "app-battery-popover__wifi-segment";
+            if (details && index < details.score) segment.classList.add("is-active");
+            meter.appendChild(segment);
+        }
+        const raw = document.createElement("span");
+        raw.className = "app-battery-popover__wifi-dbm";
+        raw.textContent = rawText;
+        reading.append(meter, raw);
+        row.append(heading, reading);
+        return row;
     }
 
     function createBatteryPopoverSummaryShell({
@@ -719,27 +768,13 @@
             ]
         ]);
 
-        const healthRows = [
-            [
-                "Controller temperature",
-                coloredHealthMetric(
-                    formatTemperature(detail.systemTemperature),
-                    healthMetricColor("temperature", detail.systemTemperature)
-                )
-            ]
-        ];
+        const healthRows = [];
         healthRows.push(...detail.batteryPacks.map((pack, index) => [
             `Battery ${index + 1}`,
             packHealthValue(pack)
         ]));
         if (detail.batteryPacks.length === 0) healthRows.push(["Battery packs", "Unavailable"]);
-        healthRows.push([
-            "Wi-Fi signal",
-            coloredHealthMetric(
-                Number.isFinite(detail.wifiRssi) ? `${Math.round(detail.wifiRssi)} dBm` : "—",
-                healthMetricColor("wifi", detail.wifiRssi)
-            )
-        ]);
+        healthRows.push(createBatteryWifiSignalRow(detail.wifiRssi));
         const healthPanel = createBatteryPopoverPanel("health", detail, healthRows);
 
         slider.append(energyPanel, healthPanel);

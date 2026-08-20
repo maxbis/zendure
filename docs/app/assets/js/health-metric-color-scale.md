@@ -13,19 +13,19 @@ Provides temperature and Wi-Fi RSSI colours for the new GUI battery Health dialo
 ## Inputs and outputs
 
 - `temperatureColor(celsius)` returns a hex colour, or `null` when the value is not finite.
-- `wifiRssiScore(rssi)` returns a 0–10 score for RSSI in dBm, or `null` when the value is not finite.
-- `wifiRssiColor(rssi)` returns a hex colour from that score, or `null` when the value is not finite.
+- `wifiRssiDetails(rssi)` returns the discrete 0–10 score, description, and colour for RSSI in dBm, or `null` when the value is not finite.
+- `wifiRssiScore(rssi)` and `wifiRssiColor(rssi)` return the corresponding values from those details.
 
 ## Flow and behavior
 
 1. Temperature is clamped to −10°C…40°C, then mapped with the same bands as `getTempColorEnhancedJS` in [`main/assets/js/schedule_renderer.js`](../../../../main/assets/js/schedule_renderer.js).
-2. Wi-Fi RSSI is scored linearly from −90 dBm (0) to −30 dBm (10), matching the old GUI battery Wi-Fi bar.
-3. That score selects green (≥8), yellow (≥5), orange (≥3), or red.
+2. Wi-Fi RSSI uses discrete signal-quality bands: below −90 is 0; −90…−86 is 1; −85…−83 is 2; −82…−81 is 3; −80…−76 is 4; −75…−71 is 5; −70…−68 is 6; −67…−64 is 7; −63…−58 is 8; −57…−50 is 9; and above −50 dBm is 10.
+3. Each band provides its own description and colour from dark gray through deep green.
 
 ## Edge cases and failure modes
 
 - When the input is missing or not finite, then colour helpers return `null` and the consumer keeps the default text colour.
-- When RSSI is stronger than −30 dBm or weaker than −90 dBm, then the score clamps to 10 or 0.
+- When RSSI is below −90 dBm or above −50 dBm, then the score is 0 or 10 respectively.
 
 ## Related files
 

@@ -516,6 +516,61 @@ button.app-state-pill:focus-visible {
     text-align: right;
 }
 
+.app-battery-popover__wifi {
+    display: grid;
+    gap: 5px;
+    margin-top: 2px;
+    padding-top: 8px;
+    border-top: 1px solid var(--gsd-border-subtle);
+}
+
+.app-battery-popover__wifi-heading,
+.app-battery-popover__wifi-reading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.app-battery-popover__wifi-heading {
+    color: var(--gsd-text-muted);
+    font-size: 0.68rem;
+}
+
+.app-battery-popover__wifi-heading strong {
+    color: var(--app-wifi-color);
+}
+
+.app-battery-popover__wifi-meter {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+}
+
+.app-battery-popover__wifi-segment {
+    height: 7px;
+    background: color-mix(in srgb, var(--gsd-surface-3) 88%, var(--gsd-page-deep));
+    border: 1px solid var(--gsd-border);
+    border-radius: 2px;
+}
+
+.app-battery-popover__wifi-segment.is-active {
+    background: var(--app-wifi-color);
+    border-color: color-mix(in srgb, var(--app-wifi-color) 82%, var(--gsd-text));
+}
+
+.app-battery-popover__wifi-dbm {
+    flex: 0 0 auto;
+    min-width: 46px;
+    color: var(--gsd-text-muted);
+    font-size: 0.58rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    text-align: right;
+}
+
 .app-target-label[data-mode="charging"] {
     background: var(--gsd-positive-soft);
     border-color: color-mix(in srgb, var(--gsd-positive) 38%, transparent);

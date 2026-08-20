@@ -62,7 +62,7 @@ With a 1200 W directional limit, an active flow below 60 W therefore shows one c
 8. The Energy view opens with a usable-range summary strip: current SoC, percent of the configured min–max window, a filled track with SoC marker, and min/max labels. When current battery power would change SoC over the next 60 minutes, a dimmed fill shows the projected usable-range level (clamped to the configured min/max window).
 9. The Energy view then shows how much energy 5% of the usable and real ranges equal, usable energy, chargeable energy, battery power, and projected usable energy at the next whole hour.
 10. Activating **Health** in the footer slides to the Health view.
-11. The Health view opens with a controller-temperature summary strip on a −5°C…+50°C scale, coloured with the same dynamic temperature colour as the value, then shows controller temperature, each reported battery pack's percentage and temperature, and controller Wi-Fi signal. Temperature and Wi-Fi values use the same dynamic colours as the old GUI battery details (`schedule_renderer.js`).
+11. The Health view opens with a controller-temperature summary strip on a −5°C…+50°C scale, then shows each reported battery pack's percentage and temperature. A subtle divider separates the controller and battery health metrics from Wi-Fi. Wi-Fi is presented as a discrete 0–10 score and description above a ten-segment coloured bar, with the raw dBm value beside the bar.
 12. Activating **Energy** in the footer returns to the Energy view.
 13. When live status refreshes while the dialog is open, the dialog is rebuilt with current values and keeps the selected Energy or Health view.
 14. Publish the normalized battery state so the Prices & Energy Plan can rebuild its display-only hourly forecast.
@@ -94,13 +94,12 @@ The dialog is positioned below its trigger when space permits. It moves above th
 - When battery percentage or configured min/max limits are missing or invalid, then the Energy view omits its summary strip and still shows the detail rows.
 - When current battery power is near zero or the 60-minute projection matches the current usable-range level, then the Energy summary omits the dimmed projection fill.
 - When controller temperature is missing or invalid, then the Health view omits its temperature summary strip and still shows the detail rows.
-- When controller temperature is missing or invalid, then the Health view displays an em dash for that value.
 - When a pack percentage or temperature is missing or invalid, then only the missing part of that pack row displays an em dash.
 - When no `packData` array is returned, then the Health view displays `Battery packs: Unavailable`.
-- When Wi-Fi RSSI is missing or invalid, then the Health view displays an em dash.
+- When Wi-Fi RSSI is missing or invalid, then the Health view displays an empty bar, an unavailable score, and an em dash for dBm.
 - When the health-metric colour scale is unavailable, then temperature and Wi-Fi values render without dynamic colour.
 - Temperature colour follows the old GUI bands on a −10°C…40°C scale: blue ≤0, light yellow ≤5, yellow ≤15, green ≤25, orange ≤30, red above.
-- Wi-Fi colour follows the old GUI RSSI score from −90…−30 dBm: green ≥8, yellow ≥5, orange ≥3, otherwise red.
+- Wi-Fi score, description, and colour follow the discrete 0–10 RSSI bands defined in `health-metric-color-scale.js`.
 - When the grid color-scale module is available, then its export and import boundaries also define the grid state and chevron deadband so these visual signals remain aligned.
 - When the grid color-scale module is unavailable, then the state calculation defensively uses −10 W and +10 W as the same boundaries.
 - When the status refresh fails after valid data has already rendered, then the existing values remain visible and the GUI reports that the latest reading could not be loaded.
