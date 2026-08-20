@@ -437,6 +437,15 @@ button.app-state-pill:focus-visible {
     text-align: right;
 }
 
+.app-battery-popover__panel[data-view="health"] .app-battery-popover__summary-current {
+    order: 2;
+}
+
+.app-battery-popover__panel[data-view="health"] .app-battery-popover__summary-readout > span {
+    order: 1;
+    text-align: left;
+}
+
 .app-battery-popover__summary-track {
     position: relative;
     height: 10px;
@@ -519,13 +528,13 @@ button.app-state-pill:focus-visible {
 .app-battery-popover__wifi {
     display: grid;
     gap: 5px;
-    margin-top: 2px;
-    padding-top: 8px;
+    margin: 2px -11px -11px;
+    padding: 8px 11px 11px;
+    background: color-mix(in srgb, var(--gsd-surface-2) 72%, transparent);
     border-top: 1px solid var(--gsd-border-subtle);
 }
 
-.app-battery-popover__wifi-heading,
-.app-battery-popover__wifi-reading {
+.app-battery-popover__wifi-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -541,12 +550,17 @@ button.app-state-pill:focus-visible {
     color: var(--app-wifi-color);
 }
 
+.app-battery-popover__wifi-reading {
+    display: grid;
+    gap: 5px;
+}
+
 .app-battery-popover__wifi-meter {
     display: grid;
-    flex: 1 1 auto;
     grid-template-columns: repeat(10, minmax(0, 1fr));
     gap: 3px;
     min-width: 0;
+    width: 100%;
 }
 
 .app-battery-popover__wifi-segment {
@@ -562,7 +576,7 @@ button.app-state-pill:focus-visible {
 }
 
 .app-battery-popover__wifi-dbm {
-    flex: 0 0 auto;
+    justify-self: end;
     min-width: 46px;
     color: var(--gsd-text-muted);
     font-size: 0.58rem;
