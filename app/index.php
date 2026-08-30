@@ -146,6 +146,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/shortwave-radiation.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/automation-control-dialog.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
 <body data-theme="graphite-signal-dark">
     <div class="gsd-flash-region" data-gsd-flash-region aria-live="polite" aria-relevant="additions"></div>
@@ -651,6 +652,38 @@ $appConfig = [
             </footer>
         </dialog>
 
+        <dialog
+            class="gsd-dialog app-automation-control-dialog"
+            id="app-automation-control-dialog"
+            aria-labelledby="app-automation-control-title"
+            data-component="automation-control-dialog"
+        >
+            <header class="gsd-dialog__header gsd-dialog__header--simple">
+                <h2 class="gsd-dialog__title" id="app-automation-control-title">Automation Control</h2>
+                <button class="gsd-icon-btn" type="button" aria-label="Close automation control" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </header>
+
+            <div class="gsd-dialog__body app-automation-control-dialog__body">
+                <div class="app-automation-control-dialog__loading" data-role="automation-control-loading" role="status">
+                    <span class="app-loading-orb" aria-hidden="true"></span>
+                    <span>Loading automation controls</span>
+                </div>
+                <iframe
+                    class="app-automation-control-dialog__frame"
+                    data-role="automation-control-frame"
+                    data-src="../automate/control/index.php"
+                    title="Automation controls"
+                    hidden
+                ></iframe>
+            </div>
+
+            <footer class="gsd-dialog__footer app-automation-control-dialog__footer">
+                <button class="gsd-btn gsd-btn--primary" type="button" data-gsd-dialog-close="done" data-gsd-initial-focus>Done</button>
+            </footer>
+        </dialog>
+
     <?php
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
@@ -659,6 +692,12 @@ $appConfig = [
             'label' => 'Shortwave Radiation',
             'description' => 'Hourly solar radiation and daily totals',
             'icon' => 'sun',
+        ],
+        [
+            'dialogId' => 'app-automation-control-dialog',
+            'label' => 'Automation Control',
+            'description' => 'One-time full charge and runtime controls',
+            'icon' => 'activity',
         ],
         [
             'href' => '../main/',

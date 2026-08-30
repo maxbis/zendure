@@ -34,7 +34,7 @@ Outputs:
 
 Current host items:
 
-- New GUI → Shortwave Radiation dialog and Old GUI (`../main/`)
+- New GUI → Shortwave Radiation dialog, Automation Control dialog (lazy-loading `../automate/control/index.php`), and Old GUI (`../main/`)
 - Old GUI → New GUI (`../app/`)
 
 ## Flow and behavior

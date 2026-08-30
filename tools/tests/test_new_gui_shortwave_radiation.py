@@ -13,6 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_INDEX = REPO_ROOT / "app" / "index.php"
 SHORTWAVE_JS = REPO_ROOT / "app" / "assets" / "js" / "shortwave-radiation.js"
+AUTOMATION_DIALOG_JS = REPO_ROOT / "app" / "assets" / "js" / "automation-control-dialog.js"
 FOOTER_PARTIAL = REPO_ROOT / "themes" / "graphite-signal-dark" / "partials" / "footer-more.php"
 VALID_KEYS = REPO_ROOT / "login" / "validkeys.txt"
 
@@ -51,7 +52,7 @@ def test_footer_partial_supports_semantic_dialog_items():
 
 
 @pytest.mark.skipif(not VALID_KEYS.is_file(), reason="Local authentication fixture is unavailable")
-def test_new_gui_renders_shortwave_menu_item_and_dialog():
+def test_new_gui_renders_more_menu_items_and_shortwave_dialog():
     html = _render_app()
 
     assert '"shortwaveRadiationUrl":"../main/api/shortwave_radiation_api.php"' in html
@@ -59,9 +60,25 @@ def test_new_gui_renders_shortwave_menu_item_and_dialog():
     assert 'id="app-shortwave-radiation-dialog"' in html
     assert 'data-gsd-dialog-target="app-shortwave-radiation-dialog"' in html
     assert "Shortwave Radiation" in html
+    assert 'data-gsd-dialog-target="app-automation-control-dialog"' in html
+    assert 'id="app-automation-control-dialog"' in html
+    assert 'data-src="../automate/control/index.php"' in html
+    assert 'assets/js/automation-control-dialog.js' in html
+    assert "Automation Control" in html
+    assert "One-time full charge and runtime controls" in html
     assert 'data-role="shortwave-refresh"' in html
     assert "Use left and right arrow keys to scroll" in html
     assert 'data-role="fetch-toggle"' not in html
+
+
+def test_automation_control_dialog_lazy_loads_and_closes_more_menu():
+    source = AUTOMATION_DIALOG_JS.read_text(encoding="utf-8")
+
+    assert 'frame.dataset.src' in source
+    assert 'frame.setAttribute("src", source)' in source
+    assert 'window.GraphiteFooterMore.close(menu)' in source
+    assert 'window.GraphiteDialog.open(dialog, { trigger: returnTarget })' in source
+    assert 'frame.addEventListener("load"' in source
 
 
 @pytest.mark.skipif(not SHORTWAVE_JS.is_file(), reason="Shortwave chart module is unavailable")

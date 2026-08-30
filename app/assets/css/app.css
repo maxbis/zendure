@@ -2982,6 +2982,61 @@ dialog.app-schedule-tooltip {
     }
 }
 
+/* Automation control dialog */
+.app-automation-control-dialog {
+    width: min(calc(100% - 24px), 760px);
+    height: min(860px, calc(100dvh - 24px));
+}
+
+.app-automation-control-dialog__body {
+    position: relative;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--gsd-surface-1);
+}
+
+.app-automation-control-dialog__loading {
+    display: flex;
+    height: 100%;
+    min-height: 360px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gsd-space-3);
+    color: var(--gsd-text-secondary);
+    font-size: 0.875rem;
+}
+
+.app-automation-control-dialog__loading[hidden],
+.app-automation-control-dialog__frame[hidden] {
+    display: none;
+}
+
+.app-automation-control-dialog__frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    background: var(--gsd-surface-1);
+    border: 0;
+}
+
+.app-automation-control-dialog__footer .gsd-btn {
+    max-width: 220px;
+}
+
+@media (max-width: 600px) {
+    .app-automation-control-dialog[open] {
+        width: calc(100% - 16px);
+        height: calc(100dvh - 16px);
+        max-height: calc(100dvh - 16px);
+    }
+
+    .app-automation-control-dialog__footer .gsd-btn {
+        max-width: none;
+    }
+}
+
 .app-schedule-edit-dialog form {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto;
