@@ -156,6 +156,15 @@ The HTTP server runs on port 1611 (configurable via `HTTP_API_PORT`). All respon
 19. `POST /api/max_charge_level`
 - Returns HTTP 405 for the same reason.
 
+20. `GET /api/full_charge_once`
+- Returns the one-time 100% charge-limit override state, including configured and effective maximums, activation and expiry timestamps, and the latest reset reason.
+
+21. `POST /api/full_charge_once?state=on|off`
+- When `state=on`, then automation temporarily uses a 100% effective maximum without changing `common/config/system.json`.
+- When `state=off`, then automation restores the configured maximum immediately.
+- When SoC reaches 100%, 24 hours pass, or automation restarts, then the override also clears.
+- The override permits an existing schedule to charge; it does not create a charging command.
+
 Endpoints `/api/p1`, `/api/zendure`, `/api/status`, and `/api/all` require `api_state` to be initialized; otherwise they return 503.
 
 ## How It Works

@@ -1037,7 +1037,59 @@ def _start_test_api_server(
         "controller_logs": [],
     }
     pause_state = {"active": False}
-    controller = SimpleNamespace(log_level="INFO", max_charge_power=1200, slow_charge_max_power=200)
+    controller = SimpleNamespace(
+        log_level="INFO",
+        min_charge_level=15,
+        configured_max_charge_level=91,
+        max_charge_level=91,
+        max_charge_power=1200,
+        slow_charge_max_power=200,
+    )
+    full_charge_state = {
+        "active": False,
+        "target_charge_level": None,
+        "armed_at": None,
+        "expires_at": None,
+        "last_reset_reason": None,
+    }
+
+    def full_charge_status():
+        return {
+            **full_charge_state,
+            "configured_max_charge_level": controller.configured_max_charge_level,
+            "effective_max_charge_level": controller.max_charge_level,
+            "reset_on_restart": True,
+        }
+
+    def arm_full_charge_once():
+        if controller.configured_max_charge_level >= 100:
+            full_charge_state["last_reset_reason"] = "not_needed"
+            return full_charge_status()
+        if not full_charge_state["active"]:
+            full_charge_state.update({
+                "active": True,
+                "target_charge_level": 100,
+                "armed_at": 1000,
+                "expires_at": 1000 + (24 * 60 * 60),
+                "last_reset_reason": None,
+            })
+            controller.max_charge_level = 100
+        return full_charge_status()
+
+    def cancel_full_charge_once(reason="manual"):
+        full_charge_state.update({
+            "active": False,
+            "target_charge_level": None,
+            "armed_at": None,
+            "expires_at": None,
+            "last_reset_reason": reason,
+        })
+        controller.max_charge_level = controller.configured_max_charge_level
+        return full_charge_status()
+
+    controller.get_full_charge_override_status = full_charge_status
+    controller.arm_full_charge_once = arm_full_charge_once
+    controller.cancel_full_charge_once = cancel_full_charge_once
 
     def refresh_p1():
         events["refresh_p1"] += 1
@@ -1990,6 +2042,31 @@ def test_dynamic_slow_charge_limit_does_not_override_max_charge_level_stop():
     )
 
     assert new_input == 0
+    assert new_output == 0
+
+
+def test_full_charge_once_effective_maximum_applies_to_dynamic_charging():
+    device_controller = _import_device_controller_module()
+    controller = _make_minimal_automate_controller(device_controller)
+    controller.configured_max_charge_level = 96
+    controller._full_charge_override_lock = threading.Lock()
+    controller._full_charge_override_active = False
+    controller._full_charge_override_target = None
+    controller._full_charge_override_armed_at = None
+    controller._full_charge_override_expires_at = None
+    controller._full_charge_override_last_reset_reason = None
+    controller.arm_full_charge_once(now=int(time.time()))
+
+    new_input, new_output = device_controller.AutomateController._calculate_new_settings(
+        controller,
+        p1_power=-650,
+        current_input=0,
+        current_output=0,
+        electric_level=97,
+    )
+
+    assert controller.max_charge_level == 100
+    assert new_input == 650
     assert new_output == 0
 
 
@@ -3431,6 +3508,73 @@ def test_api_charge_level_posts_remain_read_only_without_controller():
 
         missing_controller_post_max = requests.post(f"{runtime.base_url}/api/max_charge_level?value=80", timeout=2)
         assert missing_controller_post_max.status_code == 405
+    finally:
+        runtime.cleanup()
+
+
+def test_api_full_charge_once_get_arm_and_cancel():
+    runtime = _start_test_api_server()
+    try:
+        initial_response = requests.get(f"{runtime.base_url}/api/full_charge_once", timeout=2)
+        assert initial_response.status_code == 200
+        assert initial_response.json() == {
+            "active": False,
+            "armedAt": None,
+            "configuredMaxChargeLevel": 91,
+            "effectiveMaxChargeLevel": 91,
+            "expiresAt": None,
+            "lastResetReason": None,
+            "ok": True,
+            "resetOnRestart": True,
+            "targetChargeLevel": None,
+        }
+
+        arm_response = requests.post(f"{runtime.base_url}/api/full_charge_once?state=on", timeout=2)
+        assert arm_response.status_code == 200
+        arm_payload = arm_response.json()
+        assert arm_payload["active"] is True
+        assert arm_payload["configuredMaxChargeLevel"] == 91
+        assert arm_payload["effectiveMaxChargeLevel"] == 100
+        assert arm_payload["targetChargeLevel"] == 100
+        assert arm_payload["expiresAt"] == 1000 + (24 * 60 * 60)
+        assert runtime.controller.max_charge_level == 100
+
+        arm_again_response = requests.post(f"{runtime.base_url}/api/full_charge_once?state=on", timeout=2)
+        assert arm_again_response.status_code == 200
+        assert arm_again_response.json()["armedAt"] == 1000
+
+        cancel_response = requests.post(f"{runtime.base_url}/api/full_charge_once?state=off", timeout=2)
+        assert cancel_response.status_code == 200
+        cancel_payload = cancel_response.json()
+        assert cancel_payload["active"] is False
+        assert cancel_payload["effectiveMaxChargeLevel"] == 91
+        assert cancel_payload["lastResetReason"] == "manual"
+        assert runtime.controller.max_charge_level == 91
+    finally:
+        runtime.cleanup()
+
+
+def test_api_full_charge_once_validation_unavailable_and_not_needed():
+    runtime = _start_test_api_server()
+    try:
+        missing_state = requests.post(f"{runtime.base_url}/api/full_charge_once", timeout=2)
+        assert missing_state.status_code == 400
+
+        invalid_state = requests.post(f"{runtime.base_url}/api/full_charge_once?state=tomorrow", timeout=2)
+        assert invalid_state.status_code == 400
+
+        runtime.controller.configured_max_charge_level = 100
+        runtime.controller.max_charge_level = 100
+        not_needed = requests.post(f"{runtime.base_url}/api/full_charge_once?state=on", timeout=2)
+        assert not_needed.status_code == 200
+        assert not_needed.json()["active"] is False
+        assert "already 100%" in not_needed.json()["message"]
+
+        runtime.server.controller = None
+        missing_controller_get = requests.get(f"{runtime.base_url}/api/full_charge_once", timeout=2)
+        assert missing_controller_get.status_code == 503
+        missing_controller_post = requests.post(f"{runtime.base_url}/api/full_charge_once?state=on", timeout=2)
+        assert missing_controller_post.status_code == 503
     finally:
         runtime.cleanup()
 

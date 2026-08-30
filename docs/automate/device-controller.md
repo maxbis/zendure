@@ -12,6 +12,8 @@ This file provides a set of Python classes designed to interact with and control
 
 The shared loader is strict. Missing, malformed or invalid shared configuration prevents controller construction; the controller does not substitute local safety fallbacks.
 
+The controller also supports a memory-only one-time full-charge exception. The configured maximum remains unchanged while `max_charge_level` becomes 100% for battery-limit enforcement. The exception clears when live SoC reaches 100%, when cancelled, after 24 hours, or when a new controller is created during restart.
+
 ## `PowerResult` Data Class
 
 A simple data class used to return the result of a power-setting operation.
@@ -91,7 +93,15 @@ Inherits from `BaseDeviceController`. This class is responsible for the core log
 
 ### `check_battery_limits(self) -> None`
 
--   **Description**: Reads the current battery level from the Zendure device and updates the internal `limit_state` property. This state is used to prevent charging a full battery or discharging an empty one. Sets `limit_state` to `-1` (MIN), `0` (OK), or `1` (MAX).
+-   **Description**: Reads the current battery level from the Zendure device, evaluates completion or expiry of the one-time full-charge exception, and updates the internal `limit_state` property. This state is used to prevent charging a full battery or discharging an empty one. Sets `limit_state` to `-1` (MIN), `0` (OK), or `1` (MAX).
+
+### One-time full-charge methods
+
+- `arm_full_charge_once()` arms an idempotent, memory-only 100% effective maximum for 24 hours.
+- `cancel_full_charge_once(reason)` restores the configured maximum and records the reset reason.
+- `evaluate_full_charge_override(electric_level, now)` clears the exception on target or timeout.
+- `get_full_charge_override_status()` returns configured and effective maximums plus lifecycle timestamps.
+- `get_effective_max_charge_level(electric_level, now)` is used by battery-limit calculations so completion is applied before the current command is accepted.
 
 ### `_send_power_feed(self, power_feed: int) -> Tuple[bool, Optional[str], int]`
 

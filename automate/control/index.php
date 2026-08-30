@@ -160,6 +160,53 @@ foreach ($groupedCommands as $groupKey => $commands) {
       line-height: 1.4;
       max-width: 520px;
     }
+    .override-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .override-metric {
+      padding: 10px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+    .override-metric-label {
+      display: block;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .override-metric-value {
+      color: var(--text-primary);
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .override-state {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .override-state.active {
+      color: #ffe09a;
+      border-color: #bc8525;
+      background: rgba(122, 86, 24, 0.35);
+    }
+    .override-expiry {
+      margin: 0 0 12px;
+      color: var(--text-tertiary);
+      font-size: 13px;
+      line-height: 1.4;
+    }
     .netzero-submit {
       align-self: flex-end;
       min-height: 38px;
@@ -171,6 +218,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
       .control-help-inline {
         max-width: 100%;
       }
+    }
+    @media (max-width: 520px) {
+      .override-summary { grid-template-columns: 1fr; }
     }
     .command-btn {
       padding: 6px 12px;
@@ -356,6 +406,27 @@ foreach ($groupedCommands as $groupKey => $commands) {
           <?php endforeach; ?>
 
           <div class="command-group">
+            <div class="command-group-title">One-time Full Charge</div>
+            <div class="command-group-desc">Temporarily allow the existing schedule to charge to 100%. This permits charging but does not start it.</div>
+            <div id="fullChargeState" class="override-state">Loading status…</div>
+            <div class="override-summary">
+              <div class="override-metric">
+                <span class="override-metric-label">Normal maximum</span>
+                <span id="fullChargeConfiguredMax" class="override-metric-value">--</span>
+              </div>
+              <div class="override-metric">
+                <span class="override-metric-label">Effective maximum</span>
+                <span id="fullChargeEffectiveMax" class="override-metric-value">--</span>
+              </div>
+            </div>
+            <p id="fullChargeExpiry" class="override-expiry">The override clears at 100%, after 24 hours, when cancelled, or when automation restarts.</p>
+            <div class="command-actions">
+              <button id="fullChargeStart" type="button" class="btn btn-warning command-btn" data-command="start_full_charge_once">Allow 100% Once</button>
+              <button id="fullChargeCancel" type="button" class="btn btn-danger command-btn" data-command="cancel_full_charge_once" hidden>Cancel Override</button>
+            </div>
+          </div>
+
+          <div class="command-group">
             <div class="command-group-title">Runtime Overrides</div>
             <div class="command-group-desc">Adjust the runtime <code>NETZERO_TARGET_W</code> target used by automation.</div>
             <div class="control-form">
@@ -368,7 +439,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
               </div>
               <div class="control-help-inline">Use negative values to prefer export, positive values to prefer import, and <code>0</code> for exact netzero.</div>
             </div>
-            <div class="control-help">Battery charge limits are read-only here and come from <code>common/config/system.json</code>. Restart automation after changing that file.</div>
+            <div class="control-help">Configured battery charge limits remain read-only and come from <code>common/config/system.json</code>. The one-time full-charge action above changes only the running automation process.</div>
           </div>
         </div>
 
@@ -400,6 +471,13 @@ foreach ($groupedCommands as $groupKey => $commands) {
       var buttons = Array.prototype.slice.call(document.querySelectorAll('.command-btn'));
       var netzeroInput = document.getElementById('netzeroTargetInput');
       var netzeroSubmit = document.getElementById('netzeroTargetSubmit');
+      var fullChargeState = document.getElementById('fullChargeState');
+      var fullChargeConfiguredMax = document.getElementById('fullChargeConfiguredMax');
+      var fullChargeEffectiveMax = document.getElementById('fullChargeEffectiveMax');
+      var fullChargeExpiry = document.getElementById('fullChargeExpiry');
+      var fullChargeStart = document.getElementById('fullChargeStart');
+      var fullChargeCancel = document.getElementById('fullChargeCancel');
+      var fullChargePollTimer = null;
       var proxyUrl = <?= json_encode($commandProxyUrl, JSON_UNESCAPED_SLASHES) ?>;
       var commands = <?= json_encode($commandUi, JSON_UNESCAPED_SLASHES) ?>;
 
@@ -418,7 +496,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
 
       function setButtonsDisabled(disabled) {
         buttons.forEach(function (btn) {
-          btn.disabled = !!disabled;
+          btn.disabled = !!disabled || btn.getAttribute('data-permanent-disabled') === 'true';
         });
       }
 
@@ -431,6 +509,78 @@ foreach ($groupedCommands as $groupKey => $commands) {
               throw new Error(msg);
             }
             return payload;
+          });
+      }
+
+      function upstreamBody(payload) {
+        return payload && typeof payload.upstreamBody === 'object' && payload.upstreamBody !== null
+          ? payload.upstreamBody
+          : payload;
+      }
+
+      function formatPercent(value) {
+        return Number.isFinite(Number(value)) ? String(Number(value)) + '%' : '--';
+      }
+
+      function renderFullChargeStatus(payload) {
+        var state = upstreamBody(payload) || {};
+        var active = state.active === true;
+        var configuredMax = Number(state.configuredMaxChargeLevel);
+        var effectiveMax = Number(state.effectiveMaxChargeLevel);
+
+        fullChargeStart.removeAttribute('data-permanent-disabled');
+        fullChargeCancel.removeAttribute('data-permanent-disabled');
+        fullChargeStart.disabled = false;
+        fullChargeCancel.disabled = false;
+        fullChargeConfiguredMax.textContent = formatPercent(configuredMax);
+        fullChargeEffectiveMax.textContent = formatPercent(effectiveMax);
+        fullChargeState.textContent = active ? 'Override active' : 'Normal limit active';
+        fullChargeState.classList.toggle('active', active);
+        fullChargeStart.hidden = active;
+        fullChargeCancel.hidden = !active;
+
+        if (active && Number.isFinite(Number(state.expiresAt))) {
+          var expiry = new Date(Number(state.expiresAt) * 1000);
+          fullChargeExpiry.textContent = 'Expires ' + expiry.toLocaleString() + '. It also clears at 100%, when cancelled, or when automation restarts.';
+        } else if (configuredMax >= 100) {
+          fullChargeExpiry.textContent = 'The configured maximum is already 100%; no temporary override is needed.';
+          fullChargeStart.setAttribute('data-permanent-disabled', 'true');
+          fullChargeStart.disabled = true;
+        } else {
+          fullChargeExpiry.textContent = 'The override clears at 100%, after 24 hours, when cancelled, or when automation restarts.';
+          fullChargeStart.removeAttribute('data-permanent-disabled');
+          fullChargeStart.disabled = false;
+        }
+
+        if (fullChargePollTimer) {
+          window.clearTimeout(fullChargePollTimer);
+          fullChargePollTimer = null;
+        }
+        if (active) {
+          fullChargePollTimer = window.setTimeout(loadFullChargeStatus, 30000);
+        }
+      }
+
+      function loadFullChargeStatus() {
+        fullChargeStart.disabled = true;
+        fullChargeCancel.disabled = true;
+        fetch(proxyUrl + '?command=get_full_charge_once', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        })
+          .then(parseJsonResponse)
+          .then(renderFullChargeStatus)
+          .catch(function () {
+            fullChargeState.textContent = 'Status unavailable';
+            fullChargeState.classList.remove('active');
+            fullChargeStart.setAttribute('data-permanent-disabled', 'true');
+            fullChargeCancel.setAttribute('data-permanent-disabled', 'true');
+            fullChargeStart.disabled = true;
+            fullChargeCancel.disabled = true;
+            if (fullChargePollTimer) {
+              window.clearTimeout(fullChargePollTimer);
+            }
+            fullChargePollTimer = window.setTimeout(loadFullChargeStatus, 30000);
           });
       }
 
@@ -467,6 +617,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
           })
           .finally(function () {
             setButtonsDisabled(false);
+            if (commandKey === 'start_full_charge_once' || commandKey === 'cancel_full_charge_once') {
+              loadFullChargeStatus();
+            }
           });
       }
 
@@ -585,6 +738,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
       });
 
       loadNetzeroTarget();
+      loadFullChargeStatus();
     })();
   </script>
   <?php endif; ?>

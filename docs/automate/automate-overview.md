@@ -30,6 +30,8 @@ This module provides object-oriented wrappers for interacting with the Zendure b
 
 For detailed API documentation, see [device-controller.md](device-controller.md).
 
+The authenticated control page also provides a memory-only [one-time full-charge override](control/one-time-full-charge.md) that temporarily raises the effective maximum to 100% without modifying shared configuration.
+
 ### `automate_www.py`
 
 This is the active automation script with a built-in HTTP API:

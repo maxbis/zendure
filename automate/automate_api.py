@@ -38,6 +38,7 @@ API_PATH_SLOW_CHARGE_MAX_POWER = "/api/slow_charge_max_power"
 API_PATH_NETZERO_TARGET_W = "/api/netzero_target_w"
 API_PATH_MIN_CHARGE_LEVEL = "/api/min_charge_level"
 API_PATH_MAX_CHARGE_LEVEL = "/api/max_charge_level"
+API_PATH_FULL_CHARGE_ONCE = "/api/full_charge_once"
 
 TEST_ENDPOINTS = [
     {"path": API_PATH_TEST, "optional_params": []},
@@ -56,6 +57,7 @@ TEST_ENDPOINTS = [
     {"path": API_PATH_NETZERO_TARGET_W, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime NETZERO_TARGET_W override as a signed integer"}]},
     {"path": API_PATH_MIN_CHARGE_LEVEL, "optional_params": []},
     {"path": API_PATH_MAX_CHARGE_LEVEL, "optional_params": []},
+    {"path": API_PATH_FULL_CHARGE_ONCE, "optional_params": [{"name": "state", "type": "string", "allowed": ["on", "off"], "description": "POST only: arm or cancel the one-time 100% charge-limit override"}]},
 ]
 
 CONTROL_COMMANDS = [
@@ -72,6 +74,8 @@ CONTROL_COMMANDS = [
     {"path": API_PATH_NETZERO_TARGET_W, "name": "netzero_target_w_set", "method": "POST", "description": "Set runtime NETZERO_TARGET_W override", "example": f"{API_PATH_NETZERO_TARGET_W}?value=-50"},
     {"path": API_PATH_MIN_CHARGE_LEVEL, "name": "min_charge_level_status", "method": "GET", "description": "Get shared minimum battery state-of-charge limit", "example": f"{API_PATH_MIN_CHARGE_LEVEL}"},
     {"path": API_PATH_MAX_CHARGE_LEVEL, "name": "max_charge_level_status", "method": "GET", "description": "Get shared maximum battery state-of-charge limit", "example": f"{API_PATH_MAX_CHARGE_LEVEL}"},
+    {"path": API_PATH_FULL_CHARGE_ONCE, "name": "full_charge_once_status", "method": "GET", "description": "Get the one-time 100% charge-limit override state", "example": f"{API_PATH_FULL_CHARGE_ONCE}"},
+    {"path": API_PATH_FULL_CHARGE_ONCE, "name": "full_charge_once_set", "method": "POST", "description": "Arm or cancel the one-time 100% charge-limit override", "example": f"{API_PATH_FULL_CHARGE_ONCE}?state=on"},
 ]
 
 
@@ -170,6 +174,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_netzero_target_w_get",
         "_handle_min_charge_level_get",
         "_handle_max_charge_level_get",
+        "_handle_full_charge_once_get",
     )
     STATEFUL_GET_ROUTES = (
         "_handle_automation_status",
@@ -187,6 +192,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_netzero_target_w_post",
         "_handle_min_charge_level_post",
         "_handle_max_charge_level_post",
+        "_handle_full_charge_once_post",
     )
 
     def _send_json(self, data, status=200, sort_keys=True):
@@ -479,10 +485,27 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         return self._parse_int_query(parsed, "value")
 
     def _charge_level_payload(self, controller: Any, message: Optional[str] = None) -> dict[str, Any]:
+        override_status = None
+        get_override_status = getattr(controller, "get_full_charge_override_status", None)
+        if callable(get_override_status):
+            override_status = get_override_status()
+        configured_max = int(
+            override_status.get("configured_max_charge_level", controller.max_charge_level)
+            if isinstance(override_status, dict)
+            else getattr(controller, "configured_max_charge_level", controller.max_charge_level)
+        )
+        effective_max = int(
+            override_status.get("effective_max_charge_level", controller.max_charge_level)
+            if isinstance(override_status, dict)
+            else controller.max_charge_level
+        )
         payload: dict[str, Any] = {
             "ok": True,
             "minChargeLevel": int(controller.min_charge_level),
-            "maxChargeLevel": int(controller.max_charge_level),
+            "maxChargeLevel": effective_max,
+            "configuredMaxChargeLevel": configured_max,
+            "effectiveMaxChargeLevel": effective_max,
+            "fullChargeOverrideActive": bool(override_status.get("active", False)) if isinstance(override_status, dict) else False,
             "readOnly": True,
             "source": "common/config/system.json",
         }
@@ -649,6 +672,70 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
             "source": "common/config/system.json",
             "error": "Battery charge limits are read-only. Change them persistently in common/config/system.json and restart automation.",
         }, 405)
+        return True
+
+    @staticmethod
+    def _full_charge_once_payload(status: dict[str, Any], message: Optional[str] = None) -> dict[str, Any]:
+        payload = {
+            "ok": True,
+            "active": bool(status.get("active", False)),
+            "configuredMaxChargeLevel": int(status.get("configured_max_charge_level", 100)),
+            "effectiveMaxChargeLevel": int(status.get("effective_max_charge_level", 100)),
+            "targetChargeLevel": status.get("target_charge_level"),
+            "armedAt": status.get("armed_at"),
+            "expiresAt": status.get("expires_at"),
+            "resetOnRestart": bool(status.get("reset_on_restart", True)),
+            "lastResetReason": status.get("last_reset_reason"),
+        }
+        if message:
+            payload["message"] = message
+        return payload
+
+    def _handle_full_charge_once_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_FULL_CHARGE_ONCE:
+            return False
+        controller = getattr(self.server, "controller", None)
+        get_status = getattr(controller, "get_full_charge_override_status", None) if controller is not None else None
+        if not callable(get_status):
+            self._send_json({"ok": False, "error": "One-time full-charge control not available"}, 503)
+            return True
+        self._send_json(self._full_charge_once_payload(get_status()))
+        return True
+
+    def _handle_full_charge_once_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_FULL_CHARGE_ONCE:
+            return False
+        controller = getattr(self.server, "controller", None)
+        if controller is None:
+            self._send_json({"ok": False, "error": "One-time full-charge control not available"}, 503)
+            return True
+        query = parse_qs(parsed.query)
+        raw_state = str(query.get("state", [""])[0]).strip().lower()
+        if raw_state not in ("on", "off"):
+            self._send_json({"ok": False, "error": "Invalid state. Use state=on or state=off."}, 400)
+            return True
+
+        if raw_state == "on":
+            arm_override = getattr(controller, "arm_full_charge_once", None)
+            if not callable(arm_override):
+                self._send_json({"ok": False, "error": "One-time full-charge control not available"}, 503)
+                return True
+            status = arm_override()
+            if status.get("last_reset_reason") == "not_needed":
+                message = "Configured maximum is already 100%; no override is needed."
+            elif status.get("active"):
+                message = "One-time 100% charge-limit override is active."
+            else:
+                message = "One-time 100% charge-limit override was not activated."
+        else:
+            cancel_override = getattr(controller, "cancel_full_charge_once", None)
+            if not callable(cancel_override):
+                self._send_json({"ok": False, "error": "One-time full-charge control not available"}, 503)
+                return True
+            status = cancel_override("manual")
+            message = "One-time 100% charge-limit override cancelled."
+
+        self._send_json(self._full_charge_once_payload(status, message))
         return True
 
     def _handle_automation_status(self, parsed) -> bool:

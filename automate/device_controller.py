@@ -9,6 +9,7 @@ functionality in zero_feed_in_controller.py.
 
 import json
 import time
+import threading
 
 from collections import deque
 from dataclasses import dataclass
@@ -144,6 +145,8 @@ class BaseDeviceController:
     REQUEST_TIMEOUT = 5  # Timeout in seconds for HTTP requests
     _DEFAULT_LOG_LEVEL = "INFO"
     _RECENT_LOG_WINDOW = 3
+    FULL_CHARGE_OVERRIDE_SECONDS = 24 * 60 * 60
+    FULL_CHARGE_OVERRIDE_TARGET = 100
     _LOG_LEVEL_PRIORITY = {
         "DEBUG": 10,
         "INFO": 20,
@@ -200,7 +203,14 @@ class BaseDeviceController:
         slow_charge_max_power_raw = self.config.get("SLOW_CHARGE_MAX_POWER")
 
         self.min_charge_level = min_soc
+        self.configured_max_charge_level = max_soc
         self.max_charge_level = max_soc
+        self._full_charge_override_lock = threading.Lock()
+        self._full_charge_override_active = False
+        self._full_charge_override_target: Optional[int] = None
+        self._full_charge_override_armed_at: Optional[int] = None
+        self._full_charge_override_expires_at: Optional[int] = None
+        self._full_charge_override_last_reset_reason: Optional[str] = None
         self.max_discharge_power = max_discharge_power
         self.max_charge_power = max_charge_power
         self.netzero_target_w = netzero_target_w
@@ -217,6 +227,123 @@ class BaseDeviceController:
 
         # Track the last N emitted keyed log entries to suppress repeats.
         self._recent_log_messages = deque(maxlen=self._RECENT_LOG_WINDOW)
+
+    def _full_charge_override_status_locked(self) -> Dict[str, Any]:
+        return {
+            "active": bool(self._full_charge_override_active),
+            "configured_max_charge_level": int(self.configured_max_charge_level),
+            "effective_max_charge_level": int(self.max_charge_level),
+            "target_charge_level": self._full_charge_override_target,
+            "armed_at": self._full_charge_override_armed_at,
+            "expires_at": self._full_charge_override_expires_at,
+            "reset_on_restart": True,
+            "last_reset_reason": self._full_charge_override_last_reset_reason,
+        }
+
+    def arm_full_charge_once(self, now: Optional[float] = None) -> Dict[str, Any]:
+        """Temporarily allow charging to 100% until completion, expiry, or restart."""
+        now_ts = int(time.time() if now is None else now)
+        log_message = None
+        with self._full_charge_override_lock:
+            if self.configured_max_charge_level >= self.FULL_CHARGE_OVERRIDE_TARGET:
+                self._full_charge_override_last_reset_reason = "not_needed"
+                return self._full_charge_override_status_locked()
+            if not self._full_charge_override_active:
+                self._full_charge_override_active = True
+                self._full_charge_override_target = self.FULL_CHARGE_OVERRIDE_TARGET
+                self._full_charge_override_armed_at = now_ts
+                self._full_charge_override_expires_at = now_ts + self.FULL_CHARGE_OVERRIDE_SECONDS
+                self._full_charge_override_last_reset_reason = None
+                self.max_charge_level = self.FULL_CHARGE_OVERRIDE_TARGET
+                log_message = (
+                    "One-time full-charge override armed: "
+                    f"{self.configured_max_charge_level}% -> {self.max_charge_level}% "
+                    f"until {self._full_charge_override_expires_at}"
+                )
+            status = self._full_charge_override_status_locked()
+        if log_message:
+            self.log("info", log_message)
+        return status
+
+    def cancel_full_charge_once(self, reason: str = "manual") -> Dict[str, Any]:
+        """Restore the configured maximum and clear the runtime override."""
+        normalized_reason = str(reason or "manual").strip().lower() or "manual"
+        with self._full_charge_override_lock:
+            status, log_message = self._clear_full_charge_override_locked(normalized_reason)
+        if log_message:
+            self.log("info", log_message)
+        return status
+
+    def _clear_full_charge_override_locked(self, reason: str) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Clear override state while the caller holds the override lock."""
+        log_message = None
+        if self._full_charge_override_active:
+            previous_max = self.max_charge_level
+            self._full_charge_override_active = False
+            self._full_charge_override_target = None
+            self._full_charge_override_armed_at = None
+            self._full_charge_override_expires_at = None
+            self.max_charge_level = self.configured_max_charge_level
+            log_message = (
+                "One-time full-charge override cleared "
+                f"({reason}): {previous_max}% -> {self.max_charge_level}%"
+            )
+        self._full_charge_override_last_reset_reason = reason
+        return self._full_charge_override_status_locked(), log_message
+
+    def evaluate_full_charge_override(
+        self,
+        electric_level: Optional[Union[int, float]] = None,
+        now: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Clear an active override when it expires or its 100% target is reached."""
+        if not hasattr(self, "_full_charge_override_lock"):
+            return {
+                "active": False,
+                "configured_max_charge_level": int(self.max_charge_level),
+                "effective_max_charge_level": int(self.max_charge_level),
+                "target_charge_level": None,
+                "armed_at": None,
+                "expires_at": None,
+                "reset_on_restart": True,
+                "last_reset_reason": None,
+            }
+
+        now_ts = int(time.time() if now is None else now)
+        reset_reason = None
+        log_message = None
+        with self._full_charge_override_lock:
+            if self._full_charge_override_active:
+                expires_at = self._full_charge_override_expires_at
+                target = self._full_charge_override_target
+                if expires_at is not None and now_ts >= expires_at:
+                    reset_reason = "expired"
+                elif electric_level is not None and target is not None:
+                    try:
+                        if float(electric_level) >= float(target):
+                            reset_reason = "target_reached"
+                    except (TypeError, ValueError):
+                        pass
+            if reset_reason is not None:
+                status, log_message = self._clear_full_charge_override_locked(reset_reason)
+            else:
+                status = self._full_charge_override_status_locked()
+        if log_message:
+            self.log("info", log_message)
+        return status
+
+    def get_full_charge_override_status(self, now: Optional[float] = None) -> Dict[str, Any]:
+        """Return current override state, applying timeout expiry before reading it."""
+        return self.evaluate_full_charge_override(now=now)
+
+    def get_effective_max_charge_level(
+        self,
+        electric_level: Optional[Union[int, float]] = None,
+        now: Optional[float] = None,
+    ) -> int:
+        """Return the active maximum after applying completion and timeout resets."""
+        status = self.evaluate_full_charge_override(electric_level=electric_level, now=now)
+        return int(status["effective_max_charge_level"])
 
     def _find_config_file(self) -> Path:
         """
@@ -562,10 +689,12 @@ class AutomateController(BaseDeviceController):
             self.limit_state = 0
             return
 
+        effective_max_charge_level = self.get_effective_max_charge_level(battery_level)
+
         # Check limits
         if battery_level <= self.min_charge_level:
             self.limit_state = -1
-        elif battery_level >= self.max_charge_level:
+        elif battery_level >= effective_max_charge_level:
             self.limit_state = 1
         else:
             self.limit_state = 0
@@ -586,7 +715,7 @@ class AutomateController(BaseDeviceController):
         self.log(
             'info',
             f"Battery limit check: level={battery_level}% min={self.min_charge_level}% "
-            f"max={self.max_charge_level}% state={state_label} "
+            f"max={effective_max_charge_level}% state={state_label} "
             f"charge_allowed={charge_allowed} discharge_allowed={discharge_allowed}",
         )
 
@@ -759,12 +888,13 @@ class AutomateController(BaseDeviceController):
 
         # Battery constraints applied on desired feed
         if electric_level is not None:
+            effective_max_charge_level = self.get_effective_max_charge_level(electric_level)
             # Too full to charge
-            if electric_level >= self.max_charge_level and effective_desired < 0:
+            if electric_level >= effective_max_charge_level and effective_desired < 0:
                 effective_desired = 0
                 self.log(
                     'warning',
-                    f"Charge level at/above {self.max_charge_level}%, actual level {electric_level}%, preventing charge",
+                    f"Charge level at/above {effective_max_charge_level}%, actual level {electric_level}%, preventing charge",
                     message_key='battery_max_charge_block',
                 )
             # Too empty to discharge
