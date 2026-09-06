@@ -115,6 +115,30 @@ foreach ($groupedCommands as $groupKey => $commands) {
       gap: 8px;
       flex-wrap: wrap;
     }
+    .current-setting {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      min-height: 32px;
+      margin: 0 0 12px;
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+    }
+    .current-setting-label {
+      color: var(--text-tertiary);
+      font-size: 12px;
+    }
+    .current-setting-value {
+      color: var(--text-primary);
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .current-setting.error .current-setting-value { color: #e57373; }
+    .command-btn.is-current {
+      box-shadow: 0 0 0 2px var(--text-primary);
+    }
     .control-form {
       display: grid;
       gap: 10px;
@@ -390,6 +414,12 @@ foreach ($groupedCommands as $groupKey => $commands) {
             <div class="command-group">
               <div class="command-group-title"><?= htmlspecialchars($groupTitle, ENT_QUOTES, 'UTF-8') ?></div>
               <div class="command-group-desc"><?= htmlspecialchars($groupDescription, ENT_QUOTES, 'UTF-8') ?></div>
+              <?php if ($groupKey === 'slow_charge'): ?>
+                <div id="slowChargeCurrent" class="current-setting" role="status" aria-live="polite">
+                  <span class="current-setting-label">Current setting</span>
+                  <strong id="slowChargeCurrentValue" class="current-setting-value">Loading…</strong>
+                </div>
+              <?php endif; ?>
               <div class="command-actions">
                 <?php foreach ($commands as $key => $cfg): ?>
                   <button
@@ -477,6 +507,8 @@ foreach ($groupedCommands as $groupKey => $commands) {
       var fullChargeExpiry = document.getElementById('fullChargeExpiry');
       var fullChargeStart = document.getElementById('fullChargeStart');
       var fullChargeCancel = document.getElementById('fullChargeCancel');
+      var slowChargeCurrent = document.getElementById('slowChargeCurrent');
+      var slowChargeCurrentValue = document.getElementById('slowChargeCurrentValue');
       var fullChargePollTimer = null;
       var proxyUrl = <?= json_encode($commandProxyUrl, JSON_UNESCAPED_SLASHES) ?>;
       var commands = <?= json_encode($commandUi, JSON_UNESCAPED_SLASHES) ?>;
@@ -520,6 +552,47 @@ foreach ($groupedCommands as $groupKey => $commands) {
 
       function formatPercent(value) {
         return Number.isFinite(Number(value)) ? String(Number(value)) + '%' : '--';
+      }
+
+      function renderSlowChargeStatus(payload) {
+        if (!slowChargeCurrent || !slowChargeCurrentValue) {
+          return;
+        }
+        var state = upstreamBody(payload) || {};
+        var value = state.slowChargeMaxPower;
+        var numericValue = Number(value);
+        var hasValue = value !== null && value !== '' && Number.isFinite(numericValue);
+
+        slowChargeCurrent.classList.remove('error');
+        slowChargeCurrentValue.textContent = hasValue ? String(numericValue) + ' W' : 'Not configured';
+
+        buttons.forEach(function (btn) {
+          var commandKey = btn.getAttribute('data-command') || '';
+          if (commandKey.indexOf('slow_charge_') !== 0) {
+            return;
+          }
+          var cfg = commands[commandKey] || {};
+          var match = String(cfg.path || '').match(/[?&]value=(\d+)/);
+          var isCurrent = hasValue && match && Number(match[1]) === numericValue;
+          btn.classList.toggle('is-current', !!isCurrent);
+          btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+        });
+      }
+
+      function loadSlowChargeStatus() {
+        if (!slowChargeCurrent || !slowChargeCurrentValue) {
+          return;
+        }
+        fetch(proxyUrl + '?command=get_slow_charge_max_power', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        })
+          .then(parseJsonResponse)
+          .then(renderSlowChargeStatus)
+          .catch(function () {
+            slowChargeCurrent.classList.add('error');
+            slowChargeCurrentValue.textContent = 'Unavailable';
+          });
       }
 
       function renderFullChargeStatus(payload) {
@@ -605,6 +678,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
           .then(parseJsonResponse)
           .then(function (payload) {
             var msg = payload.message || (cfg.label + ' command completed.');
+            if (commandKey.indexOf('slow_charge_') === 0) {
+              renderSlowChargeStatus(payload);
+            }
             setStatus(msg, 'ok');
           })
           .catch(function (err) {
@@ -738,6 +814,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
       });
 
       loadNetzeroTarget();
+      loadSlowChargeStatus();
       loadFullChargeStatus();
     })();
   </script>
