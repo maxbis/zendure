@@ -98,6 +98,7 @@
         btnProfileLeft: document.getElementById('btn-profile-left'),
         btnProfileRight: document.getElementById('btn-profile-right'),
         profileRuleMembership: document.getElementById('profile-rule-membership'),
+        profileRuleMembershipHint: document.getElementById('profile-rule-membership-hint'),
         profileSelectionStatus: document.getElementById('profile-selection-status'),
         profileModeManual: document.getElementById('profile-mode-manual'),
         profileModeAuto: document.getElementById('profile-mode-auto'),
@@ -1498,6 +1499,32 @@
             label.appendChild(text);
             els.profileRuleMembership.appendChild(label);
         });
+
+        updateProfileRuleMembershipHint();
+        window.requestAnimationFrame(updateProfileRuleMembershipHint);
+    }
+
+    function updateProfileRuleMembershipHint() {
+        if (!els.profileRuleMembership || !els.profileRuleMembershipHint) return;
+
+        const list = els.profileRuleMembership;
+        const total = list.querySelectorAll('input[data-profile-rule-id]').length;
+        const ruleLabel = total === 1 ? '1 rule' : total + ' rules';
+        const isScrollable = list.scrollHeight > list.clientHeight + 1;
+
+        list.dataset.scrollable = isScrollable ? 'true' : 'false';
+        if (!isScrollable) {
+            list.dataset.scrollPosition = 'all';
+            els.profileRuleMembershipHint.textContent = ruleLabel + ' · All visible';
+            return;
+        }
+
+        const atTop = list.scrollTop <= 1;
+        const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+        list.dataset.scrollPosition = atTop ? 'top' : (atBottom ? 'bottom' : 'middle');
+        els.profileRuleMembershipHint.textContent = atTop
+            ? ruleLabel + ' · Scroll for more ↓'
+            : (atBottom ? ruleLabel + ' · End of list ↑' : ruleLabel + ' · Scroll ↑↓');
     }
 
     function renderProfiles() {
@@ -2670,7 +2697,10 @@
                 persistProfileEditorChanges();
                 renderTable();
             });
+            els.profileRuleMembership.addEventListener('scroll', updateProfileRuleMembershipHint, { passive: true });
         }
+
+        window.addEventListener('resize', updateProfileRuleMembershipHint);
 
         if (els.inpProfileShortName) {
             els.inpProfileShortName.addEventListener('input', function () {

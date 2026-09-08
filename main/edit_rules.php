@@ -658,8 +658,18 @@ $editorTodayContext = resolveEditorTodayContext();
                     </div>
                 </div>
                 <div class="profile-editor-column profile-editor-column-rules">
-                    <label>Rules In Profile</label>
-                    <div id="profile-rule-membership" class="profile-rule-membership"></div>
+                    <div class="profile-rule-membership-heading">
+                        <span id="profile-rule-membership-label">Rules In Profile</span>
+                        <span id="profile-rule-membership-hint" class="profile-rule-membership-hint">Loading rules…</span>
+                    </div>
+                    <div
+                        id="profile-rule-membership"
+                        class="profile-rule-membership"
+                        role="group"
+                        aria-labelledby="profile-rule-membership-label"
+                        aria-describedby="profile-rule-membership-hint"
+                        tabindex="0"
+                    ></div>
                 </div>
             </div>
             <div id="profile-auto-preview" class="profile-auto-preview" hidden>

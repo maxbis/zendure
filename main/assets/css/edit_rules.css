@@ -279,6 +279,20 @@ code {
     min-width: 0;
 }
 
+.profile-rule-membership-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.profile-rule-membership-hint {
+    color: var(--gsd-text-muted);
+    font-size: 0.78rem;
+    font-weight: 550;
+    text-align: right;
+}
+
 .profile-field-group {
     display: grid;
     gap: 8px;
@@ -349,9 +363,39 @@ code {
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
-    max-height: 150px;
-    overflow: auto;
-    padding-right: 4px;
+    max-height: 430px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 2px 8px 2px 2px;
+    border-radius: var(--gsd-radius-md);
+    scrollbar-color: var(--gsd-border-strong) var(--gsd-surface-1);
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+}
+
+.profile-rule-membership::-webkit-scrollbar {
+    width: 10px;
+}
+
+.profile-rule-membership::-webkit-scrollbar-track {
+    background: var(--gsd-surface-1);
+    border-radius: 999px;
+}
+
+.profile-rule-membership::-webkit-scrollbar-thumb {
+    min-height: 36px;
+    background: var(--gsd-border-strong);
+    border: 2px solid var(--gsd-surface-1);
+    border-radius: 999px;
+}
+
+.profile-rule-membership::-webkit-scrollbar-thumb:hover {
+    background: var(--gsd-text-muted);
+}
+
+.profile-rule-membership:focus-visible {
+    outline: 2px solid var(--gsd-focus-ring);
+    outline-offset: 3px;
 }
 
 .profile-rule-chip {
@@ -2131,5 +2175,9 @@ button.danger.condition-remove-btn:hover {
 
     .profile-swr-grid {
         grid-template-columns: 1fr;
+    }
+
+    .profile-rule-membership {
+        max-height: 300px;
     }
 }
