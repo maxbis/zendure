@@ -1679,8 +1679,12 @@
             }
             if (hasRuntimeRule) {
                 actionElement.dataset.runtimeRule = "true";
-                if (Object.prototype.hasOwnProperty.call(slot, "fallback_value") && slot.fallback_value !== null) {
-                    actionElement.dataset.fallbackTone = actionTone(runtimeFallbackAction(slot));
+                const fallbackAction = runtimeFallbackAction(slot);
+                if (!actionsMatch(action, fallbackAction)) {
+                    actionElement.dataset.fallbackTone = actionTone(fallbackAction);
+                    if (fallbackAction.type === "standby") {
+                        actionElement.dataset.fallbackLabel = "0";
+                    }
                 }
             }
             if (action.type === "netzero") actionElement.dataset.netzeroDirection = action.direction;

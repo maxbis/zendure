@@ -2435,6 +2435,34 @@ button.app-state-pill:focus-visible {
     background: var(--gsd-neutral);
 }
 
+.app-price-hour__action[data-fallback-label="0"] {
+    padding-bottom: 8px;
+}
+
+.app-price-hour__action[data-fallback-label="0"]::after {
+    content: "0";
+    display: grid;
+    height: 8px;
+    place-items: center;
+    background: var(--gsd-surface-3);
+    border-top: 1px solid color-mix(in srgb, var(--gsd-text-muted) 45%, transparent);
+    color: var(--gsd-text-secondary);
+    font-size: 7px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-fallback-label="0"] {
+    padding: 0;
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-fallback-label="0"]::after {
+    content: "";
+    display: block;
+    height: 2px;
+    border-top: 0;
+}
+
 .app-schedule-tooltip {
     position: fixed;
     z-index: 1200;
