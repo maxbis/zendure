@@ -150,7 +150,6 @@ $viewerConfig = [
                     <span class="gsd-badge gsd-badge--warning">Forecast</span>
                 </div>
                 <div class="optimizer-pnl__days" data-role="daily-pnl"></div>
-                <div class="optimizer-pnl__total" data-role="daily-pnl-total"></div>
             </section>
 
             <section class="gsd-card optimizer-comparison" aria-labelledby="comparison-title">

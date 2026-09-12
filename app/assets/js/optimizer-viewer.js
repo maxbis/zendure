@@ -23,7 +23,6 @@
         differenceCount: root.querySelector('[data-role="difference-count"]'),
         priceStatus: root.querySelector('[data-role="price-status"]'),
         dailyPnl: root.querySelector('[data-role="daily-pnl"]'),
-        dailyPnlTotal: root.querySelector('[data-role="daily-pnl-total"]'),
         body: root.querySelector('[data-role="comparison-body"]'),
         footnote: root.querySelector('[data-role="footnote"]')
         ,modeBanner: root.querySelector('[data-role="mode-banner"]')
@@ -388,10 +387,35 @@
         });
 
         const totalDifference = totalOptimized - totalCurrent;
-        elements.dailyPnlTotal.replaceChildren();
-        appendText(elements.dailyPnlTotal, "span", "Forecast horizon total");
-        appendText(elements.dailyPnlTotal, "strong", `Rules ${formatSignedMoney(totalCurrent)} · Optimized ${formatSignedMoney(totalOptimized)}`);
-        appendText(elements.dailyPnlTotal, "em", `${formatSignedMoney(totalDifference)} difference`, pnlClass(totalDifference));
+        const finalDay = days.at(-1);
+        const totalCard = document.createElement("article");
+        totalCard.className = "optimizer-pnl-day optimizer-pnl-day--total";
+        const totalHeader = document.createElement("header");
+        const totalTitle = appendText(totalHeader, "h3", "Complete forecast");
+        totalTitle.className = "optimizer-pnl-day__title";
+        appendText(
+            totalHeader,
+            "span",
+            `${days.length} calendar day${days.length === 1 ? "" : "s"}`,
+            "optimizer-pnl-day__period"
+        );
+        totalCard.appendChild(totalHeader);
+
+        const totalMetrics = document.createElement("div");
+        totalMetrics.className = "optimizer-pnl-day__metrics";
+        [
+            ["Rules", totalCurrent, finalDay ? `Final SoC ${finalDay.currentEndSocPercent.toFixed(1)}%` : "Final SoC unavailable"],
+            ["Optimized", totalOptimized, finalDay ? `Final SoC ${finalDay.optimizedEndSocPercent.toFixed(1)}%` : "Final SoC unavailable"],
+            ["Difference", totalDifference, "Cash P&L difference"],
+        ].forEach(([label, value, detail]) => {
+            const metric = document.createElement("div");
+            appendText(metric, "span", label);
+            appendText(metric, "strong", formatSignedMoney(value), pnlClass(value));
+            appendText(metric, "small", detail);
+            totalMetrics.appendChild(metric);
+        });
+        totalCard.appendChild(totalMetrics);
+        elements.dailyPnl.appendChild(totalCard);
     }
 
     function populateSelect() {

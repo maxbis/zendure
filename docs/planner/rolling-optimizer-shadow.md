@@ -57,6 +57,11 @@ battery limits and round-trip efficiency. P&L is sale income minus purchase cost
 Terminal battery value is deliberately excluded from daily P&L; each result therefore
 also shows ending SoC so retained energy remains visible.
 
+After the individual calendar-day cards, the viewer shows a matching Complete
+forecast card. It totals Rules and Optimizer cash P&L across the whole rolling
+horizon, shows their difference, and uses the final calendar day's ending SoC as
+the final SoC for each plan.
+
 ## Flow and behavior
 
 1. Read current prices, solar forecast and battery state.
