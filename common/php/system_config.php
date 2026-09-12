@@ -21,6 +21,7 @@ function systemConfigDefaultPath(): string
  *     minChargePercent: int,
  *     maxChargePercent: int,
  *     efficiency: float,
+ *     roundTripEfficiency?: float,
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
  *   },
@@ -87,18 +88,18 @@ function validateSystemConfig(array $config): array
     $installation = systemConfigRequireObject($config['installation'], '$.installation');
     $priceConversion = systemConfigRequireObject($config['priceConversion'], '$.priceConversion');
 
-    systemConfigAssertExactKeys(
-        $battery,
-        [
-            'capacityWh',
-            'minChargePercent',
-            'maxChargePercent',
-            'efficiency',
-            'maxChargePowerW',
-            'maxDischargePowerW',
-        ],
-        '$.battery'
-    );
+    $batteryKeys = [
+        'capacityWh',
+        'minChargePercent',
+        'maxChargePercent',
+        'efficiency',
+        'maxChargePowerW',
+        'maxDischargePowerW',
+    ];
+    if (array_key_exists('roundTripEfficiency', $battery)) {
+        $batteryKeys[] = 'roundTripEfficiency';
+    }
+    systemConfigAssertExactKeys($battery, $batteryKeys, '$.battery');
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
     $minChargePercent = systemConfigRequireInteger(
         $battery['minChargePercent'],
@@ -118,6 +119,15 @@ function validateSystemConfig(array $config): array
         );
     }
     $efficiency = systemConfigRequireNumber($battery['efficiency'], '$.battery.efficiency', 0.0, 1.0, true);
+    $roundTripEfficiency = array_key_exists('roundTripEfficiency', $battery)
+        ? systemConfigRequireNumber(
+            $battery['roundTripEfficiency'],
+            '$.battery.roundTripEfficiency',
+            0.0,
+            1.0,
+            true
+        )
+        : null;
     $maxChargePowerW = systemConfigRequireInteger(
         $battery['maxChargePowerW'],
         '$.battery.maxChargePowerW',
@@ -214,16 +224,21 @@ function validateSystemConfig(array $config): array
         12
     );
 
+    $normalizedBattery = [
+        'capacityWh' => $capacityWh,
+        'minChargePercent' => $minChargePercent,
+        'maxChargePercent' => $maxChargePercent,
+        'efficiency' => $efficiency,
+        'maxChargePowerW' => $maxChargePowerW,
+        'maxDischargePowerW' => $maxDischargePowerW,
+    ];
+    if ($roundTripEfficiency !== null) {
+        $normalizedBattery['roundTripEfficiency'] = $roundTripEfficiency;
+    }
+
     return [
         'schemaVersion' => $schemaVersion,
-        'battery' => [
-            'capacityWh' => $capacityWh,
-            'minChargePercent' => $minChargePercent,
-            'maxChargePercent' => $maxChargePercent,
-            'efficiency' => $efficiency,
-            'maxChargePowerW' => $maxChargePowerW,
-            'maxDischargePowerW' => $maxDischargePowerW,
-        ],
+        'battery' => $normalizedBattery,
         'forecast' => [
             'defaultHouseholdUsageWByHour' => $defaultHouseholdUsageWByHour,
         ],

@@ -19,7 +19,7 @@ from system_config import load_system_config  # noqa: E402
 TIMEZONE = "Europe/Amsterdam"
 PRICE_RELEASE_HOUR_LOCAL = 14
 ARBITRAGE_MIN_SPREAD_EUR_PER_KWH = 0.12
-ROUND_TRIP_EFFICIENCY = 0.90
+ROUND_TRIP_EFFICIENCY = 0.85
 CHEAP_HOUR_TOLERANCE_EUR_PER_KWH = 0.01
 EXPENSIVE_HOUR_TOLERANCE_EUR_PER_KWH = 0.01
 NETZERO_MARKET_PRICE_THRESHOLD_EUR_PER_KWH = 0.18
@@ -28,7 +28,7 @@ SERVICE_PORT = 8765
 SERVICE_HOST = "127.0.0.1"
 HTTP_TIMEOUT_SECONDS = 12
 SHORTWAVE_RADIATION_REFERENCE_W_M2 = 1000.0
-PV_SYSTEM_CAPACITY_W = 5000.0
+PV_SYSTEM_CAPACITY_W = 2640.0
 PV_DERATE_FACTOR = 0.85
 PV_OUTPUT_CLIP_W = 5000.0
 MIN_ACTION_POWER_W = 50
@@ -74,6 +74,8 @@ class PlannerSettings:
     max_charge_level: int
     max_charge_power_w: int
     max_discharge_power_w: int
+    power_step_w: int
+    default_household_usage_w_by_hour: List[int]
     arbitrage_min_spread_eur_per_kwh: float
     round_trip_efficiency: float
     cheap_hour_tolerance_eur_per_kwh: float
@@ -269,6 +271,11 @@ def load_settings() -> PlannerSettings:
         ),
         max_charge_power_w=max(0, raw_max_grid),
         max_discharge_power_w=max(0, abs(raw_min_grid)),
+        power_step_w=max(1, _get_int(schedule.get("powerStepW"), 100)),
+        default_household_usage_w_by_hour=[
+            max(0, _get_int(value, 0))
+            for value in system_config["forecast"]["defaultHouseholdUsageWByHour"]
+        ],
         arbitrage_min_spread_eur_per_kwh=_get_float(
             os.getenv("PLANNER_ARBITRAGE_MIN_SPREAD"),
             ARBITRAGE_MIN_SPREAD_EUR_PER_KWH,
@@ -279,7 +286,7 @@ def load_settings() -> PlannerSettings:
                 1.0,
                 _get_float(
                     os.getenv("PLANNER_ROUND_TRIP_EFFICIENCY"),
-                    _get_float(battery.get("efficiency"), ROUND_TRIP_EFFICIENCY),
+                    _get_float(battery.get("roundTripEfficiency"), ROUND_TRIP_EFFICIENCY),
                 ),
             ),
         ),

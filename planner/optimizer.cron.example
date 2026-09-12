@@ -1,0 +1,2 @@
+# Replace /path/to/zendure with the production checkout path.
+*/5 * * * * cd /path/to/zendure && /usr/bin/python3 -m planner.shadow --once >> planner/data/optimizer_cron.log 2>&1

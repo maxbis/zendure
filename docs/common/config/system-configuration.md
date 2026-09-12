@@ -30,10 +30,11 @@ The configuration contains:
 - Minimum state of charge: 15%.
 - Maximum state of charge: 91%.
 - Battery forecast efficiency: 0.9.
+- Battery round-trip efficiency for rolling optimization: 0.85.
 - Maximum charge command magnitude: 1200 W.
-- Maximum discharge command magnitude: 1200 W.
+- Maximum discharge command magnitude: 2000 W.
 - Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
-- Schedule range: -1600 through 1600 W.
+- Schedule range: -1800 through 1200 W.
 - Schedule power step: 100 W.
 - Installation: Amsterdam.
 - Latitude: 52.3676.
@@ -74,6 +75,7 @@ Required properties:
 - `minChargePercent`: integer from 0 through 99.
 - `maxChargePercent`: integer from 1 through 100.
 - `efficiency`: number greater than 0 and no greater than 1.
+- `roundTripEfficiency`: optional number greater than 0 and no greater than 1. It is used by the rolling optimizer and remains separate from the legacy one-way forecast efficiency.
 - `maxChargePowerW`: positive integer command magnitude.
 - `maxDischargePowerW`: positive integer command magnitude.
 
@@ -161,12 +163,12 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When minimum is equal to or greater than maximum, then schema ranges alone may pass, but both loaders reject it.
 - When the schedule minimum is equal to or greater than its maximum, then both loaders reject it.
 - When the household-usage profile does not contain exactly 24 non-negative integer values, then both loaders reject it.
-- When efficiency is zero, negative or greater than one, then both loaders reject it.
+- When either efficiency value is zero, negative or greater than one, then both loaders reject it.
 - When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.
 - When the synchronized file is stale on one host, then valid JSON does not prove both hosts use the same version.
 - When direct web access is not blocked by the active web server, then the current non-secret file could be downloadable; secrets must never be added.
 - Automation now uses the shared 91% maximum instead of its former local 93% value. This is an intentional controller behavior change.
-- Automation uses the shared 1200 W power caps, preserving its former command-cap behavior.
+- Automation uses the shared 1200 W charge and 2000 W discharge command caps. The optimizer applies the narrower -1800 through 1200 W schedule limits requested for planning.
 - When shared configuration is changed in `system.json`, then both GUIs pick up the new values through the PHP loader on their next request. Automation must be restarted to load the change.
 - The old configuration editor only edits web-only keys in `main/config/config.json`. Persistent editing of shared settings through either GUI remains deferred.
 - The automation API exposes the effective minimum and maximum through GET endpoints. POST requests to those endpoints return HTTP 405 so an in-memory override cannot conflict with the authoritative file.

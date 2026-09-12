@@ -688,6 +688,12 @@ $appConfig = [
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
         [
+            'href' => 'optimizer.php',
+            'label' => 'Optimizer Comparison',
+            'description' => 'Compare shadow plans with the active schedule',
+            'icon' => 'chart',
+        ],
+        [
             'dialogId' => 'app-shortwave-radiation-dialog',
             'label' => 'Shortwave Radiation',
             'description' => 'Hourly solar radiation and daily totals',

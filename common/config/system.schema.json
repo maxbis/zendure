@@ -53,6 +53,12 @@
           "exclusiveMinimum": 0,
           "maximum": 1
         },
+        "roundTripEfficiency": {
+          "description": "Optional round-trip efficiency factor used by the rolling optimizer.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
         "maxChargePowerW": {
           "description": "Maximum charge command magnitude in watts.",
           "type": "integer",

@@ -5,6 +5,7 @@ require_once dirname(__DIR__, 3) . '/common/php/system_config.php';
 require_once __DIR__ . '/data_functions.php';
 require_once __DIR__ . '/../../includes/config_loader.php';
 require_once __DIR__ . '/../target_battery_planner.php';
+require_once dirname(__DIR__, 3) . '/app/includes/optimizer_schedule.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -459,10 +460,20 @@ function handleGetData($type) {
             ? [$todayYmd, $tomorrowYmd]
             : [$date, (DateTimeImmutable::createFromFormat('!Ymd', $date, $timezone) ?: $now)->modify('+1 day')->format('Ymd')];
         $planningDays = [];
+        $optimizerStatus = optimizerScheduleStatus($now, $dataApiSystemConfig);
+        $optimizerPayload = null;
+        $forceRules = isset($_GET['source']) && $_GET['source'] === 'rules';
+        if (!$forceRules && $optimizerStatus['activeSource'] === 'optimizer') {
+            $optimizerValidation = optimizerScheduleValidateLatest($now, $dataApiSystemConfig);
+            $optimizerPayload = $optimizerValidation['payload'];
+        }
         foreach (array_values(array_unique($horizonDates)) as $horizonDate) {
             $dayItems = resolveScheduleForDate($schedule, $horizonDate);
             if (include_conditions) {
                 $dayItems = mergeResolvedWithConditional($dayItems, $horizonDate);
+            }
+            if (is_array($optimizerPayload)) {
+                $dayItems = optimizerScheduleApplyToDay($dayItems, $horizonDate, $optimizerPayload, $timezone);
             }
             $planningDays[] = ['date' => $horizonDate, 'items' => $dayItems];
         }
@@ -517,6 +528,9 @@ function handleGetData($type) {
             'profileSelection' => include_conditions && function_exists('resolveProfileSelectionForDate')
                 ? resolveProfileSelectionForDate($date)
                 : null,
+            'scheduleSource' => $forceRules
+                ? $optimizerStatus + ['responseSource' => 'rules']
+                : $optimizerStatus + ['responseSource' => $optimizerStatus['activeSource']],
         ];
     }
     return [

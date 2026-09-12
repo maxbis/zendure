@@ -57,18 +57,17 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
     installation = _require_object(config["installation"], "$.installation")
     price_conversion = _require_object(config["priceConversion"], "$.priceConversion")
 
-    _assert_exact_keys(
-        battery,
-        {
-            "capacityWh",
-            "minChargePercent",
-            "maxChargePercent",
-            "efficiency",
-            "maxChargePowerW",
-            "maxDischargePowerW",
-        },
-        "$.battery",
-    )
+    battery_keys = {
+        "capacityWh",
+        "minChargePercent",
+        "maxChargePercent",
+        "efficiency",
+        "maxChargePowerW",
+        "maxDischargePowerW",
+    }
+    if "roundTripEfficiency" in battery:
+        battery_keys.add("roundTripEfficiency")
+    _assert_exact_keys(battery, battery_keys, "$.battery")
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
     min_charge_percent = _require_integer(
         battery["minChargePercent"], "$.battery.minChargePercent", 0, 99
@@ -81,6 +80,15 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             "$.battery.minChargePercent must be lower than $.battery.maxChargePercent."
         )
     efficiency = _require_number(battery["efficiency"], "$.battery.efficiency", 0.0, 1.0, exclusive_minimum=True)
+    round_trip_efficiency = None
+    if "roundTripEfficiency" in battery:
+        round_trip_efficiency = _require_number(
+            battery["roundTripEfficiency"],
+            "$.battery.roundTripEfficiency",
+            0.0,
+            1.0,
+            exclusive_minimum=True,
+        )
     max_charge_power_w = _require_integer(
         battery["maxChargePowerW"], "$.battery.maxChargePowerW", 1
     )
@@ -162,16 +170,20 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         12,
     )
 
+    normalized_battery = {
+        "capacityWh": capacity_wh,
+        "minChargePercent": min_charge_percent,
+        "maxChargePercent": max_charge_percent,
+        "efficiency": efficiency,
+        "maxChargePowerW": max_charge_power_w,
+        "maxDischargePowerW": max_discharge_power_w,
+    }
+    if round_trip_efficiency is not None:
+        normalized_battery["roundTripEfficiency"] = round_trip_efficiency
+
     return {
         "schemaVersion": schema_version,
-        "battery": {
-            "capacityWh": capacity_wh,
-            "minChargePercent": min_charge_percent,
-            "maxChargePercent": max_charge_percent,
-            "efficiency": efficiency,
-            "maxChargePowerW": max_charge_power_w,
-            "maxDischargePowerW": max_discharge_power_w,
-        },
+        "battery": normalized_battery,
         "forecast": {
             "defaultHouseholdUsageWByHour": default_household_usage_w_by_hour,
         },

@@ -31,8 +31,9 @@ EXPECTED_CONFIG = {
         "minChargePercent": 15,
         "maxChargePercent": 91,
         "efficiency": 0.9,
+        "roundTripEfficiency": 0.85,
         "maxChargePowerW": 1200,
-        "maxDischargePowerW": 1200,
+        "maxDischargePowerW": 2000,
     },
     "forecast": {
         "defaultHouseholdUsageWByHour": [
@@ -42,8 +43,8 @@ EXPECTED_CONFIG = {
         ],
     },
     "schedule": {
-        "minPowerW": -1600,
-        "maxPowerW": 1600,
+        "minPowerW": -1800,
+        "maxPowerW": 1200,
         "powerStepW": 100,
     },
     "installation": {
@@ -127,7 +128,11 @@ def test_schema_contract_matches_loader_sections():
     for section in ("battery", "forecast", "schedule", "installation", "priceConversion"):
         section_schema = schema["properties"][section]
         assert section_schema["additionalProperties"] is False
-        assert set(section_schema["required"]) == set(EXPECTED_CONFIG[section])
+        expected_required = set(EXPECTED_CONFIG[section])
+        if section == "battery":
+            expected_required.remove("roundTripEfficiency")
+            assert "roundTripEfficiency" in section_schema["properties"]
+        assert set(section_schema["required"]) == expected_required
 
 
 @pytest.mark.parametrize(
@@ -143,6 +148,8 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"minChargePercent": 91}), r"must be lower than"),
         (lambda value: value["battery"].update({"efficiency": 0}), r"efficiency must be greater than 0\."),
         (lambda value: value["battery"].update({"efficiency": 1.01}), r"efficiency must be at most 1\."),
+        (lambda value: value["battery"].update({"roundTripEfficiency": 0}), r"roundTripEfficiency must be greater than 0\."),
+        (lambda value: value["battery"].update({"roundTripEfficiency": 1.01}), r"roundTripEfficiency must be at most 1\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
         (lambda value: value["forecast"].update({"defaultHouseholdUsageWByHour": [100] * 23}), r"must contain exactly 24 items\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__(4, -1), r"defaultHouseholdUsageWByHour\[4\] must be at least 0\."),

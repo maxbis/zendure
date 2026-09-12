@@ -50,6 +50,15 @@ else
 fi
 
 echo ""
+echo "==> Running optimizer log reader and schedule selector tests"
+if php "$SCRIPT_DIR/optimizer_log_test.php" && php "$SCRIPT_DIR/optimizer_schedule_selector_test.php" && node "$SCRIPT_DIR/optimizer_pnl_test.js"; then
+  :
+else
+  FAILED=1
+  FAILED_SUITES+=("optimizer_viewer")
+fi
+
+echo ""
 echo "==> Running authoritative battery forecast tests"
 if php "$SCRIPT_DIR/battery_forecast_test.php"; then
   :
