@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-const OPTIMIZER_SCHEDULE_MAX_AGE_SECONDS = 4200;
+# 10 hours stale, we fall back to rules
+const OPTIMIZER_SCHEDULE_MAX_AGE_SECONDS = 36000;
 
 function optimizerScheduleDataDir(): string
 {
