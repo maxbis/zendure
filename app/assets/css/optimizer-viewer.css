@@ -347,6 +347,180 @@
     border-color: color-mix(in srgb, var(--gsd-price) 42%, var(--gsd-border-subtle));
 }
 
+.optimizer-graphs {
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.optimizer-graphs__header {
+    align-items: flex-start;
+    padding-bottom: 14px;
+}
+
+.optimizer-graphs__header p,
+.optimizer-graph header p,
+.optimizer-graphs__note {
+    margin: 4px 0 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.72rem;
+}
+
+.optimizer-graph-pair {
+    display: grid;
+    gap: 12px;
+    padding: 0 16px;
+}
+
+.optimizer-graph {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--gsd-border);
+    border-radius: var(--gsd-radius-md);
+    background: var(--gsd-surface-2);
+}
+
+.optimizer-graph > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.optimizer-graph > header h3 {
+    margin: 0;
+    font-size: 0.88rem;
+}
+
+.optimizer-graph__scroll {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-color: var(--gsd-border-strong) transparent;
+}
+
+.optimizer-graph__scroll:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: -2px;
+}
+
+.optimizer-graph__canvas {
+    width: max-content;
+    min-width: 100%;
+}
+
+.optimizer-graph__days,
+.optimizer-graph__hours {
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+}
+
+.optimizer-graph__days {
+    height: 28px;
+    border-bottom: 1px solid var(--gsd-border-subtle);
+    background: var(--gsd-page-deep);
+}
+
+.optimizer-graph__days > span {
+    width: calc(var(--optimizer-day-slots) * 70px);
+    flex: 0 0 calc(var(--optimizer-day-slots) * 70px);
+    padding: 7px 9px;
+    border-right: 1px solid var(--gsd-border);
+    color: var(--gsd-text-secondary);
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+.optimizer-graph-hour {
+    position: relative;
+    display: grid;
+    grid-template-rows: 68px auto auto 30px auto;
+    justify-items: center;
+    width: 70px;
+    min-width: 70px;
+    padding: 7px 5px 8px;
+    border-right: 1px solid var(--gsd-border-subtle);
+    font-variant-numeric: tabular-nums;
+}
+
+.optimizer-graph-hour[data-provisional="true"]::before {
+    position: absolute;
+    top: 0;
+    right: 4px;
+    left: 4px;
+    border-top: 2px dotted var(--gsd-warning);
+    content: "";
+}
+
+.optimizer-graph-hour__bar-zone {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+    height: 64px;
+    padding-top: 4px;
+}
+
+.optimizer-graph-hour__bar {
+    width: 13px;
+    height: var(--optimizer-price-height);
+    min-height: 4px;
+    background: var(--optimizer-price-color, var(--gsd-price));
+    border-radius: 4px 4px 1px 1px;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--optimizer-price-color, var(--gsd-price)) 22%, transparent);
+}
+
+.optimizer-graph-hour__price,
+.optimizer-graph-hour__time,
+.optimizer-graph-hour__soc {
+    color: var(--gsd-text-muted);
+    font-size: 0.61rem;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+
+.optimizer-graph-hour__price {
+    color: var(--gsd-price);
+    font-weight: 700;
+}
+
+.optimizer-graph-hour__action {
+    align-self: center;
+    max-width: 62px;
+    padding: 4px 6px;
+    overflow: hidden;
+    border: 1px solid var(--gsd-border);
+    border-radius: 999px;
+    background: var(--gsd-neutral-soft);
+    color: var(--gsd-neutral);
+    font-size: 0.62rem;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.optimizer-graph-hour__action[data-direction="charge"] {
+    background: var(--gsd-positive-soft);
+    border-color: color-mix(in srgb, var(--gsd-positive) 32%, transparent);
+    color: var(--gsd-positive);
+}
+
+.optimizer-graph-hour__action[data-direction="discharge"] {
+    background: var(--gsd-negative-soft);
+    border-color: color-mix(in srgb, var(--gsd-negative) 32%, transparent);
+    color: var(--gsd-negative);
+}
+
+.optimizer-graph-hour__soc::before {
+    color: var(--gsd-text-muted);
+    content: "SoC ";
+}
+
+.optimizer-graphs__note {
+    padding: 10px 16px 14px;
+}
+
 .optimizer-comparison__header {
     align-items: flex-start;
     padding-bottom: 14px;

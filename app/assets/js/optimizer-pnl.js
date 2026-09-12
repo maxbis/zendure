@@ -90,7 +90,7 @@
         return -(gridKwh * exportPrice);
     }
 
-    function estimateDailyComparison(decisions, schedules, rawOptions) {
+    function estimateComparison(decisions, schedules, rawOptions) {
         const options = {
             capacityWh: Math.max(1, numberOr(rawOptions?.capacityWh, 1)),
             minSocPercent: clamp(numberOr(rawOptions?.minSocPercent), 0, 100),
@@ -111,6 +111,7 @@
             options.maxEnergyWh
         );
         const days = new Map();
+        const slots = [];
 
         (Array.isArray(decisions) ? decisions : []).forEach((decision) => {
             const dayKey = dateKey(decision.start);
@@ -133,6 +134,7 @@
             const duration = durationHours(decision);
             const slot = currentSlot(decision, schedules);
             const desired = desiredCurrentPower(slot, decision);
+            const currentStartSocPercent = currentEnergyWh / options.capacityWh * 100;
             const realized = realizedBatteryPower(desired.powerW, currentEnergyWh, duration, options);
             currentEnergyWh = realized.energyWh;
             const currentGridW = numberOr(decision.load_w) - numberOr(decision.pv_w) + realized.powerW;
@@ -148,9 +150,22 @@
             day.uncertainSlots += desired.uncertain ? 1 : 0;
             day.segmentCount++;
             day.periodEnd = decision.end;
+            slots.push({
+                start: decision.start,
+                end: decision.end,
+                currentBatteryPowerW: realized.powerW,
+                currentGridPowerW: currentGridW,
+                currentStartSocPercent,
+                currentEndSocPercent: currentEnergyWh / options.capacityWh * 100,
+                optimizedBatteryPowerW: numberOr(decision.battery_power_w),
+                optimizedGridPowerW: numberOr(decision.grid_power_w),
+                optimizedStartSocPercent: numberOr(decision.start_soc_percent),
+                optimizedEndSocPercent: numberOr(decision.end_soc_percent),
+                uncertain: desired.uncertain,
+            });
         });
 
-        return [...days.values()].map((day) => ({
+        const daily = [...days.values()].map((day) => ({
             ...day,
             differenceEur: day.optimizedPnlEur - day.currentPnlEur,
             isPartialDay: String(day.periodStart).slice(11, 19) !== "00:00:00"
@@ -159,9 +174,18 @@
                     && String(day.periodEnd).slice(11, 19) === "00:00:00"
                 ),
         }));
+        return { days: daily, slots };
     }
 
-    const api = Object.freeze({ estimateDailyComparison });
+    function estimateDailyComparison(decisions, schedules, rawOptions) {
+        return estimateComparison(decisions, schedules, rawOptions).days;
+    }
+
+    function estimateHourlyComparison(decisions, schedules, rawOptions) {
+        return estimateComparison(decisions, schedules, rawOptions).slots;
+    }
+
+    const api = Object.freeze({ estimateDailyComparison, estimateHourlyComparison });
     if (typeof window !== "undefined") window.OptimizerPnl = api;
     if (typeof module === "object" && module.exports) module.exports = api;
 })();

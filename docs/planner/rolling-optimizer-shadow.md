@@ -80,6 +80,17 @@ forecast card. It totals Rules and Optimizer cash P&L across the whole rolling
 horizon, shows their difference, and uses the final calendar day's ending SoC as
 the final SoC for each plan.
 
+Above the detailed hourly table, the viewer shows two read-only schedule graphs:
+
+- Rules uses the schedule currently resolved from rules and exact manual overrides.
+- Optimizer uses the decisions from the selected optimizer calculation.
+
+Both graphs use the selected optimizer calculation's price and forecast assumptions,
+share the same price scale, and keep their horizontal scroll positions synchronized.
+They reproduce the Graphite timeline language locally within the optimizer viewer;
+the live new-GUI price-plan component is not changed or instantiated a second time.
+The hourly table remains available below the graphs for detailed inspection.
+
 ## Flow and behavior
 
 1. Read current prices, solar forecast and battery state.
@@ -125,6 +136,7 @@ http://localhost/zendure/app/optimizer.php
 - When `PLANNER_EXTEND_HORIZON_TO_MIDNIGHT=false`, then the optimizer uses the exact configured horizon instead.
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.
 - When a current schedule action cannot be modeled, then the viewer treats it as idle and shows a warning for that day.
+- When an older optimizer calculation is selected, then its graph is compared with the rules currently resolved, not with a historical rules snapshot.
 - When two processes append simultaneously, then a file lock prevents interleaved log records.
 - When a malformed or non-plan line occurs, then the viewer skips it instead of failing the whole log.
 - When the optimizer cannot find a feasible state path, then the run is logged as an error.

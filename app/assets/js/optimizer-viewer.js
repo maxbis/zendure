@@ -31,6 +31,10 @@
         optimizerLastRun: root.querySelector('[data-role="optimizer-last-run"]'),
         solarForecastUpdated: root.querySelector('[data-role="solar-forecast-updated"]'),
         dailyPnl: root.querySelector('[data-role="daily-pnl"]'),
+        rulesGraphScroll: root.querySelector('[data-role="rules-graph-scroll"]'),
+        optimizerGraphScroll: root.querySelector('[data-role="optimizer-graph-scroll"]'),
+        rulesGraph: root.querySelector('[data-role="rules-graph"]'),
+        optimizerGraph: root.querySelector('[data-role="optimizer-graph"]'),
         body: root.querySelector('[data-role="comparison-body"]'),
         footnote: root.querySelector('[data-role="footnote"]')
         ,modeBanner: root.querySelector('[data-role="mode-banner"]')
@@ -41,6 +45,7 @@
         ,modeOptimizer: root.querySelector('[data-role="mode-optimizer"]')
     };
     const state = { records: [], selectedIndex: 0, controller: null };
+    let syncingGraphScroll = false;
 
     function setView(view, message = "") {
         root.dataset.state = view;
@@ -247,6 +252,20 @@
         return JSON.stringify([normalized, minimum ?? null, maximum ?? null]);
     }
 
+    function comparisonOptions(record) {
+        const plan = record?.plan || {};
+        const inputs = record?.inputs || {};
+        return {
+            capacityWh: inputs.battery_capacity_wh,
+            minSocPercent: inputs.min_soc_percent,
+            maxSocPercent: inputs.max_soc_percent,
+            startingSocPercent: plan.starting_soc_percent,
+            maxChargePowerW: inputs.max_charge_power_w,
+            maxDischargePowerW: inputs.max_discharge_power_w,
+            roundTripEfficiency: plan.round_trip_efficiency,
+        };
+    }
+
     async function fetchCurrentSchedules(record, signal) {
         const decisions = Array.isArray(record?.plan?.decisions) ? record.plan.decisions : [];
         const dates = [...new Set(decisions.map((decision) => localParts(decision.start).date))];
@@ -336,6 +355,117 @@
         return differences;
     }
 
+    function formatGraphPrice(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? `${(number * 100).toFixed(1)}¢` : "—";
+    }
+
+    function graphPriceColor(position) {
+        const progress = Math.max(0, Math.min(1, position));
+        const stops = [
+            { at: 0, color: [121, 212, 132] },
+            { at: 0.42, color: [197, 202, 98] },
+            { at: 0.7, color: [242, 168, 74] },
+            { at: 1, color: [255, 122, 117] },
+        ];
+        const upperIndex = stops.findIndex((stop) => progress <= stop.at);
+        const upper = stops[Math.max(1, upperIndex === -1 ? stops.length - 1 : upperIndex)];
+        const lower = stops[Math.max(0, stops.indexOf(upper) - 1)];
+        const local = (progress - lower.at) / Math.max(0.0001, upper.at - lower.at);
+        const color = lower.color.map((channel, index) => Math.round(channel + (upper.color[index] - channel) * local));
+        return `rgb(${color.join(", ")})`;
+    }
+
+    function renderScheduleGraph(target, record, schedules, hourly, kind, priceRange) {
+        const decisions = Array.isArray(record?.plan?.decisions) ? record.plan.decisions : [];
+        const days = [];
+        decisions.forEach((decision) => {
+            const date = localParts(decision.start).date;
+            const latest = days.at(-1);
+            if (latest?.date === date) latest.count++;
+            else days.push({ date, count: 1, start: decision.start });
+        });
+
+        const dayRow = document.createElement("div");
+        dayRow.className = "optimizer-graph__days";
+        days.forEach((day) => {
+            const label = appendText(dayRow, "span", formatDay(day.start));
+            label.style.setProperty("--optimizer-day-slots", String(day.count));
+        });
+
+        const hourRow = document.createElement("div");
+        hourRow.className = "optimizer-graph__hours";
+        decisions.forEach((decision, index) => {
+            const slot = kind === "rules" ? currentSlotFor(decision, schedules) : null;
+            const comparison = hourly[index] || {};
+            const scheduleValue = kind === "rules" ? slot?.value : decision.schedule_value;
+            const minimum = kind === "rules" ? slot?.min_power : decision.min_power;
+            const maximum = kind === "rules" ? slot?.max_power : decision.max_power;
+            const batteryPower = kind === "rules"
+                ? comparison.currentBatteryPowerW
+                : comparison.optimizedBatteryPowerW;
+            const startSoc = kind === "rules"
+                ? comparison.currentStartSocPercent
+                : comparison.optimizedStartSocPercent;
+            const endSoc = kind === "rules"
+                ? comparison.currentEndSocPercent
+                : comparison.optimizedEndSocPercent;
+            const price = Number(decision.import_price_eur_per_kwh);
+            const position = Number.isFinite(price)
+                ? (price - priceRange.minimum) / priceRange.span
+                : 0;
+
+            const hour = document.createElement("div");
+            hour.className = "optimizer-graph-hour";
+            hour.dataset.direction = directionForPower(batteryPower);
+            hour.dataset.provisional = String(decision.price_source !== "official");
+            hour.setAttribute("role", "img");
+            hour.setAttribute(
+                "aria-label",
+                `${formatDayAndTime(decision.start)} to ${formatTime(decision.end)}. ${kind === "rules" ? "Rules" : "Optimizer"} action ${modeLabel(scheduleValue)}, expected battery power ${formatPower(batteryPower)}, state of charge ${Number(startSoc).toFixed(1)} to ${Number(endSoc).toFixed(1)} percent, consumer price ${formatPrice(price)}.`
+            );
+            hour.title = `${formatDayAndTime(decision.start)}–${formatTime(decision.end)}\n${modeLabel(scheduleValue)} · ${formatPower(batteryPower)}\nSoC ${Number(startSoc).toFixed(1)}% → ${Number(endSoc).toFixed(1)}%\nBuy ${formatPrice(price)} · Sell ${formatPrice(decision.export_price_eur_per_kwh)}\n${commandDetail(scheduleValue, minimum, maximum)}`;
+
+            const barZone = document.createElement("span");
+            barZone.className = "optimizer-graph-hour__bar-zone";
+            const bar = document.createElement("span");
+            bar.className = "optimizer-graph-hour__bar";
+            bar.style.setProperty("--optimizer-price-height", `${18 + Math.max(0, Math.min(1, position)) * 82}%`);
+            bar.style.setProperty("--optimizer-price-color", graphPriceColor(position));
+            barZone.appendChild(bar);
+            appendText(hour, "span", formatGraphPrice(price), "optimizer-graph-hour__price");
+            appendText(hour, "span", formatTime(decision.start), "optimizer-graph-hour__time");
+            const action = appendText(hour, "span", modeLabel(scheduleValue), "optimizer-graph-hour__action");
+            action.dataset.direction = directionForPower(batteryPower);
+            appendText(hour, "span", `${Number(endSoc).toFixed(1)}%`, "optimizer-graph-hour__soc");
+            hour.prepend(barZone);
+            hourRow.appendChild(hour);
+        });
+
+        target.replaceChildren(dayRow, hourRow);
+    }
+
+    function renderScheduleGraphs(record, schedules) {
+        if (!window.OptimizerPnl?.estimateHourlyComparison) {
+            throw new Error("The hourly schedule comparison is unavailable.");
+        }
+        const decisions = Array.isArray(record?.plan?.decisions) ? record.plan.decisions : [];
+        const scheduleObject = Object.fromEntries(schedules.entries());
+        const hourly = window.OptimizerPnl.estimateHourlyComparison(
+            decisions,
+            scheduleObject,
+            comparisonOptions(record)
+        );
+        const prices = decisions.map((decision) => Number(decision.import_price_eur_per_kwh)).filter(Number.isFinite);
+        const minimum = prices.length ? Math.min(...prices) : 0;
+        const maximum = prices.length ? Math.max(...prices) : 1;
+        const priceRange = { minimum, span: Math.max(0.0001, maximum - minimum) };
+        renderScheduleGraph(elements.rulesGraph, record, schedules, hourly, "rules", priceRange);
+        renderScheduleGraph(elements.optimizerGraph, record, schedules, hourly, "optimizer", priceRange);
+        elements.rulesGraphScroll.scrollLeft = 0;
+        elements.optimizerGraphScroll.scrollLeft = 0;
+    }
+
     function renderSummary(record, differenceCount) {
         const plan = record.plan || {};
         const provisional = Number(record.inputs?.provisional_price_slots || 0);
@@ -369,15 +499,7 @@
         const days = window.OptimizerPnl.estimateDailyComparison(
             plan.decisions || [],
             scheduleObject,
-            {
-                capacityWh: inputs.battery_capacity_wh,
-                minSocPercent: inputs.min_soc_percent,
-                maxSocPercent: inputs.max_soc_percent,
-                startingSocPercent: plan.starting_soc_percent,
-                maxChargePowerW: inputs.max_charge_power_w,
-                maxDischargePowerW: inputs.max_discharge_power_w,
-                roundTripEfficiency: plan.round_trip_efficiency,
-            }
+            comparisonOptions(record)
         );
         elements.dailyPnl.replaceChildren();
 
@@ -481,6 +603,7 @@
         const differenceCount = renderRows(record, schedules);
         renderSummary(record, differenceCount);
         renderDailyPnl(record, schedules);
+        renderScheduleGraphs(record, schedules);
     }
 
     async function load({ preserveSelection = false } = {}) {
@@ -526,6 +649,18 @@
     elements.retry.addEventListener("click", () => load({ preserveSelection: true }));
     elements.modeRules.addEventListener("click", () => changeMode("rules"));
     elements.modeOptimizer.addEventListener("click", () => changeMode("optimizer"));
+    elements.rulesGraphScroll.addEventListener("scroll", () => {
+        if (syncingGraphScroll) return;
+        syncingGraphScroll = true;
+        elements.optimizerGraphScroll.scrollLeft = elements.rulesGraphScroll.scrollLeft;
+        window.requestAnimationFrame(() => { syncingGraphScroll = false; });
+    }, { passive: true });
+    elements.optimizerGraphScroll.addEventListener("scroll", () => {
+        if (syncingGraphScroll) return;
+        syncingGraphScroll = true;
+        elements.rulesGraphScroll.scrollLeft = elements.optimizerGraphScroll.scrollLeft;
+        window.requestAnimationFrame(() => { syncingGraphScroll = false; });
+    }, { passive: true });
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) load({ preserveSelection: true });
     });

@@ -181,6 +181,47 @@ $viewerConfig = [
                 <div class="optimizer-pnl__days" data-role="daily-pnl"></div>
             </section>
 
+            <section class="gsd-card optimizer-graphs" aria-labelledby="optimizer-graphs-title">
+                <div class="gsd-card__header optimizer-graphs__header">
+                    <div>
+                        <h2 class="gsd-card__title" id="optimizer-graphs-title">Schedule comparison</h2>
+                        <p>The selected optimizer calculation compared with the rules currently resolved.</p>
+                    </div>
+                    <div class="optimizer-legend" aria-label="Schedule graph legend">
+                        <span class="optimizer-legend__charge">Charge</span>
+                        <span class="optimizer-legend__idle">Idle</span>
+                        <span class="optimizer-legend__discharge">Discharge</span>
+                    </div>
+                </div>
+                <div class="optimizer-graph-pair">
+                    <article class="optimizer-graph" aria-labelledby="optimizer-rules-graph-title">
+                        <header>
+                            <div>
+                                <h3 id="optimizer-rules-graph-title">Rules</h3>
+                                <p>Schedule currently resolved from rules and manual overrides</p>
+                            </div>
+                            <span class="gsd-badge">Current</span>
+                        </header>
+                        <div class="optimizer-graph__scroll" data-role="rules-graph-scroll" tabindex="0" aria-label="Scrollable rule-based schedule graph">
+                            <div class="optimizer-graph__canvas" data-role="rules-graph"></div>
+                        </div>
+                    </article>
+                    <article class="optimizer-graph" aria-labelledby="optimizer-plan-graph-title">
+                        <header>
+                            <div>
+                                <h3 id="optimizer-plan-graph-title">Optimizer</h3>
+                                <p>Schedule from the selected optimizer calculation</p>
+                            </div>
+                            <span class="gsd-badge gsd-badge--info">Selected run</span>
+                        </header>
+                        <div class="optimizer-graph__scroll" data-role="optimizer-graph-scroll" tabindex="0" aria-label="Scrollable optimizer schedule graph">
+                            <div class="optimizer-graph__canvas" data-role="optimizer-graph"></div>
+                        </div>
+                    </article>
+                </div>
+                <p class="optimizer-graphs__note">Both graphs use the selected calculation's prices and forecast assumptions. Scrolling either graph keeps the hours aligned.</p>
+            </section>
+
             <section class="gsd-card optimizer-comparison" aria-labelledby="comparison-title">
                 <div class="gsd-card__header optimizer-comparison__header">
                     <div>
