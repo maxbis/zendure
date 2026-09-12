@@ -185,7 +185,44 @@
         return estimateComparison(decisions, schedules, rawOptions).slots;
     }
 
-    const api = Object.freeze({ estimateDailyComparison, estimateHourlyComparison });
+    function estimateRetainedEnergyAdjustment(rawOptions) {
+        const capacityWh = Number(rawOptions?.capacityWh);
+        const rulesEndSocPercent = Number(rawOptions?.rulesEndSocPercent);
+        const optimizedEndSocPercent = Number(rawOptions?.optimizedEndSocPercent);
+        const roundTripEfficiency = Number(rawOptions?.roundTripEfficiency);
+        const valuationPriceEurPerKwh = Number(rawOptions?.valuationPriceEurPerKwh);
+        if (
+            !Number.isFinite(capacityWh)
+            || capacityWh <= 0
+            || !Number.isFinite(rulesEndSocPercent)
+            || !Number.isFinite(optimizedEndSocPercent)
+            || !Number.isFinite(roundTripEfficiency)
+            || roundTripEfficiency <= 0
+            || roundTripEfficiency > 1
+            || !Number.isFinite(valuationPriceEurPerKwh)
+            || valuationPriceEurPerKwh < 0
+        ) {
+            return null;
+        }
+        const storedEnergyDifferenceKwh = capacityWh
+            * (optimizedEndSocPercent - rulesEndSocPercent)
+            / 100000;
+        const dischargeEfficiency = Math.sqrt(roundTripEfficiency);
+        const deliverableEnergyDifferenceKwh = storedEnergyDifferenceKwh * dischargeEfficiency;
+        return {
+            storedEnergyDifferenceKwh,
+            deliverableEnergyDifferenceKwh,
+            dischargeEfficiency,
+            valuationPriceEurPerKwh,
+            valueEur: deliverableEnergyDifferenceKwh * valuationPriceEurPerKwh,
+        };
+    }
+
+    const api = Object.freeze({
+        estimateDailyComparison,
+        estimateHourlyComparison,
+        estimateRetainedEnergyAdjustment,
+    });
     if (typeof window !== "undefined") window.OptimizerPnl = api;
     if (typeof module === "object" && module.exports) module.exports = api;
 })();

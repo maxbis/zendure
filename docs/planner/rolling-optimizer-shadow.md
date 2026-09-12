@@ -27,6 +27,7 @@ The optimizer reads:
 
 - Live battery state of charge from the existing automation status endpoint.
 - Consumer prices from the existing price endpoint.
+- A retained-energy valuation price calculated from the latest 24 official hourly consumer prices. When tomorrow is available, those later hours naturally replace today's hours in the 24-hour window.
 - Spot sale prices derived with the shared price-conversion settings.
 - Expected solar production derived from the existing shortwave forecast.
 - The solar endpoint's `cachedAt` value, stored as `inputs.solar_forecast_updated_at` in the installation timezone.
@@ -52,7 +53,7 @@ The four headline cards focus on operational decisions:
 - The active Rules, Optimizer or Rules fallback schedule and the latest relevant calculation time.
 - The selected forecast horizon and whether its prices are official or provisional.
 - The Rules and Optimizer final SoC on the same forecast horizon.
-- The Optimizer cash P&L difference versus Rules across the complete forecast, with Optimizer final SoC alongside it.
+- The adjusted Optimizer value difference versus Rules across the complete forecast, with its cash and retained-energy components shown separately.
 
 Energy cost, the terminal-value objective, efficiency and the number of changed
 schedule segments remain available under Technical optimizer details instead of
@@ -78,7 +79,11 @@ also shows ending SoC so retained energy remains visible.
 After the individual calendar-day cards, the viewer shows a matching Complete
 forecast card. It totals Rules and Optimizer cash P&L across the whole rolling
 horizon, shows their difference, and uses the final calendar day's ending SoC as
-the final SoC for each plan.
+the final SoC for each plan. It then converts the final SoC difference into stored
+energy, applies the square root of round-trip efficiency as discharge efficiency,
+and values the deliverable energy difference at the stored 24-hour average consumer
+price. Cash P&L, retained-energy value and their adjusted total remain visibly
+separate because retained energy is a virtual value rather than realized cash.
 
 Above the detailed hourly table, the viewer shows two read-only schedule graphs:
 
@@ -97,14 +102,15 @@ The hourly table remains available below the graphs for detailed inspection.
 2. Establish a minimum 24-hour horizon and extend its end through the following local midnight.
 3. Split that horizon at clock-hour boundaries, retaining a partial first hour when needed.
 4. Use official prices where available. For an unpublished future hour, use today's price at the same clock hour and mark it `repeat_today`.
-5. Evaluate feasible charge, idle and discharge powers in the configured power steps.
-6. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
-7. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
-8. Append the plan to the comparison log under a file lock.
-9. Atomically publish the same plan as the latest executable optimizer schedule.
-10. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-11. Preserve exact dated manual schedule entries over optimizer entries.
-12. During the dual-testing period, when validation fails or the plan becomes older than 70 minutes, serve rules automatically.
+5. Calculate the retained-energy valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero.
+6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
+7. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
+8. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
+9. Append the plan to the comparison log under a file lock.
+10. Atomically publish the same plan as the latest executable optimizer schedule.
+11. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+12. Preserve exact dated manual schedule entries over optimizer entries.
+13. During the dual-testing period, when validation fails or the plan becomes older than 70 minutes, serve rules automatically.
 
 Run once:
 
@@ -137,6 +143,8 @@ http://localhost/zendure/app/optimizer.php
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.
 - When a current schedule action cannot be modeled, then the viewer treats it as idle and shows a warning for that day.
 - When an older optimizer calculation is selected, then its graph is compared with the rules currently resolved, not with a historical rules snapshot.
+- When a record predates retained-energy valuation or fewer than 24 official consumer-price hours are available, then the viewer keeps showing cash P&L and marks retained-energy and adjusted values as unavailable.
+- When the 24-hour average consumer price is negative, then the retained-energy valuation rate is zero because stored energy can remain unused without battery-wear cost in the current model.
 - When two processes append simultaneously, then a file lock prevents interleaved log records.
 - When a malformed or non-plan line occurs, then the viewer skips it instead of failing the whole log.
 - When the optimizer cannot find a feasible state path, then the run is logged as an error.

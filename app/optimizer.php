@@ -152,7 +152,7 @@ $viewerConfig = [
                     <small data-role="final-soc-detail">Rules versus Optimizer</small>
                 </article>
                 <article class="gsd-card optimizer-metric">
-                    <span>Complete forecast difference</span>
+                    <span data-role="forecast-difference-label">Complete forecast difference</span>
                     <strong class="gsd-price" data-role="forecast-difference">—</strong>
                     <small data-role="forecast-difference-detail">Optimizer versus Rules cash P&amp;L</small>
                 </article>

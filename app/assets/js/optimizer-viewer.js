@@ -26,6 +26,7 @@
         priceStatus: root.querySelector('[data-role="price-status"]'),
         finalSoc: root.querySelector('[data-role="final-soc"]'),
         finalSocDetail: root.querySelector('[data-role="final-soc-detail"]'),
+        forecastDifferenceLabel: root.querySelector('[data-role="forecast-difference-label"]'),
         forecastDifference: root.querySelector('[data-role="forecast-difference"]'),
         forecastDifferenceDetail: root.querySelector('[data-role="forecast-difference-detail"]'),
         optimizerLastRun: root.querySelector('[data-role="optimizer-last-run"]'),
@@ -221,6 +222,13 @@
         if (number > 0) return `+${Math.round(number)} W`;
         if (number < 0) return `−${Math.abs(Math.round(number))} W`;
         return "0 W";
+    }
+
+    function formatEnergyDelta(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "—";
+        const sign = number > 0.0005 ? "+" : number < -0.0005 ? "−" : "";
+        return `${sign}${Math.abs(number).toFixed(2)} kWh`;
     }
 
     function directionForPower(value) {
@@ -478,7 +486,7 @@
         elements.differenceCount.textContent = `${differenceCount} of ${(plan.decisions || []).length}`;
         elements.priceStatus.textContent = provisional ? `${provisional} provisional price segment${provisional === 1 ? "" : "s"}` : "All prices official";
         elements.meta.textContent = `Shadow plan from ${formatRunTime(plan.generated_at)}`;
-        elements.footnote.textContent = "Forecast P&L is electricity sales minus purchases and excludes terminal battery value. Current dynamic NZ power is estimated from forecast solar and load; actual meter readings will differ. End-of-day SoC is shown because retained battery energy is not cash P&L.";
+        elements.footnote.textContent = "Cash P&L is electricity sales minus purchases. The adjusted complete-forecast value separately adds the virtual value of the final SoC difference using the latest 24 official consumer-price hours and assumed discharge efficiency. Current dynamic NZ power is estimated from forecast solar and load; actual meter readings will differ.";
     }
 
     function renderOptimizerStatus() {
@@ -538,16 +546,41 @@
 
         const totalDifference = totalOptimized - totalCurrent;
         const finalDay = days.at(-1);
+        const rawValuationPrice = inputs.retained_energy_valuation_price_eur_per_kwh;
+        const valuationPrice = rawValuationPrice !== null && rawValuationPrice !== ""
+            ? Number(rawValuationPrice)
+            : Number.NaN;
+        const retainedEnergy = finalDay && Number.isFinite(valuationPrice)
+            ? window.OptimizerPnl.estimateRetainedEnergyAdjustment({
+                capacityWh: inputs.battery_capacity_wh,
+                rulesEndSocPercent: finalDay.currentEndSocPercent,
+                optimizedEndSocPercent: finalDay.optimizedEndSocPercent,
+                roundTripEfficiency: plan.round_trip_efficiency,
+                valuationPriceEurPerKwh: valuationPrice,
+            })
+            : null;
+        const hasRetainedEnergyValuation = retainedEnergy !== null;
+        const retainedEnergyValue = retainedEnergy?.valueEur ?? Number.NaN;
+        const adjustedDifference = totalDifference + retainedEnergyValue;
         if (finalDay) {
             const rulesSoc = finalDay.currentEndSocPercent;
             const optimizedSoc = finalDay.optimizedEndSocPercent;
             const socDifference = optimizedSoc - rulesSoc;
             elements.finalSoc.textContent = `${rulesSoc.toFixed(1)}% vs ${optimizedSoc.toFixed(1)}%`;
             elements.finalSocDetail.textContent = `Rules vs Optimizer · ${socDifference >= 0 ? "+" : "−"}${Math.abs(socDifference).toFixed(1)} percentage points`;
-            elements.forecastDifference.textContent = formatSignedMoney(totalDifference);
-            elements.forecastDifference.className = `gsd-price ${pnlClass(totalDifference)}`.trim();
-            elements.forecastDifferenceDetail.textContent = `Optimizer vs Rules cash P&L · final SoC ${optimizedSoc.toFixed(1)}%`;
+            if (hasRetainedEnergyValuation) {
+                elements.forecastDifferenceLabel.textContent = "Adjusted forecast difference";
+                elements.forecastDifference.textContent = formatSignedMoney(adjustedDifference);
+                elements.forecastDifference.className = `gsd-price ${pnlClass(adjustedDifference)}`.trim();
+                elements.forecastDifferenceDetail.textContent = `Cash ${formatSignedMoney(totalDifference)} · retained energy ${formatSignedMoney(retainedEnergyValue)}`;
+            } else {
+                elements.forecastDifferenceLabel.textContent = "Cash forecast difference";
+                elements.forecastDifference.textContent = formatSignedMoney(totalDifference);
+                elements.forecastDifference.className = `gsd-price ${pnlClass(totalDifference)}`.trim();
+                elements.forecastDifferenceDetail.textContent = "Retained-energy valuation available after the next calculation";
+            }
         } else {
+            elements.forecastDifferenceLabel.textContent = "Adjusted forecast difference";
             elements.finalSoc.textContent = "—";
             elements.finalSocDetail.textContent = "Rules versus Optimizer";
             elements.forecastDifference.textContent = "—";
@@ -581,6 +614,35 @@
             totalMetrics.appendChild(metric);
         });
         totalCard.appendChild(totalMetrics);
+
+        const adjustment = document.createElement("div");
+        adjustment.className = "optimizer-pnl-adjustment";
+        const retainedMetric = document.createElement("div");
+        appendText(retainedMetric, "span", "Retained energy value");
+        appendText(
+            retainedMetric,
+            "strong",
+            hasRetainedEnergyValuation ? formatSignedMoney(retainedEnergyValue) : "—",
+            hasRetainedEnergyValuation ? pnlClass(retainedEnergyValue) : ""
+        );
+        appendText(
+            retainedMetric,
+            "small",
+            hasRetainedEnergyValuation
+                ? `${formatEnergyDelta(retainedEnergy.deliverableEnergyDifferenceKwh)} deliverable at ${formatPrice(valuationPrice)}`
+                : "Available after the next optimizer calculation"
+        );
+        const adjustedMetric = document.createElement("div");
+        appendText(adjustedMetric, "span", "Adjusted forecast value");
+        appendText(
+            adjustedMetric,
+            "strong",
+            hasRetainedEnergyValuation ? formatSignedMoney(adjustedDifference) : "—",
+            hasRetainedEnergyValuation ? pnlClass(adjustedDifference) : ""
+        );
+        appendText(adjustedMetric, "small", "Cash P&L difference plus retained energy value");
+        adjustment.append(retainedMetric, adjustedMetric);
+        totalCard.appendChild(adjustment);
         elements.dailyPnl.appendChild(totalCard);
     }
 

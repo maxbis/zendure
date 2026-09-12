@@ -6,8 +6,9 @@ import fcntl
 import json
 import os
 from pathlib import Path
+from statistics import fmean
 import time
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from zoneinfo import ZoneInfo
 
@@ -182,6 +183,35 @@ def solar_forecast_updated_at(payload: dict, timezone: ZoneInfo) -> Optional[str
         return None
 
 
+def retained_energy_valuation(prices: PricePayload) -> Dict[str, Any]:
+    """Build a terminal-energy price from the latest 24 official consumer prices."""
+    points: List[Tuple[str, int, float]] = []
+    for date_text, values in (
+        (prices.today_date, prices.import_today),
+        (prices.tomorrow_date, prices.import_tomorrow),
+    ):
+        if not date_text:
+            continue
+        for hour, raw in enumerate(values):
+            if raw is None:
+                continue
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                continue
+            points.append((str(date_text), hour, value))
+
+    window = points[-24:]
+    dates = list(dict.fromkeys(point[0] for point in window))
+    price = max(0.0, fmean(point[2] for point in window)) if len(window) == 24 else None
+    return {
+        "retained_energy_valuation_price_eur_per_kwh": round(price, 6) if price is not None else None,
+        "retained_energy_valuation_hour_count": len(window),
+        "retained_energy_valuation_dates": dates,
+        "retained_energy_valuation_basis": "latest_24_official_consumer_prices",
+    }
+
+
 def run_shadow_once(
     settings: PlannerSettings,
     *,
@@ -205,6 +235,7 @@ def run_shadow_once(
     prices = fetch_price_payload(settings)
     battery_state = fetch_battery_state(settings)
     shortwave = fetch_shortwave_payload(settings)
+    retained_energy_inputs = retained_energy_valuation(prices)
     slots = build_shadow_slots(
         now=generated_at,
         settings=settings,
@@ -241,6 +272,7 @@ def run_shadow_once(
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
             "solar_forecast_source": "shortwave_radiation",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),
+            **retained_energy_inputs,
         },
         "plan": plan.to_dict(),
     }

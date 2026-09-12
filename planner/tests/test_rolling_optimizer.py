@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from planner.clients import PricePayload
 from planner.models import BatteryState
 from planner.rolling_optimizer import RollingInputSlot, build_rolling_boundaries, optimize_rolling_schedule
-from planner.shadow import append_json_line, build_shadow_slots, solar_forecast_updated_at, write_json_atomic
+from planner.shadow import append_json_line, build_shadow_slots, retained_energy_valuation, solar_forecast_updated_at, write_json_atomic
 from planner.tests.support import build_test_settings
 
 
@@ -142,6 +142,29 @@ class RollingOptimizerTests(unittest.TestCase):
 
     def test_missing_solar_forecast_cache_timestamp_remains_unknown(self) -> None:
         self.assertIsNone(solar_forecast_updated_at({}, ZoneInfo("Europe/Amsterdam")))
+
+    def test_retained_energy_valuation_uses_latest_24_official_prices(self) -> None:
+        prices = PricePayload(
+            today_date="20260912",
+            tomorrow_date="20260913",
+            import_today=[0.10] * 24,
+            import_tomorrow=[0.30] * 24,
+            export_today=[0.0] * 24,
+            export_tomorrow=[0.0] * 24,
+        )
+
+        valuation = retained_energy_valuation(prices)
+
+        self.assertEqual(valuation["retained_energy_valuation_price_eur_per_kwh"], 0.30)
+        self.assertEqual(valuation["retained_energy_valuation_hour_count"], 24)
+        self.assertEqual(valuation["retained_energy_valuation_dates"], ["20260913"])
+
+    def test_retained_energy_valuation_requires_24_prices_and_never_goes_negative(self) -> None:
+        incomplete = PricePayload("20260912", None, [0.20] * 23 + [None], [], [], [])
+        negative = PricePayload("20260912", None, [-0.10] * 24, [], [], [])
+
+        self.assertIsNone(retained_energy_valuation(incomplete)["retained_energy_valuation_price_eur_per_kwh"])
+        self.assertEqual(retained_energy_valuation(negative)["retained_energy_valuation_price_eur_per_kwh"], 0.0)
 
 
 if __name__ == "__main__":

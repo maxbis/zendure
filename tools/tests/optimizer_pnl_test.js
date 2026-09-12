@@ -1,7 +1,11 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { estimateDailyComparison, estimateHourlyComparison } = require("../../app/assets/js/optimizer-pnl.js");
+const {
+    estimateDailyComparison,
+    estimateHourlyComparison,
+    estimateRetainedEnergyAdjustment,
+} = require("../../app/assets/js/optimizer-pnl.js");
 
 const decisions = [
     {
@@ -69,5 +73,18 @@ assert.equal(hourly[0].currentEndSocPercent, 100);
 assert.equal(hourly[1].currentGridPowerW, -100);
 assert.equal(hourly[1].optimizedStartSocPercent, 90);
 assert.equal(hourly[1].optimizedEndSocPercent, 90);
+
+const retainedEnergy = estimateRetainedEnergyAdjustment({
+    capacityWh: 5760,
+    rulesEndSocPercent: 30,
+    optimizedEndSocPercent: 78,
+    roundTripEfficiency: 0.85,
+    valuationPriceEurPerKwh: 0.30,
+});
+assert.ok(retainedEnergy);
+assert.ok(Math.abs(retainedEnergy.storedEnergyDifferenceKwh - 2.7648) < 1e-12);
+assert.ok(Math.abs(retainedEnergy.dischargeEfficiency - Math.sqrt(0.85)) < 1e-12);
+assert.ok(Math.abs(retainedEnergy.valueEur - 0.7647058955) < 1e-9);
+assert.equal(estimateRetainedEnergyAdjustment({ capacityWh: 0 }), null);
 
 console.log("Optimizer daily P&L tests passed.");
