@@ -50,10 +50,12 @@ main/prices/config.json
 **/*.json
 !/common/config/
 !/common/config/**
+/common/config/system.json
 /main/data/price/
 /config/*
 config.json
 config/config.json
+/main/config/config.json
 automate/config/config.jsonc
 /data/automation_status.json
 run_schedule/data/zendure_data.json
