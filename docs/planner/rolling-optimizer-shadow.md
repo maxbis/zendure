@@ -46,6 +46,17 @@ plan with the schedule resolved from rules and manual entries. Its active-schedu
 control can switch between Rules and Optimizer after confirmation. Direct web access to the raw log is denied by
 `planner/data/.htaccess` when Apache directory overrides are enabled.
 
+The four headline cards focus on operational decisions:
+
+- The active Rules, Optimizer or Rules fallback schedule and the latest relevant calculation time.
+- The selected forecast horizon and whether its prices are official or provisional.
+- The Rules and Optimizer final SoC on the same forecast horizon.
+- The Optimizer cash P&L difference versus Rules across the complete forecast, with Optimizer final SoC alongside it.
+
+Energy cost, the terminal-value objective, efficiency and the number of changed
+schedule segments remain available under Technical optimizer details instead of
+being presented as primary outcomes.
+
 For every selected prediction, the viewer also estimates cash P&L per calendar day for:
 
 - The current resolved schedule.

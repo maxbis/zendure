@@ -120,26 +120,38 @@ $viewerConfig = [
         <div class="optimizer-content" data-role="content" hidden>
             <section class="optimizer-summary" aria-label="Optimizer plan summary">
                 <article class="gsd-card optimizer-metric">
-                    <span>Horizon</span>
+                    <span>Active schedule</span>
+                    <strong data-role="active-mode">—</strong>
+                    <small data-role="plan-freshness">—</small>
+                </article>
+                <article class="gsd-card optimizer-metric">
+                    <span>Forecast horizon</span>
                     <strong data-role="horizon">—</strong>
-                    <small data-role="generated">—</small>
-                </article>
-                <article class="gsd-card optimizer-metric">
-                    <span>Battery</span>
-                    <strong data-role="soc">—</strong>
-                    <small data-role="efficiency">—</small>
-                </article>
-                <article class="gsd-card optimizer-metric">
-                    <span>Optimized energy cost</span>
-                    <strong class="gsd-price" data-role="cost">—</strong>
-                    <small data-role="objective">—</small>
-                </article>
-                <article class="gsd-card optimizer-metric">
-                    <span>Schedule changes</span>
-                    <strong data-role="difference-count">—</strong>
                     <small data-role="price-status">—</small>
                 </article>
+                <article class="gsd-card optimizer-metric">
+                    <span>Final battery</span>
+                    <strong data-role="final-soc">—</strong>
+                    <small data-role="final-soc-detail">Rules versus Optimizer</small>
+                </article>
+                <article class="gsd-card optimizer-metric">
+                    <span>Complete forecast difference</span>
+                    <strong class="gsd-price" data-role="forecast-difference">—</strong>
+                    <small data-role="forecast-difference-detail">Optimizer versus Rules cash P&amp;L</small>
+                </article>
             </section>
+
+            <details class="gsd-card optimizer-technical">
+                <summary>Technical optimizer details</summary>
+                <div class="optimizer-technical__metrics">
+                    <p><span>Calculated</span><strong data-role="generated">—</strong></p>
+                    <p><span>Optimizer battery path</span><strong data-role="soc">—</strong></p>
+                    <p><span>Round-trip efficiency</span><strong data-role="efficiency">—</strong></p>
+                    <p><span>Optimizer energy cost</span><strong data-role="cost">—</strong></p>
+                    <p><span>Objective after terminal value</span><strong data-role="objective">—</strong></p>
+                    <p><span>Different schedule segments</span><strong data-role="difference-count">—</strong></p>
+                </div>
+            </details>
 
             <section class="gsd-card optimizer-pnl" aria-labelledby="optimizer-pnl-title">
                 <div class="gsd-card__header optimizer-pnl__header">

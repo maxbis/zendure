@@ -155,6 +155,52 @@
     font-size: 0.72rem;
 }
 
+.optimizer-technical {
+    margin-bottom: 12px;
+    padding: 0;
+}
+
+.optimizer-technical summary {
+    padding: 12px 14px;
+    color: var(--gsd-text-secondary);
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.optimizer-technical summary:hover,
+.optimizer-technical summary:focus-visible {
+    color: var(--gsd-text);
+}
+
+.optimizer-technical__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    padding: 1px;
+    border-top: 1px solid var(--gsd-border);
+    background: var(--gsd-border);
+}
+
+.optimizer-technical__metrics p {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 10px 12px;
+    background: var(--gsd-surface-1);
+}
+
+.optimizer-technical__metrics span {
+    color: var(--gsd-text-muted);
+    font-size: 0.66rem;
+}
+
+.optimizer-technical__metrics strong {
+    color: var(--gsd-text-secondary);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .optimizer-comparison {
     overflow: hidden;
 }
@@ -396,6 +442,10 @@
         grid-template-columns: 1fr;
     }
 
+    .optimizer-technical__metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .optimizer-table,
     .optimizer-table tbody,
     .optimizer-table tr,
@@ -470,6 +520,10 @@
     .optimizer-metric {
         min-height: 104px;
         padding: 12px;
+    }
+
+    .optimizer-technical__metrics {
+        grid-template-columns: 1fr;
     }
 
     .optimizer-comparison__header {

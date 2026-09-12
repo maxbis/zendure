@@ -14,6 +14,8 @@
         error: root.querySelector('[data-role="error"]'),
         errorMessage: root.querySelector('[data-role="error-message"]'),
         content: root.querySelector('[data-role="content"]'),
+        activeMode: root.querySelector('[data-role="active-mode"]'),
+        planFreshness: root.querySelector('[data-role="plan-freshness"]'),
         horizon: root.querySelector('[data-role="horizon"]'),
         generated: root.querySelector('[data-role="generated"]'),
         soc: root.querySelector('[data-role="soc"]'),
@@ -22,6 +24,10 @@
         objective: root.querySelector('[data-role="objective"]'),
         differenceCount: root.querySelector('[data-role="difference-count"]'),
         priceStatus: root.querySelector('[data-role="price-status"]'),
+        finalSoc: root.querySelector('[data-role="final-soc"]'),
+        finalSocDetail: root.querySelector('[data-role="final-soc-detail"]'),
+        forecastDifference: root.querySelector('[data-role="forecast-difference"]'),
+        forecastDifferenceDetail: root.querySelector('[data-role="forecast-difference-detail"]'),
         dailyPnl: root.querySelector('[data-role="daily-pnl"]'),
         body: root.querySelector('[data-role="comparison-body"]'),
         footnote: root.querySelector('[data-role="footnote"]')
@@ -81,16 +87,26 @@
         elements.modeOptimizer.setAttribute("aria-pressed", String(requested === "optimizer"));
         elements.modeBanner.dataset.source = fallback ? "fallback" : active;
         if (fallback) {
+            elements.activeMode.textContent = "Rules fallback";
+            elements.planFreshness.textContent = status.fallbackReason || "Optimizer plan unavailable";
             elements.modeBannerTitle.textContent = "Rules fallback is active";
             elements.modeBannerCopy.textContent = status.fallbackReason || "The optimizer schedule is unavailable or stale.";
             elements.modeDetail.textContent = "Optimizer was selected, but safety validation kept the rule-based schedule active.";
         } else if (active === "optimizer") {
+            elements.activeMode.textContent = "Optimizer";
+            elements.planFreshness.textContent = status.optimizerGeneratedAt
+                ? `Active plan calculated ${formatRunTime(status.optimizerGeneratedAt)}`
+                : "Validated optimizer plan active";
             elements.modeBannerTitle.textContent = "Optimizer schedule is active";
             elements.modeBannerCopy.textContent = "The battery controller receives the latest validated optimizer schedule. Exact manual overrides still take priority.";
             elements.modeDetail.textContent = status.optimizerGeneratedAt
                 ? `Latest active plan: ${formatRunTime(status.optimizerGeneratedAt)}.`
                 : "A validated optimizer plan is active.";
         } else {
+            elements.activeMode.textContent = "Rules";
+            elements.planFreshness.textContent = status.optimizerGeneratedAt
+                ? `Latest comparison calculated ${formatRunTime(status.optimizerGeneratedAt)}`
+                : "Optimizer continues in the background";
             elements.modeBannerTitle.textContent = "Rule-based schedule is active";
             elements.modeBannerCopy.textContent = "Optimizer calculations continue in the background for comparison.";
             elements.modeDetail.textContent = "Rules and exact manual overrides determine the battery schedule.";
@@ -326,7 +342,7 @@
         elements.soc.textContent = `${Number(plan.starting_soc_percent).toFixed(1)}% → ${Number(plan.ending_soc_percent).toFixed(1)}%`;
         elements.efficiency.textContent = `${Math.round(Number(plan.round_trip_efficiency) * 100)}% round-trip efficiency`;
         elements.cost.textContent = formatMoney(plan.expected_energy_cost_eur);
-        elements.objective.textContent = `Objective ${formatMoney(plan.objective_eur)} after terminal energy value`;
+        elements.objective.textContent = formatMoney(plan.objective_eur);
         elements.differenceCount.textContent = `${differenceCount} of ${(plan.decisions || []).length}`;
         elements.priceStatus.textContent = provisional ? `${provisional} provisional price segment${provisional === 1 ? "" : "s"}` : "All prices official";
         elements.meta.textContent = `Shadow plan from ${formatRunTime(plan.generated_at)}`;
@@ -388,6 +404,22 @@
 
         const totalDifference = totalOptimized - totalCurrent;
         const finalDay = days.at(-1);
+        if (finalDay) {
+            const rulesSoc = finalDay.currentEndSocPercent;
+            const optimizedSoc = finalDay.optimizedEndSocPercent;
+            const socDifference = optimizedSoc - rulesSoc;
+            elements.finalSoc.textContent = `${rulesSoc.toFixed(1)}% vs ${optimizedSoc.toFixed(1)}%`;
+            elements.finalSocDetail.textContent = `Rules vs Optimizer · ${socDifference >= 0 ? "+" : "−"}${Math.abs(socDifference).toFixed(1)} percentage points`;
+            elements.forecastDifference.textContent = formatSignedMoney(totalDifference);
+            elements.forecastDifference.className = `gsd-price ${pnlClass(totalDifference)}`.trim();
+            elements.forecastDifferenceDetail.textContent = `Optimizer vs Rules cash P&L · final SoC ${optimizedSoc.toFixed(1)}%`;
+        } else {
+            elements.finalSoc.textContent = "—";
+            elements.finalSocDetail.textContent = "Rules versus Optimizer";
+            elements.forecastDifference.textContent = "—";
+            elements.forecastDifference.className = "gsd-price";
+            elements.forecastDifferenceDetail.textContent = "Optimizer versus Rules cash P&L";
+        }
         const totalCard = document.createElement("article");
         totalCard.className = "optimizer-pnl-day optimizer-pnl-day--total";
         const totalHeader = document.createElement("header");
