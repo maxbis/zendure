@@ -29,6 +29,7 @@ The optimizer reads:
 - Consumer prices from the existing price endpoint.
 - Spot sale prices derived with the shared price-conversion settings.
 - Expected solar production derived from the existing shortwave forecast.
+- The solar endpoint's `cachedAt` value, stored as `inputs.solar_forecast_updated_at` in the installation timezone.
 - The shared 24-hour household-usage profile.
 - Battery capacity, state-of-charge boundaries, schedule power limits and power step from shared configuration.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
@@ -56,6 +57,12 @@ The four headline cards focus on operational decisions:
 Energy cost, the terminal-value objective, efficiency and the number of changed
 schedule segments remain available under Technical optimizer details instead of
 being presented as primary outcomes.
+
+Directly below the active-schedule switch, the Optimizer status panel reports the
+last successful calculation timestamp and the solar forecast update timestamp from
+the newest successful record. It deliberately does not translate either timestamp
+into a freshness rating. Records created before this field was introduced display
+the solar update time as unknown until the next successful calculation.
 
 For every selected prediction, the viewer also estimates cash P&L per calendar day for:
 

@@ -93,6 +93,23 @@ $viewerConfig = [
             </div>
         </section>
 
+        <section class="gsd-card optimizer-status" aria-labelledby="optimizer-status-title">
+            <div>
+                <h2 id="optimizer-status-title">Optimizer status</h2>
+                <p>Reported timestamps without a freshness rating.</p>
+            </div>
+            <dl class="optimizer-status__timestamps">
+                <div>
+                    <dt>Last successful calculation</dt>
+                    <dd data-role="optimizer-last-run">—</dd>
+                </div>
+                <div>
+                    <dt>Solar forecast updated</dt>
+                    <dd data-role="solar-forecast-updated">—</dd>
+                </div>
+            </dl>
+        </section>
+
         <section class="gsd-card optimizer-controls" aria-labelledby="optimizer-run-title">
             <div>
                 <h2 id="optimizer-run-title">Optimizer run</h2>

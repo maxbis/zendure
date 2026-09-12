@@ -165,6 +165,23 @@ def append_json_line(path: Path, payload: dict) -> None:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+def solar_forecast_updated_at(payload: dict, timezone: ZoneInfo) -> Optional[str]:
+    """Return the solar endpoint cache timestamp as a local ISO timestamp."""
+    raw = payload.get("cachedAt")
+    if isinstance(raw, bool):
+        return None
+    try:
+        timestamp = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if timestamp <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(timestamp, timezone).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def run_shadow_once(
     settings: PlannerSettings,
     *,
@@ -223,6 +240,7 @@ def run_shadow_once(
             "power_step_w": settings.power_step_w,
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
             "solar_forecast_source": "shortwave_radiation",
+            "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),
         },
         "plan": plan.to_dict(),
     }

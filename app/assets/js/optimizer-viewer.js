@@ -28,6 +28,8 @@
         finalSocDetail: root.querySelector('[data-role="final-soc-detail"]'),
         forecastDifference: root.querySelector('[data-role="forecast-difference"]'),
         forecastDifferenceDetail: root.querySelector('[data-role="forecast-difference-detail"]'),
+        optimizerLastRun: root.querySelector('[data-role="optimizer-last-run"]'),
+        solarForecastUpdated: root.querySelector('[data-role="solar-forecast-updated"]'),
         dailyPnl: root.querySelector('[data-role="daily-pnl"]'),
         body: root.querySelector('[data-role="comparison-body"]'),
         footnote: root.querySelector('[data-role="footnote"]')
@@ -349,6 +351,16 @@
         elements.footnote.textContent = "Forecast P&L is electricity sales minus purchases and excludes terminal battery value. Current dynamic NZ power is estimated from forecast solar and load; actual meter readings will differ. End-of-day SoC is shown because retained battery energy is not cash P&L.";
     }
 
+    function renderOptimizerStatus() {
+        const latest = state.records[0];
+        elements.optimizerLastRun.textContent = latest?.plan?.generated_at
+            ? formatRunTime(latest.plan.generated_at)
+            : "Unknown";
+        elements.solarForecastUpdated.textContent = latest?.inputs?.solar_forecast_updated_at
+            ? formatRunTime(latest.inputs.solar_forecast_updated_at)
+            : "Unknown — available after the next calculation";
+    }
+
     function renderDailyPnl(record, schedules) {
         if (!window.OptimizerPnl) throw new Error("The daily P&L calculator is unavailable.");
         const plan = record.plan || {};
@@ -486,6 +498,7 @@
                 throw new Error(payload.error || "No completed optimizer plans are present in the log.");
             }
             state.records = payload.records;
+            renderOptimizerStatus();
             const preservedIndex = previousGeneratedAt
                 ? state.records.findIndex((record) => record.plan?.generated_at === previousGeneratedAt)
                 : -1;

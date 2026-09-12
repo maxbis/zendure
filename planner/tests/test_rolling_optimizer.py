@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from planner.clients import PricePayload
 from planner.models import BatteryState
 from planner.rolling_optimizer import RollingInputSlot, build_rolling_boundaries, optimize_rolling_schedule
-from planner.shadow import append_json_line, build_shadow_slots, write_json_atomic
+from planner.shadow import append_json_line, build_shadow_slots, solar_forecast_updated_at, write_json_atomic
 from planner.tests.support import build_test_settings
 
 
@@ -132,6 +132,16 @@ class RollingOptimizerTests(unittest.TestCase):
             write_json_atomic(path, {"sequence": 2})
             self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"sequence": 2})
             self.assertEqual(list(path.parent.glob("*.tmp")), [])
+
+    def test_solar_forecast_cache_timestamp_is_recorded_in_local_timezone(self) -> None:
+        timezone = ZoneInfo("Europe/Amsterdam")
+
+        updated_at = solar_forecast_updated_at({"cachedAt": 1789236000}, timezone)
+
+        self.assertEqual(updated_at, "2026-09-12T20:00:00+02:00")
+
+    def test_missing_solar_forecast_cache_timestamp_remains_unknown(self) -> None:
+        self.assertIsNone(solar_forecast_updated_at({}, ZoneInfo("Europe/Amsterdam")))
 
 
 if __name__ == "__main__":
