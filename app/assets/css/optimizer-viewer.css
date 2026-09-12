@@ -149,6 +149,14 @@
     line-height: 1.1;
 }
 
+.optimizer-metric > strong.gsd-positive {
+    color: var(--gsd-positive);
+}
+
+.optimizer-metric > strong.gsd-negative {
+    color: var(--gsd-negative);
+}
+
 .optimizer-metric > small {
     margin-top: 6px;
     color: var(--gsd-text-secondary);
