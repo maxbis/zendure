@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 import math
-from statistics import fmean
+from statistics import fmean, median
 from typing import Dict, List, Optional, Tuple
 
 from planner.models import BatteryState
@@ -137,12 +137,84 @@ def _hour_cost(grid_power_w: float, duration_hours: float, import_price: float, 
     return grid_kwh * export_price
 
 
+def _linear_netzero_minus_price_score(
+    current_import_price: float,
+    remaining_import_prices: List[float],
+) -> float:
+    """Return linear NZ- flexibility from the median to the maximum remaining price."""
+    if current_import_price <= 0:
+        return 0.0
+
+    prices = [float(price) for price in remaining_import_prices if math.isfinite(float(price))]
+    if not prices:
+        return 0.0
+
+    median_price = float(median(prices))
+    maximum_price = max(prices)
+    minimum_price = min(prices)
+    if maximum_price - minimum_price <= 1e-12:
+        return 0.0
+    if current_import_price >= maximum_price - 1e-12:
+        return 1.0
+
+    price_range = maximum_price - median_price
+    if price_range <= 1e-12 or current_import_price <= median_price:
+        return 0.0
+
+    return max(0.0, min(1.0, (current_import_price - median_price) / price_range))
+
+
+def _adaptive_netzero_minus_limit_w(
+    *,
+    modeled_discharge_w: int,
+    current_import_price: float,
+    remaining_import_prices: List[float],
+    start_energy_wh: float,
+    min_energy_wh: float,
+    discharge_efficiency: float,
+    duration_hours: float,
+    max_discharge_power_w: int,
+) -> int:
+    """Expand an NZ- runtime bound linearly when the current import price is valuable."""
+    modeled_discharge_w = max(0, int(modeled_discharge_w))
+    if modeled_discharge_w == 0 or duration_hours <= 0:
+        return modeled_discharge_w
+
+    available_output_w = (
+        max(0.0, start_energy_wh - min_energy_wh)
+        * discharge_efficiency
+        / duration_hours
+    )
+    maximum_feasible_w = max(
+        modeled_discharge_w,
+        min(int(max_discharge_power_w), int(math.floor(available_output_w))),
+    )
+    price_score = _linear_netzero_minus_price_score(
+        current_import_price,
+        remaining_import_prices,
+    )
+    adaptive_limit_w = modeled_discharge_w + price_score * (
+        maximum_feasible_w - modeled_discharge_w
+    )
+    return max(
+        modeled_discharge_w,
+        min(maximum_feasible_w, int(round(adaptive_limit_w))),
+    )
+
+
 def _schedule_command(
     battery_power_w: int,
     load_w: float,
     pv_w: float,
     max_discharge_power_w: int,
     power_step_w: int,
+    *,
+    current_import_price: float,
+    remaining_import_prices: List[float],
+    start_energy_wh: float,
+    min_energy_wh: float,
+    discharge_efficiency: float,
+    duration_hours: float,
 ) -> Tuple[object, Optional[int], Optional[int], str]:
     if battery_power_w > 0:
         expected_surplus_w = max(0.0, pv_w - load_w)
@@ -153,7 +225,22 @@ def _schedule_command(
     if battery_power_w < 0:
         residual_load_w = max(0.0, load_w - pv_w)
         if abs(battery_power_w) <= residual_load_w + (power_step_w / 2.0):
-            return "netzero-", max(battery_power_w, -max_discharge_power_w), 0, "offset expected household import"
+            adaptive_limit_w = _adaptive_netzero_minus_limit_w(
+                modeled_discharge_w=abs(battery_power_w),
+                current_import_price=current_import_price,
+                remaining_import_prices=remaining_import_prices,
+                start_energy_wh=start_energy_wh,
+                min_energy_wh=min_energy_wh,
+                discharge_efficiency=discharge_efficiency,
+                duration_hours=duration_hours,
+                max_discharge_power_w=max_discharge_power_w,
+            )
+            reason = (
+                "offset actual household import with price-based adaptive headroom"
+                if adaptive_limit_w > abs(battery_power_w)
+                else "offset expected household import"
+            )
+            return "netzero-", -adaptive_limit_w, 0, reason
         return battery_power_w, None, None, "discharge beyond household load for export"
 
     return 0, None, None, "idle"
@@ -377,7 +464,9 @@ def optimize_rolling_schedule(
         raise RuntimeError("Unable to select a feasible rolling plan")
 
     decisions: List[RollingDecision] = []
-    for slot, (candidate, start_energy_wh, end_energy_wh, grid_power_w) in zip(slots, best_path):
+    for slot_index, (slot, (candidate, start_energy_wh, end_energy_wh, grid_power_w)) in enumerate(
+        zip(slots, best_path)
+    ):
         action_w = candidate.power_w
         duration = slot.duration_hours
         if candidate.schedule_value is not None:
@@ -392,6 +481,15 @@ def optimize_rolling_schedule(
                 slot.pv_w,
                 battery_state.max_discharge_power_w,
                 power_step_w,
+                current_import_price=slot.import_price_eur_per_kwh,
+                remaining_import_prices=[
+                    remaining_slot.import_price_eur_per_kwh
+                    for remaining_slot in slots[slot_index:]
+                ],
+                start_energy_wh=start_energy_wh,
+                min_energy_wh=min_energy_wh,
+                discharge_efficiency=discharge_efficiency,
+                duration_hours=duration,
             )
         decisions.append(
             RollingDecision(

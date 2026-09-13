@@ -27,7 +27,8 @@ The optimizer reads:
 
 - Live battery state of charge from the existing automation status endpoint.
 - Consumer prices from the existing price endpoint.
-- A retained-energy valuation price calculated from the latest 24 official hourly consumer prices. When tomorrow is available, those later hours naturally replace today's hours in the 24-hour window.
+- A retained-energy valuation price calculated from the latest 24 official hourly consumer prices. This value is stored for comparison reporting; it is not the terminal price used by the optimizer objective.
+- A terminal price calculated as the average consumer price across the optimization horizon. The optimizer uses this value when comparing remaining battery energy at the end of the horizon.
 - Spot sale prices derived with the shared price-conversion settings.
 - Expected solar production derived from the existing shortwave forecast.
 - The solar endpoint's `cachedAt` value, stored as `inputs.solar_forecast_updated_at` in the installation timezone.
@@ -102,16 +103,18 @@ The hourly table remains available below the graphs for detailed inspection.
 2. Establish a minimum 24-hour horizon and extend its end through the following local midnight.
 3. Split that horizon at clock-hour boundaries, retaining a partial first hour when needed.
 4. Use official prices where available. For an unpublished future hour, use today's price at the same clock hour and mark it `repeat_today`.
-5. Calculate the retained-energy valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero.
+5. Calculate the reporting valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero. Separately, calculate the optimizer's terminal price from the average consumer price across all horizon slots.
 6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
 7. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
 8. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
 9. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
-10. Append the plan to the comparison log under a file lock.
-11. Atomically publish the same plan as the latest executable optimizer schedule.
-12. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-13. Preserve exact dated manual schedule entries over optimizer entries.
-14. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
+10. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
+11. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
+12. Append the plan to the comparison log under a file lock.
+13. Atomically publish the same plan as the latest executable optimizer schedule.
+14. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+15. Preserve exact dated manual schedule entries over optimizer entries.
+16. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 
@@ -139,6 +142,10 @@ http://localhost/zendure/app/optimizer.php
 
 - When an upstream source cannot be read, then an error record is appended and the last executable plan is not replaced.
 - When tomorrow's prices become available, then the next run automatically replaces repeated-today assumptions with official prices.
+- When a `netzero-` slot's consumer price is at or below the median remaining price, then its runtime discharge limit remains equal to the modeled discharge.
+- When a `netzero-` slot has the maximum remaining consumer price, then its runtime discharge limit expands to the maximum power supported by the battery and energy available above minimum SoC.
+- When all remaining consumer prices are equal or the current consumer price is non-positive, then price-dependent `netzero-` headroom is disabled.
+- When actual household import remains below an adaptive `netzero-` limit, then runtime follows the meter and does not intentionally export battery energy.
 - When the minimum horizon already ends exactly at midnight, then no additional day is added.
 - When `PLANNER_EXTEND_HORIZON_TO_MIDNIGHT=false`, then the optimizer uses the exact configured horizon instead.
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.

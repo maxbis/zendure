@@ -137,6 +137,7 @@ profile and price conversion. Its first-version defaults are:
 - 50 Wh state discretization
 - today's same-clock-hour price for an unknown future price
 - opportunistic bounded `netzero+` during solar-capable idle periods when storing solar after round-trip losses is worth more than exporting it
+- linear price-dependent `netzero-` headroom above the modeled household discharge, limited by maximum discharge power and energy available above minimum SoC
 
 Relevant environment overrides are:
 

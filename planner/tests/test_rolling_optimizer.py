@@ -10,7 +10,13 @@ from zoneinfo import ZoneInfo
 
 from planner.clients import PricePayload
 from planner.models import BatteryState
-from planner.rolling_optimizer import RollingInputSlot, build_rolling_boundaries, optimize_rolling_schedule
+from planner.rolling_optimizer import (
+    RollingInputSlot,
+    _adaptive_netzero_minus_limit_w,
+    _linear_netzero_minus_price_score,
+    build_rolling_boundaries,
+    optimize_rolling_schedule,
+)
 from planner.shadow import append_json_line, build_shadow_slots, retained_energy_valuation, solar_forecast_updated_at, write_json_atomic
 from planner.tests.support import build_test_settings
 
@@ -61,6 +67,96 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertGreater(plan.decisions[0].battery_power_w, 0)
         self.assertLess(plan.decisions[1].battery_power_w, 0)
         self.assertEqual(plan.decisions[0].schedule_value, plan.decisions[0].battery_power_w)
+
+    def test_netzero_minus_price_score_is_linear_above_the_median(self) -> None:
+        score = _linear_netzero_minus_price_score(0.35, [0.25, 0.25, 0.35, 0.45])
+
+        self.assertAlmostEqual(score, 1.0 / 3.0)
+
+    def test_netzero_minus_price_score_is_zero_at_or_below_the_median(self) -> None:
+        self.assertEqual(_linear_netzero_minus_price_score(0.25, [0.20, 0.25, 0.30]), 0.0)
+        self.assertEqual(_linear_netzero_minus_price_score(0.25, [0.25, 0.25]), 0.0)
+        self.assertEqual(_linear_netzero_minus_price_score(-0.05, [-0.10, -0.05, -0.01]), 0.0)
+
+    def test_netzero_minus_repeated_highest_price_gets_full_score(self) -> None:
+        self.assertEqual(_linear_netzero_minus_price_score(0.45, [0.45, 0.45, 0.20]), 1.0)
+
+    def test_netzero_minus_highest_price_gets_full_feasible_range(self) -> None:
+        limit = _adaptive_netzero_minus_limit_w(
+            modeled_discharge_w=200,
+            current_import_price=0.45,
+            remaining_import_prices=[0.45, 0.25, 0.20],
+            start_energy_wh=4000.0,
+            min_energy_wh=1000.0,
+            discharge_efficiency=0.9,
+            duration_hours=1.0,
+            max_discharge_power_w=1800,
+        )
+
+        self.assertEqual(limit, 1800)
+
+    def test_netzero_minus_limit_interpolates_linearly(self) -> None:
+        limit = _adaptive_netzero_minus_limit_w(
+            modeled_discharge_w=200,
+            current_import_price=0.35,
+            remaining_import_prices=[0.25, 0.25, 0.35, 0.45],
+            start_energy_wh=4000.0,
+            min_energy_wh=1000.0,
+            discharge_efficiency=0.9,
+            duration_hours=1.0,
+            max_discharge_power_w=1800,
+        )
+
+        self.assertEqual(limit, 733)
+
+    def test_netzero_minus_headroom_respects_available_energy(self) -> None:
+        limit = _adaptive_netzero_minus_limit_w(
+            modeled_discharge_w=200,
+            current_import_price=0.45,
+            remaining_import_prices=[0.45, 0.25, 0.20],
+            start_energy_wh=1500.0,
+            min_energy_wh=1000.0,
+            discharge_efficiency=0.9,
+            duration_hours=1.0,
+            max_discharge_power_w=1800,
+        )
+
+        self.assertEqual(limit, 450)
+
+    def test_selected_household_discharge_emits_price_adaptive_netzero_minus(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 12, 10, 0, tzinfo=tz)
+        slots = [
+            RollingInputSlot(now, now + timedelta(hours=1), 0.45, 0.0, "official", 200.0, 0.0),
+            RollingInputSlot(
+                now + timedelta(hours=1),
+                now + timedelta(hours=2),
+                0.20,
+                0.0,
+                "official",
+                0.0,
+                0.0,
+            ),
+        ]
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(50.0, 5760.0, 1200, 1800, 15, 91),
+            slots=slots,
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertEqual(decision.battery_power_w, -200)
+        self.assertEqual(decision.schedule_value, "netzero-")
+        self.assertEqual(decision.min_power, -1800)
+        self.assertEqual(decision.max_power, 0)
+        self.assertEqual(
+            decision.reason,
+            "offset actual household import with price-based adaptive headroom",
+        )
 
     def test_expected_solar_charge_uses_bounded_netzero_plus(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
