@@ -455,7 +455,7 @@
     }
 
     function formatPriceCents(value) {
-        return Number.isFinite(value) ? `${Math.round(value * 100)} ct` : "—";
+        return Number.isFinite(value) ? `${(value * 100).toFixed(1)} ct` : "—";
     }
 
     function setDimmedToken(element, formattedValue, token) {
