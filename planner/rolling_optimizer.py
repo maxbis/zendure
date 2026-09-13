@@ -174,6 +174,7 @@ def _adaptive_netzero_minus_limit_w(
     discharge_efficiency: float,
     duration_hours: float,
     max_discharge_power_w: int,
+    power_step_w: int,
 ) -> int:
     """Expand an NZ- runtime bound linearly when the current import price is valuable."""
     modeled_discharge_w = max(0, int(modeled_discharge_w))
@@ -196,9 +197,13 @@ def _adaptive_netzero_minus_limit_w(
     adaptive_limit_w = modeled_discharge_w + price_score * (
         maximum_feasible_w - modeled_discharge_w
     )
+    stepped_limit_w = (
+        int(math.floor(adaptive_limit_w / max(1, power_step_w)))
+        * max(1, power_step_w)
+    )
     return max(
         modeled_discharge_w,
-        min(maximum_feasible_w, int(round(adaptive_limit_w))),
+        min(maximum_feasible_w, stepped_limit_w),
     )
 
 
@@ -234,6 +239,7 @@ def _schedule_command(
                 discharge_efficiency=discharge_efficiency,
                 duration_hours=duration_hours,
                 max_discharge_power_w=max_discharge_power_w,
+                power_step_w=power_step_w,
             )
             reason = (
                 "offset actual household import with price-based adaptive headroom"

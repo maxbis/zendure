@@ -109,7 +109,7 @@ The hourly table remains available below the graphs for detailed inspection.
 8. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
 9. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
 10. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
-11. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
+11. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
 12. Append the plan to the comparison log under a file lock.
 13. Atomically publish the same plan as the latest executable optimizer schedule.
 14. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.

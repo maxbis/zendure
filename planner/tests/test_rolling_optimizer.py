@@ -91,6 +91,7 @@ class RollingOptimizerTests(unittest.TestCase):
             discharge_efficiency=0.9,
             duration_hours=1.0,
             max_discharge_power_w=1800,
+            power_step_w=100,
         )
 
         self.assertEqual(limit, 1800)
@@ -105,9 +106,10 @@ class RollingOptimizerTests(unittest.TestCase):
             discharge_efficiency=0.9,
             duration_hours=1.0,
             max_discharge_power_w=1800,
+            power_step_w=100,
         )
 
-        self.assertEqual(limit, 733)
+        self.assertEqual(limit, 700)
 
     def test_netzero_minus_headroom_respects_available_energy(self) -> None:
         limit = _adaptive_netzero_minus_limit_w(
@@ -119,9 +121,10 @@ class RollingOptimizerTests(unittest.TestCase):
             discharge_efficiency=0.9,
             duration_hours=1.0,
             max_discharge_power_w=1800,
+            power_step_w=100,
         )
 
-        self.assertEqual(limit, 450)
+        self.assertEqual(limit, 400)
 
     def test_selected_household_discharge_emits_price_adaptive_netzero_minus(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
@@ -153,6 +156,7 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertEqual(decision.schedule_value, "netzero-")
         self.assertEqual(decision.min_power, -1800)
         self.assertEqual(decision.max_power, 0)
+        self.assertEqual(decision.min_power % 100, 0)
         self.assertEqual(
             decision.reason,
             "offset actual household import with price-based adaptive headroom",
