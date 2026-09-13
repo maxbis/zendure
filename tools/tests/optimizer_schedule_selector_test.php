@@ -53,7 +53,7 @@ selectorAssert($resolved[0]['value'] === 1200 && $resolved[0]['source'] === 'opt
 selectorAssert($resolved[1]['value'] === 0 && $resolved[1]['key'] === '202609121900', 'Exact manual override did not win.');
 
 $stale = $payload;
-$stale['plan']['generated_at'] = '2026-09-12T17:00:00+02:00';
+$stale['plan']['generated_at'] = '2026-09-12T08:00:00+02:00';
 optimizerScheduleWriteJsonAtomic(optimizerScheduleLatestPath(), $stale);
 $fallback = optimizerScheduleStatus($now, $systemConfig);
 selectorAssert($fallback['activeSource'] === 'rules' && $fallback['fallbackActive'] === true, 'Stale optimizer plan did not fall back to rules.');

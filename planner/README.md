@@ -111,7 +111,7 @@ python3 -m planner.shadow --once
 
 Each run appends the comparison log and atomically publishes
 `planner/data/optimizer_schedule_latest.json`. The authenticated optimizer page can
-select this plan as the active schedule. During the dual-testing period, plans older than 70 minutes or failing
+select this plan as the active schedule. During the dual-testing period, plans older than 10 hours or failing
 schedule safety validation automatically fall back to rules.
 
 To refresh with cron every five minutes, use `planner/optimizer.cron.example` after
@@ -136,6 +136,7 @@ profile and price conversion. Its first-version defaults are:
 - 2,640 Wp solar capacity with the existing configurable PV derate
 - 50 Wh state discretization
 - today's same-clock-hour price for an unknown future price
+- opportunistic bounded `netzero+` during solar-capable idle periods when storing solar after round-trip losses is worth more than exporting it
 
 Relevant environment overrides are:
 

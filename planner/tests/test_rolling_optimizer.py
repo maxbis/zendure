@@ -88,7 +88,92 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertGreater(decision.battery_power_w, 0)
         self.assertEqual(decision.schedule_value, "netzero+")
         self.assertEqual(decision.min_power, 0)
-        self.assertEqual(decision.max_power, decision.battery_power_w)
+        self.assertEqual(decision.max_power, 1200)
+
+    def test_daylight_idle_uses_opportunistic_netzero_plus(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 13, 13, 0, tzinfo=tz)
+        slot = RollingInputSlot(
+            now,
+            now + timedelta(hours=1),
+            0.35,
+            0.10,
+            "official",
+            220.0,
+            110.0,
+        )
+
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(15.0, 5760.0, 1200, 1800, 15, 91),
+            slots=[slot],
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertEqual(decision.battery_power_w, 0)
+        self.assertEqual(decision.schedule_value, "netzero+")
+        self.assertEqual(decision.min_power, 0)
+        self.assertEqual(decision.max_power, 1200)
+        self.assertEqual(decision.reason, "opportunistically absorb actual solar surplus")
+
+    def test_small_solar_surplus_below_power_step_is_modeled_by_netzero_plus(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 13, 16, 0, tzinfo=tz)
+        slot = RollingInputSlot(
+            now,
+            now + timedelta(hours=1),
+            0.40,
+            0.05,
+            "official",
+            220.0,
+            260.0,
+        )
+
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(50.0, 5760.0, 1200, 1800, 15, 91),
+            slots=[slot],
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertEqual(decision.battery_power_w, 40)
+        self.assertEqual(decision.schedule_value, "netzero+")
+        self.assertEqual(decision.max_power, 1200)
+
+    def test_expensive_export_keeps_daylight_idle_fixed_at_zero(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 13, 13, 0, tzinfo=tz)
+        slot = RollingInputSlot(
+            now,
+            now + timedelta(hours=1),
+            0.20,
+            0.30,
+            "official",
+            220.0,
+            110.0,
+        )
+
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(15.0, 5760.0, 1200, 1800, 15, 91),
+            slots=[slot],
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertEqual(decision.battery_power_w, 0)
+        self.assertEqual(decision.schedule_value, 0)
 
     def test_unknown_tomorrow_prices_repeat_today_by_hour(self) -> None:
         with TemporaryDirectory() as temp_dir:

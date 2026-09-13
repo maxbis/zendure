@@ -95,6 +95,16 @@ class RollingPlan:
         }
 
 
+@dataclass(frozen=True)
+class _ActionCandidate:
+    power_w: int
+    schedule_value: Optional[object] = None
+    min_power: Optional[int] = None
+    max_power: Optional[int] = None
+    reason: Optional[str] = None
+    opportunistic: bool = False
+
+
 def build_rolling_boundaries(
     now: datetime,
     horizon_hours: int,
@@ -149,6 +159,64 @@ def _schedule_command(
     return 0, None, None, "idle"
 
 
+def _opportunistic_netzero_plus_candidate(
+    *,
+    slot: RollingInputSlot,
+    energy_wh: float,
+    max_energy_wh: float,
+    charge_efficiency: float,
+    max_charge_power_w: int,
+    terminal_price: float,
+    terminal_value_factor: float,
+    future_import_prices: List[float],
+) -> Optional[_ActionCandidate]:
+    """Return a daylight NZ+ choice when stored solar is worth more than export."""
+    if slot.pv_w <= 0 or slot.duration_hours <= 0 or max_charge_power_w <= 0:
+        return None
+
+    future_consumer_value = max(
+        [terminal_price * max(0.0, terminal_value_factor)] + future_import_prices
+    )
+    stored_solar_value = future_consumer_value * charge_efficiency * charge_efficiency
+    if slot.export_price_eur_per_kwh >= stored_solar_value - 1e-12:
+        return None
+
+    available_input_w = max(
+        0.0,
+        (max_energy_wh - energy_wh)
+        / max(charge_efficiency * slot.duration_hours, 0.000001),
+    )
+    expected_surplus_w = max(0.0, slot.pv_w - slot.load_w)
+    modeled_power_w = int(
+        round(min(expected_surplus_w, float(max_charge_power_w), available_input_w))
+    )
+
+    return _ActionCandidate(
+        power_w=max(0, modeled_power_w),
+        schedule_value="netzero+",
+        min_power=0,
+        max_power=max_charge_power_w,
+        reason="opportunistically absorb actual solar surplus",
+        opportunistic=True,
+    )
+
+
+def _tie_rank(candidate: _ActionCandidate) -> Tuple[int, int]:
+    """Prefer gentler actions, then adaptive NZ+ over fixed idle on exact ties."""
+    return (abs(candidate.power_w), 0 if candidate.opportunistic else 1)
+
+
+def _bucket_adjusted_cost(
+    cash_cost: float,
+    energy_wh: float,
+    discharge_efficiency: float,
+    continuation_consumer_price: float,
+) -> float:
+    """Compare paths inside one approximate SoC bucket without discarding useful energy."""
+    deliverable_kwh = energy_wh * discharge_efficiency / 1000.0
+    return cash_cost - deliverable_kwh * continuation_consumer_price
+
+
 def optimize_rolling_schedule(
     *,
     now: datetime,
@@ -185,16 +253,43 @@ def optimize_rolling_schedule(
     charge_actions = list(
         range(power_step_w, int(battery_state.max_charge_power_w) + 1, power_step_w)
     )
-    actions = sorted(discharge_actions + [0] + charge_actions)
+    actions = [
+        _ActionCandidate(power_w=power)
+        for power in sorted(discharge_actions + [0] + charge_actions)
+    ]
 
-    states: Dict[int, Tuple[float, float, List[Tuple[int, float, float, float]]]] = {
+    terminal_price = fmean(slot.import_price_eur_per_kwh for slot in slots)
+
+    states: Dict[int, Tuple[float, float, List[Tuple[_ActionCandidate, float, float, float]]]] = {
         start_key: (0.0, starting_energy_wh, [])
     }
-    for slot in slots:
-        next_states: Dict[int, Tuple[float, float, List[Tuple[int, float, float, float]]]] = {}
+    for slot_index, slot in enumerate(slots):
+        next_states: Dict[int, Tuple[float, float, List[Tuple[_ActionCandidate, float, float, float]]]] = {}
         duration = slot.duration_hours
+        future_import_prices = [
+            future_slot.import_price_eur_per_kwh
+            for future_slot in slots[slot_index + 1:]
+        ]
+        continuation_consumer_price = max(
+            [terminal_price * max(0.0, terminal_value_factor)] + future_import_prices
+        )
         for _energy_key, (cost_so_far, energy_wh, path) in states.items():
-            for action_w in actions:
+            candidates = list(actions)
+            opportunistic = _opportunistic_netzero_plus_candidate(
+                slot=slot,
+                energy_wh=energy_wh,
+                max_energy_wh=max_energy_wh,
+                charge_efficiency=charge_efficiency,
+                max_charge_power_w=int(battery_state.max_charge_power_w),
+                terminal_price=terminal_price,
+                terminal_value_factor=terminal_value_factor,
+                future_import_prices=future_import_prices,
+            )
+            if opportunistic is not None:
+                candidates.append(opportunistic)
+
+            for candidate in candidates:
+                action_w = candidate.power_w
                 if action_w >= 0:
                     next_energy_wh = energy_wh + action_w * duration * charge_efficiency
                 else:
@@ -211,29 +306,54 @@ def optimize_rolling_schedule(
                 )
                 candidate_cost = cost_so_far + hour_cost
                 previous = next_states.get(next_key)
-                if previous is None or candidate_cost < previous[0] - 1e-12:
+                previous_action = (
+                    previous[2][-1][0]
+                    if previous is not None and previous[2]
+                    else _ActionCandidate(0)
+                )
+                compare_stored_value = candidate.opportunistic or previous_action.opportunistic
+                if compare_stored_value:
+                    candidate_comparison_cost = _bucket_adjusted_cost(
+                        candidate_cost,
+                        next_energy_wh,
+                        discharge_efficiency,
+                        continuation_consumer_price,
+                    )
+                    previous_comparison_cost = (
+                        float("inf")
+                        if previous is None
+                        else _bucket_adjusted_cost(
+                            previous[0],
+                            previous[1],
+                            discharge_efficiency,
+                            continuation_consumer_price,
+                        )
+                    )
+                else:
+                    candidate_comparison_cost = candidate_cost
+                    previous_comparison_cost = float("inf") if previous is None else previous[0]
+
+                if previous is None or candidate_comparison_cost < previous_comparison_cost - 1e-12:
                     next_states[next_key] = (
                         candidate_cost,
                         next_energy_wh,
-                        path + [(action_w, energy_wh, next_energy_wh, grid_power_w)],
+                        path + [(candidate, energy_wh, next_energy_wh, grid_power_w)],
                     )
-                elif previous is not None and abs(candidate_cost - previous[0]) <= 1e-12:
-                    previous_action = previous[2][-1][0] if previous[2] else 0
-                    if abs(action_w) < abs(previous_action):
+                elif previous is not None and abs(candidate_comparison_cost - previous_comparison_cost) <= 1e-12:
+                    if _tie_rank(candidate) < _tie_rank(previous_action):
                         next_states[next_key] = (
                             candidate_cost,
                             next_energy_wh,
-                            path + [(action_w, energy_wh, next_energy_wh, grid_power_w)],
+                            path + [(candidate, energy_wh, next_energy_wh, grid_power_w)],
                         )
         if not next_states:
             raise RuntimeError("No feasible battery states remain in the rolling horizon")
         states = next_states
 
-    terminal_price = fmean(slot.import_price_eur_per_kwh for slot in slots)
     best_key: Optional[int] = None
     best_objective = float("inf")
     best_energy_cost = 0.0
-    best_path: List[Tuple[int, float, float, float]] = []
+    best_path: List[Tuple[_ActionCandidate, float, float, float]] = []
     best_terminal_value = 0.0
     best_ending_energy_wh = starting_energy_wh
     for energy_key, (energy_cost, energy_wh, path) in states.items():
@@ -257,15 +377,22 @@ def optimize_rolling_schedule(
         raise RuntimeError("Unable to select a feasible rolling plan")
 
     decisions: List[RollingDecision] = []
-    for slot, (action_w, start_energy_wh, end_energy_wh, grid_power_w) in zip(slots, best_path):
+    for slot, (candidate, start_energy_wh, end_energy_wh, grid_power_w) in zip(slots, best_path):
+        action_w = candidate.power_w
         duration = slot.duration_hours
-        schedule_value, min_power, max_power, reason = _schedule_command(
-            action_w,
-            slot.load_w,
-            slot.pv_w,
-            battery_state.max_discharge_power_w,
-            power_step_w,
-        )
+        if candidate.schedule_value is not None:
+            schedule_value = candidate.schedule_value
+            min_power = candidate.min_power
+            max_power = candidate.max_power
+            reason = candidate.reason or "opportunistic dynamic action"
+        else:
+            schedule_value, min_power, max_power, reason = _schedule_command(
+                action_w,
+                slot.load_w,
+                slot.pv_w,
+                battery_state.max_discharge_power_w,
+                power_step_w,
+            )
         decisions.append(
             RollingDecision(
                 start=slot.start.isoformat(),

@@ -104,13 +104,14 @@ The hourly table remains available below the graphs for detailed inspection.
 4. Use official prices where available. For an unpublished future hour, use today's price at the same clock hour and mark it `repeat_today`.
 5. Calculate the retained-energy valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero.
 6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
-7. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
-8. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
-9. Append the plan to the comparison log under a file lock.
-10. Atomically publish the same plan as the latest executable optimizer schedule.
-11. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-12. Preserve exact dated manual schedule entries over optimizer entries.
-13. During the dual-testing period, when validation fails or the plan becomes older than 70 minutes, serve rules automatically.
+7. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
+8. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
+9. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
+10. Append the plan to the comparison log under a file lock.
+11. Atomically publish the same plan as the latest executable optimizer schedule.
+12. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+13. Preserve exact dated manual schedule entries over optimizer entries.
+14. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 
@@ -150,7 +151,7 @@ http://localhost/zendure/app/optimizer.php
 - When the optimizer cannot find a feasible state path, then the run is logged as an error.
 - When Rules is selected, then calculations and logging continue but the resolved schedule endpoint serves the existing rule result.
 - When Optimizer is selected, then activation first runs a new calculation and refuses the switch unless the published plan passes validation.
-- When the selected optimizer plan becomes missing, malformed, stale, discontinuous, outside the current horizon or outside configured power limits, then the resolved schedule endpoint falls back to rules.
+- When the selected optimizer plan becomes missing, malformed, more than 10 hours old, discontinuous, outside the current horizon or outside configured power limits, then the resolved schedule endpoint falls back to rules.
 - When an exact dated manual entry applies to an hour, then it retains priority over the optimizer for that hour.
 - When a mode changes, then the authenticated API records the event in `planner/data/optimizer_mode_audit.log` and the viewer asks the automation controller to refresh. If that refresh request fails, the controller still obtains the change during its normal polling cycle.
 - The historical comparison log is advisory only and is never read by the schedule endpoint.
