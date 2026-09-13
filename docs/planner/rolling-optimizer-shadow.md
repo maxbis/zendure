@@ -107,14 +107,16 @@ The hourly table remains available below the graphs for detailed inspection.
 6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
 7. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
 8. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
-9. Translate each decision into the existing schedule vocabulary: `netzero+`, `netzero-`, zero or a fixed signed power.
+9. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
 10. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
 11. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
-12. Append the plan to the comparison log under a file lock.
-13. Atomically publish the same plan as the latest executable optimizer schedule.
-14. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-15. Preserve exact dated manual schedule entries over optimizer entries.
-16. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
+12. When a selected `netzero+` command has a zero charging minimum, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the original positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
+13. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round it down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
+14. Append the plan to the comparison log under a file lock.
+15. Atomically publish the same plan as the latest executable optimizer schedule.
+16. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+17. Preserve exact dated manual schedule entries over optimizer entries.
+18. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 
@@ -146,6 +148,9 @@ http://localhost/zendure/app/optimizer.php
 - When a `netzero-` slot has the maximum remaining consumer price, then its runtime discharge limit expands to the maximum power supported by the battery and energy available above minimum SoC.
 - When all remaining consumer prices are equal or the current consumer price is non-positive, then price-dependent `netzero-` headroom is disabled.
 - When actual household import remains below an adaptive `netzero-` limit, then runtime follows the meter and does not intentionally export battery energy.
+- When a zero-minimum `netzero+` slot has a linear remaining-price score below 0.50, then it remains charge-only.
+- When a zero-minimum `netzero+` slot has a score of at least 0.50 and usable battery energy is available, then it becomes bounded bidirectional `netzero` while retaining its original charging limit.
+- When bidirectional `netzero` is selected, then its discharge limit scales linearly with the price score and remains constrained by discharge power, energy above minimum SoC and slot duration.
 - When the minimum horizon already ends exactly at midnight, then no additional day is added.
 - When `PLANNER_EXTEND_HORIZON_TO_MIDNIGHT=false`, then the optimizer uses the exact configured horizon instead.
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.

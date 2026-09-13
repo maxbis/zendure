@@ -9,6 +9,9 @@ from typing import Dict, List, Optional, Tuple
 from planner.models import BatteryState
 
 
+NETZERO_BIDIRECTIONAL_PRICE_SCORE_THRESHOLD = 0.50
+
+
 @dataclass(frozen=True)
 class RollingInputSlot:
     start: datetime
@@ -204,6 +207,85 @@ def _adaptive_netzero_minus_limit_w(
     return max(
         modeled_discharge_w,
         min(maximum_feasible_w, stepped_limit_w),
+    )
+
+
+def _adaptive_netzero_bidirectional_discharge_limit_w(
+    *,
+    current_import_price: float,
+    remaining_import_prices: List[float],
+    start_energy_wh: float,
+    min_energy_wh: float,
+    discharge_efficiency: float,
+    duration_hours: float,
+    max_discharge_power_w: int,
+    power_step_w: int,
+) -> int:
+    """Return price-scaled discharge headroom for an eligible NZ+ command."""
+    price_score = _linear_netzero_minus_price_score(
+        current_import_price,
+        remaining_import_prices,
+    )
+    if (
+        price_score + 1e-12 < NETZERO_BIDIRECTIONAL_PRICE_SCORE_THRESHOLD
+        or duration_hours <= 0
+    ):
+        return 0
+
+    available_output_w = (
+        max(0.0, start_energy_wh - min_energy_wh)
+        * discharge_efficiency
+        / duration_hours
+    )
+    maximum_feasible_w = min(
+        int(max_discharge_power_w),
+        int(math.floor(available_output_w)),
+    )
+    adaptive_limit_w = price_score * max(0, maximum_feasible_w)
+    stepped_limit_w = (
+        int(math.floor((adaptive_limit_w + 1e-9) / max(1, power_step_w)))
+        * max(1, power_step_w)
+    )
+    return max(0, min(maximum_feasible_w, stepped_limit_w))
+
+
+def _promote_netzero_plus_to_bidirectional(
+    *,
+    schedule_value: object,
+    min_power: Optional[int],
+    max_power: Optional[int],
+    reason: str,
+    current_import_price: float,
+    remaining_import_prices: List[float],
+    start_energy_wh: float,
+    min_energy_wh: float,
+    discharge_efficiency: float,
+    duration_hours: float,
+    max_discharge_power_w: int,
+    power_step_w: int,
+) -> Tuple[object, Optional[int], Optional[int], str]:
+    """Make zero-minimum NZ+ bidirectional when its relative price is high enough."""
+    if schedule_value != "netzero+" or min_power != 0:
+        return schedule_value, min_power, max_power, reason
+
+    discharge_limit_w = _adaptive_netzero_bidirectional_discharge_limit_w(
+        current_import_price=current_import_price,
+        remaining_import_prices=remaining_import_prices,
+        start_energy_wh=start_energy_wh,
+        min_energy_wh=min_energy_wh,
+        discharge_efficiency=discharge_efficiency,
+        duration_hours=duration_hours,
+        max_discharge_power_w=max_discharge_power_w,
+        power_step_w=power_step_w,
+    )
+    if discharge_limit_w <= 0:
+        return schedule_value, min_power, max_power, reason
+
+    return (
+        "netzero",
+        -discharge_limit_w,
+        max_power,
+        "absorb actual solar surplus and offset high-value household import",
     )
 
 
@@ -497,6 +579,23 @@ def optimize_rolling_schedule(
                 discharge_efficiency=discharge_efficiency,
                 duration_hours=duration,
             )
+        schedule_value, min_power, max_power, reason = _promote_netzero_plus_to_bidirectional(
+            schedule_value=schedule_value,
+            min_power=min_power,
+            max_power=max_power,
+            reason=reason,
+            current_import_price=slot.import_price_eur_per_kwh,
+            remaining_import_prices=[
+                remaining_slot.import_price_eur_per_kwh
+                for remaining_slot in slots[slot_index:]
+            ],
+            start_energy_wh=start_energy_wh,
+            min_energy_wh=min_energy_wh,
+            discharge_efficiency=discharge_efficiency,
+            duration_hours=duration,
+            max_discharge_power_w=battery_state.max_discharge_power_w,
+            power_step_w=power_step_w,
+        )
         decisions.append(
             RollingDecision(
                 start=slot.start.isoformat(),

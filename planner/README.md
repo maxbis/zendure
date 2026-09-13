@@ -138,6 +138,7 @@ profile and price conversion. Its first-version defaults are:
 - today's same-clock-hour price for an unknown future price
 - opportunistic bounded `netzero+` during solar-capable idle periods when storing solar after round-trip losses is worth more than exporting it
 - linear price-dependent `netzero-` headroom above the modeled household discharge, limited by maximum discharge power and energy available above minimum SoC
+- promotion of zero-minimum `netzero+` to bounded bidirectional `netzero` at a remaining-horizon linear price score of 0.50 or higher, retaining the charging cap and scaling discharge headroom with the price score
 
 Relevant environment overrides are:
 

@@ -12,6 +12,7 @@ from planner.clients import PricePayload
 from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
+    _adaptive_netzero_bidirectional_discharge_limit_w,
     _adaptive_netzero_minus_limit_w,
     _linear_netzero_minus_price_score,
     build_rolling_boundaries,
@@ -161,6 +162,93 @@ class RollingOptimizerTests(unittest.TestCase):
             decision.reason,
             "offset actual household import with price-based adaptive headroom",
         )
+
+    def test_bidirectional_headroom_starts_at_half_price_score(self) -> None:
+        common = {
+            "remaining_import_prices": [0.20, 0.30, 0.40],
+            "start_energy_wh": 4000.0,
+            "min_energy_wh": 1000.0,
+            "discharge_efficiency": 0.9,
+            "duration_hours": 1.0,
+            "max_discharge_power_w": 1800,
+            "power_step_w": 100,
+        }
+
+        below_threshold = _adaptive_netzero_bidirectional_discharge_limit_w(
+            current_import_price=0.34,
+            **common,
+        )
+        at_threshold = _adaptive_netzero_bidirectional_discharge_limit_w(
+            current_import_price=0.35,
+            **common,
+        )
+
+        self.assertEqual(below_threshold, 0)
+        self.assertEqual(at_threshold, 900)
+
+    def test_high_price_zero_minimum_netzero_plus_becomes_bidirectional(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 12, 12, 0, tzinfo=tz)
+        slots = [
+            RollingInputSlot(now, now + timedelta(hours=1), 0.45, -0.10, "official", 100.0, 1300.0),
+            RollingInputSlot(
+                now + timedelta(hours=1),
+                now + timedelta(hours=2),
+                0.20,
+                0.0,
+                "official",
+                0.0,
+                0.0,
+            ),
+        ]
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(70.0, 5760.0, 1200, 1800, 15, 91),
+            slots=slots,
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertGreaterEqual(decision.battery_power_w, 0)
+        self.assertEqual(decision.schedule_value, "netzero")
+        self.assertEqual(decision.min_power, -1800)
+        self.assertEqual(decision.max_power, 1200)
+        self.assertEqual(
+            decision.reason,
+            "absorb actual solar surplus and offset high-value household import",
+        )
+
+    def test_lower_price_zero_minimum_netzero_plus_remains_charge_only(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 12, 12, 0, tzinfo=tz)
+        slots = [
+            RollingInputSlot(now, now + timedelta(hours=1), 0.30, -0.10, "official", 100.0, 1300.0),
+            RollingInputSlot(
+                now + timedelta(hours=1),
+                now + timedelta(hours=2),
+                0.60,
+                0.0,
+                "official",
+                0.0,
+                0.0,
+            ),
+        ]
+        plan = optimize_rolling_schedule(
+            now=now,
+            battery_state=BatteryState(70.0, 5760.0, 1200, 1800, 15, 91),
+            slots=slots,
+            round_trip_efficiency=0.85,
+            power_step_w=100,
+            soc_step_wh=50.0,
+            terminal_value_factor=1.0,
+        )
+
+        decision = plan.decisions[0]
+        self.assertEqual(decision.schedule_value, "netzero+")
+        self.assertEqual(decision.min_power, 0)
 
     def test_expected_solar_charge_uses_bounded_netzero_plus(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
