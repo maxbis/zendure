@@ -1303,6 +1303,20 @@
             ), null);
     }
 
+    function hasFullDirectionalPowerRange(slot, action) {
+        if (action?.type !== "netzero") return false;
+
+        const { minimum, maximum } = powerLimits(slot);
+        const shared = sharedPowerBounds();
+        if (action.direction === "plus") {
+            return (minimum === null || minimum === 0) && maximum === shared.maximum;
+        }
+        if (action.direction === "minus") {
+            return minimum === shared.minimum && (maximum === null || maximum === 0);
+        }
+        return false;
+    }
+
     function setActionBadgeContent(element, slot, action) {
         const fixedPower = numericValue(slot?.value);
         if (fixedPower !== null) {
@@ -1310,7 +1324,9 @@
             return;
         }
 
-        const limit = outerPowerLimit(slot);
+        const limit = hasFullDirectionalPowerRange(slot, action)
+            ? null
+            : outerPowerLimit(slot);
         if (limit !== null) {
             element.dataset.limitValue = "true";
             element.textContent = formatBadgePower(limit, { signed: true });

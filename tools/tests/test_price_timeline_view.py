@@ -148,3 +148,16 @@ def test_dynamic_power_badge_uses_signed_outer_limit():
     assert 'numeric > 0 ? "+" : numeric < 0 ? "−" : ""' in source
     assert "formatBadgePower(limit, { signed: true })" in source
     assert "closestPowerLimit" not in source
+
+
+def test_full_directional_ranges_use_netzero_icons_instead_of_redundant_limits():
+    source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+
+    assert "function hasFullDirectionalPowerRange(slot, action)" in source
+    assert 'action.direction === "plus"' in source
+    assert 'action.direction === "minus"' in source
+    assert "maximum === shared.maximum" in source
+    assert "minimum === shared.minimum" in source
+    assert "hasFullDirectionalPowerRange(slot, action)" in source
+    assert 'action.direction === "plus" ? "sun"' in source
+    assert 'action.direction === "minus" ? "bolt"' in source
