@@ -289,6 +289,25 @@ def _promote_netzero_plus_to_bidirectional(
     )
 
 
+def _normalize_netzero_plus_charge_limit(
+    *,
+    schedule_value: object,
+    min_power: Optional[int],
+    max_power: Optional[int],
+    max_charge_power_w: int,
+    power_step_w: int,
+) -> Tuple[object, Optional[int], Optional[int]]:
+    """Give every zero-minimum NZ+ command the full configured charge range."""
+    if schedule_value != "netzero+" or min_power != 0:
+        return schedule_value, min_power, max_power
+
+    step_w = max(1, int(power_step_w))
+    normalized_max_power = (
+        max(0, int(max_charge_power_w)) // step_w
+    ) * step_w
+    return schedule_value, 0, normalized_max_power
+
+
 def _schedule_command(
     battery_power_w: int,
     load_w: float,
@@ -579,6 +598,13 @@ def optimize_rolling_schedule(
                 discharge_efficiency=discharge_efficiency,
                 duration_hours=duration,
             )
+        schedule_value, min_power, max_power = _normalize_netzero_plus_charge_limit(
+            schedule_value=schedule_value,
+            min_power=min_power,
+            max_power=max_power,
+            max_charge_power_w=battery_state.max_charge_power_w,
+            power_step_w=power_step_w,
+        )
         schedule_value, min_power, max_power, reason = _promote_netzero_plus_to_bidirectional(
             schedule_value=schedule_value,
             min_power=min_power,

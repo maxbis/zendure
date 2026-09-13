@@ -15,6 +15,7 @@ from planner.rolling_optimizer import (
     _adaptive_netzero_bidirectional_discharge_limit_w,
     _adaptive_netzero_minus_limit_w,
     _linear_netzero_minus_price_score,
+    _normalize_netzero_plus_charge_limit,
     build_rolling_boundaries,
     optimize_rolling_schedule,
 )
@@ -186,6 +187,30 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertEqual(below_threshold, 0)
         self.assertEqual(at_threshold, 900)
 
+    def test_zero_minimum_netzero_plus_uses_full_configured_charge_range(self) -> None:
+        schedule_value, min_power, max_power = _normalize_netzero_plus_charge_limit(
+            schedule_value="netzero+",
+            min_power=0,
+            max_power=200,
+            max_charge_power_w=1200,
+            power_step_w=100,
+        )
+
+        self.assertEqual(schedule_value, "netzero+")
+        self.assertEqual(min_power, 0)
+        self.assertEqual(max_power, 1200)
+
+    def test_netzero_plus_normalization_does_not_change_other_commands(self) -> None:
+        command = _normalize_netzero_plus_charge_limit(
+            schedule_value="netzero",
+            min_power=-600,
+            max_power=200,
+            max_charge_power_w=1200,
+            power_step_w=100,
+        )
+
+        self.assertEqual(command, ("netzero", -600, 200))
+
     def test_high_price_zero_minimum_netzero_plus_becomes_bidirectional(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
         now = datetime(2026, 9, 12, 12, 0, tzinfo=tz)
@@ -249,6 +274,7 @@ class RollingOptimizerTests(unittest.TestCase):
         decision = plan.decisions[0]
         self.assertEqual(decision.schedule_value, "netzero+")
         self.assertEqual(decision.min_power, 0)
+        self.assertEqual(decision.max_power, 1200)
 
     def test_expected_solar_charge_uses_bounded_netzero_plus(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
