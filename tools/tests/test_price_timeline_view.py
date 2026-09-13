@@ -138,3 +138,13 @@ def test_mobile_overview_moves_time_labels_lower_than_desktop():
 
     assert "transform: translateY(6px);" in source
     assert "transform: translateY(9px);" in source
+
+
+def test_dynamic_power_badge_uses_signed_outer_limit():
+    source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+
+    assert "function outerPowerLimit(slot)" in source
+    assert "Math.abs(value) > Math.abs(outer)" in source
+    assert 'numeric > 0 ? "+" : numeric < 0 ? "−" : ""' in source
+    assert "formatBadgePower(limit, { signed: true })" in source
+    assert "closestPowerLimit" not in source

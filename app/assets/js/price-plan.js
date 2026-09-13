@@ -1281,23 +1281,25 @@
         return "neutral";
     }
 
-    function formatBadgePower(value) {
+    function formatBadgePower(value, { signed = false } = {}) {
+        const numeric = Number(value);
         const magnitude = Math.abs(Number(value));
         if (!Number.isFinite(magnitude)) return "";
-        if (magnitude < 1000) return String(magnitude);
+        const prefix = signed ? (numeric > 0 ? "+" : numeric < 0 ? "−" : "") : "";
+        if (magnitude < 1000) return `${prefix}${magnitude}`;
         const step = sharedPowerStepW();
         const rounded = Math.round(magnitude / step) * step;
         const thousands = Math.floor(rounded / 1000);
         const hundreds = (rounded % 1000) / 100;
-        return `${thousands}K${hundreds || ""}`;
+        return `${prefix}${thousands}K${hundreds || ""}`;
     }
 
-    function closestPowerLimit(slot) {
+    function outerPowerLimit(slot) {
         const { minimum, maximum } = powerLimits(slot);
         return [minimum, maximum]
             .filter((value) => value !== null)
-            .reduce((closest, value) => (
-                closest === null || Math.abs(value) < Math.abs(closest) ? value : closest
+            .reduce((outer, value) => (
+                outer === null || Math.abs(value) > Math.abs(outer) ? value : outer
             ), null);
     }
 
@@ -1308,10 +1310,10 @@
             return;
         }
 
-        const limit = closestPowerLimit(slot);
+        const limit = outerPowerLimit(slot);
         if (limit !== null) {
             element.dataset.limitValue = "true";
-            element.textContent = formatBadgePower(limit);
+            element.textContent = formatBadgePower(limit, { signed: true });
             return;
         }
 
