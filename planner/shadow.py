@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from zoneinfo import ZoneInfo
 
-from planner.clients import PricePayload, fetch_battery_state, fetch_price_payload, fetch_shortwave_payload
+from planner.clients import PricePayload, fetch_price_payload, fetch_runtime_readings, fetch_shortwave_payload
 from planner.config import PlannerSettings, load_settings
 from planner.forecast import derive_pv_forecast_by_date
 from planner.rolling_optimizer import (
@@ -20,6 +20,7 @@ from planner.rolling_optimizer import (
     build_rolling_boundaries,
     optimize_rolling_schedule,
 )
+from planner.runtime_log import runtime_log_path, update_runtime_log
 
 
 DEFAULT_HORIZON_HOURS = 24
@@ -218,6 +219,7 @@ def run_shadow_once(
     now: Optional[datetime] = None,
     output_path: Optional[Path] = None,
     latest_path: Optional[Path] = None,
+    runtime_output_path: Optional[Path] = None,
 ) -> dict:
     tz = ZoneInfo(settings.timezone)
     generated_at = (now or datetime.now(tz)).astimezone(tz)
@@ -233,7 +235,8 @@ def run_shadow_once(
     )
 
     prices = fetch_price_payload(settings)
-    battery_state = fetch_battery_state(settings)
+    runtime_readings = fetch_runtime_readings(settings)
+    battery_state = runtime_readings.battery_state
     shortwave = fetch_shortwave_payload(settings)
     retained_energy_inputs = retained_energy_valuation(prices)
     slots = build_shadow_slots(
@@ -276,6 +279,16 @@ def run_shadow_once(
         },
         "plan": plan.to_dict(),
     }
+    try:
+        update_runtime_log(
+            runtime_output_path or runtime_log_path(settings.data_dir),
+            observed_at=generated_at,
+            timezone=settings.timezone,
+            plan=payload["plan"],
+            readings=runtime_readings,
+        )
+    except Exception as exc:
+        payload["runtime_log_error"] = str(exc)
     append_json_line(output_path or shadow_log_path(settings), payload)
     executable_payload = {
         "type": "optimizer_executable_schedule",
@@ -305,6 +318,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override the atomically published executable schedule path.",
     )
+    parser.add_argument(
+        "--runtime-output",
+        type=Path,
+        default=None,
+        help="Override the human-readable optimizer runtime log path.",
+    )
     return parser
 
 
@@ -313,6 +332,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     settings = load_settings()
     output_path = args.output.expanduser().resolve() if args.output else shadow_log_path(settings)
     latest_path = args.latest_output.expanduser().resolve() if args.latest_output else latest_schedule_path(settings)
+    runtime_output_path = args.runtime_output.expanduser().resolve() if args.runtime_output else runtime_log_path(settings.data_dir)
     lock_path = run_lock_path(settings)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     interval = args.interval_seconds
@@ -330,7 +350,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                         return 2
                     time.sleep(interval)
                     continue
-                payload = run_shadow_once(settings, output_path=output_path, latest_path=latest_path)
+                payload = run_shadow_once(
+                    settings,
+                    output_path=output_path,
+                    latest_path=latest_path,
+                    runtime_output_path=runtime_output_path,
+                )
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
             plan = payload["plan"]
             print(
@@ -338,6 +363,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 f"({plan['horizon_start']} -> {plan['horizon_end']}, "
                 f"objective EUR {plan['objective_eur']:.4f})"
             )
+            if payload.get("runtime_log_error"):
+                print(f"Runtime observation log warning: {payload['runtime_log_error']}")
         except Exception as exc:
             error_payload = {
                 "type": "optimizer_shadow_error",

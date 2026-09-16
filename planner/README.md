@@ -128,6 +128,33 @@ The default log is `planner/data/optimizer_schedule.log`. Each line is a complet
 plan snapshot, so later runs never overwrite earlier plans. Use `--output` or
 `PLANNER_SHADOW_LOG_PATH` to select another path.
 
+Each optimizer run also appends a human-readable operational observation to
+`planner/data/optimizer_runtime.log`. The runtime journal records the current
+and next schedule decisions, their predicted ending battery percentages,
+predicted load, solar and grid power, and the corresponding live measurements.
+Set `PLANNER_RUNTIME_LOG_PATH` or pass `--runtime-output` to select another
+path.
+
+The journal uses structured text events:
+
+```text
+[2026-09-16T14:02:04+02:00] event=HOUR_OPENED | hour_start=2026-09-16T14:00:00+02:00 | hour_end=2026-09-16T15:00:00+02:00 | current_schedule=netzero+(+0..+500W) | current_predicted_end_soc=68.4 | next_schedule=+300W | next_predicted_end_soc=73.2
+[2026-09-16T14:17:03+02:00] event=SAMPLE | hour_start=2026-09-16T14:00:00+02:00 | actual_soc=63.0 | actual_grid_w=-142 | actual_battery_w=500 | actual_solar_w=608 | actual_household_w=250 | measurement_status=fresh
+[2026-09-16T15:02:07+02:00] event=HOUR_CLOSED | hour_start=2026-09-16T14:00:00+02:00 | hour_end=2026-09-16T15:00:00+02:00 | status=complete | predicted_usage_wh=220 | actual_usage_wh=263 | usage_error_wh=+43 | predicted_end_soc=68.4 | actual_soc=67.0 | soc_error_ppt=-1.4
+```
+
+At the first run after an hour boundary, the logger reconstructs its state from
+the journal and closes every crossed hour exactly once. Actual hourly energy is
+calculated from fresh samples with time weighting. Missed or stale readings are
+reported as unavailable or incomplete rather than as zero. Positive grid power
+means import and negative grid power means export. Positive battery power means
+charging.
+
+Gross household power is calculated from live readings as
+`grid + solar - battery`. When live solar is unavailable, the log leaves gross
+household power unavailable and retains `actual_net_demand_w` (`grid - battery`)
+as the directly derivable value.
+
 The optimizer uses the shared battery limits, schedule power step, household
 profile and price conversion. Its first-version defaults are:
 
