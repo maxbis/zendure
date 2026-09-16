@@ -32,6 +32,10 @@
         optimizerLastRun: root.querySelector('[data-role="optimizer-last-run"]'),
         solarForecastUpdated: root.querySelector('[data-role="solar-forecast-updated"]'),
         dailyPnl: root.querySelector('[data-role="daily-pnl"]'),
+        solarTotal: root.querySelector('[data-role="solar-total"]'),
+        solarPeak: root.querySelector('[data-role="solar-peak"]'),
+        solarGraphScroll: root.querySelector('[data-role="solar-graph-scroll"]'),
+        solarGraph: root.querySelector('[data-role="solar-graph"]'),
         rulesGraphScroll: root.querySelector('[data-role="rules-graph-scroll"]'),
         optimizerGraphScroll: root.querySelector('[data-role="optimizer-graph-scroll"]'),
         rulesGraph: root.querySelector('[data-role="rules-graph"]'),
@@ -222,6 +226,19 @@
         if (number > 0) return `+${Math.round(number)} W`;
         if (number < 0) return `−${Math.abs(Math.round(number))} W`;
         return "0 W";
+    }
+
+    function formatSolarPower(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number) || number <= 0) return "0 W";
+        if (number >= 1000) return `${(number / 1000).toFixed(number >= 10000 ? 0 : 1)} kW`;
+        return `${Math.round(number)} W`;
+    }
+
+    function formatSolarEnergy(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number) || number <= 0) return "0 kWh forecast";
+        return `${number.toFixed(number >= 10 ? 1 : 2)} kWh forecast`;
     }
 
     function formatEnergyDelta(value) {
@@ -453,6 +470,73 @@
         target.replaceChildren(dayRow, hourRow);
     }
 
+    function renderSolarGraph(record) {
+        const decisions = Array.isArray(record?.plan?.decisions) ? record.plan.decisions : [];
+        const days = [];
+        decisions.forEach((decision) => {
+            const date = localParts(decision.start).date;
+            const latest = days.at(-1);
+            if (latest?.date === date) latest.count++;
+            else days.push({ date, count: 1, start: decision.start });
+        });
+
+        const dayRow = document.createElement("div");
+        dayRow.className = "optimizer-graph__days";
+        days.forEach((day) => {
+            const label = appendText(dayRow, "span", formatDay(day.start));
+            label.style.setProperty("--optimizer-day-slots", String(day.count));
+        });
+
+        const peak = decisions.reduce((best, decision) => {
+            const power = Math.max(0, Number(decision.pv_w) || 0);
+            return power > best.power ? { power, start: decision.start } : best;
+        }, { power: 0, start: null });
+        const totalKwh = decisions.reduce((total, decision) => {
+            const start = new Date(decision.start).getTime();
+            const end = new Date(decision.end).getTime();
+            const durationHours = Number.isFinite(start) && Number.isFinite(end)
+                ? Math.max(0, end - start) / 3600000
+                : 0;
+            return total + (Math.max(0, Number(decision.pv_w) || 0) * durationHours / 1000);
+        }, 0);
+
+        elements.solarTotal.textContent = formatSolarEnergy(totalKwh);
+        elements.solarPeak.textContent = peak.start
+            ? `Peak ${formatSolarPower(peak.power)} · ${formatDayAndTime(peak.start)}`
+            : "No predicted generation";
+
+        const hourRow = document.createElement("div");
+        hourRow.className = "optimizer-solar__hours";
+        decisions.forEach((decision) => {
+            const solarPower = Math.max(0, Number(decision.pv_w) || 0);
+            const loadPower = Math.max(0, Number(decision.load_w) || 0);
+            const netPower = solarPower - loadPower;
+            const height = peak.power > 0 ? (solarPower / peak.power) * 100 : 0;
+            const hour = document.createElement("div");
+            hour.className = "optimizer-solar-hour";
+            hour.setAttribute("role", "img");
+            hour.setAttribute(
+                "aria-label",
+                `${formatDayAndTime(decision.start)} to ${formatTime(decision.end)}. Predicted solar ${formatSolarPower(solarPower)}, household load ${formatSolarPower(loadPower)}, ${netPower >= 0 ? "surplus" : "deficit"} ${formatSolarPower(Math.abs(netPower))}.`
+            );
+            hour.title = `${formatDayAndTime(decision.start)}–${formatTime(decision.end)}\nSolar ${formatSolarPower(solarPower)}\nLoad ${formatSolarPower(loadPower)}\n${netPower >= 0 ? "Surplus" : "Deficit"} ${formatSolarPower(Math.abs(netPower))}`;
+
+            const barZone = document.createElement("span");
+            barZone.className = "optimizer-solar-hour__bar-zone";
+            const bar = document.createElement("span");
+            bar.className = "optimizer-solar-hour__bar";
+            bar.style.setProperty("--optimizer-solar-height", `${height}%`);
+            barZone.appendChild(bar);
+            appendText(hour, "span", formatSolarPower(solarPower), "optimizer-solar-hour__power");
+            appendText(hour, "span", formatTime(decision.start), "optimizer-solar-hour__time");
+            hour.prepend(barZone);
+            hourRow.appendChild(hour);
+        });
+
+        elements.solarGraph.replaceChildren(dayRow, hourRow);
+        elements.solarGraphScroll.scrollLeft = 0;
+    }
+
     function renderScheduleGraphs(record, schedules) {
         if (!window.OptimizerPnl?.estimateHourlyComparison) {
             throw new Error("The hourly schedule comparison is unavailable.");
@@ -468,6 +552,7 @@
         const minimum = prices.length ? Math.min(...prices) : 0;
         const maximum = prices.length ? Math.max(...prices) : 1;
         const priceRange = { minimum, span: Math.max(0.0001, maximum - minimum) };
+        renderSolarGraph(record);
         renderScheduleGraph(elements.rulesGraph, record, schedules, hourly, "rules", priceRange);
         renderScheduleGraph(elements.optimizerGraph, record, schedules, hourly, "optimizer", priceRange);
         elements.rulesGraphScroll.scrollLeft = 0;
@@ -711,17 +796,20 @@
     elements.retry.addEventListener("click", () => load({ preserveSelection: true }));
     elements.modeRules.addEventListener("click", () => changeMode("rules"));
     elements.modeOptimizer.addEventListener("click", () => changeMode("optimizer"));
-    elements.rulesGraphScroll.addEventListener("scroll", () => {
+    function syncGraphScroll(source, targets) {
         if (syncingGraphScroll) return;
         syncingGraphScroll = true;
-        elements.optimizerGraphScroll.scrollLeft = elements.rulesGraphScroll.scrollLeft;
+        targets.forEach((target) => { target.scrollLeft = source.scrollLeft; });
         window.requestAnimationFrame(() => { syncingGraphScroll = false; });
+    }
+    elements.solarGraphScroll.addEventListener("scroll", () => {
+        syncGraphScroll(elements.solarGraphScroll, [elements.rulesGraphScroll, elements.optimizerGraphScroll]);
+    }, { passive: true });
+    elements.rulesGraphScroll.addEventListener("scroll", () => {
+        syncGraphScroll(elements.rulesGraphScroll, [elements.solarGraphScroll, elements.optimizerGraphScroll]);
     }, { passive: true });
     elements.optimizerGraphScroll.addEventListener("scroll", () => {
-        if (syncingGraphScroll) return;
-        syncingGraphScroll = true;
-        elements.rulesGraphScroll.scrollLeft = elements.optimizerGraphScroll.scrollLeft;
-        window.requestAnimationFrame(() => { syncingGraphScroll = false; });
+        syncGraphScroll(elements.optimizerGraphScroll, [elements.solarGraphScroll, elements.rulesGraphScroll]);
     }, { passive: true });
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) load({ preserveSelection: true });

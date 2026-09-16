@@ -187,12 +187,31 @@ $viewerConfig = [
                         <h2 class="gsd-card__title" id="optimizer-graphs-title">Schedule comparison</h2>
                         <p>The selected optimizer calculation compared with the rules currently resolved.</p>
                     </div>
-                    <div class="optimizer-legend" aria-label="Schedule graph legend">
-                        <span class="optimizer-legend__charge">Charge</span>
-                        <span class="optimizer-legend__idle">Idle</span>
-                        <span class="optimizer-legend__discharge">Discharge</span>
+                    <div class="optimizer-graphs__aside">
+                        <div class="optimizer-solar-summary" aria-label="Solar forecast summary">
+                            <span>Solar forecast</span>
+                            <strong data-role="solar-total">—</strong>
+                            <small data-role="solar-peak">—</small>
+                        </div>
+                        <div class="optimizer-legend" aria-label="Schedule graph legend">
+                            <span class="optimizer-legend__charge">Charge</span>
+                            <span class="optimizer-legend__idle">Idle</span>
+                            <span class="optimizer-legend__discharge">Discharge</span>
+                        </div>
                     </div>
                 </div>
+                <article class="optimizer-solar" aria-labelledby="optimizer-solar-graph-title">
+                    <header>
+                        <div>
+                            <h3 id="optimizer-solar-graph-title">Predicted solar power</h3>
+                            <p>Hourly PV output estimated from the shortwave-radiation forecast</p>
+                        </div>
+                        <span class="gsd-badge gsd-badge--warning">Shared input</span>
+                    </header>
+                    <div class="optimizer-graph__scroll optimizer-solar__scroll" data-role="solar-graph-scroll" tabindex="0" aria-label="Scrollable predicted solar power graph">
+                        <div class="optimizer-graph__canvas" data-role="solar-graph"></div>
+                    </div>
+                </article>
                 <div class="optimizer-graph-pair">
                     <article class="optimizer-graph" aria-labelledby="optimizer-rules-graph-title">
                         <header>
