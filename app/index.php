@@ -694,6 +694,12 @@ $appConfig = [
             'icon' => 'chart',
         ],
         [
+            'href' => 'optimizer_runtime.php',
+            'label' => 'Optimizer Runtime',
+            'description' => 'Review forecasts and measured hourly results',
+            'icon' => 'activity',
+        ],
+        [
             'dialogId' => 'app-shortwave-radiation-dialog',
             'label' => 'Shortwave Radiation',
             'description' => 'Hourly solar radiation and daily totals',

@@ -67,6 +67,7 @@ $viewerConfig = [
                 </div>
             </div>
             <div class="app-topbar__actions">
+                <a class="gsd-btn gsd-btn--secondary optimizer-return" href="optimizer_runtime.php">Runtime log</a>
                 <a class="gsd-btn gsd-btn--secondary optimizer-return" href="./">Live app</a>
                 <button class="gsd-icon-btn" type="button" aria-label="Refresh optimizer comparison" data-role="refresh">
                     <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#refresh"></use></svg>
