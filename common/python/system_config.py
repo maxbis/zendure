@@ -97,14 +97,23 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
     )
 
     _assert_exact_keys(forecast, {"defaultHouseholdUsageWByHour"}, "$.forecast")
-    default_household_usage = _require_list(
+    default_household_usage = _require_object(
         forecast["defaultHouseholdUsageWByHour"],
         "$.forecast.defaultHouseholdUsageWByHour",
-        24,
+    )
+    household_usage_hours = {f"{hour:02d}:00" for hour in range(24)}
+    _assert_exact_keys(
+        default_household_usage,
+        household_usage_hours,
+        "$.forecast.defaultHouseholdUsageWByHour",
     )
     default_household_usage_w_by_hour = [
-        _require_integer(value, f"$.forecast.defaultHouseholdUsageWByHour[{hour}]", 0)
-        for hour, value in enumerate(default_household_usage)
+        _require_integer(
+            default_household_usage[f"{hour:02d}:00"],
+            f"$.forecast.defaultHouseholdUsageWByHour.{hour:02d}:00",
+            0,
+        )
+        for hour in range(24)
     ]
 
     _assert_exact_keys(schedule, {"minPowerW", "maxPowerW", "powerStepW"}, "$.schedule")
@@ -211,14 +220,6 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
 def _require_object(value: Any, path: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemConfigError(f"Expected an object at {path}.")
-    return value
-
-
-def _require_list(value: Any, path: str, length: int) -> list[Any]:
-    if not isinstance(value, list):
-        raise SystemConfigError(f"Expected an array at {path}.")
-    if len(value) != length:
-        raise SystemConfigError(f"{path} must contain exactly {length} items.")
     return value
 
 

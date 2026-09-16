@@ -112,7 +112,7 @@ Meaning:
 
 Canonical value:
 
-- `forecast.defaultHouseholdUsageWByHour`: 24 local-hour watt values.
+- `forecast.defaultHouseholdUsageWByHour`: 24 watt values keyed by local whole-hour start (`00:00` through `23:00`).
 - Hours 00 through 07 use 100 W.
 - Hours 08 through 20 use 220 W.
 - Hours 21 through 23 use 160 W.

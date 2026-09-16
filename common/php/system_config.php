@@ -144,16 +144,24 @@ function validateSystemConfig(array $config): array
         ['defaultHouseholdUsageWByHour'],
         '$.forecast'
     );
-    $defaultHouseholdUsage = systemConfigRequireList(
+    $defaultHouseholdUsage = systemConfigRequireObject(
         $forecast['defaultHouseholdUsageWByHour'],
-        '$.forecast.defaultHouseholdUsageWByHour',
-        24
+        '$.forecast.defaultHouseholdUsageWByHour'
+    );
+    $householdUsageHours = [];
+    for ($hour = 0; $hour < 24; $hour++) {
+        $householdUsageHours[] = sprintf('%02d:00', $hour);
+    }
+    systemConfigAssertExactKeys(
+        $defaultHouseholdUsage,
+        $householdUsageHours,
+        '$.forecast.defaultHouseholdUsageWByHour'
     );
     $defaultHouseholdUsageWByHour = [];
-    foreach ($defaultHouseholdUsage as $hour => $usageW) {
+    foreach ($householdUsageHours as $hour => $hourKey) {
         $defaultHouseholdUsageWByHour[] = systemConfigRequireInteger(
-            $usageW,
-            '$.forecast.defaultHouseholdUsageWByHour[' . $hour . ']',
+            $defaultHouseholdUsage[$hourKey],
+            '$.forecast.defaultHouseholdUsageWByHour.' . $hourKey,
             0
         );
     }
@@ -268,18 +276,6 @@ function systemConfigRequireObject($value, string $path): array
 {
     if (!is_array($value)) {
         throw new SystemConfigException('Expected an object at ' . $path . '.');
-    }
-    return $value;
-}
-
-/** @param mixed $value @return list<mixed> */
-function systemConfigRequireList($value, string $path, int $length): array
-{
-    if (!is_array($value) || !array_is_list($value)) {
-        throw new SystemConfigException('Expected an array at ' . $path . '.');
-    }
-    if (count($value) !== $length) {
-        throw new SystemConfigException($path . ' must contain exactly ' . $length . ' items.');
     }
     return $value;
 }

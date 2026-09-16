@@ -62,6 +62,12 @@ EXPECTED_CONFIG = {
     },
 }
 
+SOURCE_CONFIG = copy.deepcopy(EXPECTED_CONFIG)
+SOURCE_CONFIG["forecast"]["defaultHouseholdUsageWByHour"] = {
+    f"{hour:02d}:00": usage_w
+    for hour, usage_w in enumerate(EXPECTED_CONFIG["forecast"]["defaultHouseholdUsageWByHour"])
+}
+
 
 def _run_php_loader(path: Optional[Path] = None) -> subprocess.CompletedProcess[str]:
     load_expression = "loadSystemConfig()" if path is None else "loadSystemConfig($argv[1])"
@@ -104,6 +110,10 @@ def test_default_python_loader_returns_approved_configuration():
     assert load_system_config() == EXPECTED_CONFIG
 
 
+def test_source_configuration_uses_explicit_local_hour_keys():
+    assert json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8")) == SOURCE_CONFIG
+
+
 def test_default_php_loader_returns_approved_configuration():
     php_result = _run_php_loader()
 
@@ -134,6 +144,11 @@ def test_schema_contract_matches_loader_sections():
             assert "roundTripEfficiency" in section_schema["properties"]
         assert set(section_schema["required"]) == expected_required
 
+    usage_schema = schema["properties"]["forecast"]["properties"]["defaultHouseholdUsageWByHour"]
+    assert usage_schema["type"] == "object"
+    assert usage_schema["minProperties"] == usage_schema["maxProperties"] == 24
+    assert usage_schema["propertyNames"]["enum"] == [f"{hour:02d}:00" for hour in range(24)]
+
 
 @pytest.mark.parametrize(
     ("mutate", "expected_message"),
@@ -151,8 +166,9 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"roundTripEfficiency": 0}), r"roundTripEfficiency must be greater than 0\."),
         (lambda value: value["battery"].update({"roundTripEfficiency": 1.01}), r"roundTripEfficiency must be at most 1\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
-        (lambda value: value["forecast"].update({"defaultHouseholdUsageWByHour": [100] * 23}), r"must contain exactly 24 items\."),
-        (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__(4, -1), r"defaultHouseholdUsageWByHour\[4\] must be at least 0\."),
+        (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].pop("04:00"), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(missing: 04:00\)\."),
+        (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].update({"24:00": 100}), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(unknown: 24:00\)\."),
+        (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__("04:00", -1), r"defaultHouseholdUsageWByHour\.04:00 must be at least 0\."),
         (lambda value: value["schedule"].update({"minPowerW": 1}), r"minPowerW must be at most 0\."),
         (lambda value: value["schedule"].update({"maxPowerW": 0, "minPowerW": 0}), r"minPowerW must be lower than"),
         (lambda value: value["schedule"].update({"powerStepW": 0}), r"powerStepW must be at least 1\."),
@@ -164,7 +180,7 @@ def test_schema_contract_matches_loader_sections():
     ],
 )
 def test_php_and_python_reject_invalid_contracts(tmp_path: Path, mutate, expected_message: str):
-    payload = copy.deepcopy(EXPECTED_CONFIG)
+    payload = copy.deepcopy(SOURCE_CONFIG)
     mutate(payload)
     path = _write_config(tmp_path / "system.json", payload)
     _assert_both_reject(path, expected_message)

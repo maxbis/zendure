@@ -79,11 +79,19 @@
       ],
       "properties": {
         "defaultHouseholdUsageWByHour": {
-          "description": "Fallback household demand for each local hour from 00 through 23, in watts.",
-          "type": "array",
-          "minItems": 24,
-          "maxItems": 24,
-          "items": {
+          "description": "Fallback household demand keyed by each local whole-hour start from 00:00 through 23:00, in watts.",
+          "type": "object",
+          "minProperties": 24,
+          "maxProperties": 24,
+          "propertyNames": {
+            "enum": [
+              "00:00", "01:00", "02:00", "03:00", "04:00", "05:00",
+              "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+              "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+              "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+            ]
+          },
+          "additionalProperties": {
             "type": "integer",
             "minimum": 0
           }

@@ -87,7 +87,7 @@ The power-cap properties are automation inputs. Outgoing battery commands are cl
 
 Required properties:
 
-- `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, indexed by local hour 0 through 23.
+- `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, keyed by local whole-hour start (`00:00` through `23:00`). The shared loaders normalize this object to the indexed runtime list used by the planners.
 
 This fallback usage model is consumed by the new-GUI JavaScript forecast and the PHP target-battery planner.
 
