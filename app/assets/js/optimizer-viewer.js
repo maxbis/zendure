@@ -472,6 +472,10 @@
 
     function renderSolarGraph(record) {
         const decisions = Array.isArray(record?.plan?.decisions) ? record.plan.decisions : [];
+        const batteryCapacityWh = Number(record?.inputs?.battery_capacity_wh);
+        const roundTripEfficiency = Math.max(0, Math.min(1, Number(record?.plan?.round_trip_efficiency)));
+        const chargeEfficiency = Number.isFinite(roundTripEfficiency) ? Math.sqrt(roundTripEfficiency) : Number.NaN;
+        const canEstimateBatteryGain = batteryCapacityWh > 0 && Number.isFinite(chargeEfficiency);
         const days = [];
         decisions.forEach((decision) => {
             const date = localParts(decision.start).date;
@@ -511,15 +515,26 @@
             const solarPower = Math.max(0, Number(decision.pv_w) || 0);
             const loadPower = Math.max(0, Number(decision.load_w) || 0);
             const netPower = solarPower - loadPower;
+            const start = new Date(decision.start).getTime();
+            const end = new Date(decision.end).getTime();
+            const durationHours = Number.isFinite(start) && Number.isFinite(end)
+                ? Math.max(0, end - start) / 3600000
+                : 0;
+            const batteryGainPpt = netPower > 0 && canEstimateBatteryGain
+                ? netPower * durationHours * chargeEfficiency / batteryCapacityWh * 100
+                : 0;
             const height = peak.power > 0 ? (solarPower / peak.power) * 100 : 0;
             const hour = document.createElement("div");
             hour.className = "optimizer-solar-hour";
+            const batteryGainText = netPower > 0 && canEstimateBatteryGain
+                ? ` Battery charge potential ${batteryGainPpt.toFixed(1)} percentage points.`
+                : "";
             hour.setAttribute("role", "img");
             hour.setAttribute(
                 "aria-label",
-                `${formatDayAndTime(decision.start)} to ${formatTime(decision.end)}. Predicted solar ${formatSolarPower(solarPower)}, household load ${formatSolarPower(loadPower)}, ${netPower >= 0 ? "surplus" : "deficit"} ${formatSolarPower(Math.abs(netPower))}.`
+                `${formatDayAndTime(decision.start)} to ${formatTime(decision.end)}. Predicted solar ${formatSolarPower(solarPower)}, household load ${formatSolarPower(loadPower)}, ${netPower >= 0 ? "surplus" : "deficit"} ${formatSolarPower(Math.abs(netPower))}.${batteryGainText}`
             );
-            hour.title = `${formatDayAndTime(decision.start)}–${formatTime(decision.end)}\nSolar ${formatSolarPower(solarPower)}\nLoad ${formatSolarPower(loadPower)}\n${netPower >= 0 ? "Surplus" : "Deficit"} ${formatSolarPower(Math.abs(netPower))}`;
+            hour.title = `${formatDayAndTime(decision.start)}–${formatTime(decision.end)}\nSolar ${formatSolarPower(solarPower)}\nLoad ${formatSolarPower(loadPower)}\n${netPower >= 0 ? "Surplus" : "Deficit"} ${formatSolarPower(Math.abs(netPower))}${netPower > 0 && canEstimateBatteryGain ? `\nBattery charge potential +${batteryGainPpt.toFixed(1)} ppt` : ""}`;
 
             const barZone = document.createElement("span");
             barZone.className = "optimizer-solar-hour__bar-zone";
