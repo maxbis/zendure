@@ -3,16 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import fcntl
+import json
 import math
 import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 from zoneinfo import ZoneInfo
 
 from planner.clients import RuntimeReadings
 
 
-DEFAULT_RUNTIME_LOG_FILE_NAME = "optimizer_runtime.log"
+DEFAULT_RUNTIME_LOG_FILE_NAME = "optimizer_runtime.jsonl"
 MAX_FRESH_AGE_SECONDS = 300
 MAX_SAMPLE_HOLD_SECONDS = 20 * 60
 MIN_COMPLETE_COVERAGE_PERCENT = 75.0
@@ -21,7 +22,7 @@ MIN_COMPLETE_COVERAGE_PERCENT = 75.0
 @dataclass(frozen=True)
 class ParsedEvent:
     observed_at: datetime
-    fields: Dict[str, str]
+    fields: Dict[str, Any]
 
 
 def runtime_log_path(data_dir: Path) -> Path:
@@ -50,45 +51,40 @@ def _number(value: object) -> Optional[float]:
     return result if math.isfinite(result) else None
 
 
-def _format_number(value: Optional[float], digits: int = 1) -> str:
-    return "unavailable" if value is None else f"{value:.{digits}f}"
+def _rounded(value: Optional[float], digits: int = 1) -> Optional[float]:
+    return None if value is None else round(value, digits)
 
 
-def _format_signed(value: Optional[float], digits: int = 1) -> str:
-    return "unavailable" if value is None else f"{value:+.{digits}f}"
-
-
-def _format_schedule(decision: Optional[dict]) -> str:
+def _schedule_value(decision: Optional[dict]) -> object:
     if not decision:
-        return "unavailable"
+        return None
     value = decision.get("schedule_value")
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return f"{float(value):+g}W"
-    label = str(value) if value is not None else "auto"
-    minimum = _number(decision.get("min_power"))
-    maximum = _number(decision.get("max_power"))
-    if minimum is None and maximum is None:
-        return label
-    return f"{label}({_format_signed(minimum, 0)}..{_format_signed(maximum, 0)}W)"
+    if isinstance(value, bool):
+        return None
+    return value if isinstance(value, (str, int, float)) else None
 
 
-def _decision_fields(plan: dict) -> Dict[str, str]:
+def _decision_fields(plan: dict) -> Dict[str, object]:
     decisions = plan.get("decisions") if isinstance(plan.get("decisions"), list) else []
     current = decisions[0] if decisions and isinstance(decisions[0], dict) else None
     following = decisions[1] if len(decisions) > 1 and isinstance(decisions[1], dict) else None
     return {
-        "current_schedule": _format_schedule(current),
-        "current_expected_battery_w": _format_number(_number((current or {}).get("battery_power_w")), 0),
-        "current_predicted_end_soc": _format_number(_number((current or {}).get("end_soc_percent"))),
-        "current_predicted_load_w": _format_number(_number((current or {}).get("load_w")), 0),
-        "current_predicted_solar_w": _format_number(_number((current or {}).get("pv_w")), 0),
-        "current_predicted_grid_w": _format_number(_number((current or {}).get("grid_power_w")), 0),
-        "next_schedule": _format_schedule(following),
-        "next_expected_battery_w": _format_number(_number((following or {}).get("battery_power_w")), 0),
-        "next_predicted_end_soc": _format_number(_number((following or {}).get("end_soc_percent"))),
-        "next_predicted_load_w": _format_number(_number((following or {}).get("load_w")), 0),
-        "next_predicted_solar_w": _format_number(_number((following or {}).get("pv_w")), 0),
-        "next_predicted_grid_w": _format_number(_number((following or {}).get("grid_power_w")), 0),
+        "current_schedule": _schedule_value(current),
+        "current_min_power_w": _number((current or {}).get("min_power")),
+        "current_max_power_w": _number((current or {}).get("max_power")),
+        "current_expected_battery_w": _number((current or {}).get("battery_power_w")),
+        "current_predicted_end_soc": _rounded(_number((current or {}).get("end_soc_percent"))),
+        "current_predicted_load_w": _number((current or {}).get("load_w")),
+        "current_predicted_solar_w": _number((current or {}).get("pv_w")),
+        "current_predicted_grid_w": _number((current or {}).get("grid_power_w")),
+        "next_schedule": _schedule_value(following),
+        "next_min_power_w": _number((following or {}).get("min_power")),
+        "next_max_power_w": _number((following or {}).get("max_power")),
+        "next_expected_battery_w": _number((following or {}).get("battery_power_w")),
+        "next_predicted_end_soc": _rounded(_number((following or {}).get("end_soc_percent"))),
+        "next_predicted_load_w": _number((following or {}).get("load_w")),
+        "next_predicted_solar_w": _number((following or {}).get("pv_w")),
+        "next_predicted_grid_w": _number((following or {}).get("grid_power_w")),
     }
 
 
@@ -108,27 +104,25 @@ def _ages(observed_at: datetime, readings: RuntimeReadings) -> tuple[Optional[fl
     return p1_age, zendure_age, max(ages) if ages else None
 
 
-def _serialize_line(observed_at: datetime, fields: Dict[str, str]) -> str:
-    body = " | ".join(f"{key}={value}" for key, value in fields.items())
-    return f"[{observed_at.isoformat()}] {body}\n"
+def _serialize_line(observed_at: datetime, fields: Dict[str, object]) -> str:
+    payload = {"observed_at": observed_at.isoformat(), **fields}
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n"
 
 
 def _parse_line(line: str) -> Optional[ParsedEvent]:
-    if not line.startswith("[") or "] " not in line:
-        return None
-    timestamp_text, body = line[1:].split("] ", 1)
     try:
-        observed_at = datetime.fromisoformat(timestamp_text)
+        fields = json.loads(line)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(fields, dict) or not isinstance(fields.get("observed_at"), str):
+        return None
+    try:
+        observed_at = datetime.fromisoformat(fields["observed_at"])
     except ValueError:
         return None
-    fields: Dict[str, str] = {}
-    for part in body.strip().split(" | "):
-        if "=" not in part:
-            continue
-        key, value = part.split("=", 1)
-        fields[key.strip()] = value.strip()
-    if "event" not in fields:
+    if not isinstance(fields.get("event"), str):
         return None
+    fields.pop("observed_at", None)
     return ParsedEvent(observed_at=observed_at, fields=fields)
 
 
@@ -143,7 +137,7 @@ def parse_runtime_events(lines: Iterable[str]) -> List[ParsedEvent]:
 
 def _event_datetime(event: ParsedEvent, key: str) -> Optional[datetime]:
     value = event.fields.get(key)
-    if not value:
+    if not isinstance(value, str) or not value:
         return None
     try:
         return datetime.fromisoformat(value)
@@ -223,7 +217,7 @@ def _closure_fields(
     observed_at: datetime,
     readings: RuntimeReadings,
     is_latest_crossed_hour: bool,
-) -> Dict[str, str]:
+) -> Dict[str, object]:
     samples = _events_for_hour(events, "SAMPLE", start)
     baseline = _baseline_for_hour(events, start)
     household_wh, household_coverage = _integrate_samples(samples, "actual_household_w", start, end)
@@ -252,24 +246,24 @@ def _closure_fields(
         "hour_start": start.isoformat(),
         "hour_end": end.isoformat(),
         "status": status,
-        "samples": str(len(samples)),
-        "coverage_pct": _format_number(coverage_percent),
-        "predicted_usage_wh": _format_number(predicted_usage_wh, 0),
-        "actual_usage_wh": _format_number(household_wh, 0),
-        "usage_error_wh": _format_signed(usage_error, 0),
-        "predicted_solar_wh": _format_number(predicted_solar_wh, 0),
-        "actual_solar_wh": _format_number(solar_wh, 0),
-        "predicted_grid_wh": _format_signed(predicted_grid_wh, 0),
-        "actual_grid_wh": _format_signed(grid_wh, 0),
-        "actual_net_demand_wh": _format_signed(net_demand_wh, 0),
-        "predicted_end_soc": _format_number(predicted_soc),
-        "actual_soc": _format_number(actual_soc),
-        "soc_error_ppt": _format_signed(soc_error),
-        "closed_late_s": _format_number(max(0.0, observed_at.timestamp() - end.timestamp()), 0),
+        "samples": len(samples),
+        "coverage_pct": _rounded(coverage_percent),
+        "predicted_usage_wh": _rounded(predicted_usage_wh),
+        "actual_usage_wh": _rounded(household_wh),
+        "usage_error_wh": _rounded(usage_error),
+        "predicted_solar_wh": _rounded(predicted_solar_wh),
+        "actual_solar_wh": _rounded(solar_wh),
+        "predicted_grid_wh": _rounded(predicted_grid_wh),
+        "actual_grid_wh": _rounded(grid_wh),
+        "actual_net_demand_wh": _rounded(net_demand_wh),
+        "predicted_end_soc": _rounded(predicted_soc),
+        "actual_soc": _rounded(actual_soc),
+        "soc_error_ppt": _rounded(soc_error),
+        "closed_late_s": _rounded(max(0.0, observed_at.timestamp() - end.timestamp()), 0),
     }
 
 
-def _forecast_fields(plan: dict, hour_start: datetime, hour_end: datetime) -> Dict[str, str]:
+def _forecast_fields(plan: dict, hour_start: datetime, hour_end: datetime) -> Dict[str, object]:
     return {
         "hour_start": hour_start.isoformat(),
         "hour_end": hour_end.isoformat(),
@@ -334,14 +328,14 @@ def update_runtime_log(
         sample = {
             "event": "SAMPLE",
             **forecast,
-            "actual_soc": _format_number(readings.battery_state.soc_percent),
-            "actual_grid_w": _format_number(readings.grid_power_w, 0),
-            "actual_battery_w": _format_number(readings.battery_power_w, 0),
-            "actual_solar_w": _format_number(readings.solar_power_w, 0),
-            "actual_household_w": _format_number(readings.household_power_w, 0),
-            "actual_net_demand_w": _format_number(readings.net_household_power_w, 0),
+            "actual_soc": _rounded(readings.battery_state.soc_percent),
+            "actual_grid_w": _rounded(readings.grid_power_w),
+            "actual_battery_w": _rounded(readings.battery_power_w),
+            "actual_solar_w": _rounded(readings.solar_power_w),
+            "actual_household_w": _rounded(readings.household_power_w),
+            "actual_net_demand_w": _rounded(readings.net_household_power_w),
             "measurement_status": measurement_status,
-            "measurement_age_s": _format_number(measurement_age, 0),
+            "measurement_age_s": _rounded(measurement_age, 0),
         }
         new_lines.append(_serialize_line(observed_at, sample))
         handle.seek(0, os.SEEK_END)

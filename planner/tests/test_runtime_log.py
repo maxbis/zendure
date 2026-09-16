@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -118,22 +119,29 @@ class RuntimeLogTests(unittest.TestCase):
 
     def test_first_run_opens_hour_and_logs_current_and_next_schedule(self) -> None:
         with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "runtime.log"
+            path = Path(temp_dir) / "runtime.jsonl"
             at = datetime(2026, 9, 16, 14, 2, tzinfo=TZ)
 
             update_runtime_log(path, observed_at=at, timezone="Europe/Amsterdam", plan=plan(at), readings=readings(at))
 
-            text = path.read_text(encoding="utf-8")
-            self.assertIn("event=HOUR_OPENED", text)
-            self.assertIn("current_schedule=netzero+(+0..+500W)", text)
-            self.assertIn("current_predicted_end_soc=55.0", text)
-            self.assertIn("next_schedule=+300W", text)
-            self.assertIn("next_predicted_end_soc=60.0", text)
-            self.assertIn("actual_household_w=300", text)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            raw_events = [json.loads(line) for line in lines]
+            self.assertTrue(all(isinstance(event, dict) for event in raw_events))
+            self.assertIsInstance(next(event for event in raw_events if event["event"] == "SAMPLE")["actual_household_w"], float)
+            events = parse_runtime_events(lines)
+            opened = next(event for event in events if event.fields["event"] == "HOUR_OPENED")
+            sample = next(event for event in events if event.fields["event"] == "SAMPLE")
+            self.assertEqual(opened.fields["current_schedule"], "netzero+")
+            self.assertEqual(opened.fields["current_min_power_w"], 0)
+            self.assertEqual(opened.fields["current_max_power_w"], 500)
+            self.assertEqual(opened.fields["current_predicted_end_soc"], 55.0)
+            self.assertEqual(opened.fields["next_schedule"], 300)
+            self.assertEqual(opened.fields["next_predicted_end_soc"], 60.0)
+            self.assertEqual(sample.fields["actual_household_w"], 300.0)
 
     def test_first_run_after_boundary_closes_hour_once(self) -> None:
         with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "runtime.log"
+            path = Path(temp_dir) / "runtime.jsonl"
             for minute in (0, 15, 30, 45):
                 at = datetime(2026, 9, 16, 14, minute, tzinfo=TZ)
                 update_runtime_log(path, observed_at=at, timezone="Europe/Amsterdam", plan=plan(at), readings=readings(at))
@@ -152,16 +160,16 @@ class RuntimeLogTests(unittest.TestCase):
             closures = [event for event in events if event.fields.get("event") == "HOUR_CLOSED"]
             self.assertEqual(len(closures), 1)
             self.assertEqual(closures[0].fields["status"], "complete")
-            self.assertEqual(closures[0].fields["predicted_usage_wh"], "220")
-            self.assertEqual(closures[0].fields["actual_usage_wh"], "300")
-            self.assertEqual(closures[0].fields["actual_grid_wh"], "+100")
-            self.assertEqual(closures[0].fields["actual_solar_wh"], "200")
-            self.assertEqual(closures[0].fields["actual_soc"], "54.0")
-            self.assertEqual(closures[0].fields["soc_error_ppt"], "-1.0")
+            self.assertEqual(closures[0].fields["predicted_usage_wh"], 220.0)
+            self.assertEqual(closures[0].fields["actual_usage_wh"], 300.0)
+            self.assertEqual(closures[0].fields["actual_grid_wh"], 100.0)
+            self.assertEqual(closures[0].fields["actual_solar_wh"], 200.0)
+            self.assertEqual(closures[0].fields["actual_soc"], 54.0)
+            self.assertEqual(closures[0].fields["soc_error_ppt"], -1.0)
 
     def test_missed_hour_is_closed_as_incomplete(self) -> None:
         with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "runtime.log"
+            path = Path(temp_dir) / "runtime.jsonl"
             first = datetime(2026, 9, 16, 14, 0, tzinfo=TZ)
             update_runtime_log(path, observed_at=first, timezone="Europe/Amsterdam", plan=plan(first), readings=readings(first))
             later = datetime(2026, 9, 16, 16, 5, tzinfo=TZ)
@@ -171,12 +179,12 @@ class RuntimeLogTests(unittest.TestCase):
             closures = [event for event in events if event.fields.get("event") == "HOUR_CLOSED"]
             self.assertEqual(len(closures), 2)
             self.assertEqual([event.fields["status"] for event in closures], ["incomplete", "incomplete"])
-            self.assertEqual(closures[1].fields["actual_usage_wh"], "unavailable")
-            self.assertEqual(closures[1].fields["actual_soc"], "50.0")
+            self.assertIsNone(closures[1].fields["actual_usage_wh"])
+            self.assertEqual(closures[1].fields["actual_soc"], 50.0)
 
     def test_malformed_trailing_line_is_ignored(self) -> None:
         with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "runtime.log"
+            path = Path(temp_dir) / "runtime.jsonl"
             at = datetime(2026, 9, 16, 14, 0, tzinfo=TZ)
             update_runtime_log(path, observed_at=at, timezone="Europe/Amsterdam", plan=plan(at), readings=readings(at))
             with path.open("a", encoding="utf-8") as handle:
@@ -201,7 +209,7 @@ class RuntimeLogTests(unittest.TestCase):
                 export_today=[0.10] * 24,
                 export_tomorrow=[0.10] * 24,
             )
-            runtime_path = temp_path / "runtime.log"
+            runtime_path = temp_path / "runtime.jsonl"
             shortwave = {
                 "hourly": {
                     "time": ["2026-09-16T14:00", "2026-09-16T15:00"],
@@ -222,7 +230,8 @@ class RuntimeLogTests(unittest.TestCase):
 
             self.assertNotIn("runtime_log_error", result)
             self.assertTrue(runtime_path.exists())
-            self.assertIn("event=SAMPLE", runtime_path.read_text(encoding="utf-8"))
+            events = parse_runtime_events(runtime_path.read_text(encoding="utf-8").splitlines())
+            self.assertTrue(any(event.fields.get("event") == "SAMPLE" for event in events))
 
 
 if __name__ == "__main__":
