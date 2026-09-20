@@ -44,7 +44,7 @@ function rtSigned(mixed $value, string $unit, int $digits = 1): string
     if (!is_numeric($value)) {
         return '—';
     }
-    $number = (float) $value;
+    $number = round((float) $value, $digits);
     $sign = $number > 0 ? '+' : ($number < 0 ? '−' : '');
     return $sign . number_format(abs($number), $digits, '.', ',') . ' ' . $unit;
 }
@@ -91,7 +91,7 @@ function rtLocalTime(mixed $value, DateTimeZone $timezone, string $format): stri
 
 function rtGridDirection(mixed $value): string
 {
-    if (!is_numeric($value) || (float) $value === 0.0) {
+    if (!is_numeric($value) || round((float) $value) === 0.0) {
         return '';
     }
     return (float) $value > 0 ? ' import' : ' export';
@@ -218,7 +218,7 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                         <?php if ($isClosed): ?>
                             <div class="runtime-metrics">
                                 <div><span>Household</span><strong><?= rtEnergy($event['actual_usage_wh'] ?? null); ?></strong><small>Forecast <?= rtEnergy($event['predicted_usage_wh'] ?? null); ?> · error <?= rtSigned($event['usage_error_wh'] ?? null, 'Wh', 0); ?></small></div>
-                                <div><span>Solar</span><strong><?= rtEnergy($event['actual_solar_wh'] ?? null); ?></strong><small>Forecast <?= rtEnergy($event['predicted_solar_wh'] ?? null); ?></small></div>
+                                <div><span>Solar forecast</span><strong><?= rtEnergy($event['predicted_solar_wh'] ?? null); ?></strong></div>
                                 <div>
                                     <span>Grid exchange</span>
                                     <strong><?= rtSigned($event['actual_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['actual_grid_wh'] ?? null)); ?></strong>
@@ -253,7 +253,7 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                             <?php if ($isSample): ?>
                                 <div class="runtime-metrics runtime-metrics--sample">
                                     <div><span>Household</span><strong><?= rtPower($event['actual_household_w'] ?? null); ?></strong><small>Forecast <?= rtPower($event['current_predicted_load_w'] ?? null); ?></small></div>
-                                    <div><span>Solar</span><strong><?= rtPower($event['actual_solar_w'] ?? null); ?></strong><small>Forecast <?= rtPower($event['current_predicted_solar_w'] ?? null); ?></small></div>
+                                    <div><span>Solar forecast</span><strong><?= rtPower($event['current_predicted_solar_w'] ?? null); ?></strong></div>
                                     <div><span>Grid exchange</span><strong><?= rtSigned($event['actual_grid_w'] ?? null, 'W', 0); ?><?= rtEscape(rtGridDirection($event['actual_grid_w'] ?? null)); ?></strong><small>Forecast <?= rtSigned($event['current_predicted_grid_w'] ?? null, 'W', 0); ?><?= rtEscape(rtGridDirection($event['current_predicted_grid_w'] ?? null)); ?></small></div>
                                     <div><span>Battery</span><strong><?= rtSigned($event['actual_battery_w'] ?? null, 'W', 0); ?></strong><small>SoC <?= rtSoc($event['actual_soc'] ?? null); ?></small></div>
                                 </div>
