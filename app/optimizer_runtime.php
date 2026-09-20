@@ -97,6 +97,26 @@ function rtGridDirection(mixed $value): string
     return (float) $value > 0 ? ' import' : ' export';
 }
 
+function rtInitialBatteryPlanWh(array $event): ?float
+{
+    $usage = $event['predicted_usage_wh'] ?? null;
+    $solar = $event['predicted_solar_wh'] ?? null;
+    $grid = $event['predicted_grid_wh'] ?? null;
+    if (!is_numeric($usage) || !is_numeric($solar) || !is_numeric($grid)) {
+        return null;
+    }
+
+    // The three forecasts share the opening plan: grid = usage - solar + battery.
+    $batteryWh = (float) $grid - (float) $usage + (float) $solar;
+    return is_finite($batteryWh) ? $batteryWh : null;
+}
+
+function rtBatteryDirection(float $value): string
+{
+    $rounded = round($value);
+    return $rounded > 0 ? ' charge' : ($rounded < 0 ? ' discharge' : '');
+}
+
 $viewLabels = ['hours' => 'Hour summaries', 'samples' => '15-minute samples', 'all' => 'All events'];
 $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 days', 'date' => 'Specific date', 'all' => 'All history'];
 ?>
@@ -192,6 +212,7 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                     $gridForecastStatus = $isClosed
                         ? rtGridForecastStatus($event['actual_grid_wh'] ?? null, $event['predicted_grid_wh'] ?? null)
                         : null;
+                    $initialBatteryPlanWh = $isClosed ? rtInitialBatteryPlanWh($event) : null;
                     ?>
                     <article class="gsd-card runtime-event" data-event="<?= rtEscape(strtolower($type)); ?>">
                         <header class="runtime-event__header">
@@ -234,7 +255,14 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                                         Forecast <?= rtSigned($event['predicted_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['predicted_grid_wh'] ?? null)); ?>
                                     </small>
                                 </div>
-                                <div><span>Battery at close</span><strong><?= rtSoc($event['actual_soc'] ?? null); ?></strong><small>Forecast <?= rtSoc($event['predicted_end_soc'] ?? null); ?> · error <?= rtSigned($event['soc_error_ppt'] ?? null, 'ppt'); ?></small></div>
+                                <div>
+                                    <span>Battery at close</span>
+                                    <strong><?= rtSoc($event['actual_soc'] ?? null); ?></strong>
+                                    <small>Forecast <?= rtSoc($event['predicted_end_soc'] ?? null); ?> · error <?= rtSigned($event['soc_error_ppt'] ?? null, 'ppt'); ?></small>
+                                    <?php if ($initialBatteryPlanWh !== null): ?>
+                                        <small>Initial plan <?= rtSigned($initialBatteryPlanWh, 'Wh', 0); ?><?= rtEscape(rtBatteryDirection($initialBatteryPlanWh)); ?></small>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <footer class="runtime-event__footer"><?= rtNumber($event['coverage_pct'] ?? null); ?>% measurement coverage · <?= (int) ($event['samples'] ?? 0); ?> samples · closed <?= rtNumber($event['closed_late_s'] ?? null, 0); ?>s after boundary</footer>
                         <?php else: ?>
