@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 const RT_GRID_FORECAST_ABSOLUTE_TOLERANCE_WH = 100;
+const RT_GRID_FORECAST_WARNING_TOLERANCE_WH = 250;
 const RT_GRID_FORECAST_GOOD_ERROR_RATIO = 0.15;
 const RT_GRID_FORECAST_WARNING_ERROR_RATIO = 0.50;
 
@@ -27,7 +28,10 @@ function rtGridForecastStatus(mixed $actual, mixed $forecast): ?string
     if ($errorRatio <= RT_GRID_FORECAST_GOOD_ERROR_RATIO) {
         return 'good';
     }
-    return $errorRatio < RT_GRID_FORECAST_WARNING_ERROR_RATIO ? 'warning' : 'bad';
+    if ($errorWh < RT_GRID_FORECAST_WARNING_TOLERANCE_WH || $errorRatio < RT_GRID_FORECAST_WARNING_ERROR_RATIO) {
+        return 'warning';
+    }
+    return 'bad';
 }
 
 function rtGridForecastStatusLabel(string $status): string
@@ -37,7 +41,7 @@ function rtGridForecastStatusLabel(string $status): string
 
     return match ($status) {
         'good' => sprintf('Grid forecast error under %d Wh or within %d%% of forecast', RT_GRID_FORECAST_ABSOLUTE_TOLERANCE_WH, $goodPercent),
-        'warning' => sprintf('Grid result more than %d%% and less than %d%% off forecast', $goodPercent, $warningPercent),
-        default => sprintf('Grid result at least %d%% off forecast', $warningPercent),
+        'warning' => sprintf('Grid forecast error under %d Wh or more than %d%% and less than %d%% off forecast', RT_GRID_FORECAST_WARNING_TOLERANCE_WH, $goodPercent, $warningPercent),
+        default => sprintf('Grid forecast error at least %d Wh and at least %d%% off forecast', RT_GRID_FORECAST_WARNING_TOLERANCE_WH, $warningPercent),
     };
 }
