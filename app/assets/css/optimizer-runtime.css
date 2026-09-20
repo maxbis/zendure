@@ -104,6 +104,7 @@
 
 .runtime-metrics > div {
     display: grid;
+    align-content: start;
     gap: 5px;
     min-width: 0;
     padding: 13px 15px;
