@@ -115,6 +115,28 @@
     font-variant-numeric: tabular-nums;
 }
 
+.runtime-grid-forecast-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--gsd-neutral);
+    vertical-align: 1px;
+}
+
+.runtime-grid-forecast-dot[data-status="good"] {
+    background: var(--gsd-positive);
+}
+
+.runtime-grid-forecast-dot[data-status="warning"] {
+    background: var(--gsd-warning);
+}
+
+.runtime-grid-forecast-dot[data-status="bad"] {
+    background: var(--gsd-negative);
+}
+
 .runtime-event__footer {
     padding: 9px 16px;
     border-top: 1px solid var(--gsd-border-subtle);

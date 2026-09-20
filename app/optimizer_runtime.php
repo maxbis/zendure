@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../login/validate.php';
 require_once __DIR__ . '/../common/php/system_config.php';
 require_once __DIR__ . '/includes/optimizer_runtime_log.php';
+require_once __DIR__ . '/includes/optimizer_runtime_grid_accuracy.php';
 
 $systemConfig = loadSystemConfig();
 $timezone = new DateTimeZone($systemConfig['installation']['timezone']);
@@ -188,6 +189,9 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                     $isSample = $type === 'SAMPLE';
                     $title = $isClosed ? 'Hour completed' : ($isSample ? 'Runtime sample' : 'Hour forecast opened');
                     $timeSource = $isClosed ? ($event['hour_start'] ?? null) : ($event['observed_at'] ?? null);
+                    $gridForecastStatus = $isClosed
+                        ? rtGridForecastStatus($event['actual_grid_wh'] ?? null, $event['predicted_grid_wh'] ?? null)
+                        : null;
                     ?>
                     <article class="gsd-card runtime-event" data-event="<?= rtEscape(strtolower($type)); ?>">
                         <header class="runtime-event__header">
@@ -215,7 +219,21 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                             <div class="runtime-metrics">
                                 <div><span>Household</span><strong><?= rtEnergy($event['actual_usage_wh'] ?? null); ?></strong><small>Forecast <?= rtEnergy($event['predicted_usage_wh'] ?? null); ?> · error <?= rtSigned($event['usage_error_wh'] ?? null, 'Wh', 0); ?></small></div>
                                 <div><span>Solar</span><strong><?= rtEnergy($event['actual_solar_wh'] ?? null); ?></strong><small>Forecast <?= rtEnergy($event['predicted_solar_wh'] ?? null); ?></small></div>
-                                <div><span>Grid exchange</span><strong><?= rtSigned($event['actual_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['actual_grid_wh'] ?? null)); ?></strong><small>Forecast <?= rtSigned($event['predicted_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['predicted_grid_wh'] ?? null)); ?></small></div>
+                                <div>
+                                    <span>Grid exchange</span>
+                                    <strong><?= rtSigned($event['actual_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['actual_grid_wh'] ?? null)); ?></strong>
+                                    <small>
+                                        <?php if ($gridForecastStatus !== null): ?>
+                                            <span
+                                                class="runtime-grid-forecast-dot"
+                                                data-status="<?= rtEscape($gridForecastStatus); ?>"
+                                                role="img"
+                                                aria-label="<?= rtEscape(rtGridForecastStatusLabel($gridForecastStatus)); ?>"
+                                            ></span>
+                                        <?php endif; ?>
+                                        Forecast <?= rtSigned($event['predicted_grid_wh'] ?? null, 'Wh', 0); ?><?= rtEscape(rtGridDirection($event['predicted_grid_wh'] ?? null)); ?>
+                                    </small>
+                                </div>
                                 <div><span>Battery at close</span><strong><?= rtSoc($event['actual_soc'] ?? null); ?></strong><small>Forecast <?= rtSoc($event['predicted_end_soc'] ?? null); ?> · error <?= rtSigned($event['soc_error_ppt'] ?? null, 'ppt'); ?></small></div>
                             </div>
                             <footer class="runtime-event__footer"><?= rtNumber($event['coverage_pct'] ?? null); ?>% measurement coverage · <?= (int) ($event['samples'] ?? 0); ?> samples · closed <?= rtNumber($event['closed_late_s'] ?? null, 0); ?>s after boundary</footer>
