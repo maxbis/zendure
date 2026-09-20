@@ -2356,9 +2356,10 @@ button.app-state-pill:focus-visible {
     display: none;
 }
 
-.app-price-hour__action[data-limit-value="true"],
+.app-price-hour .app-price-hour__action[data-limit-value="true"],
 .app-schedule-tooltip__badge[data-limit-value="true"] {
-    font-style: italic;
+    font-style: normal;
+    font-weight: 550;
     text-decoration-line: underline;
     text-decoration-style: dotted;
     text-decoration-thickness: 1px;
@@ -2663,6 +2664,11 @@ dialog.app-schedule-tooltip {
     color: var(--gsd-text-on-signal);
 }
 
+.app-price-hour__action[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]),
+.app-schedule-tooltip__badge[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]) {
+    color: color-mix(in srgb, var(--gsd-text-on-signal) 85%, transparent);
+}
+
 .app-schedule-tooltip__limits {
     margin-left: 43px;
     padding: 5px 7px;
@@ -2784,8 +2790,8 @@ dialog.app-schedule-tooltip {
     background: none;
     border-radius: 0;
     color: var(--gsd-text-secondary);
-    font-style: italic;
-    font-weight: 750;
+    font-style: normal;
+    font-weight: 550;
     text-decoration-line: underline;
     text-decoration-style: dotted;
     text-underline-offset: 2px;
@@ -4464,6 +4470,10 @@ dialog.app-schedule-tooltip {
 
     .app-price-hour__action[data-tone="neutral"] {
         border-color: var(--gsd-border-subtle);
+    }
+
+    .app-price-hour__action[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]) {
+        color: var(--gsd-text-on-signal);
     }
 
     .app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-fallback-tone]::after {
