@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+const OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_WINDOW_DAYS = 30;
+const OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_MIN_SAMPLES = 7;
+const OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_MIN_COVERAGE_PCT = 75.0;
+
 function optimizerRuntimeLogDefaultPath(): string
 {
     $configured = getenv('PLANNER_RUNTIME_LOG_PATH');
@@ -42,6 +46,50 @@ function optimizerRuntimeLogEventTime(array $event, DateTimeZone $timezone): ?Da
     } catch (Exception) {
         return null;
     }
+}
+
+function optimizerRuntimeLogHourStart(array $event, DateTimeZone $timezone): ?DateTimeImmutable
+{
+    $raw = is_string($event['hour_start'] ?? null) ? $event['hour_start'] : null;
+    if ($raw === null) {
+        return null;
+    }
+
+    try {
+        return (new DateTimeImmutable($raw))->setTimezone($timezone);
+    } catch (Exception) {
+        return null;
+    }
+}
+
+function optimizerRuntimeLogIsHouseholdMedianSample(array $event): bool
+{
+    return ($event['event'] ?? null) === 'HOUR_CLOSED'
+        && ($event['status'] ?? null) === 'complete'
+        && is_numeric($event['coverage_pct'] ?? null)
+        && (float) $event['coverage_pct'] >= OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_MIN_COVERAGE_PCT
+        && is_numeric($event['predicted_solar_wh'] ?? null)
+        && (float) $event['predicted_solar_wh'] === 0.0
+        && is_numeric($event['actual_usage_wh'] ?? null);
+}
+
+/**
+ * @param list<float> $values
+ */
+function optimizerRuntimeLogMedian(array $values): ?float
+{
+    $count = count($values);
+    if ($count === 0) {
+        return null;
+    }
+
+    sort($values, SORT_NUMERIC);
+    $middle = intdiv($count, 2);
+    if ($count % 2 === 1) {
+        return $values[$middle];
+    }
+
+    return ($values[$middle - 1] + $values[$middle]) / 2;
 }
 
 function optimizerRuntimeLogMatchesView(array $event, string $view): bool
@@ -116,6 +164,8 @@ function optimizerRuntimeLogRead(
     $scannedLines = 0;
     $latestAt = null;
     $latestTimestamp = null;
+    /** @var array<int, list<array{timestamp: int, value: float}>> $householdHistoryByHour */
+    $householdHistoryByHour = array_fill(0, 24, []);
 
     try {
         @flock($handle, LOCK_SH);
@@ -138,6 +188,34 @@ function optimizerRuntimeLogRead(
             if ($latestTimestamp === null || $eventTime->getTimestamp() > $latestTimestamp) {
                 $latestTimestamp = $eventTime->getTimestamp();
                 $latestAt = $eventTime->format(DateTimeInterface::ATOM);
+            }
+
+            $hourStart = optimizerRuntimeLogHourStart($event, $timezone);
+            if ($hourStart !== null && optimizerRuntimeLogIsHouseholdMedianSample($event)) {
+                $hour = (int) $hourStart->format('G');
+                $hourStartTimestamp = $hourStart->getTimestamp();
+                $windowStartTimestamp = $hourStart->modify(
+                    '-' . OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_WINDOW_DAYS . ' days'
+                )->getTimestamp();
+                $householdHistoryByHour[$hour] = array_values(array_filter(
+                    $householdHistoryByHour[$hour],
+                    static fn (array $sample): bool => $sample['timestamp'] >= $windowStartTimestamp
+                ));
+                $priorSamples = array_values(array_filter(
+                    $householdHistoryByHour[$hour],
+                    static fn (array $sample): bool => $sample['timestamp'] < $hourStartTimestamp
+                ));
+                $median = optimizerRuntimeLogMedian(array_map(
+                    static fn (array $sample): float => $sample['value'],
+                    $priorSamples
+                ));
+
+                $event['_household_rolling_median_wh'] = $median;
+                $event['_household_rolling_median_samples'] = count($priorSamples);
+                $householdHistoryByHour[$hour][] = [
+                    'timestamp' => $hourStartTimestamp,
+                    'value' => (float) $event['actual_usage_wh'],
+                ];
             }
             if (!optimizerRuntimeLogMatchesView($event, $view)
                 || !optimizerRuntimeLogMatchesPeriod($eventTime, $now, $period, $date)) {

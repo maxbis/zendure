@@ -238,7 +238,19 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
 
                         <?php if ($isClosed): ?>
                             <div class="runtime-metrics">
-                                <div><span>Household</span><strong><?= rtEnergy($event['actual_usage_wh'] ?? null); ?></strong><small>Forecast <?= rtEnergy($event['predicted_usage_wh'] ?? null); ?> · error <?= rtSigned($event['usage_error_wh'] ?? null, 'Wh', 0); ?></small></div>
+                                <div>
+                                    <span>Household</span>
+                                    <strong><?= rtEnergy($event['actual_usage_wh'] ?? null); ?></strong>
+                                    <small>Forecast <?= rtEnergy($event['predicted_usage_wh'] ?? null); ?> · error <?= rtSigned($event['usage_error_wh'] ?? null, 'Wh', 0); ?></small>
+                                    <?php if (array_key_exists('_household_rolling_median_samples', $event)): ?>
+                                        <?php $medianSamples = (int) $event['_household_rolling_median_samples']; ?>
+                                        <?php if ($medianSamples >= OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_MIN_SAMPLES && is_numeric($event['_household_rolling_median_wh'] ?? null)): ?>
+                                            <small><?= OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_WINDOW_DAYS; ?>d median <?= rtEnergy($event['_household_rolling_median_wh']); ?> · <?= $medianSamples; ?> samples</small>
+                                        <?php else: ?>
+                                            <small>Collecting median data · <?= $medianSamples; ?>/<?= OPTIMIZER_RUNTIME_HOUSEHOLD_MEDIAN_MIN_SAMPLES; ?> samples</small>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </div>
                                 <div><span>Solar forecast</span><strong><?= rtEnergy($event['predicted_solar_wh'] ?? null); ?></strong></div>
                                 <div>
                                     <span>Grid exchange</span>

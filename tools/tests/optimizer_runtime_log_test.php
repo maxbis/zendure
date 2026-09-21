@@ -25,6 +25,19 @@ $events = [
     ['observed_at' => '2026-09-16T09:15:00+02:00', 'event' => 'SAMPLE', 'actual_soc' => 55],
 ];
 
+foreach ([90, 100, 110, 120, 130, 900, 140, 150] as $dayOffset => $usageWh) {
+    $day = 8 + $dayOffset;
+    $events[] = [
+        'observed_at' => sprintf('2026-09-%02dT07:02:00+02:00', $day),
+        'event' => 'HOUR_CLOSED',
+        'hour_start' => sprintf('2026-09-%02dT06:00:00+02:00', $day),
+        'status' => 'complete',
+        'coverage_pct' => 98.0,
+        'predicted_solar_wh' => 0,
+        'actual_usage_wh' => $usageWh,
+    ];
+}
+
 $lines = array_map(
     static fn (array $event): string => json_encode($event, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
     $events
@@ -41,7 +54,7 @@ try {
     runtimeLogTestAssert(count($hours['events']) === 2, 'Both closed-hour events should be returned.');
     runtimeLogTestAssert($hours['events'][0]['observed_at'] === '2026-09-16T09:02:00+02:00', 'Events should be newest first.');
     runtimeLogTestAssert($hours['invalid_lines'] === 1, 'Malformed JSON should be counted and ignored.');
-    runtimeLogTestAssert($hours['scanned_lines'] === 7, 'Every non-empty line should be scanned.');
+    runtimeLogTestAssert($hours['scanned_lines'] === 15, 'Every non-empty line should be scanned.');
     runtimeLogTestAssert($hours['latest_at'] === '2026-09-16T09:15:00+02:00', 'Latest timestamp should cover all valid event types.');
 
     $dateSamples = optimizerRuntimeLogRead($path, $timezone, $now, 'samples', 'date', '2026-09-16', 1);
@@ -50,7 +63,11 @@ try {
     runtimeLogTestAssert($dateSamples['events'][0]['actual_soc'] === 55, 'The result limit should retain the newest matching event.');
 
     $all = optimizerRuntimeLogRead($path, $timezone, $now, 'all', 'all', null, 250);
-    runtimeLogTestAssert($all['matching_count'] === 6, 'All history should include all recognized runtime event types.');
+    runtimeLogTestAssert($all['matching_count'] === 14, 'All history should include all recognized runtime event types.');
+
+    $medianEvent = $all['events'][0];
+    runtimeLogTestAssert($medianEvent['_household_rolling_median_samples'] === 7, 'The current hour should be excluded from its rolling median.');
+    runtimeLogTestAssert($medianEvent['_household_rolling_median_wh'] === 120.0, 'The rolling median should resist the 900 Wh outlier.');
 } finally {
     unlink($path);
 }
