@@ -130,6 +130,21 @@ function appEnergyHistoryMapLiveReportRows(array $report, array $priceRows, stri
     return $mapped;
 }
 
+/**
+ * Live reports contain placeholder rows for all 24 hours. Only elapsed hours
+ * can contribute to today's totals; retain missing readings in elapsed hours.
+ *
+ * @param array<int, array<string, mixed>> $rows
+ * @return array<int, array<string, mixed>>
+ */
+function appEnergyHistoryFilterFutureRows(array $rows, string $today, int $currentHour): array
+{
+    return array_values(array_filter($rows, static function (array $row) use ($today, $currentHour): bool {
+        return (string)($row['local_date'] ?? '') !== $today
+            || (int)($row['local_hour'] ?? -1) <= $currentHour;
+    }));
+}
+
 function appEnergyHistoryFloat(mixed $value): ?float
 {
     if ($value === null || is_bool($value) || !is_numeric($value)) {

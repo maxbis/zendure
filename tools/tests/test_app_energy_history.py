@@ -44,6 +44,19 @@ def _map_live_rows(
     return json.loads(proc.stdout)
 
 
+def _build_filtered_payload(rows: list[dict[str, object]], current_hour: int) -> dict[str, object]:
+    php = (
+        f'require {json.dumps(str(HELPER_FILE))};'
+        f'$rows=json_decode({json.dumps(json.dumps(rows))},true);'
+        f'$rows=appEnergyHistoryFilterFutureRows($rows,"2026-08-01",{current_hour});'
+        'echo json_encode(appEnergyHistoryBuildPayload($rows,3));'
+    )
+    proc = subprocess.run(["php", "-r", php], capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip())
+    return json.loads(proc.stdout)
+
+
 def _row(
     hour: int,
     *,
@@ -159,6 +172,26 @@ def test_grid_cost_is_unavailable_when_meter_or_required_price_is_missing() -> N
     assert grid["import"]["missingHours"] == ["2026-08-01 00:00"]
     assert grid["export"]["eur"] is None
     assert grid["export"]["missingHours"] == ["2026-08-01 01:00"]
+
+
+def test_today_grid_cost_ignores_future_placeholder_but_not_elapsed_missing_data() -> None:
+    rows = [
+        _row(21, grid_from_wh=1000, grid_to_wh=100, consumer=0.30, spot=0.10),
+        _row(22, grid_from_wh=500, grid_to_wh=0, consumer=0.20),
+        _row(23, grid_from_wh=None, grid_to_wh=None),
+    ]
+    through_22 = _build_filtered_payload(rows, 22)
+    grid = through_22["whPerDay"]["2026-08-01"]["gridPriceTotals"]
+    assert [hour["hourLabel"] for hour in through_22["whPerHour"]] == [
+        "2026-08-01 21:00", "2026-08-01 22:00"
+    ]
+    assert grid["import"]["eur"] == pytest.approx(0.40)
+    assert grid["export"]["eur"] == pytest.approx(0.01)
+    assert grid["import"]["complete"] is True
+    assert grid["export"]["complete"] is True
+
+    through_23 = _build_filtered_payload(rows, 23)
+    assert through_23["whPerDay"]["2026-08-01"]["gridPriceTotals"]["import"]["eur"] is None
 
 
 def test_live_report_rows_use_live_energy_and_price_ticks() -> None:

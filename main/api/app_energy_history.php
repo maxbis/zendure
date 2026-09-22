@@ -25,6 +25,7 @@ try {
     date_default_timezone_set($timezone->getName());
     $requestedDays = appEnergyHistoryResolveDays($_GET['days'] ?? null);
     $endDate = new DateTimeImmutable('today', $timezone);
+    $currentHour = (int)(new DateTimeImmutable('now', $timezone))->format('G');
     $startDate = $endDate->modify('-' . $requestedDays . ' days');
     $pdo = appEnergyHistoryCreatePdo();
     $rows = [];
@@ -52,6 +53,7 @@ try {
         $rows = array_merge($rows, appEnergyHistoryFetchRows($pdo, $today, $today));
     }
 
+    $rows = appEnergyHistoryFilterFutureRows($rows, $today, $currentHour);
     $payload = appEnergyHistoryBuildPayload($rows, $requestedDays, $todaySource, $isStale);
     $payload['baseWh'] = $systemConfig['battery']['capacityWh'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
