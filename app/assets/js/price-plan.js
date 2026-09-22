@@ -1440,10 +1440,6 @@
             (total, segment) => total + Math.max(0, Number(segment.duration_s) || 0),
             0
         ));
-        const count = document.createElement("span");
-        count.className = "app-price-hour__history-count";
-        count.textContent = String(history.segments.length);
-        count.setAttribute("aria-hidden", "true");
         const strip = document.createElement("span");
         strip.className = "app-price-hour__history-strip";
         strip.setAttribute("aria-hidden", "true");
@@ -1456,7 +1452,7 @@
             item.style.setProperty("--app-history-share", String(Math.max(0, Number(segment.duration_s) || 0) / totalDuration));
             strip.appendChild(item);
         });
-        element.replaceChildren(primary, count, strip);
+        element.replaceChildren(primary, strip);
     }
 
     function spotPrice(consumerPrice) {

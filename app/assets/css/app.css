@@ -2298,24 +2298,6 @@ button.app-state-pill:focus-visible {
     stroke-width: 2.4;
 }
 
-.app-price-hour__history-count {
-    position: absolute;
-    z-index: 2;
-    top: 1px;
-    right: 2px;
-    display: grid;
-    min-width: 10px;
-    height: 10px;
-    padding-inline: 2px;
-    place-items: center;
-    background: color-mix(in srgb, var(--gsd-page-deep) 78%, transparent);
-    border-radius: 999px;
-    color: var(--gsd-text);
-    font-size: 6px;
-    font-weight: 800;
-    line-height: 1;
-}
-
 .app-price-hour__history-strip {
     position: absolute;
     z-index: 2;
