@@ -77,6 +77,67 @@ function rtSchedule(array $event, string $prefix): string
     return $labels[(string) $value] ?? (string) $value;
 }
 
+function rtScheduleValue(mixed $value): string
+{
+    if (is_numeric($value)) {
+        return rtSigned($value, 'W', 0);
+    }
+    $labels = ['netzero+' => 'NZ+', 'netzero-' => 'NZ−', 'netzero' => 'NZ±', 'auto' => 'Auto'];
+    return $labels[(string) $value] ?? (string) $value;
+}
+
+function rtScheduleIcon(mixed $value): string
+{
+    if (is_numeric($value)) {
+        $power = (float) $value;
+        return $power < 0 ? 'bolt' : 'battery';
+    }
+    return match ((string) $value) {
+        'netzero+' => 'sun',
+        'netzero-' => 'bolt',
+        'netzero' => 'bidirectional',
+        default => 'refresh',
+    };
+}
+
+function rtScheduleDirection(mixed $value): string
+{
+    if (is_numeric($value)) {
+        $power = (float) $value;
+        return $power > 0 ? 'charge' : ($power < 0 ? 'discharge' : 'idle');
+    }
+    return match ((string) $value) {
+        'netzero+' => 'charge',
+        'netzero-' => 'discharge',
+        'netzero' => 'balance',
+        default => 'idle',
+    };
+}
+
+function rtScheduleDuration(mixed $seconds): string
+{
+    if (!is_numeric($seconds)) {
+        return '';
+    }
+    $minutes = max(1, (int) round((float) $seconds / 60));
+    return $minutes . 'm';
+}
+
+function rtScheduleSegmentTitle(array $segment, DateTimeZone $timezone): string
+{
+    $title = rtLocalTime($segment['start'] ?? null, $timezone, 'H:i')
+        . '–' . rtLocalTime($segment['end'] ?? null, $timezone, 'H:i')
+        . ' · ' . rtScheduleValue($segment['schedule'] ?? null);
+    $limits = [];
+    if (is_numeric($segment['min_power_w'] ?? null)) {
+        $limits[] = 'min ' . rtSigned($segment['min_power_w'], 'W', 0);
+    }
+    if (is_numeric($segment['max_power_w'] ?? null)) {
+        $limits[] = 'max ' . rtSigned($segment['max_power_w'], 'W', 0);
+    }
+    return $limits === [] ? $title : $title . ' · ' . implode(' · ', $limits);
+}
+
 function rtLocalTime(mixed $value, DateTimeZone $timezone, string $format): string
 {
     if (!is_string($value) || $value === '') {
@@ -237,6 +298,53 @@ $periodLabels = ['24h' => 'Last 24 hours', 'today' => 'Today', '7d' => 'Last 7 d
                         </header>
 
                         <?php if ($isClosed): ?>
+                            <?php $scheduleSegments = is_array($event['_schedule_segments'] ?? null) ? $event['_schedule_segments'] : []; ?>
+                            <?php if ($scheduleSegments !== []): ?>
+                                <?php
+                                $largestScheduleSegment = array_reduce(
+                                    array_keys($scheduleSegments),
+                                    static fn (?int $largest, int $index): int => $largest === null
+                                        || (int) ($scheduleSegments[$index]['duration_s'] ?? 0) > (int) ($scheduleSegments[$largest]['duration_s'] ?? 0)
+                                            ? $index
+                                            : $largest,
+                                    null
+                                );
+                                $scheduleDurationTotal = max(1, array_sum(array_map(
+                                    static fn (array $segment): int => (int) ($segment['duration_s'] ?? 0),
+                                    $scheduleSegments
+                                )));
+                                ?>
+                                <section class="runtime-mode-history" aria-label="Schedules applied during this hour">
+                                    <div class="runtime-mode-history__heading">
+                                        <span>Schedules applied</span>
+                                        <small><?= count($scheduleSegments); ?> <?= count($scheduleSegments) === 1 ? 'period' : 'periods'; ?> observed</small>
+                                    </div>
+                                    <div class="runtime-mode-history__badges">
+                                        <?php foreach ($scheduleSegments as $index => $segment): ?>
+                                            <?php $direction = rtScheduleDirection($segment['schedule'] ?? null); ?>
+                                            <span
+                                                class="runtime-mode-badge"
+                                                data-direction="<?= rtEscape($direction); ?>"
+                                                data-primary="<?= $index === $largestScheduleSegment ? 'true' : 'false'; ?>"
+                                                title="<?= rtEscape(rtScheduleSegmentTitle($segment, $timezone)); ?>"
+                                                aria-label="<?= rtEscape(rtScheduleSegmentTitle($segment, $timezone)); ?>"
+                                            >
+                                                <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#<?= rtEscape(rtScheduleIcon($segment['schedule'] ?? null)); ?>"></use></svg>
+                                                <strong><?= rtEscape(rtScheduleValue($segment['schedule'] ?? null)); ?></strong>
+                                                <small><?= rtEscape(rtScheduleDuration($segment['duration_s'] ?? null)); ?></small>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="runtime-mode-history__timeline" aria-hidden="true">
+                                        <?php foreach ($scheduleSegments as $segment): ?>
+                                            <span
+                                                data-direction="<?= rtEscape(rtScheduleDirection($segment['schedule'] ?? null)); ?>"
+                                                style="--runtime-segment-share: <?= rtEscape(number_format(((int) ($segment['duration_s'] ?? 0) / $scheduleDurationTotal) * 100, 3, '.', '')); ?>%;"
+                                            ></span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </section>
+                            <?php endif; ?>
                             <div class="runtime-metrics">
                                 <div>
                                     <span>Household</span>

@@ -102,6 +102,116 @@
     background: var(--gsd-border-subtle);
 }
 
+.runtime-mode-history {
+    display: grid;
+    gap: 9px;
+    padding: 11px 15px 12px;
+    border-bottom: 1px solid var(--gsd-border-subtle);
+    background: var(--gsd-surface-2);
+}
+
+.runtime-mode-history__heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.runtime-mode-history__heading > span {
+    color: var(--gsd-text-muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.runtime-mode-history__heading small {
+    color: var(--gsd-text-muted);
+    font-size: 0.66rem;
+}
+
+.runtime-mode-history__badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.runtime-mode-badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    min-height: 28px;
+    padding: 4px 8px;
+    border: 1px solid var(--gsd-border);
+    border-radius: 999px;
+    background: var(--gsd-surface-3);
+    color: var(--gsd-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.runtime-mode-badge[data-primary="true"] {
+    border-color: color-mix(in srgb, currentColor 45%, var(--gsd-border));
+    color: var(--gsd-text);
+}
+
+.runtime-mode-badge[data-direction="charge"] {
+    color: var(--gsd-positive);
+}
+
+.runtime-mode-badge[data-direction="discharge"] {
+    color: var(--gsd-negative);
+}
+
+.runtime-mode-badge[data-direction="balance"] {
+    color: var(--gsd-accent);
+}
+
+.runtime-mode-badge .gsd-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.runtime-mode-badge strong {
+    color: currentColor;
+    font-size: 0.74rem;
+    font-weight: 750;
+}
+
+.runtime-mode-badge small {
+    color: var(--gsd-text-muted);
+    font-size: 0.64rem;
+}
+
+.runtime-mode-history__timeline {
+    display: flex;
+    width: 100%;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--gsd-border-subtle);
+}
+
+.runtime-mode-history__timeline > span {
+    flex: 0 0 var(--runtime-segment-share);
+    min-width: 2px;
+    background: var(--gsd-neutral);
+}
+
+.runtime-mode-history__timeline > span[data-direction="charge"] {
+    background: var(--gsd-positive);
+}
+
+.runtime-mode-history__timeline > span[data-direction="discharge"] {
+    background: var(--gsd-negative);
+}
+
+.runtime-mode-history__timeline > span[data-direction="balance"] {
+    background: var(--gsd-accent);
+}
+
 .runtime-metrics > div {
     display: grid;
     align-content: start;

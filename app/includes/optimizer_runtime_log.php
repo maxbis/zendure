@@ -62,6 +62,111 @@ function optimizerRuntimeLogHourStart(array $event, DateTimeZone $timezone): ?Da
     }
 }
 
+function optimizerRuntimeLogHourEnd(array $event, DateTimeZone $timezone): ?DateTimeImmutable
+{
+    $raw = is_string($event['hour_end'] ?? null) ? $event['hour_end'] : null;
+    if ($raw === null) {
+        return null;
+    }
+
+    try {
+        return (new DateTimeImmutable($raw))->setTimezone($timezone);
+    } catch (Exception) {
+        return null;
+    }
+}
+
+/**
+ * @return array{schedule: string|int|float, min_power_w: ?float, max_power_w: ?float}|null
+ */
+function optimizerRuntimeLogScheduleObservation(array $event): ?array
+{
+    $schedule = $event['current_schedule'] ?? null;
+    if (is_bool($schedule) || (!is_string($schedule) && !is_int($schedule) && !is_float($schedule))) {
+        return null;
+    }
+
+    return [
+        'schedule' => $schedule,
+        'min_power_w' => is_numeric($event['current_min_power_w'] ?? null)
+            ? (float) $event['current_min_power_w']
+            : null,
+        'max_power_w' => is_numeric($event['current_max_power_w'] ?? null)
+            ? (float) $event['current_max_power_w']
+            : null,
+    ];
+}
+
+/**
+ * @param list<array{observed_at: DateTimeImmutable, schedule: string|int|float, min_power_w: ?float, max_power_w: ?float}> $observations
+ * @return list<array{schedule: string|int|float, min_power_w: ?float, max_power_w: ?float, start: string, end: string, duration_s: int}>
+ */
+function optimizerRuntimeLogScheduleSegments(
+    array $observations,
+    DateTimeImmutable $hourStart,
+    DateTimeImmutable $hourEnd
+): array {
+    if ($observations === []) {
+        return [];
+    }
+
+    usort(
+        $observations,
+        static fn (array $left, array $right): int => $left['observed_at']->getTimestamp() <=> $right['observed_at']->getTimestamp()
+    );
+    $hourStartTimestamp = $hourStart->getTimestamp();
+    $hourEndTimestamp = $hourEnd->getTimestamp();
+    $segments = [];
+
+    foreach ($observations as $index => $observation) {
+        $scheduleKey = json_encode([
+            $observation['schedule'],
+            $observation['min_power_w'],
+            $observation['max_power_w'],
+        ]);
+        $changeTimestamp = $index === 0
+            ? $hourStartTimestamp
+            : max($hourStartTimestamp, min($hourEndTimestamp, $observation['observed_at']->getTimestamp()));
+        $lastIndex = count($segments) - 1;
+
+        if ($lastIndex >= 0 && $segments[$lastIndex]['_key'] === $scheduleKey) {
+            continue;
+        }
+        if ($lastIndex >= 0) {
+            $segments[$lastIndex]['_end_timestamp'] = $changeTimestamp;
+        }
+        $segments[] = [
+            '_key' => $scheduleKey,
+            '_start_timestamp' => $changeTimestamp,
+            '_end_timestamp' => $hourEndTimestamp,
+            'schedule' => $observation['schedule'],
+            'min_power_w' => $observation['min_power_w'],
+            'max_power_w' => $observation['max_power_w'],
+        ];
+    }
+
+    return array_values(array_map(
+        static function (array $segment) use ($hourStart): array {
+            $start = DateTimeImmutable::createFromFormat('U', (string) $segment['_start_timestamp'])
+                ->setTimezone($hourStart->getTimezone());
+            $end = DateTimeImmutable::createFromFormat('U', (string) $segment['_end_timestamp'])
+                ->setTimezone($hourStart->getTimezone());
+            return [
+                'schedule' => $segment['schedule'],
+                'min_power_w' => $segment['min_power_w'],
+                'max_power_w' => $segment['max_power_w'],
+                'start' => $start->format(DateTimeInterface::ATOM),
+                'end' => $end->format(DateTimeInterface::ATOM),
+                'duration_s' => max(0, $segment['_end_timestamp'] - $segment['_start_timestamp']),
+            ];
+        },
+        array_filter(
+            $segments,
+            static fn (array $segment): bool => $segment['_end_timestamp'] > $segment['_start_timestamp']
+        )
+    ));
+}
+
 function optimizerRuntimeLogIsHouseholdMedianSample(array $event): bool
 {
     return ($event['event'] ?? null) === 'HOUR_CLOSED'
@@ -166,6 +271,8 @@ function optimizerRuntimeLogRead(
     $latestTimestamp = null;
     /** @var array<int, list<array{timestamp: int, value: float}>> $householdHistoryByHour */
     $householdHistoryByHour = array_fill(0, 24, []);
+    /** @var array<int, list<array{observed_at: DateTimeImmutable, schedule: string|int|float, min_power_w: ?float, max_power_w: ?float}>> $scheduleObservationsByHour */
+    $scheduleObservationsByHour = [];
 
     try {
         @flock($handle, LOCK_SH);
@@ -191,6 +298,29 @@ function optimizerRuntimeLogRead(
             }
 
             $hourStart = optimizerRuntimeLogHourStart($event, $timezone);
+            $eventType = (string) ($event['event'] ?? '');
+            if ($hourStart !== null && in_array($eventType, ['HOUR_OPENED', 'SAMPLE'], true)) {
+                $scheduleObservation = optimizerRuntimeLogScheduleObservation($event);
+                if ($scheduleObservation !== null) {
+                    $hourKey = $hourStart->getTimestamp();
+                    $scheduleObservationsByHour[$hourKey][] = [
+                        'observed_at' => $eventTime,
+                        ...$scheduleObservation,
+                    ];
+                }
+            }
+            if ($hourStart !== null && $eventType === 'HOUR_CLOSED') {
+                $hourEnd = optimizerRuntimeLogHourEnd($event, $timezone);
+                $hourKey = $hourStart->getTimestamp();
+                if ($hourEnd !== null) {
+                    $event['_schedule_segments'] = optimizerRuntimeLogScheduleSegments(
+                        $scheduleObservationsByHour[$hourKey] ?? [],
+                        $hourStart,
+                        $hourEnd
+                    );
+                }
+                unset($scheduleObservationsByHour[$hourKey]);
+            }
             if ($hourStart !== null && optimizerRuntimeLogIsHouseholdMedianSample($event)) {
                 $hour = (int) $hourStart->format('G');
                 $hourStartTimestamp = $hourStart->getTimestamp();
