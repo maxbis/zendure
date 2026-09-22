@@ -4362,6 +4362,21 @@ dialog#app-energy-summary-tooltip.is-overview {
     line-height: 1.4;
 }
 
+.app-energy-history__partial-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--gsd-warning-soft);
+    color: var(--gsd-warning);
+    font-size: 0.62rem;
+    vertical-align: middle;
+}
+
+.app-energy-history__partial-badge[hidden] {
+    display: none;
+}
+
 .app-energy-history__status {
     margin: 8px 0 0;
     padding: 7px 9px;

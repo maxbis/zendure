@@ -31,7 +31,8 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 ## Edge cases / failure modes
 
 - When a required price or meter reading is missing, then the affected grid total is unavailable (`—`).
-- When any elapsed hour lacks complete version 2 battery-flow attribution, then all daily battery-flow values and P&L are unavailable (`—`); the dialog explains the first affected hour and reason.
+- When some elapsed hours have complete version 2 battery-flow attribution and others do not, then the dialog shows the sums from complete hours as **partial**, with the number of covered and excluded hours plus the first affected hour and reason. These are not full-day P&L values.
+- When no elapsed hour has complete battery-flow attribution, then battery-flow values and P&L are unavailable (`—`).
 - When today is selected, future placeholder hours are excluded and totals cover elapsed hours through now.
 - When spot prices are negative, charging opportunity cost or export revenue can be negative.
 

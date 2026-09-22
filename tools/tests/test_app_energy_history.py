@@ -229,7 +229,7 @@ def test_battery_flow_totals_use_four_way_attribution_and_report_pnl() -> None:
     assert flow["pnlMilliEur"] == -240
 
 
-def test_incomplete_battery_hour_hides_day_pnl_instead_of_showing_partial_sum() -> None:
+def test_incomplete_battery_hour_keeps_covered_values_and_marks_day_partial() -> None:
     complete = _battery_flow(
         charge_grid=1000, charge_solar=0, discharge_home=500,
         discharge_export=0, charge_cost=300, home_savings=150,
@@ -244,8 +244,26 @@ def test_incomplete_battery_hour_hides_day_pnl_instead_of_showing_partial_sum() 
     payload = _build_payload([_row(0, battery_flow=complete), _row(1, battery_flow=incomplete)])
     flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
     assert flow["complete"] is False
+    assert flow["partial"] is True
+    assert flow["elapsedHours"] == 2
+    assert flow["valuedHours"] == 1
     assert flow["missingHours"] == ["2026-08-01 01:00"]
     assert flow["reasons"] == ["missing_home_load"]
+    assert flow["chargeGridWh"] == 1000
+    assert flow["pnlMilliEur"] == -150
+
+
+def test_battery_pnl_stays_unavailable_when_no_hour_can_be_valued() -> None:
+    incomplete = _battery_flow(
+        charge_grid=0, charge_solar=0, discharge_home=0,
+        discharge_export=0, charge_cost=0, home_savings=0,
+        export_revenue=0,
+    )
+    incomplete["battery_pnl_status"] = "missing_home_load"
+    flow = _build_payload([_row(0, battery_flow=incomplete)])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    assert flow["complete"] is False
+    assert flow["partial"] is False
+    assert flow["valuedHours"] == 0
     assert flow["chargeGridWh"] is None
     assert flow["pnlMilliEur"] is None
 

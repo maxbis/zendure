@@ -241,6 +241,9 @@ function appEnergyHistoryBuildPayload(
                 ],
                 'batteryFlow' => [
                     'complete' => true,
+                    'partial' => false,
+                    'elapsedHours' => 0,
+                    'valuedHours' => 0,
                     'missingHours' => [],
                     'reasons' => [],
                     'chargeGridWh' => 0,
@@ -302,6 +305,7 @@ function appEnergyHistoryBuildPayload(
         if ($batteryStatus === '') {
             $batteryStatus = 'unavailable';
         }
+        $days[$date]['batteryFlow']['elapsedHours']++;
         $batteryComplete = $batteryStatus === 'complete'
             && (int)($row['battery_pnl_method_version'] ?? 0) === 2
             && !in_array(null, $batteryValues, true)
@@ -319,6 +323,7 @@ function appEnergyHistoryBuildPayload(
             $days[$date]['batteryFlow']['reasons'][] = $batteryStatus === 'complete' ? 'unavailable' : $batteryStatus;
         } else {
             $flow =& $days[$date]['batteryFlow'];
+            $flow['valuedHours']++;
             $flow['chargeGridWh'] += (int)$batteryValues['battery_charge_grid_wh'];
             $flow['chargeSurplusWh'] += (int)$batteryValues['battery_charge_surplus_wh'];
             $flow['dischargeHomeWh'] += (int)$batteryValues['battery_discharge_home_wh'];
@@ -369,7 +374,8 @@ function appEnergyHistoryBuildPayload(
 
         $batteryFlow = $day['batteryFlow'];
         $batteryFlow['reasons'] = array_values(array_unique($batteryFlow['reasons']));
-        if (!$batteryFlow['complete']) {
+        $batteryFlow['partial'] = !$batteryFlow['complete'] && $batteryFlow['valuedHours'] > 0;
+        if (!$batteryFlow['complete'] && !$batteryFlow['partial']) {
             foreach ([
                 'chargeGridWh', 'chargeSurplusWh', 'dischargeHomeWh', 'dischargeExportWh',
                 'chargeGridMilliEur', 'chargeSurplusMilliEur', 'chargeCostMilliEur',

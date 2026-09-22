@@ -340,9 +340,13 @@
         });
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
+        content.querySelector('[data-role="energy-battery-pnl-label"]').textContent = detail.batteryFlow?.partial
+            ? "Battery P&L · partial"
+            : "Estimated battery P&L";
         const status = content.querySelector('[data-role="energy-battery-status"]');
         status.textContent = batteryFlowStatusMessage(detail.batteryFlow);
         status.hidden = status.textContent === "";
+        content.querySelector('[data-role="energy-battery-partial-badge"]').hidden = !detail.batteryFlow?.partial;
         return content;
     }
 
@@ -360,11 +364,16 @@
         };
         const reasons = [...new Set(flow?.reasons || [])].map((reason) => explanations[reason] || explanations.unavailable);
         const firstHour = flow?.missingHours?.[0]?.replace(" ", " · ");
+        if (flow?.partial) {
+            const covered = `${flow.valuedHours} of ${flow.elapsedHours} elapsed hours`;
+            return `Partial battery P&L includes ${covered}. Excluded ${flow.missingHours.length} hour${flow.missingHours.length === 1 ? "" : "s"}${firstHour ? `, starting at ${firstHour}` : ""}: ${reasons.join("; ") || explanations.unavailable}.`;
+        }
         return `Battery P&L unavailable because ${reasons.join("; ") || explanations.unavailable}${firstHour ? ` (${firstHour})` : ""}.`;
     }
 
     function summaryTooltipTitle(detail) {
-        return `${detail.label === "Net flow" ? "Energy costs" : detail.label} · ${formatDay(selectedDay, true)}`;
+        const day = selectedDay === localDateKey() ? "Today so far" : formatDay(selectedDay, true);
+        return `${detail.label === "Net flow" ? "Energy costs" : detail.label} · ${day}`;
     }
 
     function buildSummaryTooltipContent(detail) {
@@ -1080,7 +1089,8 @@
             batteryChargeCost: milliToEur(batteryFlow.chargeCostMilliEur),
             batteryHomeValue: milliToEur(batteryFlow.homeSavingsMilliEur),
             batteryExportValue: milliToEur(batteryFlow.exportRevenueMilliEur),
-            batteryDischargeValue: batteryFlow.complete
+            batteryDischargeValue: finiteNumber(batteryFlow.homeSavingsMilliEur) !== null
+                && finiteNumber(batteryFlow.exportRevenueMilliEur) !== null
                 ? milliToEur(batteryFlow.homeSavingsMilliEur + batteryFlow.exportRevenueMilliEur)
                 : null,
             batteryBenefit: milliToEur(batteryFlow.pnlMilliEur),
