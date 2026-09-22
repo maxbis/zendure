@@ -597,7 +597,7 @@ $appConfig = [
                 </div>
 
                 <template data-role="energy-money-overview-template">
-                    <div class="app-energy-history__money-overview" role="group" aria-label="Estimated electricity costs and battery benefit">
+                    <div class="app-energy-history__money-overview" role="group" aria-label="Grid cost and battery profit and loss">
                         <section class="app-energy-history__money-card app-energy-history__money-card--grid" aria-labelledby="energy-grid-cost-title">
                             <h3 id="energy-grid-cost-title">Grid cost</h3>
                             <dl>
@@ -607,15 +607,24 @@ $appConfig = [
                             </dl>
                         </section>
                         <section class="app-energy-history__money-card app-energy-history__money-card--battery" aria-labelledby="energy-battery-benefit-title">
-                            <h3 id="energy-battery-benefit-title">Battery</h3>
+                            <h3 id="energy-battery-benefit-title">Battery P&amp;L</h3>
+                            <h4>Charging costs</h4>
                             <dl>
-                                <div><dt>Charged <span>· spot price</span></dt><dd data-role="energy-battery-charge-cost">—</dd></div>
-                                <div><dt>Discharged <span>· consumer price</span></dt><dd data-role="energy-battery-discharge-value">—</dd></div>
-                                <div class="app-energy-history__money-total"><dt>Estimated battery benefit</dt><dd data-role="energy-battery-benefit">—</dd></div>
+                                <div class="app-energy-history__money-flow"><dt>From grid <span>· consumer price</span></dt><dd><small data-role="energy-battery-charge-grid-wh">—</small><strong data-role="energy-battery-charge-grid-cost">—</strong></dd></div>
+                                <div class="app-energy-history__money-flow"><dt>From surplus solar <span>· spot price</span></dt><dd><small data-role="energy-battery-charge-solar-wh">—</small><strong data-role="energy-battery-charge-solar-cost">—</strong></dd></div>
+                                <div class="app-energy-history__money-subtotal"><dt>Total charging cost</dt><dd data-role="energy-battery-charge-cost">—</dd></div>
                             </dl>
+                            <h4>Discharge value</h4>
+                            <dl>
+                                <div class="app-energy-history__money-flow"><dt>Used at home <span>· consumer price</span></dt><dd><small data-role="energy-battery-discharge-home-wh">—</small><strong data-role="energy-battery-discharge-home-value">—</strong></dd></div>
+                                <div class="app-energy-history__money-flow"><dt>Exported <span>· spot price</span></dt><dd><small data-role="energy-battery-discharge-export-wh">—</small><strong data-role="energy-battery-discharge-export-value">—</strong></dd></div>
+                                <div class="app-energy-history__money-subtotal"><dt>Total discharge value</dt><dd data-role="energy-battery-discharge-value">—</dd></div>
+                                <div class="app-energy-history__money-total"><dt>Estimated battery P&amp;L</dt><dd data-role="energy-battery-benefit">—</dd></div>
+                            </dl>
+                            <p class="app-energy-history__battery-status" data-role="energy-battery-status" hidden></p>
                         </section>
                     </div>
-                    <p class="app-energy-history__money-note">Battery benefit is indicative and already reflected in grid flows. Grid cost excludes fixed fees.</p>
+                    <p class="app-energy-history__money-note">Battery flows are estimated. Battery P&amp;L is already reflected in grid flows; do not subtract it from net grid cost. Grid cost excludes fixed fees.</p>
                 </template>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>

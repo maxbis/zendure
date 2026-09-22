@@ -55,7 +55,12 @@ function appEnergyHistoryFetchRows(PDO $pdo, string $startDate, string $endDate)
     $stmt = $pdo->prepare(
         'SELECT local_date, local_hour, charged_wh, discharged_wh, grid_from_wh, grid_to_wh,
                 battery_pct_start, battery_pct_end,
-                consumer_eur_per_kwh, spot_eur_per_kwh
+                consumer_eur_per_kwh, spot_eur_per_kwh,
+                battery_charge_grid_wh, battery_charge_surplus_wh,
+                battery_discharge_home_wh, battery_discharge_export_wh,
+                battery_charge_cost_milli_eur, battery_home_savings_milli_eur,
+                battery_export_revenue_milli_eur, battery_flow_pnl_milli_eur,
+                battery_pnl_status, battery_pnl_method_version
          FROM hourly_report_inputs
          WHERE local_date BETWEEN :start_date AND :end_date
          ORDER BY local_date ASC, local_hour ASC'
@@ -125,6 +130,16 @@ function appEnergyHistoryMapLiveReportRows(array $report, array $priceRows, stri
             'battery_pct_end' => $hourRow['battery_pct_end'] ?? null,
             'consumer_eur_per_kwh' => $price['consumer_eur_per_kwh'] ?? null,
             'spot_eur_per_kwh' => $price['spot_eur_per_kwh'] ?? null,
+            'battery_charge_grid_wh' => $hourRow['battery_charge_grid_wh'] ?? null,
+            'battery_charge_surplus_wh' => $hourRow['battery_charge_surplus_wh'] ?? null,
+            'battery_discharge_home_wh' => $hourRow['battery_discharge_home_wh'] ?? null,
+            'battery_discharge_export_wh' => $hourRow['battery_discharge_export_wh'] ?? null,
+            'battery_charge_cost_milli_eur' => $hourRow['battery_charge_cost_milli_eur'] ?? null,
+            'battery_home_savings_milli_eur' => $hourRow['battery_home_savings_milli_eur'] ?? null,
+            'battery_export_revenue_milli_eur' => $hourRow['battery_export_revenue_milli_eur'] ?? null,
+            'battery_flow_pnl_milli_eur' => $hourRow['battery_flow_pnl_milli_eur'] ?? null,
+            'battery_pnl_status' => $hourRow['battery_pnl_status'] ?? null,
+            'battery_pnl_method_version' => $hourRow['battery_pnl_method_version'] ?? null,
         ];
     }
     return $mapped;
@@ -224,6 +239,21 @@ function appEnergyHistoryBuildPayload(
                     'import' => appEnergyHistoryEmptyMoneyMetric(),
                     'export' => appEnergyHistoryEmptyMoneyMetric(),
                 ],
+                'batteryFlow' => [
+                    'complete' => true,
+                    'missingHours' => [],
+                    'reasons' => [],
+                    'chargeGridWh' => 0,
+                    'chargeSurplusWh' => 0,
+                    'dischargeHomeWh' => 0,
+                    'dischargeExportWh' => 0,
+                    'chargeGridMilliEur' => 0,
+                    'chargeSurplusMilliEur' => 0,
+                    'chargeCostMilliEur' => 0,
+                    'homeSavingsMilliEur' => 0,
+                    'exportRevenueMilliEur' => 0,
+                    'pnlMilliEur' => 0,
+                ],
             ];
         }
 
@@ -254,6 +284,54 @@ function appEnergyHistoryBuildPayload(
             if ($energyWh > 0) {
                 $days[$date]['gridMoney'][$direction]['sum'] += ($energyWh / 1000.0) * $price;
             }
+        }
+
+        $batteryWhFields = [
+            'battery_charge_grid_wh', 'battery_charge_surplus_wh',
+            'battery_discharge_home_wh', 'battery_discharge_export_wh',
+        ];
+        $batteryMoneyFields = [
+            'battery_charge_cost_milli_eur', 'battery_home_savings_milli_eur',
+            'battery_export_revenue_milli_eur', 'battery_flow_pnl_milli_eur',
+        ];
+        $batteryValues = [];
+        foreach (array_merge($batteryWhFields, $batteryMoneyFields) as $field) {
+            $batteryValues[$field] = appEnergyHistoryFloat($row[$field] ?? null);
+        }
+        $batteryStatus = (string)($row['battery_pnl_status'] ?? 'unavailable');
+        if ($batteryStatus === '') {
+            $batteryStatus = 'unavailable';
+        }
+        $batteryComplete = $batteryStatus === 'complete'
+            && (int)($row['battery_pnl_method_version'] ?? 0) === 2
+            && !in_array(null, $batteryValues, true)
+            && (
+                $batteryValues['battery_charge_grid_wh'] + $batteryValues['battery_discharge_home_wh'] === 0.0
+                || $consumerPrice !== null
+            )
+            && (
+                $batteryValues['battery_charge_surplus_wh'] + $batteryValues['battery_discharge_export_wh'] === 0.0
+                || $spotPrice !== null
+            );
+        if (!$batteryComplete) {
+            $days[$date]['batteryFlow']['complete'] = false;
+            $days[$date]['batteryFlow']['missingHours'][] = $hourLabel;
+            $days[$date]['batteryFlow']['reasons'][] = $batteryStatus === 'complete' ? 'unavailable' : $batteryStatus;
+        } else {
+            $flow =& $days[$date]['batteryFlow'];
+            $flow['chargeGridWh'] += (int)$batteryValues['battery_charge_grid_wh'];
+            $flow['chargeSurplusWh'] += (int)$batteryValues['battery_charge_surplus_wh'];
+            $flow['dischargeHomeWh'] += (int)$batteryValues['battery_discharge_home_wh'];
+            $flow['dischargeExportWh'] += (int)$batteryValues['battery_discharge_export_wh'];
+            $gridChargeMilliEur = (int)round($batteryValues['battery_charge_grid_wh'] * ($consumerPrice ?? 0.0));
+            $chargeMilliEur = (int)$batteryValues['battery_charge_cost_milli_eur'];
+            $flow['chargeGridMilliEur'] += $gridChargeMilliEur;
+            $flow['chargeSurplusMilliEur'] += $chargeMilliEur - $gridChargeMilliEur;
+            $flow['chargeCostMilliEur'] += $chargeMilliEur;
+            $flow['homeSavingsMilliEur'] += (int)$batteryValues['battery_home_savings_milli_eur'];
+            $flow['exportRevenueMilliEur'] += (int)$batteryValues['battery_export_revenue_milli_eur'];
+            $flow['pnlMilliEur'] += (int)$batteryValues['battery_flow_pnl_milli_eur'];
+            unset($flow);
         }
 
         $whPerHour[] = [
@@ -289,6 +367,18 @@ function appEnergyHistoryBuildPayload(
             ];
         }
 
+        $batteryFlow = $day['batteryFlow'];
+        $batteryFlow['reasons'] = array_values(array_unique($batteryFlow['reasons']));
+        if (!$batteryFlow['complete']) {
+            foreach ([
+                'chargeGridWh', 'chargeSurplusWh', 'dischargeHomeWh', 'dischargeExportWh',
+                'chargeGridMilliEur', 'chargeSurplusMilliEur', 'chargeCostMilliEur',
+                'homeSavingsMilliEur', 'exportRevenueMilliEur', 'pnlMilliEur',
+            ] as $field) {
+                $batteryFlow[$field] = null;
+            }
+        }
+
         $whPerDay[$date] = [
             'pos' => round($day['chargedWh'], 2),
             'neg' => round(-$day['dischargedWh'], 2),
@@ -297,6 +387,7 @@ function appEnergyHistoryBuildPayload(
                 'import' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['import']),
                 'export' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['export']),
             ],
+            'batteryFlowTotals' => $batteryFlow,
         ];
     }
     krsort($whPerDay, SORT_STRING);

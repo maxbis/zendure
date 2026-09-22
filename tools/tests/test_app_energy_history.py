@@ -66,6 +66,7 @@ def _row(
     spot: float | None = 0.1,
     grid_from_wh: float | None = 0.0,
     grid_to_wh: float | None = 0.0,
+    battery_flow: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "local_date": "2026-08-01",
@@ -78,6 +79,31 @@ def _row(
         "battery_pct_end": 55,
         "consumer_eur_per_kwh": consumer,
         "spot_eur_per_kwh": spot,
+        **(battery_flow or {}),
+    }
+
+
+def _battery_flow(
+    *,
+    charge_grid: int,
+    charge_solar: int,
+    discharge_home: int,
+    discharge_export: int,
+    charge_cost: int,
+    home_savings: int,
+    export_revenue: int,
+) -> dict[str, object]:
+    return {
+        "battery_charge_grid_wh": charge_grid,
+        "battery_charge_surplus_wh": charge_solar,
+        "battery_discharge_home_wh": discharge_home,
+        "battery_discharge_export_wh": discharge_export,
+        "battery_charge_cost_milli_eur": charge_cost,
+        "battery_home_savings_milli_eur": home_savings,
+        "battery_export_revenue_milli_eur": export_revenue,
+        "battery_flow_pnl_milli_eur": home_savings + export_revenue - charge_cost,
+        "battery_pnl_status": "complete",
+        "battery_pnl_method_version": 2,
     }
 
 
@@ -174,6 +200,56 @@ def test_grid_cost_is_unavailable_when_meter_or_required_price_is_missing() -> N
     assert grid["export"]["missingHours"] == ["2026-08-01 01:00"]
 
 
+def test_battery_flow_totals_use_four_way_attribution_and_report_pnl() -> None:
+    payload = _build_payload(
+        [
+            _row(0, consumer=0.30, spot=0.10, battery_flow=_battery_flow(
+                charge_grid=1000, charge_solar=500, discharge_home=400,
+                discharge_export=100, charge_cost=350, home_savings=120,
+                export_revenue=10,
+            )),
+            _row(1, consumer=0.20, spot=0.15, battery_flow=_battery_flow(
+                charge_grid=0, charge_solar=1000, discharge_home=500,
+                discharge_export=200, charge_cost=150, home_savings=100,
+                export_revenue=30,
+            )),
+        ]
+    )
+    flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    assert flow["complete"] is True
+    assert flow["chargeGridWh"] == 1000
+    assert flow["chargeSurplusWh"] == 1500
+    assert flow["dischargeHomeWh"] == 900
+    assert flow["dischargeExportWh"] == 300
+    assert flow["chargeGridMilliEur"] == 300
+    assert flow["chargeSurplusMilliEur"] == 200
+    assert flow["chargeCostMilliEur"] == 500
+    assert flow["homeSavingsMilliEur"] == 220
+    assert flow["exportRevenueMilliEur"] == 40
+    assert flow["pnlMilliEur"] == -240
+
+
+def test_incomplete_battery_hour_hides_day_pnl_instead_of_showing_partial_sum() -> None:
+    complete = _battery_flow(
+        charge_grid=1000, charge_solar=0, discharge_home=500,
+        discharge_export=0, charge_cost=300, home_savings=150,
+        export_revenue=0,
+    )
+    incomplete = _battery_flow(
+        charge_grid=0, charge_solar=0, discharge_home=0,
+        discharge_export=0, charge_cost=0, home_savings=0,
+        export_revenue=0,
+    )
+    incomplete["battery_pnl_status"] = "missing_home_load"
+    payload = _build_payload([_row(0, battery_flow=complete), _row(1, battery_flow=incomplete)])
+    flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    assert flow["complete"] is False
+    assert flow["missingHours"] == ["2026-08-01 01:00"]
+    assert flow["reasons"] == ["missing_home_load"]
+    assert flow["chargeGridWh"] is None
+    assert flow["pnlMilliEur"] is None
+
+
 def test_today_grid_cost_ignores_future_placeholder_but_not_elapsed_missing_data() -> None:
     rows = [
         _row(21, grid_from_wh=1000, grid_to_wh=100, consumer=0.30, spot=0.10),
@@ -207,6 +283,11 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
                     "battery_pct_start": 32,
                     "battery_pct_end": 40,
                     "price_eur_per_kwh": 9.99,
+                    **_battery_flow(
+                        charge_grid=500, charge_solar=225, discharge_home=100,
+                        discharge_export=10, charge_cost=167, home_savings=28,
+                        export_revenue=1,
+                    ),
                 }
             ]
         },
@@ -231,6 +312,11 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
             "battery_pct_end": 40,
             "consumer_eur_per_kwh": 0.28,
             "spot_eur_per_kwh": 0.12,
+            **_battery_flow(
+                charge_grid=500, charge_solar=225, discharge_home=100,
+                discharge_export=10, charge_cost=167, home_savings=28,
+                export_revenue=1,
+            ),
         }
     ]
 
@@ -251,13 +337,11 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
         assert role in energy_js
 
     assert 'label: "Net flow"' in energy_js
-    assert "discharged.eur - charged.eur" in energy_js
     assert 'data-role="energy-money-overview-template"' in app_index
     assert "content.append(elements.moneyOverviewTemplate.content.cloneNode(true))" in energy_js
     assert 'trigger === elements.pnlSummary) return;' in energy_js
     assert 'detail.label === "Net flow" ? buildMoneyOverview(detail)' in energy_js
-    assert "indicativeDischarge.eur - indicativeCharge.eur" in energy_js
-    assert "batteryBenefit: money.indicative.pnl.eur" in energy_js
+    assert "batteryBenefit: milliToEur(batteryFlow.pnlMilliEur)" in energy_js
     assert "setEnergySummaryValue(elements.charged, totals.charged, true)" in energy_js
     assert "setEnergySummaryValue(elements.discharged, -totals.discharged, true)" in energy_js
     assert "formatEnergy(row.wh, true)" in energy_js
@@ -265,6 +349,8 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert "signed: false" not in energy_js
 
     helper = HELPER_FILE.read_text(encoding="utf-8")
+    assert "battery_charge_grid_wh" in helper
+    assert "battery_pnl_method_version" in helper
     assert "'pnl' =>" in helper
     assert "dailyReportGenerateLive($today)" in endpoint
     assert "appEnergyHistoryFetchPriceRows($pdo, $today)" in endpoint

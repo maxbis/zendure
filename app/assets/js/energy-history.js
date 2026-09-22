@@ -156,6 +156,12 @@
         return number < 0 ? `−${formatMoney(-number)}` : formatMoney(number);
     }
 
+    function formatFlowKwh(wh) {
+        const number = finiteNumber(wh);
+        if (number === null) return "—";
+        return `${new Intl.NumberFormat([], { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(number / 1000)} kWh`;
+    }
+
     function setMoneyValue(element, value, signed = false) {
         element.textContent = signed ? formatMoney(value, true) : formatCost(value);
         element.dataset.sign = value === null ? "missing" : value < 0 ? "negative" : value > 0 ? "positive" : "zero";
@@ -313,16 +319,52 @@
             ["energy-grid-import-cost", detail.gridImportCost],
             ["energy-grid-export-value", detail.gridExportValue],
             ["energy-grid-net-cost", detail.gridNetCost],
+            ["energy-battery-charge-grid-cost", detail.batteryChargeGridCost],
+            ["energy-battery-charge-solar-cost", detail.batteryChargeSolarCost],
             ["energy-battery-charge-cost", detail.batteryChargeCost],
+            ["energy-battery-discharge-home-value", detail.batteryHomeValue],
+            ["energy-battery-discharge-export-value", detail.batteryExportValue],
             ["energy-battery-discharge-value", detail.batteryDischargeValue],
             ["energy-battery-benefit", detail.batteryBenefit, true]
         ];
         values.forEach(([role, value, signed]) => {
             setMoneyValue(content.querySelector(`[data-role="${role}"]`), value, signed);
         });
+        [
+            ["energy-battery-charge-grid-wh", detail.batteryChargeGridWh],
+            ["energy-battery-charge-solar-wh", detail.batteryChargeSolarWh],
+            ["energy-battery-discharge-home-wh", detail.batteryDischargeHomeWh],
+            ["energy-battery-discharge-export-wh", detail.batteryDischargeExportWh]
+        ].forEach(([role, wh]) => {
+            content.querySelector(`[data-role="${role}"]`).textContent = formatFlowKwh(wh);
+        });
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
+        const status = content.querySelector('[data-role="energy-battery-status"]');
+        status.textContent = batteryFlowStatusMessage(detail.batteryFlow);
+        status.hidden = status.textContent === "";
         return content;
+    }
+
+    function batteryFlowStatusMessage(flow) {
+        if (flow?.complete === true) return "";
+        const explanations = {
+            missing_boundary_sample: "a battery reading is missing",
+            missing_grid_counters: "grid meter readings are missing",
+            missing_home_load: "grid or solar production data is missing",
+            energy_total_mismatch: "battery energy readings do not agree",
+            missing_consumer_price: "a consumer price is missing",
+            missing_spot_price: "a spot price is missing",
+            not_calculated: "the calculation is not available",
+            unavailable: "the calculation is not available"
+        };
+        const reasons = [...new Set(flow?.reasons || [])].map((reason) => explanations[reason] || explanations.unavailable);
+        const firstHour = flow?.missingHours?.[0]?.replace(" ", " · ");
+        return `Battery P&L unavailable because ${reasons.join("; ") || explanations.unavailable}${firstHour ? ` (${firstHour})` : ""}.`;
+    }
+
+    function summaryTooltipTitle(detail) {
+        return `${detail.label === "Net flow" ? "Energy costs" : detail.label} · ${formatDay(selectedDay, true)}`;
     }
 
     function buildSummaryTooltipContent(detail) {
@@ -333,7 +375,7 @@
         if (!detail || !trigger || !summaryTooltip.open) return;
 
         const title = summaryTooltip.querySelector(".app-energy-summary-tooltip__title");
-        if (title) title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
+        if (title) title.textContent = summaryTooltipTitle(detail);
 
         summaryTooltip.querySelectorAll(".app-energy-summary-tooltip__day-nav").forEach((button) => {
             const direction = Number(button.dataset.direction);
@@ -392,7 +434,7 @@
         const title = document.createElement("strong");
         title.id = "app-energy-summary-tooltip-title";
         title.className = "app-energy-summary-tooltip__title";
-        title.textContent = `${detail.label} · ${formatDay(selectedDay, true)}`;
+        title.textContent = summaryTooltipTitle(detail);
         const close = document.createElement("button");
         close.type = "button";
         close.className = "gsd-icon-btn app-energy-summary-tooltip__close";
@@ -495,7 +537,7 @@
         summaryTooltipDetails.set(trigger, detail);
         const energy = formatEnergy(detail.energy, detail.signed);
         if (detail.label === "Net flow") {
-            trigger.setAttribute("aria-label", `Net flow ${energy}. Show grid cost and battery benefit.`);
+            trigger.setAttribute("aria-label", `Net flow ${energy}. Show energy costs and battery P&L.`);
             return;
         }
         const consumer = formatMoney(detail.consumer, detail.signed);
@@ -950,29 +992,7 @@
             const discharged = totals[priceType].discharged;
             charged.eur = charged.complete ? charged.eur : null;
             discharged.eur = discharged.complete ? discharged.eur : null;
-            // PnL: discharge value minus charge cost (negative spot charge is a benefit).
-            totals[priceType].pnl = {
-                eur: charged.complete && discharged.complete ? discharged.eur - charged.eur : null,
-                complete: charged.complete && discharged.complete,
-                missingHours: [...new Set([...charged.missingHours, ...discharged.missingHours])]
-            };
         });
-
-        const indicativeCharge = totals.spot.charged;
-        const indicativeDischarge = totals.consumer.discharged;
-        totals.indicative = {
-            pnl: {
-                // Indicative value: avoided consumer cost on discharge minus spot cost on charge.
-                eur: indicativeCharge.complete && indicativeDischarge.complete
-                    ? indicativeDischarge.eur - indicativeCharge.eur
-                    : null,
-                complete: indicativeCharge.complete && indicativeDischarge.complete,
-                missingHours: [...new Set([
-                    ...indicativeCharge.missingHours,
-                    ...indicativeDischarge.missingHours
-                ])]
-            }
-        };
 
         return totals;
     }
@@ -1006,8 +1026,10 @@
 
     function priceWarning(totals, grid) {
         const missingHours = [...new Set([
-            ...totals.consumer.pnl.missingHours,
-            ...totals.spot.pnl.missingHours,
+            ...totals.consumer.charged.missingHours,
+            ...totals.consumer.discharged.missingHours,
+            ...totals.spot.charged.missingHours,
+            ...totals.spot.discharged.missingHours,
             ...grid.import.missingHours,
             ...grid.export.missingHours
         ])];
@@ -1021,6 +1043,8 @@
         const totals = totalsForDays(days);
         const money = moneyTotalsForDays(days);
         const grid = gridMoneyTotalsForDays(days);
+        const batteryFlow = payload?.whPerDay?.[days[0]]?.batteryFlowTotals || { complete: false, reasons: ["unavailable"], missingHours: [] };
+        const milliToEur = (value) => finiteNumber(value) === null ? null : finiteNumber(value) / 1000;
         const energyNet = totals.charged - totals.discharged;
         setEnergySummaryValue(elements.charged, totals.charged, true);
         setEnergySummaryValue(elements.discharged, -totals.discharged, true);
@@ -1046,9 +1070,20 @@
             gridImportCost: grid.import.eur,
             gridExportValue: grid.export.eur,
             gridNetCost: grid.net,
-            batteryChargeCost: money.spot.charged.eur,
-            batteryDischargeValue: money.consumer.discharged.eur,
-            batteryBenefit: money.indicative.pnl.eur,
+            batteryFlow,
+            batteryChargeGridWh: batteryFlow.chargeGridWh,
+            batteryChargeSolarWh: batteryFlow.chargeSurplusWh,
+            batteryDischargeHomeWh: batteryFlow.dischargeHomeWh,
+            batteryDischargeExportWh: batteryFlow.dischargeExportWh,
+            batteryChargeGridCost: milliToEur(batteryFlow.chargeGridMilliEur),
+            batteryChargeSolarCost: milliToEur(batteryFlow.chargeSurplusMilliEur),
+            batteryChargeCost: milliToEur(batteryFlow.chargeCostMilliEur),
+            batteryHomeValue: milliToEur(batteryFlow.homeSavingsMilliEur),
+            batteryExportValue: milliToEur(batteryFlow.exportRevenueMilliEur),
+            batteryDischargeValue: batteryFlow.complete
+                ? milliToEur(batteryFlow.homeSavingsMilliEur + batteryFlow.exportRevenueMilliEur)
+                : null,
+            batteryBenefit: milliToEur(batteryFlow.pnlMilliEur),
             signed: true
         });
         return priceWarning(money, grid);
