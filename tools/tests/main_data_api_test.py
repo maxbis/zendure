@@ -165,6 +165,7 @@ def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]
         "currentTime",
         "resolved",
         "entries",
+        "runtimeHistory",
         "forecast",
         "forecastAsOf",
         "forecastBatteryPercent",
@@ -195,6 +196,8 @@ def validate_schedule_resolved(result: Dict[str, Any]) -> Tuple[bool, List[str]]
             missing = required_forecast_fields.difference(hour)
             if missing:
                 failures.append(f"Expected forecast['{forecast_key}'] fields: {sorted(missing)}")
+    if "runtimeHistory" in body and not isinstance(body["runtimeHistory"], dict):
+        failures.append("Expected 'runtimeHistory' to be an object")
     if "entries" in body and not isinstance(body["entries"], list):
         failures.append("Expected 'entries' to be a list")
     elif isinstance(body.get("entries"), list):

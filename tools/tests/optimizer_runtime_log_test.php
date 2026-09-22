@@ -107,6 +107,16 @@ try {
     runtimeLogTestAssert($closedHour['_schedule_segments'][1]['schedule'] === 'netzero+', 'The changed schedule should be retained.');
     runtimeLogTestAssert($closedHour['_schedule_segments'][1]['duration_s'] === 1740, 'The final schedule should run to the hour boundary.');
 
+    $scheduleHistory = optimizerRuntimeLogScheduleHistoryForDate($path, $timezone, '20260916');
+    runtimeLogTestAssert(count($scheduleHistory) === 1, 'Only completed hours with schedule observations should be returned.');
+    runtimeLogTestAssert(isset($scheduleHistory['202609160800']), 'History should use the schedule-compatible local hour key.');
+    runtimeLogTestAssert($scheduleHistory['202609160800']['status'] === 'unknown', 'The closure status should be retained.');
+    runtimeLogTestAssert(count($scheduleHistory['202609160800']['segments']) === 2, 'The API history should retain every applied schedule period.');
+    runtimeLogTestAssert($scheduleHistory['202609160800']['segments'][0]['schedule'] === 'netzero-', 'The first historical schedule should remain chronological.');
+    runtimeLogTestAssert($scheduleHistory['202609160800']['segments'][1]['schedule'] === 'netzero+', 'The changed historical schedule should remain chronological.');
+    runtimeLogTestAssert(optimizerRuntimeLogScheduleHistoryForDate($path, $timezone, 'invalid') === [], 'Invalid dates should return no history.');
+    runtimeLogTestAssert(optimizerRuntimeLogScheduleHistoryForDate($path . '.missing', $timezone, '20260916') === [], 'A missing journal should return no history.');
+
     $medianEvent = $all['events'][0];
     runtimeLogTestAssert($medianEvent['_household_rolling_median_samples'] === 7, 'The current hour should be excluded from its rolling median.');
     runtimeLogTestAssert($medianEvent['_household_rolling_median_wh'] === 120.0, 'The rolling median should resist the 900 Wh outlier.');

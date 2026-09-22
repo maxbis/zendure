@@ -85,6 +85,7 @@
         prices: { today: null, tomorrow: null },
         dates: { today: null, tomorrow: null },
         schedules: { today: [], tomorrow: [] },
+        runtimeHistory: { today: {}, tomorrow: {} },
         entries: { today: [], tomorrow: [] },
         ruleColors: {},
         batteryForecast: {},
@@ -1091,10 +1092,40 @@
         return section;
     }
 
-    function showPriceTooltip({ date, hour, slot, action, limited }, trigger, anchor) {
+    function tooltipRuntimeHistory(history) {
+        const section = document.createElement("div");
+        section.className = "app-schedule-tooltip__history";
+        section.appendChild(tooltipSectionLabel("Optimizer runtime history"));
+        history.segments.forEach((segment) => {
+            const slot = runtimeSegmentSlot(segment);
+            const action = actionFor(slot);
+            const item = document.createElement("div");
+            item.className = "app-schedule-tooltip__history-item";
+            const time = document.createElement("span");
+            time.className = "app-schedule-tooltip__history-time";
+            time.textContent = `${formatRuntimeTime(segment.start)}–${formatRuntimeTime(segment.end)}`;
+            item.append(time, tooltipActionRow(slot, action));
+            if (hasPowerLimits(slot)) item.appendChild(tooltipLimits(slot));
+            section.appendChild(item);
+        });
+        const source = document.createElement("p");
+        source.className = "app-schedule-tooltip__history-source";
+        source.textContent = "Source: optimizer runtime journal";
+        section.appendChild(source);
+        return section;
+    }
+
+    function tooltipHistoryUnavailable() {
+        const warning = document.createElement("p");
+        warning.className = "app-schedule-tooltip__history-unavailable";
+        warning.textContent = "Historical schedule unavailable. The action below is the current rule result and may differ from what ran during this hour.";
+        return warning;
+    }
+
+    function showPriceTooltip({ date, hour, slot, action, limited, history = null, historyUnavailable = false }, trigger, anchor) {
         hidePriceTooltip();
         activeTooltipTrigger = trigger;
-        activeScheduleTooltip = { detail: { date, hour, slot, action, limited }, trigger, anchor };
+        activeScheduleTooltip = { detail: { date, hour, slot, action, limited, history, historyUnavailable }, trigger, anchor };
         trigger.setAttribute("aria-describedby", priceTooltip.id);
         if (trigger.matches(".app-price-hour__action")) trigger.setAttribute("aria-expanded", "true");
 
@@ -1117,17 +1148,22 @@
         heading.append(title, createTooltipCloseButton());
         header.appendChild(heading);
 
-        const runtimeConditions = formatRuntimeConditions(slot);
+        const runtimeConditions = history ? "" : formatRuntimeConditions(slot);
         const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
-        const rule = createTooltipRule(slot, ruleColor);
+        const rule = history ? null : createTooltipRule(slot, ruleColor);
         if (rule) header.appendChild(rule);
         priceTooltip.setAttribute("aria-labelledby", time.id);
 
         const content = document.createElement("div");
         content.className = "app-schedule-tooltip__content";
-        const targetPlanning = tooltipTargetPlanning(slot);
-        if (targetPlanning) content.appendChild(targetPlanning);
-        if (runtimeConditions) {
+        if (history) {
+            content.appendChild(tooltipRuntimeHistory(history));
+        } else {
+            if (historyUnavailable) content.appendChild(tooltipHistoryUnavailable());
+            const targetPlanning = tooltipTargetPlanning(slot);
+            if (targetPlanning) content.appendChild(targetPlanning);
+        }
+        if (!history && runtimeConditions) {
             const fallbackValue = Object.prototype.hasOwnProperty.call(slot, "fallback_value") ? slot.fallback_value : 0;
             const fallbackSlot = { value: fallbackValue };
             const fallbackAction = runtimeFallbackAction(slot);
@@ -1150,7 +1186,7 @@
                 otherwise.classList.add("app-schedule-tooltip__section-label--otherwise");
                 content.append(otherwise, tooltipActionRow(fallbackSlot, fallbackAction));
             }
-        } else {
+        } else if (!history) {
             content.appendChild(tooltipActionRow(slot, action));
             if (limited) content.appendChild(tooltipLimits(slot));
         }
@@ -1344,6 +1380,60 @@
         use.setAttribute("href", `../themes/graphite-signal-dark/assets/icons/sprite.svg#${icon}`);
         svg.appendChild(use);
         element.replaceChildren(svg);
+    }
+
+    function runtimeSegmentSlot(segment) {
+        return {
+            value: segment?.schedule,
+            min_power: segment?.min_power_w ?? null,
+            max_power: segment?.max_power_w ?? null,
+            source: "optimizer_runtime"
+        };
+    }
+
+    function runtimeHistoryForHour(day, hour, currentHour) {
+        if (isSimulation || day.key !== "today" || hour >= currentHour) return null;
+        const entry = day.runtimeHistory?.[`${day.date}${pad(hour)}00`];
+        return entry && Array.isArray(entry.segments) && entry.segments.length ? entry : null;
+    }
+
+    function formatRuntimeTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "—";
+        return new Intl.DateTimeFormat(undefined, {
+            timeZone: config.solarLocation?.timezone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23"
+        }).format(date);
+    }
+
+    function runtimeHistoryDescription(history) {
+        return history.segments.map((segment) => {
+            const slot = runtimeSegmentSlot(segment);
+            const action = actionFor(slot);
+            const limits = hasPowerLimits(slot) ? `, limited to ${formatPowerLimits(slot)}` : "";
+            return `${action.label}${limits} from ${formatRuntimeTime(segment.start)} to ${formatRuntimeTime(segment.end)}`;
+        }).join("; ");
+    }
+
+    function setRuntimeHistoryBadgeContent(element, history) {
+        const totalDuration = Math.max(1, history.segments.reduce(
+            (total, segment) => total + Math.max(0, Number(segment.duration_s) || 0),
+            0
+        ));
+        const segments = history.segments.map((segment) => {
+            const slot = runtimeSegmentSlot(segment);
+            const action = actionFor(slot);
+            const item = document.createElement("span");
+            item.className = "app-price-hour__history-segment";
+            item.dataset.tone = actionTone(action);
+            item.style.setProperty("--app-history-share", String(Math.max(0, Number(segment.duration_s) || 0) / totalDuration));
+            item.setAttribute("aria-hidden", "true");
+            setActionBadgeContent(item, action.type === "netzero" ? { value: slot.value } : slot, action);
+            return item;
+        });
+        element.replaceChildren(...segments);
     }
 
     function spotPrice(consumerPrice) {
@@ -1628,7 +1718,15 @@
 
             for (let hour = 0; hour < 24; hour += 1) {
                 const price = day.values[hour];
-                const slot = day.slots[hour];
+                const resolvedSlot = day.slots[hour];
+                const history = runtimeHistoryForHour(day, hour, currentHour);
+                const historyUnavailable = !isSimulation && day.key === "today" && hour < currentHour && !history;
+                const dominantSegment = history
+                    ? history.segments.reduce((largest, segment) =>
+                        (Number(segment.duration_s) || 0) > (Number(largest.duration_s) || 0) ? segment : largest
+                    )
+                    : null;
+                const slot = dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot;
                 const action = actionFor(slot);
                 const limited = hasPowerLimits(slot);
                 const position = Number.isFinite(price) ? (price - minimum) / span : 0;
@@ -1685,10 +1783,12 @@
             actionElement.dataset.action = action.type;
             actionElement.dataset.tone = actionTone(action);
             actionElement.dataset.limited = limited ? "true" : "false";
-            const hasRuntimeRule = Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length > 0;
-            const ruleColor = normalizeRuleColor(state.ruleColors[String(slot?.rule_index ?? "")]);
+            actionElement.dataset.history = history ? "true" : "false";
+            actionElement.dataset.historyUnavailable = historyUnavailable ? "true" : "false";
+            const hasRuntimeRule = !history && Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length > 0;
+            const ruleColor = normalizeRuleColor(state.ruleColors[String(resolvedSlot?.rule_index ?? "")]);
             let ruleIndicator = null;
-            if (isRuleResult(slot)) {
+            if (!history && isRuleResult(slot)) {
                 actionElement.dataset.ruleResult = "true";
                 ruleIndicator = document.createElement("span");
                 ruleIndicator.className = "app-price-hour__rule-indicator";
@@ -1706,12 +1806,17 @@
                 }
             }
             if (action.type === "netzero") actionElement.dataset.netzeroDirection = action.direction;
-            setActionBadgeContent(actionElement, slot, action);
-            const tooltipDetail = { date: day.date, hour, slot, action, limited };
+            if (history) setRuntimeHistoryBadgeContent(actionElement, history);
+            else setActionBadgeContent(actionElement, slot, action);
+            const tooltipDetail = { date: day.date, hour, slot, action, limited, history, historyUnavailable };
             actionElement.setAttribute("aria-expanded", "false");
             actionElement.setAttribute(
                 "aria-label",
-                `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}, source ${sourceFor(slot)}. Show schedule details.`
+                history
+                    ? `${day.label}, ${pad(hour)}:00, optimizer runtime history: ${runtimeHistoryDescription(history)}. Show schedule details.`
+                    : historyUnavailable
+                        ? `${day.label}, ${pad(hour)}:00, historical schedule unavailable. Current rule result ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}. Show schedule details.`
+                        : `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}, source ${sourceFor(slot)}. Show schedule details.`
             );
             actionElement.addEventListener("mouseenter", () => {
                 if (isTimelineOverview()) return;
@@ -1751,7 +1856,7 @@
                     if (isTimelineOverview()) return;
                     setSelectedHour(selectionKey);
                     hidePriceTooltip();
-                    openEditDialog({ hour, price, slot, day: day.key, date: day.date }, editButton);
+                    openEditDialog({ hour, price, slot: resolvedSlot, day: day.key, date: day.date }, editButton);
                 });
             }
             hourColumn.append(editButton);
@@ -1807,8 +1912,8 @@
             ? `${formatDate(todayDate)} through ${formatDate(tomorrowDate)} · historical simulation`
             : "Today through tomorrow · swipe or scroll for all 48 hours";
         const days = [
-            { key: "today", label: isSimulation ? "Selected day" : "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today) },
-            { key: "tomorrow", label: isSimulation ? "Following day" : "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow) }
+            { key: "today", label: isSimulation ? "Selected day" : "Today", date: todayDate, values: todayValues, slots: scheduleMap(state.schedules.today), runtimeHistory: state.runtimeHistory.today },
+            { key: "tomorrow", label: isSimulation ? "Following day" : "Tomorrow", date: tomorrowDate, values: tomorrowValues, slots: scheduleMap(state.schedules.tomorrow), runtimeHistory: state.runtimeHistory.tomorrow }
         ];
         renderSummary(days);
         renderTimeline(days);
@@ -1973,6 +2078,8 @@
                 state.dates.tomorrow = scenario.dates?.tomorrow || dates.tomorrow;
                 state.schedules.today = scenario.schedules.today || [];
                 state.schedules.tomorrow = scenario.schedules.tomorrow || [];
+                state.runtimeHistory.today = {};
+                state.runtimeHistory.tomorrow = {};
                 state.entries.today = scenario.entries?.today || [];
                 state.entries.tomorrow = scenario.entries?.tomorrow || [];
                 state.ruleColors = rulesResult.status === "fulfilled" ? rulesResult.value : {};
@@ -2000,6 +2107,12 @@
             state.dates.tomorrow = pricePayload.dates?.tomorrow || dates.tomorrow;
             state.schedules.today = results[1].status === "fulfilled" ? results[1].value.resolved : [];
             state.schedules.tomorrow = results[2].status === "fulfilled" ? results[2].value.resolved : [];
+            state.runtimeHistory.today = results[1].status === "fulfilled" && results[1].value.runtimeHistory
+                ? results[1].value.runtimeHistory
+                : {};
+            state.runtimeHistory.tomorrow = results[2].status === "fulfilled" && results[2].value.runtimeHistory
+                ? results[2].value.runtimeHistory
+                : {};
             state.entries.today = results[1].status === "fulfilled" ? results[1].value.entries || [] : [];
             state.entries.tomorrow = results[2].status === "fulfilled" ? results[2].value.entries || [] : [];
             state.ruleColors = results[3].status === "fulfilled" ? results[3].value : {};
@@ -2028,11 +2141,13 @@
             if (results.every((result) => result.status === "rejected")) return;
             if (results[0].status === "fulfilled") {
                 state.schedules.today = results[0].value.resolved;
+                state.runtimeHistory.today = results[0].value.runtimeHistory || {};
                 state.entries.today = results[0].value.entries || [];
                 applyServerForecast(results[0].value, dates.today);
             }
             if (results[1].status === "fulfilled") {
                 state.schedules.tomorrow = results[1].value.resolved;
+                state.runtimeHistory.tomorrow = results[1].value.runtimeHistory || {};
                 state.entries.tomorrow = results[1].value.entries || [];
                 applyServerForecast(results[1].value, dates.tomorrow);
             }

@@ -6,6 +6,7 @@ require_once __DIR__ . '/data_functions.php';
 require_once __DIR__ . '/../../includes/config_loader.php';
 require_once __DIR__ . '/../target_battery_planner.php';
 require_once dirname(__DIR__, 3) . '/app/includes/optimizer_schedule.php';
+require_once dirname(__DIR__, 3) . '/app/includes/optimizer_runtime_log.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -514,6 +515,13 @@ function handleGetData($type) {
             }
         }
         $uiEntries = makeUiScheduleEntries($schedule);
+        $runtimeHistory = $date === $todayYmd
+            ? optimizerRuntimeLogScheduleHistoryForDate(
+                optimizerRuntimeLogDefaultPath(),
+                $timezone,
+                $date
+            )
+            : [];
         return [
             'success' => true,
             'date' => $date,
@@ -521,6 +529,7 @@ function handleGetData($type) {
             'currentTime' => date('Hi'),
             'resolved' => $resolved,
             'entries' => $uiEntries,
+            'runtimeHistory' => (object) $runtimeHistory,
             'forecast' => $forecast,
             'forecastAsOf' => $now->format(DateTimeInterface::ATOM),
             'forecastBatteryPercent' => $batteryPercent,

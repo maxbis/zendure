@@ -167,6 +167,93 @@ function optimizerRuntimeLogScheduleSegments(
     ));
 }
 
+/**
+ * Return completed optimizer schedule history for one installation-local date.
+ *
+ * The result is keyed like schedule entries (YmdHi), but remains a display-only
+ * projection of the runtime journal. It does not modify the resolved schedule.
+ *
+ * @return array<string, array{status: string, hour_start: string, hour_end: string, segments: list<array<string, mixed>>}>
+ */
+function optimizerRuntimeLogScheduleHistoryForDate(
+    string $path,
+    DateTimeZone $timezone,
+    string $date
+): array {
+    $normalizedDate = str_replace('-', '', $date);
+    if (preg_match('/^\d{8}$/', $normalizedDate) !== 1 || !is_file($path) || !is_readable($path)) {
+        return [];
+    }
+
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) {
+        return [];
+    }
+
+    $history = [];
+    /** @var array<int, list<array{observed_at: DateTimeImmutable, schedule: string|int|float, min_power_w: ?float, max_power_w: ?float}>> $observationsByHour */
+    $observationsByHour = [];
+
+    try {
+        @flock($handle, LOCK_SH);
+        while (($line = fgets($handle)) !== false) {
+            $event = optimizerRuntimeLogDecodeLine(trim($line));
+            if ($event === null) {
+                continue;
+            }
+            $hourStart = optimizerRuntimeLogHourStart($event, $timezone);
+            if ($hourStart === null || $hourStart->format('Ymd') !== $normalizedDate) {
+                continue;
+            }
+            $eventType = (string) ($event['event'] ?? '');
+            $hourKey = $hourStart->getTimestamp();
+
+            if (in_array($eventType, ['HOUR_OPENED', 'SAMPLE'], true)) {
+                $eventTime = optimizerRuntimeLogEventTime($event, $timezone);
+                $observation = optimizerRuntimeLogScheduleObservation($event);
+                if ($eventTime !== null && $observation !== null) {
+                    $observationsByHour[$hourKey][] = [
+                        'observed_at' => $eventTime,
+                        ...$observation,
+                    ];
+                }
+                continue;
+            }
+            if ($eventType !== 'HOUR_CLOSED') {
+                continue;
+            }
+
+            $hourEnd = optimizerRuntimeLogHourEnd($event, $timezone);
+            if ($hourEnd === null) {
+                unset($observationsByHour[$hourKey]);
+                continue;
+            }
+            $segments = optimizerRuntimeLogScheduleSegments(
+                $observationsByHour[$hourKey] ?? [],
+                $hourStart,
+                $hourEnd
+            );
+            unset($observationsByHour[$hourKey]);
+            if ($segments === []) {
+                continue;
+            }
+
+            $history[$hourStart->format('YmdHi')] = [
+                'status' => (string) ($event['status'] ?? 'unknown'),
+                'hour_start' => $hourStart->format(DateTimeInterface::ATOM),
+                'hour_end' => $hourEnd->format(DateTimeInterface::ATOM),
+                'segments' => $segments,
+            ];
+        }
+    } finally {
+        @flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+
+    ksort($history);
+    return $history;
+}
+
 function optimizerRuntimeLogIsHouseholdMedianSample(array $event): bool
 {
     return ($event['event'] ?? null) === 'HOUR_CLOSED'

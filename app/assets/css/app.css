@@ -2281,6 +2281,53 @@ button.app-state-pill:focus-visible {
     stroke-width: 2.4;
 }
 
+.app-price-hour__action[data-history="true"] {
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+    padding: 0;
+    background: var(--gsd-border-subtle);
+    border-color: var(--gsd-border-subtle);
+}
+
+.app-price-hour__history-segment {
+    display: grid;
+    min-width: 5px;
+    flex: var(--app-history-share) 1 0;
+    place-items: center;
+    overflow: hidden;
+    background: var(--gsd-surface-3);
+    color: var(--gsd-text-secondary);
+    font-size: 0.48rem;
+    line-height: 1;
+}
+
+.app-price-hour__history-segment[data-tone="positive"] {
+    background: var(--gsd-positive);
+    color: var(--gsd-text-on-signal);
+}
+
+.app-price-hour__history-segment[data-tone="negative"] {
+    background: var(--gsd-negative);
+    color: var(--gsd-text-on-signal);
+}
+
+.app-price-hour__history-segment[data-tone="mixed"] {
+    background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%);
+    color: var(--gsd-text-on-signal);
+}
+
+.app-price-hour__history-segment > .gsd-icon {
+    width: 10px;
+    height: 10px;
+    stroke-width: 2.5;
+}
+
+.app-price-hour__action[data-history-unavailable="true"] {
+    border-style: dashed;
+    opacity: 0.58;
+}
+
 .app-price-hour__rule-indicator {
     justify-self: center;
     width: calc(100% - 4px);
@@ -2354,6 +2401,10 @@ button.app-state-pill:focus-visible {
 
 .app-price-plan[data-timeline-view="overview"] .app-price-hour__action > * {
     display: none;
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-history="true"] > .app-price-hour__history-segment {
+    display: block;
 }
 
 .app-price-hour .app-price-hour__action[data-limit-value="true"],
@@ -2623,6 +2674,46 @@ dialog.app-schedule-tooltip {
 .app-schedule-tooltip__action > span:last-child > span {
     color: var(--gsd-text-muted);
     font-size: 0.61rem;
+}
+
+.app-schedule-tooltip__history {
+    display: grid;
+    gap: 8px;
+}
+
+.app-schedule-tooltip__history-item {
+    display: grid;
+    gap: 5px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--gsd-border-subtle);
+}
+
+.app-schedule-tooltip__history-time {
+    color: var(--gsd-text-secondary);
+    font-size: 0.64rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-schedule-tooltip__history-item .app-schedule-tooltip__limits {
+    margin-left: 43px;
+}
+
+.app-schedule-tooltip__history-source {
+    margin: 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.58rem;
+}
+
+.app-schedule-tooltip__history-unavailable {
+    margin: 0 0 2px;
+    padding: 7px 8px;
+    background: color-mix(in srgb, var(--gsd-warning) 10%, transparent);
+    border-left: 2px solid var(--gsd-warning);
+    border-radius: 3px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.61rem;
+    line-height: 1.4;
 }
 
 .app-schedule-tooltip__badge {
