@@ -53,7 +53,7 @@ function appEnergyHistoryResolveDays(mixed $rawValue): int
 function appEnergyHistoryFetchRows(PDO $pdo, string $startDate, string $endDate): array
 {
     $stmt = $pdo->prepare(
-        'SELECT local_date, local_hour, charged_wh, discharged_wh,
+        'SELECT local_date, local_hour, charged_wh, discharged_wh, grid_from_wh, grid_to_wh,
                 battery_pct_start, battery_pct_end,
                 consumer_eur_per_kwh, spot_eur_per_kwh
          FROM hourly_report_inputs
@@ -119,6 +119,8 @@ function appEnergyHistoryMapLiveReportRows(array $report, array $priceRows, stri
             'local_hour' => $hour,
             'charged_wh' => $hourRow['charged_wh'] ?? 0,
             'discharged_wh' => $hourRow['discharged_wh'] ?? 0,
+            'grid_from_wh' => $hourRow['grid_from_wh'] ?? null,
+            'grid_to_wh' => $hourRow['grid_to_wh'] ?? null,
             'battery_pct_start' => $hourRow['battery_pct_start'] ?? null,
             'battery_pct_end' => $hourRow['battery_pct_end'] ?? null,
             'consumer_eur_per_kwh' => $price['consumer_eur_per_kwh'] ?? null,
@@ -179,6 +181,8 @@ function appEnergyHistoryBuildPayload(
         $hourLabel = $date . ' ' . $hour . ':00';
         $chargedWh = max(0.0, appEnergyHistoryFloat($row['charged_wh'] ?? null) ?? 0.0);
         $dischargedWh = max(0.0, appEnergyHistoryFloat($row['discharged_wh'] ?? null) ?? 0.0);
+        $gridFromWh = appEnergyHistoryFloat($row['grid_from_wh'] ?? null);
+        $gridToWh = appEnergyHistoryFloat($row['grid_to_wh'] ?? null);
         $consumerPrice = appEnergyHistoryFloat($row['consumer_eur_per_kwh'] ?? null);
         $spotPrice = appEnergyHistoryFloat($row['spot_eur_per_kwh'] ?? null);
         $battery = appEnergyHistoryFloat($row['battery_pct_end'] ?? null)
@@ -201,6 +205,10 @@ function appEnergyHistoryBuildPayload(
                         'discharged' => appEnergyHistoryEmptyMoneyMetric(),
                     ],
                 ],
+                'gridMoney' => [
+                    'import' => appEnergyHistoryEmptyMoneyMetric(),
+                    'export' => appEnergyHistoryEmptyMoneyMetric(),
+                ],
             ];
         }
 
@@ -217,6 +225,19 @@ function appEnergyHistoryBuildPayload(
                     continue;
                 }
                 $days[$date]['money'][$priceType][$direction]['sum'] += ($energyWh / 1000.0) * $price;
+            }
+        }
+
+        foreach ([
+            'import' => [$gridFromWh, $consumerPrice],
+            'export' => [$gridToWh, $spotPrice],
+        ] as $direction => [$energyWh, $price]) {
+            if ($energyWh === null || $energyWh < 0 || ($energyWh > 0 && $price === null)) {
+                $days[$date]['gridMoney'][$direction]['missingHours'][] = $hourLabel;
+                continue;
+            }
+            if ($energyWh > 0) {
+                $days[$date]['gridMoney'][$direction]['sum'] += ($energyWh / 1000.0) * $price;
             }
         }
 
@@ -257,6 +278,10 @@ function appEnergyHistoryBuildPayload(
             'pos' => round($day['chargedWh'], 2),
             'neg' => round(-$day['dischargedWh'], 2),
             'priceTotals' => $priceTotals,
+            'gridPriceTotals' => [
+                'import' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['import']),
+                'export' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['export']),
+            ],
         ];
     }
     krsort($whPerDay, SORT_STRING);

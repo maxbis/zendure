@@ -4194,6 +4194,109 @@ dialog.app-schedule-tooltip {
 .app-energy-history__summary .gsd-positive { color: var(--gsd-positive); }
 .app-energy-history__summary .gsd-negative { color: var(--gsd-negative); }
 
+.app-energy-history__money-overview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.app-energy-history__money-card {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--gsd-border-subtle);
+    border-radius: 10px;
+    background: var(--gsd-surface-2);
+}
+
+.app-energy-history__money-card h3 {
+    margin: 0 0 8px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.app-energy-history__money-card dl {
+    display: grid;
+    gap: 0;
+    margin: 0;
+}
+
+.app-energy-history__money-card dl > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+}
+
+.app-energy-history__money-card dt {
+    min-width: 0;
+    color: var(--gsd-text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.app-energy-history__money-card dt span {
+    color: var(--gsd-text-muted);
+}
+
+.app-energy-history__money-card dd {
+    flex: 0 0 auto;
+    margin: 0;
+    color: var(--gsd-text);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.app-energy-history__money-card .app-energy-history__money-total {
+    align-items: center;
+    margin-top: 6px;
+    padding: 9px 10px;
+    border: 1px solid var(--gsd-border);
+    border-radius: 8px;
+    background: var(--gsd-surface-3);
+}
+
+.app-energy-history__money-total dt {
+    color: var(--gsd-text);
+    font-weight: 700;
+}
+
+.app-energy-history__money-total dd {
+    font-size: 1rem;
+}
+
+.app-energy-history__money-card--battery[data-benefit-sign="positive"] .app-energy-history__money-total {
+    border-color: var(--gsd-positive-soft);
+    background: var(--gsd-positive-soft);
+}
+
+.app-energy-history__money-card--battery .app-energy-history__money-total dd[data-sign="positive"] {
+    color: var(--gsd-positive);
+}
+
+.app-energy-history__money-card--battery[data-benefit-sign="negative"] .app-energy-history__money-total {
+    border-color: var(--gsd-negative-soft);
+    background: var(--gsd-negative-soft);
+}
+
+.app-energy-history__money-card--battery .app-energy-history__money-total dd[data-sign="negative"] {
+    color: var(--gsd-negative);
+}
+
+.app-energy-history__money-card--grid .app-energy-history__money-total dd[data-sign="negative"] {
+    color: var(--gsd-positive);
+}
+
+.app-energy-history__money-note {
+    margin: 8px 2px 0;
+    color: var(--gsd-text-muted);
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+
 .app-energy-history__status {
     margin: 8px 0 0;
     padding: 7px 9px;
@@ -4723,6 +4826,20 @@ dialog.app-schedule-tooltip {
 
     .app-energy-history__summary .app-energy-history__summary-title {
         margin: 0;
+    }
+
+    .app-energy-history__money-overview {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .app-energy-history__money-card {
+        padding: 10px;
+    }
+
+    .app-energy-history__money-card dt {
+        font-size: 0.72rem;
     }
 
     .app-energy-history__loading,

@@ -591,10 +591,30 @@ $appConfig = [
                         <strong class="gsd-negative" data-role="energy-total-discharged">—</strong>
                     </button>
                     <button type="button" data-role="energy-pnl-summary" aria-expanded="false">
-                        <span class="app-energy-history__summary-title">PnL</span>
+                        <span class="app-energy-history__summary-title">Net flow</span>
                         <strong data-role="energy-total-pnl">—</strong>
                     </button>
                 </div>
+
+                <div class="app-energy-history__money-overview" role="group" aria-label="Estimated electricity costs and battery benefit">
+                    <section class="app-energy-history__money-card app-energy-history__money-card--grid" aria-labelledby="energy-grid-cost-title">
+                        <h3 id="energy-grid-cost-title">Grid cost</h3>
+                        <dl>
+                            <div><dt>Imported <span>· consumer price</span></dt><dd data-role="energy-grid-import-cost">—</dd></div>
+                            <div><dt>Exported <span>· spot price</span></dt><dd data-role="energy-grid-export-value">—</dd></div>
+                            <div class="app-energy-history__money-total"><dt>Estimated net grid cost</dt><dd data-role="energy-grid-net-cost">—</dd></div>
+                        </dl>
+                    </section>
+                    <section class="app-energy-history__money-card app-energy-history__money-card--battery" aria-labelledby="energy-battery-benefit-title">
+                        <h3 id="energy-battery-benefit-title">Battery</h3>
+                        <dl>
+                            <div><dt>Charged <span>· spot price</span></dt><dd data-role="energy-battery-charge-cost">—</dd></div>
+                            <div><dt>Discharged <span>· consumer price</span></dt><dd data-role="energy-battery-discharge-value">—</dd></div>
+                            <div class="app-energy-history__money-total"><dt>Estimated battery benefit</dt><dd data-role="energy-battery-benefit">—</dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <p class="app-energy-history__money-note">Battery benefit is indicative and already reflected in grid flows. Grid cost excludes fixed fees.</p>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>
             </div>

@@ -30,6 +30,12 @@
         chargedSummary: component.querySelector('[data-role="energy-charged-summary"]'),
         dischargedSummary: component.querySelector('[data-role="energy-discharged-summary"]'),
         pnlSummary: component.querySelector('[data-role="energy-pnl-summary"]'),
+        gridImportCost: component.querySelector('[data-role="energy-grid-import-cost"]'),
+        gridExportValue: component.querySelector('[data-role="energy-grid-export-value"]'),
+        gridNetCost: component.querySelector('[data-role="energy-grid-net-cost"]'),
+        batteryChargeCost: component.querySelector('[data-role="energy-battery-charge-cost"]'),
+        batteryDischargeValue: component.querySelector('[data-role="energy-battery-discharge-value"]'),
+        batteryBenefit: component.querySelector('[data-role="energy-battery-benefit"]'),
         status: component.querySelector('[data-role="energy-history-status"]')
     };
 
@@ -147,6 +153,17 @@
         }).format(Math.abs(number));
         if (!signed || number === 0) return formatted;
         return `${number > 0 ? "+" : "−"}${formatted}`;
+    }
+
+    function formatCost(value) {
+        const number = finiteNumber(value);
+        if (number === null) return "—";
+        return number < 0 ? `−${formatMoney(-number)}` : formatMoney(number);
+    }
+
+    function setMoneyValue(element, value, signed = false) {
+        element.textContent = signed ? formatMoney(value, true) : formatCost(value);
+        element.dataset.sign = value === null ? "missing" : value < 0 ? "negative" : value > 0 ? "positive" : "zero";
     }
 
     function setDimmedToken(element, formattedValue, token) {
@@ -278,9 +295,10 @@
     function buildSummaryTooltipPrices(detail) {
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
-        const priceRows = [["Consumer", detail.consumer], ["Spot", detail.spot]];
+        const suffix = detail.label === "Net flow" ? " P&L" : "";
+        const priceRows = [[`Consumer${suffix}`, detail.consumer], [`Spot${suffix}`, detail.spot]];
         if (Object.hasOwn(detail, "indicative")) {
-            priceRows.push(["Indicative", detail.indicative]);
+            priceRows.push(["Indicative P&L", detail.indicative]);
         }
         priceRows.forEach(([label, value]) => {
             const row = document.createElement("p");
@@ -938,20 +956,50 @@
         return totals;
     }
 
-    function priceWarning(totals) {
+    function gridMoneyTotalsForDays(days) {
+        const totals = {
+            import: { eur: 0, complete: true, missingHours: [] },
+            export: { eur: 0, complete: true, missingHours: [] }
+        };
+        days.forEach((day) => {
+            const grid = payload?.whPerDay?.[day]?.gridPriceTotals;
+            ["import", "export"].forEach((direction) => {
+                const source = grid?.[direction];
+                const target = totals[direction];
+                if (!source || source.complete !== true || finiteNumber(source.eur) === null) {
+                    target.complete = false;
+                } else {
+                    target.eur += finiteNumber(source.eur);
+                }
+                if (Array.isArray(source?.missingHours)) target.missingHours.push(...source.missingHours);
+            });
+        });
+        ["import", "export"].forEach((direction) => {
+            if (!totals[direction].complete) totals[direction].eur = null;
+        });
+        totals.net = totals.import.complete && totals.export.complete
+            ? totals.import.eur - totals.export.eur
+            : null;
+        return totals;
+    }
+
+    function priceWarning(totals, grid) {
         const missingHours = [...new Set([
             ...totals.consumer.pnl.missingHours,
-            ...totals.spot.pnl.missingHours
+            ...totals.spot.pnl.missingHours,
+            ...grid.import.missingHours,
+            ...grid.export.missingHours
         ])];
         if (!missingHours.length) return "";
         const shown = missingHours.slice(0, 3).map((hour) => hour.replace(" ", " · ")).join(", ");
         const remainder = missingHours.length > 3 ? ` and ${missingHours.length - 3} more` : "";
-        return `Some price totals are unavailable because price data is missing for ${shown}${remainder}.`;
+        return `Some totals are unavailable because meter or price data is missing for ${shown}${remainder}.`;
     }
 
     function renderSummary(days) {
         const totals = totalsForDays(days);
         const money = moneyTotalsForDays(days);
+        const grid = gridMoneyTotalsForDays(days);
         const energyNet = totals.charged - totals.discharged;
         setEnergySummaryValue(elements.charged, totals.charged, true);
         setEnergySummaryValue(elements.discharged, -totals.discharged, true);
@@ -972,14 +1020,21 @@
             signed: true
         });
         setSummaryTooltip(elements.pnlSummary, {
-            label: "PnL",
+            label: "Net flow",
             energy: energyNet,
             consumer: money.consumer.pnl.eur,
             spot: money.spot.pnl.eur,
             indicative: money.indicative.pnl.eur,
             signed: true
         });
-        return priceWarning(money);
+        setMoneyValue(elements.gridImportCost, grid.import.eur);
+        setMoneyValue(elements.gridExportValue, grid.export.eur);
+        setMoneyValue(elements.gridNetCost, grid.net);
+        setMoneyValue(elements.batteryChargeCost, money.spot.charged.eur);
+        setMoneyValue(elements.batteryDischargeValue, money.consumer.discharged.eur);
+        setMoneyValue(elements.batteryBenefit, money.indicative.pnl.eur, true);
+        elements.batteryBenefit.closest(".app-energy-history__money-card").dataset.benefitSign = elements.batteryBenefit.dataset.sign;
+        return priceWarning(money, grid);
     }
 
     function summaryPeriodLabel(day) {

@@ -51,12 +51,16 @@ def _row(
     discharged_wh: float = 0.0,
     consumer: float | None = 0.3,
     spot: float | None = 0.1,
+    grid_from_wh: float | None = 0.0,
+    grid_to_wh: float | None = 0.0,
 ) -> dict[str, object]:
     return {
         "local_date": "2026-08-01",
         "local_hour": hour,
         "charged_wh": charged_wh,
         "discharged_wh": discharged_wh,
+        "grid_from_wh": grid_from_wh,
+        "grid_to_wh": grid_to_wh,
         "battery_pct_start": 50,
         "battery_pct_end": 55,
         "consumer_eur_per_kwh": consumer,
@@ -128,6 +132,35 @@ def test_price_pnl_is_discharged_minus_charged() -> None:
     assert totals["spot"]["pnl"]["eur"] == pytest.approx(0.19)
 
 
+def test_grid_cost_uses_each_hours_consumer_import_and_spot_export_prices() -> None:
+    payload = _build_payload(
+        [
+            _row(0, grid_from_wh=1000, grid_to_wh=500, consumer=0.30, spot=0.10),
+            _row(1, grid_from_wh=500, grid_to_wh=1000, consumer=0.20, spot=-0.05),
+        ]
+    )
+    grid = payload["whPerDay"]["2026-08-01"]["gridPriceTotals"]
+    assert grid["import"]["eur"] == pytest.approx(0.40)
+    assert grid["export"]["eur"] == pytest.approx(0)
+    assert grid["import"]["complete"] is True
+    assert grid["export"]["complete"] is True
+
+
+def test_grid_cost_is_unavailable_when_meter_or_required_price_is_missing() -> None:
+    payload = _build_payload(
+        [
+            _row(0, grid_from_wh=None),
+            _row(1, grid_to_wh=100, spot=None),
+            _row(2, grid_from_wh=0, grid_to_wh=0, consumer=None, spot=None),
+        ]
+    )
+    grid = payload["whPerDay"]["2026-08-01"]["gridPriceTotals"]
+    assert grid["import"]["eur"] is None
+    assert grid["import"]["missingHours"] == ["2026-08-01 00:00"]
+    assert grid["export"]["eur"] is None
+    assert grid["export"]["missingHours"] == ["2026-08-01 01:00"]
+
+
 def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
     rows = _map_live_rows(
         {
@@ -136,6 +169,8 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
                     "hour": "13",
                     "charged_wh": 725.5,
                     "discharged_wh": 110.25,
+                    "grid_from_wh": 330.5,
+                    "grid_to_wh": 20.75,
                     "battery_pct_start": 32,
                     "battery_pct_end": 40,
                     "price_eur_per_kwh": 9.99,
@@ -157,6 +192,8 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
             "local_hour": 13,
             "charged_wh": 725.5,
             "discharged_wh": 110.25,
+            "grid_from_wh": 330.5,
+            "grid_to_wh": 20.75,
             "battery_pct_start": 32,
             "battery_pct_end": 40,
             "consumer_eur_per_kwh": 0.28,
@@ -180,9 +217,9 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
         assert f'data-role="{role}"' in app_index
         assert role in energy_js
 
-    assert 'label: "PnL"' in energy_js
+    assert 'label: "Net flow"' in energy_js
     assert "discharged.eur - charged.eur" in energy_js
-    assert '["Indicative", detail.indicative]' in energy_js
+    assert '["Indicative P&L", detail.indicative]' in energy_js
     assert "indicativeDischarge.eur - indicativeCharge.eur" in energy_js
     assert "indicative: money.indicative.pnl.eur" in energy_js
     assert "setEnergySummaryValue(elements.charged, totals.charged, true)" in energy_js
