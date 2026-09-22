@@ -252,9 +252,12 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
 
     assert 'label: "Net flow"' in energy_js
     assert "discharged.eur - charged.eur" in energy_js
-    assert '["Indicative P&L", detail.indicative]' in energy_js
+    assert 'data-role="energy-money-overview-template"' in app_index
+    assert "content.append(elements.moneyOverviewTemplate.content.cloneNode(true))" in energy_js
+    assert 'trigger === elements.pnlSummary) return;' in energy_js
+    assert 'detail.label === "Net flow" ? buildMoneyOverview(detail)' in energy_js
     assert "indicativeDischarge.eur - indicativeCharge.eur" in energy_js
-    assert "indicative: money.indicative.pnl.eur" in energy_js
+    assert "batteryBenefit: money.indicative.pnl.eur" in energy_js
     assert "setEnergySummaryValue(elements.charged, totals.charged, true)" in energy_js
     assert "setEnergySummaryValue(elements.discharged, -totals.discharged, true)" in energy_js
     assert "formatEnergy(row.wh, true)" in energy_js

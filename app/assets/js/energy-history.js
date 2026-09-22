@@ -30,12 +30,7 @@
         chargedSummary: component.querySelector('[data-role="energy-charged-summary"]'),
         dischargedSummary: component.querySelector('[data-role="energy-discharged-summary"]'),
         pnlSummary: component.querySelector('[data-role="energy-pnl-summary"]'),
-        gridImportCost: component.querySelector('[data-role="energy-grid-import-cost"]'),
-        gridExportValue: component.querySelector('[data-role="energy-grid-export-value"]'),
-        gridNetCost: component.querySelector('[data-role="energy-grid-net-cost"]'),
-        batteryChargeCost: component.querySelector('[data-role="energy-battery-charge-cost"]'),
-        batteryDischargeValue: component.querySelector('[data-role="energy-battery-discharge-value"]'),
-        batteryBenefit: component.querySelector('[data-role="energy-battery-benefit"]'),
+        moneyOverviewTemplate: component.querySelector('[data-role="energy-money-overview-template"]'),
         status: component.querySelector('[data-role="energy-history-status"]')
     };
 
@@ -295,11 +290,8 @@
     function buildSummaryTooltipPrices(detail) {
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
-        const suffix = detail.label === "Net flow" ? " P&L" : "";
-        const priceRows = [[`Consumer${suffix}`, detail.consumer], [`Spot${suffix}`, detail.spot]];
-        if (Object.hasOwn(detail, "indicative")) {
-            priceRows.push(["Indicative P&L", detail.indicative]);
-        }
+        prices.dataset.role = "energy-summary-tooltip-content";
+        const priceRows = [["Consumer", detail.consumer], ["Spot", detail.spot]];
         priceRows.forEach(([label, value]) => {
             const row = document.createElement("p");
             const name = document.createElement("span");
@@ -310,6 +302,31 @@
             prices.appendChild(row);
         });
         return prices;
+    }
+
+    function buildMoneyOverview(detail) {
+        const content = document.createElement("div");
+        content.className = "app-energy-summary-tooltip__overview";
+        content.dataset.role = "energy-summary-tooltip-content";
+        content.append(elements.moneyOverviewTemplate.content.cloneNode(true));
+        const values = [
+            ["energy-grid-import-cost", detail.gridImportCost],
+            ["energy-grid-export-value", detail.gridExportValue],
+            ["energy-grid-net-cost", detail.gridNetCost],
+            ["energy-battery-charge-cost", detail.batteryChargeCost],
+            ["energy-battery-discharge-value", detail.batteryDischargeValue],
+            ["energy-battery-benefit", detail.batteryBenefit, true]
+        ];
+        values.forEach(([role, value, signed]) => {
+            setMoneyValue(content.querySelector(`[data-role="${role}"]`), value, signed);
+        });
+        const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
+        benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
+        return content;
+    }
+
+    function buildSummaryTooltipContent(detail) {
+        return detail.label === "Net flow" ? buildMoneyOverview(detail) : buildSummaryTooltipPrices(detail);
     }
 
     function refreshSummaryTooltip(detail, trigger) {
@@ -323,8 +340,8 @@
             button.disabled = !adjacentSummaryDay(direction);
         });
 
-        const prices = summaryTooltip.querySelector(".app-price-summary-tooltip__prices");
-        if (prices) prices.replaceWith(buildSummaryTooltipPrices(detail));
+        const content = summaryTooltip.querySelector('[data-role="energy-summary-tooltip-content"]');
+        if (content) content.replaceWith(buildSummaryTooltipContent(detail));
 
         pinnedSummaryTooltipTrigger = trigger;
         positionSummaryTooltip(trigger);
@@ -364,6 +381,7 @@
         hideSummaryTooltip();
         activeSummaryTooltipTrigger = trigger;
         pinnedSummaryTooltipTrigger = pinned ? trigger : null;
+        summaryTooltip.classList.toggle("is-overview", detail.label === "Net flow");
         trigger.setAttribute("aria-describedby", summaryTooltip.id);
         trigger.setAttribute("aria-expanded", "true");
 
@@ -384,7 +402,7 @@
         heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1), close);
         header.appendChild(heading);
 
-        summaryTooltip.replaceChildren(header, buildSummaryTooltipPrices(detail));
+        summaryTooltip.replaceChildren(header, buildSummaryTooltipContent(detail));
         summaryTooltip.hidden = false;
         summaryTooltip.style.visibility = "hidden";
         if (compactChartMedia.matches) summaryTooltip.showModal();
@@ -476,17 +494,18 @@
     function setSummaryTooltip(trigger, detail) {
         summaryTooltipDetails.set(trigger, detail);
         const energy = formatEnergy(detail.energy, detail.signed);
+        if (detail.label === "Net flow") {
+            trigger.setAttribute("aria-label", `Net flow ${energy}. Show grid cost and battery benefit.`);
+            return;
+        }
         const consumer = formatMoney(detail.consumer, detail.signed);
         const spot = formatMoney(detail.spot, detail.signed);
-        const indicative = Object.hasOwn(detail, "indicative")
-            ? ` Indicative ${formatMoney(detail.indicative, detail.signed)}.`
-            : "";
-        trigger.setAttribute("aria-label", `${detail.label} ${energy}. Consumer ${consumer}. Spot ${spot}.${indicative} Show price totals.`);
+        trigger.setAttribute("aria-label", `${detail.label} ${energy}. Consumer ${consumer}. Spot ${spot}. Show price totals.`);
     }
 
     function bindSummaryTooltip(trigger) {
         trigger.addEventListener("mouseenter", () => {
-            if (compactChartMedia.matches) return;
+            if (compactChartMedia.matches || trigger === elements.pnlSummary) return;
             if (!pinnedSummaryTooltipTrigger) showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
         });
         trigger.addEventListener("mouseleave", () => {
@@ -495,7 +514,9 @@
             }
         });
         trigger.addEventListener("focus", () => {
-            if (!compactChartMedia.matches) showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+            if (!compactChartMedia.matches && trigger !== elements.pnlSummary) {
+                showSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+            }
         });
         trigger.addEventListener("blur", () => {
             if (pinnedSummaryTooltipTrigger !== trigger) hideSummaryTooltip(trigger);
@@ -1022,18 +1043,14 @@
         setSummaryTooltip(elements.pnlSummary, {
             label: "Net flow",
             energy: energyNet,
-            consumer: money.consumer.pnl.eur,
-            spot: money.spot.pnl.eur,
-            indicative: money.indicative.pnl.eur,
+            gridImportCost: grid.import.eur,
+            gridExportValue: grid.export.eur,
+            gridNetCost: grid.net,
+            batteryChargeCost: money.spot.charged.eur,
+            batteryDischargeValue: money.consumer.discharged.eur,
+            batteryBenefit: money.indicative.pnl.eur,
             signed: true
         });
-        setMoneyValue(elements.gridImportCost, grid.import.eur);
-        setMoneyValue(elements.gridExportValue, grid.export.eur);
-        setMoneyValue(elements.gridNetCost, grid.net);
-        setMoneyValue(elements.batteryChargeCost, money.spot.charged.eur);
-        setMoneyValue(elements.batteryDischargeValue, money.consumer.discharged.eur);
-        setMoneyValue(elements.batteryBenefit, money.indicative.pnl.eur, true);
-        elements.batteryBenefit.closest(".app-energy-history__money-card").dataset.benefitSign = elements.batteryBenefit.dataset.sign;
         return priceWarning(money, grid);
     }
 
