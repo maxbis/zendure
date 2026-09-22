@@ -313,6 +313,19 @@ def test_conservative_discharge_can_be_negative_and_missing_charge_blocks_pnl() 
     assert estimate["pnlMilliEur"] is None
 
 
+def test_conservative_value_is_available_without_any_classified_hours() -> None:
+    flow = _build_payload([
+        _row(0, discharged_wh=750, consumer=0.40, spot=0.15,
+             battery_flow={"battery_pnl_status": "missing_home_load"}),
+    ])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    assert flow["partial"] is False
+    assert flow["dischargeHomeWh"] is None
+    assert flow["conservative"]["unclassifiedWh"] == 750
+    assert flow["conservative"]["dischargeValueMilliEur"] == 113
+    assert flow["conservative"]["chargeCostMilliEur"] == 0
+    assert flow["conservative"]["pnlMilliEur"] == 113
+
+
 def test_today_grid_cost_ignores_future_placeholder_but_not_elapsed_missing_data() -> None:
     rows = [
         _row(21, grid_from_wh=1000, grid_to_wh=100, consumer=0.30, spot=0.10),
