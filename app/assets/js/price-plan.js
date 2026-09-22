@@ -1418,22 +1418,45 @@
     }
 
     function setRuntimeHistoryBadgeContent(element, history) {
+        const dominant = history.segments.reduce((largest, segment) =>
+            (Number(segment.duration_s) || 0) > (Number(largest.duration_s) || 0) ? segment : largest
+        );
+        const dominantSlot = runtimeSegmentSlot(dominant);
+        const dominantAction = actionFor(dominantSlot);
+        const primary = document.createElement("span");
+        primary.className = "app-price-hour__history-primary";
+        setActionBadgeContent(
+            primary,
+            dominantAction.type === "netzero" ? { value: dominantSlot.value } : dominantSlot,
+            dominantAction
+        );
+
+        if (history.segments.length === 1) {
+            element.replaceChildren(primary);
+            return;
+        }
+
         const totalDuration = Math.max(1, history.segments.reduce(
             (total, segment) => total + Math.max(0, Number(segment.duration_s) || 0),
             0
         ));
-        const segments = history.segments.map((segment) => {
+        const count = document.createElement("span");
+        count.className = "app-price-hour__history-count";
+        count.textContent = String(history.segments.length);
+        count.setAttribute("aria-hidden", "true");
+        const strip = document.createElement("span");
+        strip.className = "app-price-hour__history-strip";
+        strip.setAttribute("aria-hidden", "true");
+        history.segments.forEach((segment) => {
             const slot = runtimeSegmentSlot(segment);
             const action = actionFor(slot);
             const item = document.createElement("span");
             item.className = "app-price-hour__history-segment";
             item.dataset.tone = actionTone(action);
             item.style.setProperty("--app-history-share", String(Math.max(0, Number(segment.duration_s) || 0) / totalDuration));
-            item.setAttribute("aria-hidden", "true");
-            setActionBadgeContent(item, action.type === "netzero" ? { value: slot.value } : slot, action);
-            return item;
+            strip.appendChild(item);
         });
-        element.replaceChildren(...segments);
+        element.replaceChildren(primary, count, strip);
     }
 
     function spotPrice(consumerPrice) {
@@ -1784,6 +1807,7 @@
             actionElement.dataset.tone = actionTone(action);
             actionElement.dataset.limited = limited ? "true" : "false";
             actionElement.dataset.history = history ? "true" : "false";
+            actionElement.dataset.historyChanged = history && history.segments.length > 1 ? "true" : "false";
             actionElement.dataset.historyUnavailable = historyUnavailable ? "true" : "false";
             const hasRuntimeRule = !history && Array.isArray(slot?.runtime_conditions) && slot.runtime_conditions.length > 0;
             const ruleColor = normalizeRuleColor(state.ruleColors[String(resolvedSlot?.rule_index ?? "")]);

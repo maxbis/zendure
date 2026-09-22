@@ -2281,46 +2281,71 @@ button.app-state-pill:focus-visible {
     stroke-width: 2.4;
 }
 
-.app-price-hour__action[data-history="true"] {
+.app-price-hour__action[data-history-changed="true"] {
+    padding-bottom: 4px;
+}
+
+.app-price-hour__history-primary {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+}
+
+.app-price-hour__history-primary > .gsd-icon {
+    width: 12px;
+    height: 12px;
+    stroke-width: 2.4;
+}
+
+.app-price-hour__history-count {
+    position: absolute;
+    z-index: 2;
+    top: 1px;
+    right: 2px;
+    display: grid;
+    min-width: 10px;
+    height: 10px;
+    padding-inline: 2px;
+    place-items: center;
+    background: color-mix(in srgb, var(--gsd-page-deep) 78%, transparent);
+    border-radius: 999px;
+    color: var(--gsd-text);
+    font-size: 6px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.app-price-hour__history-strip {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: flex;
-    align-items: stretch;
+    height: 3px;
     gap: 1px;
-    padding: 0;
+    overflow: hidden;
     background: var(--gsd-border-subtle);
-    border-color: var(--gsd-border-subtle);
+    pointer-events: none;
 }
 
 .app-price-hour__history-segment {
-    display: grid;
-    min-width: 5px;
+    min-width: 1px;
     flex: var(--app-history-share) 1 0;
-    place-items: center;
-    overflow: hidden;
-    background: var(--gsd-surface-3);
-    color: var(--gsd-text-secondary);
-    font-size: 0.48rem;
-    line-height: 1;
+    background: var(--gsd-neutral);
 }
 
 .app-price-hour__history-segment[data-tone="positive"] {
     background: var(--gsd-positive);
-    color: var(--gsd-text-on-signal);
 }
 
 .app-price-hour__history-segment[data-tone="negative"] {
     background: var(--gsd-negative);
-    color: var(--gsd-text-on-signal);
 }
 
 .app-price-hour__history-segment[data-tone="mixed"] {
-    background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%);
-    color: var(--gsd-text-on-signal);
-}
-
-.app-price-hour__history-segment > .gsd-icon {
-    width: 10px;
-    height: 10px;
-    stroke-width: 2.5;
+    background: linear-gradient(90deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%);
 }
 
 .app-price-hour__action[data-history-unavailable="true"] {
@@ -2403,8 +2428,9 @@ button.app-state-pill:focus-visible {
     display: none;
 }
 
-.app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-history="true"] > .app-price-hour__history-segment {
-    display: block;
+.app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-history="true"] > .app-price-hour__history-strip {
+    display: flex;
+    height: 2px;
 }
 
 .app-price-hour .app-price-hour__action[data-limit-value="true"],
