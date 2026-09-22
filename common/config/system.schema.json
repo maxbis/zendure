@@ -121,6 +121,11 @@
           "description": "Power increment used by schedule planning and editing.",
           "type": "integer",
           "minimum": 1
+        },
+        "activeHourDeadbandW": {
+          "description": "Minimum modeled power difference required to replace the already-active optimizer command; zero disables stabilization.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

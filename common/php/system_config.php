@@ -26,7 +26,7 @@ function systemConfigDefaultPath(): string
  *     maxDischargePowerW: int
  *   },
  *   forecast: array{defaultHouseholdUsageWByHour: list<int>},
- *   schedule: array{minPowerW: int, maxPowerW: int, powerStepW: int},
+ *   schedule: array{minPowerW: int, maxPowerW: int, powerStepW: int, activeHourDeadbandW?: int},
  *   installation: array{name: string, latitude: float, longitude: float, timezone: string},
  *   priceConversion: array{
  *     supplierMarkupEurPerKwh: float,
@@ -166,14 +166,19 @@ function validateSystemConfig(array $config): array
         );
     }
 
-    systemConfigAssertExactKeys(
-        $schedule,
-        ['minPowerW', 'maxPowerW', 'powerStepW'],
-        '$.schedule'
-    );
+    $scheduleKeys = ['minPowerW', 'maxPowerW', 'powerStepW'];
+    if (array_key_exists('activeHourDeadbandW', $schedule)) {
+        $scheduleKeys[] = 'activeHourDeadbandW';
+    }
+    systemConfigAssertExactKeys($schedule, $scheduleKeys, '$.schedule');
     $minPowerW = systemConfigRequireInteger($schedule['minPowerW'], '$.schedule.minPowerW', PHP_INT_MIN, 0);
     $maxPowerW = systemConfigRequireInteger($schedule['maxPowerW'], '$.schedule.maxPowerW', 0);
     $powerStepW = systemConfigRequireInteger($schedule['powerStepW'], '$.schedule.powerStepW', 1);
+    $activeHourDeadbandW = systemConfigRequireInteger(
+        $schedule['activeHourDeadbandW'] ?? 0,
+        '$.schedule.activeHourDeadbandW',
+        0
+    );
     if ($minPowerW >= $maxPowerW) {
         throw new SystemConfigException('$.schedule.minPowerW must be lower than $.schedule.maxPowerW.');
     }
@@ -254,6 +259,7 @@ function validateSystemConfig(array $config): array
             'minPowerW' => $minPowerW,
             'maxPowerW' => $maxPowerW,
             'powerStepW' => $powerStepW,
+            'activeHourDeadbandW' => $activeHourDeadbandW,
         ],
         'installation' => [
             'name' => $name,

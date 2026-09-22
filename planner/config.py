@@ -75,6 +75,7 @@ class PlannerSettings:
     max_charge_power_w: int
     max_discharge_power_w: int
     power_step_w: int
+    active_hour_deadband_w: int
     default_household_usage_w_by_hour: List[int]
     arbitrage_min_spread_eur_per_kwh: float
     round_trip_efficiency: float
@@ -244,6 +245,15 @@ def load_settings() -> PlannerSettings:
 
     raw_min_grid = _get_int(schedule.get("minPowerW"), -1600)
     raw_max_grid = _get_int(schedule.get("maxPowerW"), 1600)
+    power_step_w = max(1, _get_int(schedule.get("powerStepW"), 100))
+    active_hour_deadband_w = _get_int(
+        os.getenv("PLANNER_ACTIVE_HOUR_DEADBAND_W"),
+        _get_int(schedule.get("activeHourDeadbandW"), 0),
+    )
+    if active_hour_deadband_w < 0:
+        raise ValueError("activeHourDeadbandW must be zero or greater")
+    if active_hour_deadband_w % power_step_w != 0:
+        raise ValueError("activeHourDeadbandW must be a multiple of powerStepW")
 
     return PlannerSettings(
         repo_root=repo_root,
@@ -271,7 +281,8 @@ def load_settings() -> PlannerSettings:
         ),
         max_charge_power_w=max(0, raw_max_grid),
         max_discharge_power_w=max(0, abs(raw_min_grid)),
-        power_step_w=max(1, _get_int(schedule.get("powerStepW"), 100)),
+        power_step_w=power_step_w,
+        active_hour_deadband_w=active_hour_deadband_w,
         default_household_usage_w_by_hour=[
             max(0, _get_int(value, 0))
             for value in system_config["forecast"]["defaultHouseholdUsageWByHour"]

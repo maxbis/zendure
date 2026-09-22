@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from datetime import datetime
 import fcntl
 import json
+import math
 import os
 from pathlib import Path
 from statistics import fmean
@@ -15,6 +17,7 @@ from zoneinfo import ZoneInfo
 from planner.clients import PricePayload, fetch_price_payload, fetch_runtime_readings, fetch_shortwave_payload
 from planner.config import PlannerSettings, load_settings
 from planner.forecast import derive_pv_forecast_by_date
+from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
     build_rolling_boundaries,
@@ -213,6 +216,262 @@ def retained_energy_valuation(prices: PricePayload) -> Dict[str, Any]:
     }
 
 
+def _read_json_object(path: Path) -> Optional[dict]:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _decision_at(plan: dict, moment: datetime) -> Optional[dict]:
+    decisions = plan.get("decisions")
+    if not isinstance(decisions, list):
+        return None
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            continue
+        try:
+            start = datetime.fromisoformat(str(decision["start"]))
+            end = datetime.fromisoformat(str(decision["end"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if start <= moment < end:
+            return decision
+    return None
+
+
+def _command_signature(decision: dict) -> tuple[object, object, object]:
+    return (
+        decision.get("schedule_value"),
+        decision.get("min_power"),
+        decision.get("max_power"),
+    )
+
+
+def _number(value: object) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _active_command_is_soc_safe(
+    decision: dict,
+    *,
+    now: datetime,
+    battery_state: BatteryState,
+    round_trip_efficiency: float,
+) -> bool:
+    try:
+        end = datetime.fromisoformat(str(decision["end"]))
+    except (KeyError, TypeError, ValueError):
+        return False
+    duration_hours = max(0.0, (end - now).total_seconds() / 3600.0)
+    if duration_hours <= 0:
+        return False
+
+    value = decision.get("schedule_value")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum_power = maximum_power = float(value)
+    else:
+        minimum_power = _number(decision.get("min_power"))
+        maximum_power = _number(decision.get("max_power"))
+        if minimum_power is None or maximum_power is None:
+            return False
+
+    efficiency = math.sqrt(max(0.01, min(1.0, float(round_trip_efficiency))))
+    capacity_wh = float(battery_state.usable_capacity_wh)
+    minimum_energy_wh = capacity_wh * battery_state.min_charge_level_percent / 100.0
+    maximum_energy_wh = capacity_wh * battery_state.max_charge_level_percent / 100.0
+    starting_energy_wh = max(
+        minimum_energy_wh,
+        min(maximum_energy_wh, capacity_wh * battery_state.soc_percent / 100.0),
+    )
+    lowest_energy_wh = starting_energy_wh
+    highest_energy_wh = starting_energy_wh
+    if minimum_power < 0:
+        lowest_energy_wh -= abs(minimum_power) * duration_hours / efficiency
+    if maximum_power > 0:
+        highest_energy_wh += maximum_power * duration_hours * efficiency
+    return lowest_energy_wh >= minimum_energy_wh - 0.001 and highest_energy_wh <= maximum_energy_wh + 0.001
+
+
+def _recalculate_plan_trajectory(
+    plan: dict,
+    *,
+    battery_state: BatteryState,
+    round_trip_efficiency: float,
+) -> Optional[dict]:
+    stabilized = deepcopy(plan)
+    decisions = stabilized.get("decisions")
+    if not isinstance(decisions, list) or not decisions:
+        return None
+
+    efficiency = math.sqrt(max(0.01, min(1.0, float(round_trip_efficiency))))
+    capacity_wh = float(battery_state.usable_capacity_wh)
+    minimum_energy_wh = capacity_wh * battery_state.min_charge_level_percent / 100.0
+    maximum_energy_wh = capacity_wh * battery_state.max_charge_level_percent / 100.0
+    energy_wh = max(
+        minimum_energy_wh,
+        min(maximum_energy_wh, capacity_wh * battery_state.soc_percent / 100.0),
+    )
+    raw_ending_energy_wh = capacity_wh * float(plan.get("ending_soc_percent", 0.0)) / 100.0
+    raw_excess_wh = max(0.0, raw_ending_energy_wh - minimum_energy_wh)
+    raw_terminal_value = max(0.0, float(plan.get("terminal_energy_value_eur", 0.0)))
+    terminal_value_per_excess_wh = raw_terminal_value / raw_excess_wh if raw_excess_wh > 0 else 0.0
+    total_cost = 0.0
+
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            return None
+        try:
+            start = datetime.fromisoformat(str(decision["start"]))
+            end = datetime.fromisoformat(str(decision["end"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        power_w = _number(decision.get("battery_power_w"))
+        import_price = _number(decision.get("import_price_eur_per_kwh"))
+        export_price = _number(decision.get("export_price_eur_per_kwh"))
+        load_w = _number(decision.get("load_w"))
+        pv_w = _number(decision.get("pv_w"))
+        if None in (power_w, import_price, export_price, load_w, pv_w):
+            return None
+        duration_hours = max(0.0, (end - start).total_seconds() / 3600.0)
+        next_energy_wh = (
+            energy_wh + power_w * duration_hours * efficiency
+            if power_w >= 0
+            else energy_wh - abs(power_w) * duration_hours / efficiency
+        )
+        if next_energy_wh < minimum_energy_wh - 0.001 or next_energy_wh > maximum_energy_wh + 0.001:
+            return None
+        grid_power_w = load_w - pv_w + power_w
+        grid_kwh = grid_power_w * duration_hours / 1000.0
+        expected_cost = grid_kwh * (import_price if grid_kwh >= 0 else export_price)
+        decision["start_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
+        decision["end_soc_percent"] = round(next_energy_wh / capacity_wh * 100.0, 2)
+        decision["grid_power_w"] = round(grid_power_w, 1)
+        decision["expected_cost_eur"] = round(expected_cost, 6)
+        total_cost += expected_cost
+        energy_wh = next_energy_wh
+
+    terminal_value = max(0.0, energy_wh - minimum_energy_wh) * terminal_value_per_excess_wh
+    stabilized["starting_soc_percent"] = round(
+        max(minimum_energy_wh, min(maximum_energy_wh, capacity_wh * battery_state.soc_percent / 100.0))
+        / capacity_wh
+        * 100.0,
+        2,
+    )
+    stabilized["ending_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
+    stabilized["expected_energy_cost_eur"] = round(total_cost, 6)
+    stabilized["terminal_energy_value_eur"] = round(terminal_value, 6)
+    stabilized["objective_eur"] = round(total_cost - terminal_value, 6)
+    return stabilized
+
+
+def stabilize_active_hour_plan(
+    proposed_plan: dict,
+    previous_payload: Optional[dict],
+    *,
+    now: datetime,
+    battery_state: BatteryState,
+    round_trip_efficiency: float,
+    deadband_w: int,
+) -> tuple[dict, dict]:
+    metadata: Dict[str, Any] = {
+        "active_hour_deadband_w": deadband_w,
+        "applied": False,
+    }
+    if deadband_w <= 0:
+        metadata["reason"] = "disabled"
+        return proposed_plan, metadata
+    if not isinstance(previous_payload, dict) or previous_payload.get("type") != "optimizer_executable_schedule":
+        metadata["reason"] = "no_previous_schedule"
+        return proposed_plan, metadata
+
+    previous_plan = previous_payload.get("plan")
+    if not isinstance(previous_plan, dict):
+        metadata["reason"] = "no_previous_schedule"
+        return proposed_plan, metadata
+    try:
+        previous_generated_at = datetime.fromisoformat(str(previous_plan["generated_at"]))
+    except (KeyError, TypeError, ValueError):
+        metadata["reason"] = "invalid_previous_schedule"
+        return proposed_plan, metadata
+    hour_start = now.replace(minute=0, second=0, microsecond=0)
+    if previous_generated_at < hour_start:
+        metadata["reason"] = "new_hour"
+        return proposed_plan, metadata
+
+    previous_decision = _decision_at(previous_plan, now)
+    proposed_decision = _decision_at(proposed_plan, now)
+    if previous_decision is None or proposed_decision is None:
+        metadata["reason"] = "no_comparable_active_decision"
+        return proposed_plan, metadata
+    if _command_signature(previous_decision) == _command_signature(proposed_decision):
+        metadata["reason"] = "command_unchanged"
+        return proposed_plan, metadata
+
+    previous_power = _number(previous_decision.get("battery_power_w"))
+    proposed_power = _number(proposed_decision.get("battery_power_w"))
+    if previous_power is None or proposed_power is None:
+        metadata["reason"] = "missing_expected_power"
+        return proposed_plan, metadata
+    difference_w = abs(proposed_power - previous_power)
+    metadata.update({
+        "proposed_power_w": round(proposed_power),
+        "published_power_w": round(proposed_power),
+        "difference_w": round(difference_w),
+    })
+    if difference_w >= deadband_w:
+        metadata["reason"] = "threshold_met"
+        return proposed_plan, metadata
+    if not _active_command_is_soc_safe(
+        previous_decision,
+        now=now,
+        battery_state=battery_state,
+        round_trip_efficiency=round_trip_efficiency,
+    ):
+        metadata["reason"] = "soc_safety_override"
+        return proposed_plan, metadata
+
+    stabilized = deepcopy(proposed_plan)
+    stabilized_decision = _decision_at(stabilized, now)
+    if stabilized_decision is None:
+        metadata["reason"] = "no_comparable_active_decision"
+        return proposed_plan, metadata
+    for field in ("schedule_value", "battery_power_w"):
+        stabilized_decision[field] = previous_decision[field]
+    stabilized_decision["reason"] = previous_decision.get(
+        "reason",
+        "retained by active-hour deadband",
+    )
+    for field in ("min_power", "max_power"):
+        if field in previous_decision:
+            stabilized_decision[field] = previous_decision[field]
+        else:
+            stabilized_decision.pop(field, None)
+    recalculated = _recalculate_plan_trajectory(
+        stabilized,
+        battery_state=battery_state,
+        round_trip_efficiency=round_trip_efficiency,
+    )
+    if recalculated is None:
+        metadata["reason"] = "trajectory_safety_override"
+        return proposed_plan, metadata
+
+    metadata.update({
+        "applied": True,
+        "reason": "below_active_hour_deadband",
+        "published_power_w": round(previous_power),
+    })
+    return recalculated, metadata
+
+
 def run_shadow_once(
     settings: PlannerSettings,
     *,
@@ -272,6 +531,7 @@ def run_shadow_once(
             "max_charge_power_w": battery_state.max_charge_power_w,
             "max_discharge_power_w": battery_state.max_discharge_power_w,
             "power_step_w": settings.power_step_w,
+            "active_hour_deadband_w": settings.active_hour_deadband_w,
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
             "solar_forecast_source": "shortwave_radiation",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),
@@ -279,12 +539,22 @@ def run_shadow_once(
         },
         "plan": plan.to_dict(),
     }
+    published_path = latest_path or latest_schedule_path(settings)
+    executable_plan, stabilization = stabilize_active_hour_plan(
+        payload["plan"],
+        _read_json_object(published_path) if settings.active_hour_deadband_w > 0 else None,
+        now=generated_at,
+        battery_state=battery_state,
+        round_trip_efficiency=settings.round_trip_efficiency,
+        deadband_w=settings.active_hour_deadband_w,
+    )
+    payload["publication"] = {"active_hour_stabilization": stabilization}
     try:
         update_runtime_log(
             runtime_output_path or runtime_log_path(settings.data_dir),
             observed_at=generated_at,
             timezone=settings.timezone,
-            plan=payload["plan"],
+            plan=executable_plan,
             readings=runtime_readings,
         )
     except Exception as exc:
@@ -295,9 +565,10 @@ def run_shadow_once(
         "version": 1,
         "published_at": datetime.now(tz).isoformat(),
         "inputs": payload["inputs"],
-        "plan": payload["plan"],
+        "publication": payload["publication"],
+        "plan": executable_plan,
     }
-    write_json_atomic(latest_path or latest_schedule_path(settings), executable_payload)
+    write_json_atomic(published_path, executable_payload)
     return payload
 
 

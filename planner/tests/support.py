@@ -27,6 +27,7 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         max_charge_power_w=1200,
         max_discharge_power_w=1600,
         power_step_w=100,
+        active_hour_deadband_w=0,
         default_household_usage_w_by_hour=[200] * 24,
         arbitrage_min_spread_eur_per_kwh=0.12,
         round_trip_efficiency=0.85,

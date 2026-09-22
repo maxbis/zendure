@@ -116,10 +116,18 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         for hour in range(24)
     ]
 
-    _assert_exact_keys(schedule, {"minPowerW", "maxPowerW", "powerStepW"}, "$.schedule")
+    schedule_keys = {"minPowerW", "maxPowerW", "powerStepW"}
+    if "activeHourDeadbandW" in schedule:
+        schedule_keys.add("activeHourDeadbandW")
+    _assert_exact_keys(schedule, schedule_keys, "$.schedule")
     min_power_w = _require_integer(schedule["minPowerW"], "$.schedule.minPowerW", -(2**63), 0)
     max_power_w = _require_integer(schedule["maxPowerW"], "$.schedule.maxPowerW", 0)
     power_step_w = _require_integer(schedule["powerStepW"], "$.schedule.powerStepW", 1)
+    active_hour_deadband_w = _require_integer(
+        schedule.get("activeHourDeadbandW", 0),
+        "$.schedule.activeHourDeadbandW",
+        0,
+    )
     if min_power_w >= max_power_w:
         raise SystemConfigError("$.schedule.minPowerW must be lower than $.schedule.maxPowerW.")
 
@@ -200,6 +208,7 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             "minPowerW": min_power_w,
             "maxPowerW": max_power_w,
             "powerStepW": power_step_w,
+            "activeHourDeadbandW": active_hour_deadband_w,
         },
         "installation": {
             "name": name,

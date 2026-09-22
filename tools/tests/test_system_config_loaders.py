@@ -46,6 +46,7 @@ EXPECTED_CONFIG = {
         "minPowerW": -1800,
         "maxPowerW": 1200,
         "powerStepW": 100,
+        "activeHourDeadbandW": 0,
     },
     "installation": {
         "name": "Amsterdam",
@@ -142,6 +143,9 @@ def test_schema_contract_matches_loader_sections():
         if section == "battery":
             expected_required.remove("roundTripEfficiency")
             assert "roundTripEfficiency" in section_schema["properties"]
+        if section == "schedule":
+            expected_required.remove("activeHourDeadbandW")
+            assert "activeHourDeadbandW" in section_schema["properties"]
         assert set(section_schema["required"]) == expected_required
 
     usage_schema = schema["properties"]["forecast"]["properties"]["defaultHouseholdUsageWByHour"]

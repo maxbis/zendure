@@ -178,6 +178,15 @@ Relevant environment overrides are:
 - `PLANNER_ROUND_TRIP_EFFICIENCY`
 - `PLANNER_SOC_STEP_WH`
 - `PLANNER_TERMINAL_VALUE_FACTOR`
+- `PLANNER_ACTIVE_HOUR_DEADBAND_W` (defaults to `schedule.activeHourDeadbandW`; `0` disables stabilization)
+
+When `schedule.activeHourDeadbandW` is greater than zero, only the already-active
+hour is stabilized. A newly proposed command whose modeled battery power differs
+by less than the configured number of watts keeps the previously published
+command. Future hours remain unfiltered, every new hour starts with a fresh
+decision, and SOC safety checks always override the deadband. The raw optimizer
+plan stays in `optimizer_schedule.log`; publication metadata records whether the
+executable current-hour decision was retained.
 - `PLANNER_PV_SYSTEM_CAPACITY_W`
 - `PLANNER_PV_DERATE_FACTOR`
 - `PLANNER_PV_OUTPUT_CLIP_W`
