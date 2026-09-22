@@ -268,6 +268,51 @@ def test_battery_pnl_stays_unavailable_when_no_hour_can_be_valued() -> None:
     assert flow["pnlMilliEur"] is None
 
 
+def test_unclassified_discharge_uses_lower_hourly_price_and_covers_charge_cost() -> None:
+    classified = _battery_flow(
+        charge_grid=1000, charge_solar=0, discharge_home=500,
+        discharge_export=0, charge_cost=300, home_savings=150,
+        export_revenue=0,
+    )
+    unclassified = {
+        "battery_charge_grid_wh": 200,
+        "battery_charge_surplus_wh": 300,
+        "battery_pnl_status": "missing_home_load",
+        "battery_pnl_method_version": 2,
+    }
+    payload = _build_payload([
+        _row(0, charged_wh=1000, discharged_wh=500, battery_flow=classified),
+        _row(1, charged_wh=500, discharged_wh=1000, consumer=0.40, spot=0.10,
+             battery_flow=unclassified),
+        _row(2, discharged_wh=1000, consumer=0.20, spot=0.30,
+             battery_flow={"battery_pnl_status": "missing_home_load"}),
+    ])
+    flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    estimate = flow["conservative"]
+    assert flow["valuedHours"] == 1
+    assert flow["pnlMilliEur"] == -150  # Classified-hours total remains separate.
+    assert estimate["unclassifiedWh"] == 2000
+    assert estimate["unclassifiedValueMilliEur"] == 300  # 1000 Wh at 0.10 and 0.20.
+    assert estimate["chargeGridWh"] == 1200
+    assert estimate["chargeSurplusWh"] == 300
+    assert estimate["chargeCostMilliEur"] == 410
+    assert estimate["dischargeValueMilliEur"] == 450
+    assert estimate["pnlMilliEur"] == 40
+    assert estimate["complete"] is True
+
+
+def test_conservative_discharge_can_be_negative_and_missing_charge_blocks_pnl() -> None:
+    flow = _build_payload([
+        _row(0, charged_wh=100, discharged_wh=1000, consumer=0.30, spot=-0.05,
+             battery_flow={"battery_pnl_status": "missing_home_load"}),
+    ])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
+    estimate = flow["conservative"]
+    assert estimate["unclassifiedValueMilliEur"] == -50
+    assert estimate["dischargeValueMilliEur"] == -50
+    assert estimate["chargeComplete"] is False
+    assert estimate["pnlMilliEur"] is None
+
+
 def test_today_grid_cost_ignores_future_placeholder_but_not_elapsed_missing_data() -> None:
     rows = [
         _row(21, grid_from_wh=1000, grid_to_wh=100, consumer=0.30, spot=0.10),
