@@ -91,6 +91,7 @@
         batteryForecast: {},
         forecastAsOf: null,
         forecastUnavailableReason: null,
+        optimizerSolarForecast: null,
         controller: null
     };
 
@@ -563,6 +564,25 @@
         return payload;
     }
 
+    async function fetchOptimizerSolarForecast(signal) {
+        if (!config.optimizerSolarUrl) return null;
+        const payload = await fetchJson(new URL(config.optimizerSolarUrl, document.baseURI).href, signal);
+        const plan = payload?.records?.[0]?.plan;
+        if (!plan || !Array.isArray(plan.decisions)) return null;
+
+        const generatedAt = Date.parse(plan.generated_at);
+        if (!Number.isFinite(generatedAt)) return null;
+
+        const hours = {};
+        plan.decisions.forEach((decision) => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):/.exec(String(decision?.start || ""));
+            const powerW = numericValue(decision?.pv_w);
+            if (!match || powerW === null || powerW < 0) return;
+            hours[`${match[1]}${match[2]}${match[3]}${match[4]}00`] = powerW;
+        });
+        return { generatedAt, hours };
+    }
+
     async function fetchBacktest(signal) {
         if (!config.backtestUrl) throw new Error("No historical simulation source is configured");
         const url = new URL(config.backtestUrl, document.baseURI);
@@ -984,6 +1004,34 @@
         return section;
     }
 
+    function tooltipOptimizerSolarForecast(date, hour) {
+        if (!hourEndsInFuture(date, hour)) return null;
+        const forecast = state.optimizerSolarForecast;
+        if (!forecast || Date.now() - forecast.generatedAt > 60 * 60 * 1000) return null;
+        const powerW = forecast.hours[forecastKey(date, hour)];
+        if (!Number.isFinite(powerW)) return null;
+
+        const section = document.createElement("div");
+        section.className = "app-schedule-tooltip__forecast";
+        section.appendChild(tooltipSectionLabel("Optimizer solar prediction"));
+
+        const values = document.createElement("div");
+        values.className = "app-schedule-tooltip__forecast-values app-schedule-tooltip__solar-values";
+        const row = document.createElement("p");
+        const label = document.createElement("span");
+        const value = document.createElement("strong");
+        label.textContent = "PV output";
+        value.textContent = powerW >= 1000 ? `${(powerW / 1000).toFixed(1)} kW` : `${Math.round(powerW)} W`;
+        row.append(label, value);
+        values.appendChild(row);
+
+        const detail = document.createElement("p");
+        detail.className = "app-schedule-tooltip__forecast-detail";
+        detail.textContent = `Calculated ${formatRuntimeTime(forecast.generatedAt)}`;
+        section.append(values, detail);
+        return section;
+    }
+
     function tooltipTargetPlanning(slot) {
         const planning = slot?.planning;
         if (!planning || !["empty_at_solar_charge", "full_at_netzero_minus"].includes(planning.mode)) return null;
@@ -1193,6 +1241,8 @@
 
         const batteryForecast = tooltipBatteryForecast(date, hour);
         if (batteryForecast) content.appendChild(batteryForecast);
+        const solarForecast = tooltipOptimizerSolarForecast(date, hour);
+        if (solarForecast) content.appendChild(solarForecast);
 
         priceTooltip.replaceChildren(header, content);
         priceTooltip.hidden = false;
@@ -2114,7 +2164,8 @@
                 fetchPrices(state.controller.signal),
                 fetchSchedule(dates.today, state.controller.signal),
                 fetchSchedule(dates.tomorrow, state.controller.signal),
-                fetchRuleColors(state.controller.signal)
+                fetchRuleColors(state.controller.signal),
+                fetchOptimizerSolarForecast(state.controller.signal)
             ]);
             if (results.slice(0, 3).every((result) => result.status === "rejected")) {
                 throw results[0].reason || new Error("All price and schedule sources failed");
@@ -2136,6 +2187,7 @@
             state.entries.today = results[1].status === "fulfilled" ? results[1].value.entries || [] : [];
             state.entries.tomorrow = results[2].status === "fulfilled" ? results[2].value.entries || [] : [];
             state.ruleColors = results[3].status === "fulfilled" ? results[3].value : {};
+            state.optimizerSolarForecast = results[4].status === "fulfilled" ? results[4].value : null;
             state.batteryForecast = {};
             if (results[1].status === "fulfilled") applyServerForecast(results[1].value, dates.today);
             if (results[2].status === "fulfilled") applyServerForecast(results[2].value, dates.tomorrow);
@@ -2156,9 +2208,11 @@
         try {
             const results = await Promise.allSettled([
                 fetchSchedule(dates.today, controller.signal),
-                fetchSchedule(dates.tomorrow, controller.signal)
+                fetchSchedule(dates.tomorrow, controller.signal),
+                fetchOptimizerSolarForecast(controller.signal)
             ]);
-            if (results.every((result) => result.status === "rejected")) return;
+            if (results.slice(0, 2).every((result) => result.status === "rejected")) return;
+            state.optimizerSolarForecast = results[2].status === "fulfilled" ? results[2].value : null;
             if (results[0].status === "fulfilled") {
                 state.schedules.today = results[0].value.resolved;
                 state.runtimeHistory.today = results[0].value.runtimeHistory || {};

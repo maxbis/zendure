@@ -104,6 +104,7 @@ $appConfig = [
         'scheduleApiUrl',
         '../main/data/api/data_api.php?type=schedule&resolved=1'
     ),
+    'optimizerSolarUrl' => 'api/optimizer_log.php?limit=1',
     'scheduleRefreshUrl' => '../main/api/refresh_schedule_proxy.php',
     'rulesUrl' => '../main/edit_rules.php?api=1',
     'priceUrls' => ConfigLoader::get('priceApiUrl', []),

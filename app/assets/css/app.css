@@ -2825,6 +2825,10 @@ dialog.app-schedule-tooltip {
     font-variant-numeric: tabular-nums;
 }
 
+.app-schedule-tooltip__solar-values {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .app-schedule-tooltip__forecast-detail,
 .app-schedule-tooltip__forecast-unavailable {
     margin: 0;
