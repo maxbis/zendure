@@ -478,6 +478,7 @@ def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> 
     assert 'if (summaryTooltip.matches(":modal") || eventInsideSummaryTooltip(event.target)) return;' in energy_js
     assert 'dialog#app-energy-summary-tooltip.app-schedule-tooltip.is-overview' in app_css
     assert 'height: 100dvh;' in app_css
+    assert 'padding-top: calc(20px + env(safe-area-inset-top, 0px));' in app_css
     assert 'flex: 1 1 auto;' in app_css
     assert '-webkit-overflow-scrolling: touch;' in app_css
     assert 'event.pointerType !== "mouse" || chartInteractionIsSuppressed()' in energy_js

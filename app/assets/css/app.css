@@ -4857,7 +4857,7 @@ dialog#app-energy-summary-tooltip.is-overview {
         max-height: 100vh;
         max-height: 100dvh;
         box-sizing: border-box;
-        padding-top: env(safe-area-inset-top);
+        padding-top: calc(20px + env(safe-area-inset-top, 0px));
         border: 0;
         border-radius: 0;
     }
