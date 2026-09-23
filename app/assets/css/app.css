@@ -4326,8 +4326,6 @@ dialog#app-energy-summary-tooltip.is-overview {
 .app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
     margin-block: 3px;
     padding: 7px 0;
-    border-radius: 8px;
-    background: var(--gsd-warning-soft);
 }
 
 .app-energy-history__money-empty dt {
@@ -4338,8 +4336,8 @@ dialog#app-energy-summary-tooltip.is-overview {
     display: inline-block;
     padding: 1px 6px;
     border-radius: 999px;
-    background: var(--gsd-warning-soft);
-    color: var(--gsd-warning);
+    background: var(--gsd-surface-3);
+    color: var(--gsd-text-secondary);
     font-size: 0.64rem;
     font-weight: 700;
 }
@@ -4349,10 +4347,6 @@ dialog#app-energy-summary-tooltip.is-overview {
     margin-top: 3px;
     color: var(--gsd-text-muted);
     font-size: 0.62rem;
-}
-
-.app-energy-history__money-flow--unclassified dd strong {
-    color: var(--gsd-warning);
 }
 
 .app-energy-history__money-card .app-energy-history__money-subtotal {

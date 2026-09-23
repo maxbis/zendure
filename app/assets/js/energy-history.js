@@ -377,10 +377,10 @@
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
         const unclassifiedNote = content.querySelector('[data-role="energy-battery-unclassified-note"]');
         unclassifiedNote.textContent = useConservative && !conservative.dischargeComplete
-            ? "Conservative · hourly price unavailable"
+            ? "Hourly price unavailable"
             : useConservative && !conservative.chargeComplete
-                ? "Conservative · lower hourly price; charging data missing"
-                : "Conservative · lower hourly price";
+                ? "Valued at lower hourly price; charging data missing"
+                : "Valued at lower hourly price";
         const status = content.querySelector('[data-role="energy-battery-status"]');
         status.textContent = useConservative ? "" : batteryFlowStatusMessage(detail.batteryFlow);
         status.hidden = status.textContent === "";

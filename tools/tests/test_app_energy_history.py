@@ -526,7 +526,17 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     discharge_total = app_index.index('data-role="energy-battery-discharge-value"')
     assert confirmed_export < unclassified < discharge_total
     assert 'class="app-energy-history__unclassified-tag">Unclassified</span>' in app_index
-    assert 'data-role="energy-battery-unclassified-note">Conservative · lower hourly price' in app_index
+    assert 'data-role="energy-battery-unclassified-note">Valued at lower hourly price' in app_index
+    assert '"Valued at lower hourly price"' in energy_js
+    unclassified_row_css = app_css.split('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {', 1)[1].split('}', 1)[0]
+    assert 'margin-block: 3px;' in unclassified_row_css
+    assert 'background:' not in unclassified_row_css
+    unclassified_tag_css = app_css.split('.app-energy-history__money-flow--unclassified dt .app-energy-history__unclassified-tag {', 1)[1].split('}', 1)[0]
+    assert 'background: var(--gsd-surface-3);' in unclassified_tag_css
+    assert 'color: var(--gsd-text-secondary);' in unclassified_tag_css
+    assert '.app-energy-history__money-flow--unclassified dd strong' not in app_css
+    assert app_index.count('style="margin-left: 16px;" class="app-energy-history__money-flow"') == 2
+    assert '<h4 style="margin-left: 16px;">Discharge value</h4>' in app_index
     assert '<dt data-role="energy-battery-discharge-label">Total discharge value</dt>' in app_index
     assert '<dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt>' in app_index
     assert '.app-energy-history__money-card h3 {' in app_css
