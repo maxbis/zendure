@@ -194,7 +194,9 @@ function appEnergyHistoryBuildPayload(
     array $rows,
     int $requestedDays,
     string $todaySource = 'sqlite_replication.status_updates',
-    bool $isStale = false
+    bool $isStale = false,
+    ?array $batteryConfig = null,
+    ?string $todayDate = null
 ): array
 {
     $whPerHour = [];
@@ -225,6 +227,15 @@ function appEnergyHistoryBuildPayload(
             $days[$date] = [
                 'chargedWh' => 0.0,
                 'dischargedWh' => 0.0,
+                'storedEnergy' => [
+                    'openingPct' => null,
+                    'closingPct' => null,
+                    'firstHour' => null,
+                    'lastHour' => null,
+                    'consumerPriceSum' => 0.0,
+                    'pricedHours' => 0,
+                    'hourCount' => 0,
+                ],
                 'money' => [
                     'consumer' => [
                         'charged' => appEnergyHistoryEmptyMoneyMetric(),
@@ -275,6 +286,21 @@ function appEnergyHistoryBuildPayload(
 
         $days[$date]['chargedWh'] += $chargedWh;
         $days[$date]['dischargedWh'] += $dischargedWh;
+        $stored =& $days[$date]['storedEnergy'];
+        if ($stored['firstHour'] === null || $hourNumber < $stored['firstHour']) {
+            $stored['firstHour'] = $hourNumber;
+            $stored['openingPct'] = appEnergyHistoryFloat($row['battery_pct_start'] ?? null);
+        }
+        if ($stored['lastHour'] === null || $hourNumber > $stored['lastHour']) {
+            $stored['lastHour'] = $hourNumber;
+            $stored['closingPct'] = appEnergyHistoryFloat($row['battery_pct_end'] ?? null);
+        }
+        $stored['hourCount']++;
+        if ($consumerPrice !== null) {
+            $stored['consumerPriceSum'] += $consumerPrice;
+            $stored['pricedHours']++;
+        }
+        unset($stored);
 
         foreach (['consumer' => $consumerPrice, 'spot' => $spotPrice] as $priceType => $price) {
             foreach (['charged' => $chargedWh, 'discharged' => $dischargedWh] as $direction => $energyWh) {
@@ -414,6 +440,30 @@ function appEnergyHistoryBuildPayload(
 
     $whPerDay = [];
     foreach ($days as $date => $day) {
+        $stored = $day['storedEnergy'];
+        $capacityWh = appEnergyHistoryFloat($batteryConfig['capacityWh'] ?? null);
+        $roundTripEfficiency = appEnergyHistoryFloat($batteryConfig['roundTripEfficiency'] ?? null);
+        $expectedLastHour = $date === $todayDate ? $stored['lastHour'] : 23;
+        $storedComplete = $capacityWh !== null && $capacityWh > 0
+            && $roundTripEfficiency !== null && $roundTripEfficiency > 0 && $roundTripEfficiency <= 1
+            && $stored['firstHour'] === 0 && $stored['lastHour'] === $expectedLastHour
+            && $stored['hourCount'] === $expectedLastHour + 1
+            && $stored['pricedHours'] === $stored['hourCount']
+            && $stored['openingPct'] !== null && $stored['closingPct'] !== null
+            && $stored['openingPct'] >= 0 && $stored['openingPct'] <= 100
+            && $stored['closingPct'] >= 0 && $stored['closingPct'] <= 100;
+        $storedDeltaWh = $storedComplete
+            ? $capacityWh * ($stored['closingPct'] - $stored['openingPct']) / 100
+            : null;
+        $deliverableDeltaWh = $storedComplete
+            ? $storedDeltaWh * sqrt($roundTripEfficiency)
+            : null;
+        $averageConsumerPrice = $storedComplete
+            ? $stored['consumerPriceSum'] / $stored['pricedHours']
+            : null;
+        $storedValueEur = $storedComplete
+            ? round($deliverableDeltaWh / 1000 * $averageConsumerPrice, 6)
+            : null;
         $priceTotals = [];
         foreach (['consumer', 'spot'] as $priceType) {
             $charged = appEnergyHistoryFinishMoneyMetric($day['money'][$priceType]['charged']);
@@ -474,6 +524,15 @@ function appEnergyHistoryBuildPayload(
                 'export' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['export']),
             ],
             'batteryFlowTotals' => $batteryFlow,
+            'storedEnergyValue' => [
+                'complete' => $storedComplete,
+                'openingPct' => $stored['openingPct'],
+                'closingPct' => $stored['closingPct'],
+                'storedDeltaWh' => $storedDeltaWh === null ? null : round($storedDeltaWh, 3),
+                'deliverableDeltaWh' => $deliverableDeltaWh === null ? null : round($deliverableDeltaWh, 3),
+                'averageConsumerEurPerKwh' => $averageConsumerPrice === null ? null : round($averageConsumerPrice, 6),
+                'valueEur' => $storedValueEur,
+            ],
         ];
     }
     krsort($whPerDay, SORT_STRING);

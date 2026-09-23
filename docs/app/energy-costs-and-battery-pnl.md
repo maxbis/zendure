@@ -4,7 +4,7 @@
 
 The **Net flow** card opens the app's **Energy costs** dialog for the selected day. It shows an estimated net grid cost and a separate estimate of the battery's economic contribution. The two figures answer different questions and must **not** be added or subtracted from each other: battery activity is already reflected in the measured grid flows.
 
-These are variable-energy estimates, not a supplier invoice. Fixed fees, taxes or charges not included in the stored prices, battery degradation, and the value of energy remaining in the battery are outside this P&L.
+These are variable-energy estimates, not a supplier invoice. The battery figure includes the day's **change** in stored-energy value, not the value of the whole battery balance. Fixed fees, taxes or charges not included in the stored prices, battery purchase and degradation remain outside this P&L.
 
 ## Location
 
@@ -23,7 +23,7 @@ The app reads these sources, using local calendar dates and hours in **Europe/Am
 - Solar production: `enphase_history.production_hourly.energy_wh`, filtered by the configured system ID and source (defaults: `5053376`, `production_micro`). Production is needed to estimate home load and therefore to classify battery discharge as home use or export. The Enphase source table is `production_hourly`, not merely the `enphase_history` database name.
 - Historical calculated values and audit status: `sqlite_replication.hourly_report_inputs`, one row per local date/hour. Its `battery_pnl_status` and `battery_pnl_method_version` indicate whether the four-way battery attribution is usable.
 
-The API returns per-hour chart values and per-day `gridPriceTotals` and `batteryFlowTotals`. Battery-flow energy is stored in whole Wh, and financial components are stored in millieuros before display as euros.
+The API returns per-hour chart values and per-day `gridPriceTotals`, `batteryFlowTotals`, and `storedEnergyValue`. Battery-flow energy is stored in whole Wh, and financial components are stored in millieuros before display as euros. `storedEnergyValue` uses the configured battery capacity and round-trip efficiency from `common/config/system.json`.
 
 ## Flow and behavior
 
@@ -42,7 +42,7 @@ Version 2 of the hourly report attributes charging and discharging as follows:
 1. Charging concurrent with grid import is attributed to **From grid · consumer price**, up to the charged energy. Remaining charge is **From surplus solar · spot price**: the spot price represents the opportunity cost of not exporting that energy.
 2. Estimated home load is `max(0, solar production + grid import − grid export + battery discharge − battery charge)` for the hour.
 3. Battery discharge is assigned to **Used at home · consumer price** up to estimated home load. Any remainder is **Exported · spot price**.
-4. **Estimated battery P&L** = home-use value + battery-export value − grid-charging cost − surplus-solar charging opportunity cost.
+4. **Battery flow P&L** = home-use value + battery-export value − grid-charging cost − surplus-solar charging opportunity cost.
 
 The home/export discharge split is an **estimate derived from an energy balance**, not a separately metered battery-export reading. Likewise, the four-way battery P&L is not an additional saving to subtract from net grid cost.
 
@@ -50,9 +50,16 @@ The home/export discharge split is an **estimate derived from an energy balance*
 
 If an hour has measured battery discharge but lacks a usable home/export split, the app does **not** report that discharge as zero or call it export revenue. It shows an indented **Unclassified** row immediately beneath the confirmed **Exported · spot price** row, with the sublabel **Conservative · lower hourly price**. The app values that hour's discharge at `min(consumer price, spot price)`. This is a provisional conservative value; a negative spot price can make it negative. Both hourly prices must exist for this fallback. The confirmed exported amount is not increased by unclassified discharge.
 
-Charging cost in such an hour is still included when its grid/surplus Wh split and the relevant hourly prices are available. The dialog shows a numeric **Estimated battery P&L** only when every elapsed hour has both a covered charging cost and a covered discharge value. The unclassified sublabel is the visible indication that this number is conservative; there is no separate conservative heading badge or explanatory banner. Otherwise it shows the available components but leaves the whole-day P&L unavailable. If a required hourly price or charging input is missing, the sublabel says so. Classified home/export rows remain separate from the unclassified fallback row.
+Charging cost in such an hour is still included when its grid/surplus Wh split and the relevant hourly prices are available. The dialog shows a numeric **Battery flow P&L** only when every elapsed hour has both a covered charging cost and a covered discharge value. The unclassified sublabel is the visible indication that this number is conservative; there is no separate conservative heading badge or explanatory banner. Otherwise it shows the available components but leaves the whole-day flow P&L unavailable. If a required hourly price or charging input is missing, the sublabel says so. Classified home/export rows remain separate from the unclassified fallback row.
 
-When all hours have complete version-2 attribution, the dialog uses the classified values and shows **Estimated battery P&L**. A **Partial** label means only some hours have complete attribution; a partial sum must not be read as a full-day result.
+When all hours have complete version-2 attribution, the dialog uses the classified values for **Battery flow P&L**. A **Partial** label means only some hours have complete attribution; a partial sum must not be read as a full-day result.
+
+### Stored energy and final contribution
+
+- **Change in stored value** uses battery percentage at local midnight and the latest battery percentage for today, or end-of-day battery percentage for a past day. It does not count the battery's entire opening balance as today's gain.
+- Percentage change becomes stored Wh using configured capacity. Multiplication by `sqrt(roundTripEfficiency)` estimates the energy deliverable from that change, matching the app's optimizer valuation convention. Signed deliverable kWh are valued at the arithmetic average of that day's **elapsed hourly consumer prices**. For today, future hours and predicted future charge are excluded; for completed days, all 24 hourly prices are used.
+- **Estimated battery economic contribution** = complete battery flow P&L + change in stored value. It is shown only when both components are available. A partially classified flow can still contribute when the conservative fallback covers every elapsed hour. Missing midnight or closing battery readings, hourly prices, or battery configuration make stored value and the final estimate unavailable rather than zero.
+- This is a modeled variable-energy contribution under the app's pricing and attribution assumptions, **not measured bill savings or total battery return**. It must not be added to or subtracted from net grid cost.
 
 ## Timing and freshness
 
@@ -70,6 +77,7 @@ The repository's `docs/daily-report-operations.md` gives a more frequent **examp
 - An hour with no battery energy movement can have complete zero battery P&L without requiring otherwise irrelevant prices or production.
 - A price or production row arriving after the historical updater does not automatically change `hourly_report_inputs`; a rerun is required.
 - Currency displayed to cents is rounded from hourly millieuro components. Subtracting displayed rounded subtotals can therefore differ by one cent from the displayed P&L.
+- Per-day stored-energy changes use each day's own average consumer price. Summing daily economic-contribution figures across days is not a formal inventory revaluation or audited multi-day return.
 - The current `(local_date, local_hour)` aggregate key cannot represent both occurrences of the repeated autumn daylight-saving hour. This is a known limitation of the hourly report.
 
 ## Related files

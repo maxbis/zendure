@@ -54,7 +54,7 @@ try {
     }
 
     $rows = appEnergyHistoryFilterFutureRows($rows, $today, $currentHour);
-    $payload = appEnergyHistoryBuildPayload($rows, $requestedDays, $todaySource, $isStale);
+    $payload = appEnergyHistoryBuildPayload($rows, $requestedDays, $todaySource, $isStale, $systemConfig['battery'], $today);
     $payload['baseWh'] = $systemConfig['battery']['capacityWh'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 } catch (SystemConfigException $error) {

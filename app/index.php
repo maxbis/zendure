@@ -621,11 +621,13 @@ $appConfig = [
                                 <div class="app-energy-history__money-flow"><dt>Exported <span>· spot price</span></dt><dd><small data-role="energy-battery-discharge-export-wh">—</small><strong data-role="energy-battery-discharge-export-value">—</strong></dd></div>
                                 <div class="app-energy-history__money-flow app-energy-history__money-flow--unclassified" data-role="energy-battery-unclassified-row" hidden><dt><span class="app-energy-history__unclassified-tag">Unclassified</span><small data-role="energy-battery-unclassified-note">Conservative · lower hourly price</small></dt><dd><small data-role="energy-battery-unclassified-wh">—</small><strong data-role="energy-battery-unclassified-value">—</strong></dd></div>
                                 <div class="app-energy-history__money-subtotal"><dt data-role="energy-battery-discharge-label">Total discharge value</dt><dd data-role="energy-battery-discharge-value">—</dd></div>
-                                <div class="app-energy-history__money-total"><dt data-role="energy-battery-pnl-label">Estimated battery P&amp;L</dt><dd data-role="energy-battery-benefit">—</dd></div>
+                                <div class="app-energy-history__money-subtotal"><dt>Battery flow P&amp;L</dt><dd data-role="energy-battery-flow-pnl">—</dd></div>
+                                <div class="app-energy-history__money-flow app-energy-history__money-flow--stored"><dt>Change in stored value <span>· average consumer price</span><small data-role="energy-battery-stored-note"></small></dt><dd><small data-role="energy-battery-stored-wh">—</small><strong data-role="energy-battery-stored-value">—</strong></dd></div>
+                                <div class="app-energy-history__money-total"><dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt><dd data-role="energy-battery-benefit">—</dd></div>
                             </dl>
                         </section>
                     </div>
-                    <p class="app-energy-history__money-note">Battery flows are estimated. Battery P&amp;L is already reflected in grid flows; do not subtract it from net grid cost. Grid cost excludes fixed fees.</p>
+                    <p class="app-energy-history__money-note">Stored value is the change since midnight, not the battery's whole balance. The final estimate is not measured bill savings and must not be combined with net grid cost. It excludes fixed fees and battery ownership costs.</p>
                 </template>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>

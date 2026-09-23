@@ -162,6 +162,12 @@
         return `${new Intl.NumberFormat([], { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(number / 1000)} kWh`;
     }
 
+    function formatSignedFlowKwh(wh) {
+        const number = finiteNumber(wh);
+        if (number === null) return "—";
+        return `${number > 0 ? "+" : number < 0 ? "−" : ""}${formatFlowKwh(Math.abs(number))}`;
+    }
+
     function setMoneyValue(element, value, signed = false) {
         element.textContent = signed ? formatMoney(value, true) : formatCost(value);
         element.dataset.sign = value === null ? "missing" : value < 0 ? "negative" : value > 0 ? "positive" : "zero";
@@ -319,6 +325,12 @@
         const conservative = detail.batteryFlow?.conservative;
         const useConservative = !detail.batteryFlow?.complete && conservative?.unclassifiedWh > 0;
         const milliToEur = (value) => finiteNumber(value) === null ? null : value / 1000;
+        const flowPnl = useConservative ? milliToEur(conservative.pnlMilliEur) : detail.batteryBenefit;
+        const completeFlowPnl = detail.batteryFlow?.complete
+            ? detail.batteryBenefit
+            : conservative?.complete ? milliToEur(conservative.pnlMilliEur) : null;
+        const storedValue = detail.storedEnergyValue?.complete ? finiteNumber(detail.storedEnergyValue.valueEur) : null;
+        const economicContribution = completeFlowPnl === null || storedValue === null ? null : completeFlowPnl + storedValue;
         const values = [
             ["energy-grid-import-cost", detail.gridImportCost],
             ["energy-grid-export-value", detail.gridExportValue],
@@ -330,7 +342,9 @@
             ["energy-battery-discharge-export-value", useConservative ? milliToEur(detail.batteryFlow.exportRevenueMilliEur ?? 0) : detail.batteryExportValue],
             ["energy-battery-unclassified-value", useConservative ? milliToEur(conservative.unclassifiedValueMilliEur) : null],
             ["energy-battery-discharge-value", useConservative ? milliToEur(conservative.dischargeValueMilliEur) : detail.batteryDischargeValue],
-            ["energy-battery-benefit", useConservative ? milliToEur(conservative.pnlMilliEur) : detail.batteryBenefit, true]
+            ["energy-battery-flow-pnl", flowPnl, true],
+            ["energy-battery-stored-value", storedValue, true],
+            ["energy-battery-benefit", economicContribution, true]
         ];
         values.forEach(([role, value, signed]) => {
             setMoneyValue(content.querySelector(`[data-role="${role}"]`), value, signed);
@@ -344,6 +358,13 @@
         ].forEach(([role, wh]) => {
             content.querySelector(`[data-role="${role}"]`).textContent = formatFlowKwh(wh);
         });
+        content.querySelector('[data-role="energy-battery-stored-wh"]').textContent = formatSignedFlowKwh(detail.storedEnergyValue?.deliverableDeltaWh);
+        content.querySelector('[data-role="energy-battery-stored-note"]').textContent = detail.storedEnergyValue?.complete
+            ? `${selectedDay === localDateKey() ? "Midnight → now" : "Start → end of day"} · ${formatMoney(detail.storedEnergyValue.averageConsumerEurPerKwh)}/kWh`
+            : "Unavailable: battery level or price data missing";
+        content.querySelector('[data-role="energy-battery-stored-value"]').closest(".app-energy-history__money-flow").title = detail.storedEnergyValue?.complete
+            ? `Opening ${detail.storedEnergyValue.openingPct}% → latest ${detail.storedEnergyValue.closingPct}%. Valued at ${formatMoney(detail.storedEnergyValue.averageConsumerEurPerKwh)} per kWh using the day's elapsed hourly consumer prices.`
+            : "Stored value unavailable: opening or closing battery level, hourly consumer price, or battery configuration is missing.";
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
         content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = !useConservative;
@@ -1069,6 +1090,7 @@
         const money = moneyTotalsForDays(days);
         const grid = gridMoneyTotalsForDays(days);
         const batteryFlow = payload?.whPerDay?.[days[0]]?.batteryFlowTotals || { complete: false, reasons: ["unavailable"], missingHours: [] };
+        const storedEnergyValue = payload?.whPerDay?.[days[0]]?.storedEnergyValue || { complete: false };
         const milliToEur = (value) => finiteNumber(value) === null ? null : finiteNumber(value) / 1000;
         const energyNet = totals.charged - totals.discharged;
         setEnergySummaryValue(elements.charged, totals.charged, true);
@@ -1096,6 +1118,7 @@
             gridExportValue: grid.export.eur,
             gridNetCost: grid.net,
             batteryFlow,
+            storedEnergyValue,
             batteryChargeGridWh: batteryFlow.chargeGridWh,
             batteryChargeSolarWh: batteryFlow.chargeSurplusWh,
             batteryDischargeHomeWh: batteryFlow.dischargeHomeWh,

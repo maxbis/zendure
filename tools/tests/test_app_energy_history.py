@@ -58,6 +58,21 @@ def _build_filtered_payload(rows: list[dict[str, object]], current_hour: int) ->
     return json.loads(proc.stdout)
 
 
+def _build_stored_value_payload(
+    rows: list[dict[str, object]], today: str = "2026-08-01"
+) -> dict[str, object]:
+    php = (
+        f'require {json.dumps(str(HELPER_FILE))};'
+        f'$rows=json_decode({json.dumps(json.dumps(rows))},true);'
+        '$battery=["capacityWh"=>5760,"roundTripEfficiency"=>0.85];'
+        f'echo json_encode(appEnergyHistoryBuildPayload($rows,3,"live",false,$battery,{json.dumps(today)}));'
+    )
+    proc = subprocess.run(["php", "-r", php], capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip())
+    return json.loads(proc.stdout)
+
+
 def _row(
     hour: int,
     *,
@@ -327,6 +342,64 @@ def test_conservative_value_is_available_without_any_classified_hours() -> None:
     assert flow["conservative"]["pnlMilliEur"] == 113
 
 
+def test_today_stored_value_uses_only_midnight_to_latest_level_and_elapsed_prices() -> None:
+    rows = [
+        {**_row(0, consumer=0.20), "battery_pct_start": 50, "battery_pct_end": 60},
+        {**_row(1, consumer=0.40), "battery_pct_start": 60, "battery_pct_end": 70},
+    ]
+    stored = _build_stored_value_payload(rows)["whPerDay"]["2026-08-01"]["storedEnergyValue"]
+    expected_deliverable_wh = 5760 * 0.20 * 0.85**0.5
+    assert stored["complete"] is True
+    assert stored["openingPct"] == 50
+    assert stored["closingPct"] == 70
+    assert stored["storedDeltaWh"] == pytest.approx(1152)
+    assert stored["deliverableDeltaWh"] == pytest.approx(expected_deliverable_wh, abs=0.001)
+    assert stored["averageConsumerEurPerKwh"] == pytest.approx(0.30)
+    assert stored["valueEur"] == pytest.approx(expected_deliverable_wh / 1000 * 0.30, abs=0.000001)
+
+
+def test_stored_value_can_be_negative_and_does_not_count_opening_stock_as_gain() -> None:
+    rows = [
+        {**_row(0), "battery_pct_start": 80, "battery_pct_end": 75},
+        {**_row(1), "battery_pct_start": 75, "battery_pct_end": 70},
+    ]
+    stored = _build_stored_value_payload(rows)["whPerDay"]["2026-08-01"]["storedEnergyValue"]
+    assert stored["complete"] is True
+    assert stored["storedDeltaWh"] == pytest.approx(-576)
+    assert stored["valueEur"] == pytest.approx(-576 * 0.85**0.5 / 1000 * 0.30, abs=0.000001)
+
+
+@pytest.mark.parametrize("change", ["missing_open", "missing_close", "missing_price", "missing_hour"])
+def test_stored_value_is_unavailable_without_complete_boundaries_and_prices(change: str) -> None:
+    rows = [
+        {**_row(0), "battery_pct_start": 50, "battery_pct_end": 55},
+        {**_row(1), "battery_pct_start": 55, "battery_pct_end": 60},
+    ]
+    if change == "missing_open":
+        rows[0]["battery_pct_start"] = None
+    elif change == "missing_close":
+        rows[1]["battery_pct_end"] = None
+    elif change == "missing_price":
+        rows[1]["consumer_eur_per_kwh"] = None
+    else:
+        rows.pop(0)
+    stored = _build_stored_value_payload(rows)["whPerDay"]["2026-08-01"]["storedEnergyValue"]
+    assert stored["complete"] is False
+    assert stored["valueEur"] is None
+
+
+def test_historical_stored_value_requires_end_of_day_reading() -> None:
+    rows = [
+        {**_row(hour), "battery_pct_start": 50 + hour, "battery_pct_end": 51 + hour}
+        for hour in range(24)
+    ]
+    past = _build_stored_value_payload(rows, today="2026-08-02")["whPerDay"]["2026-08-01"]["storedEnergyValue"]
+    assert past["complete"] is True
+    assert past["closingPct"] == 74
+    missing_last = _build_stored_value_payload(rows[:-1], today="2026-08-02")["whPerDay"]["2026-08-01"]["storedEnergyValue"]
+    assert missing_last["complete"] is False
+
+
 def test_today_grid_cost_ignores_future_placeholder_but_not_elapsed_missing_data() -> None:
     rows = [
         _row(21, grid_from_wh=1000, grid_to_wh=100, consumer=0.30, spot=0.10),
@@ -452,7 +525,9 @@ def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_b
     assert 'class="app-energy-history__unclassified-tag">Unclassified</span>' in app_index
     assert 'data-role="energy-battery-unclassified-note">Conservative · lower hourly price' in app_index
     assert '<dt data-role="energy-battery-discharge-label">Total discharge value</dt>' in app_index
-    assert '<dt data-role="energy-battery-pnl-label">Estimated battery P&amp;L</dt>' in app_index
+    assert '<dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt>' in app_index
+    assert 'data-role="energy-battery-stored-value"' in app_index
+    assert 'data-role="energy-battery-flow-pnl"' in app_index
     assert 'status.textContent = useConservative ? "" : batteryFlowStatusMessage' in energy_js
     assert 'badge.hidden = useConservative || !detail.batteryFlow?.partial' in energy_js
     assert "Conservative battery P&L" not in energy_js

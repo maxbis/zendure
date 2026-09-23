@@ -4298,6 +4298,18 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-size: 0.82rem;
 }
 
+.app-energy-history__money-flow--stored {
+    margin-top: 4px;
+    border-top: 1px solid var(--gsd-border-subtle);
+}
+
+.app-energy-history__money-flow--stored dt small {
+    display: block;
+    margin-top: 2px;
+    color: var(--gsd-text-muted);
+    font-size: 0.62rem;
+}
+
 .app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
     margin-left: 12px;
     padding-left: 10px;
