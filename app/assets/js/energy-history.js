@@ -352,12 +352,20 @@
         [
             ["energy-battery-charge-grid-wh", useConservative ? conservative.chargeGridWh : detail.batteryChargeGridWh],
             ["energy-battery-charge-solar-wh", useConservative ? conservative.chargeSurplusWh : detail.batteryChargeSolarWh],
-            ["energy-battery-discharge-home-wh", useConservative ? (detail.batteryDischargeHomeWh ?? 0) : detail.batteryDischargeHomeWh],
-            ["energy-battery-discharge-export-wh", useConservative ? (detail.batteryDischargeExportWh ?? 0) : detail.batteryDischargeExportWh],
+            ["energy-battery-discharge-home-wh", detail.batteryDischargeHomeWh],
+            ["energy-battery-discharge-export-wh", detail.batteryDischargeExportWh],
             ["energy-battery-unclassified-wh", useConservative ? conservative.unclassifiedWh : null]
         ].forEach(([role, wh]) => {
             content.querySelector(`[data-role="${role}"]`).textContent = formatFlowKwh(wh);
         });
+        const noDischarge = detail.dischargedWh === 0;
+        const noClassifiedDischarge = useConservative && detail.batteryFlow?.valuedHours === 0;
+        content.querySelector('[data-role="energy-battery-discharge-home-row"]').hidden = noDischarge
+            || noClassifiedDischarge || detail.batteryDischargeHomeWh === 0;
+        content.querySelector('[data-role="energy-battery-discharge-export-row"]').hidden = noDischarge
+            || noClassifiedDischarge || detail.batteryDischargeExportWh === 0;
+        content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = noDischarge || !useConservative;
+        content.querySelector('[data-role="energy-battery-no-discharge"]').hidden = !noDischarge;
         content.querySelector('[data-role="energy-battery-stored-wh"]').textContent = formatSignedFlowKwh(detail.storedEnergyValue?.deliverableDeltaWh);
         content.querySelector('[data-role="energy-battery-stored-note"]').textContent = detail.storedEnergyValue?.complete
             ? `${selectedDay === localDateKey() ? "Midnight → now" : "Start → end of day"} · ${formatMoney(detail.storedEnergyValue.averageConsumerEurPerKwh)}/kWh`
@@ -367,7 +375,6 @@
             : "Stored value unavailable: opening or closing battery level, hourly consumer price, or battery configuration is missing.";
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
-        content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = !useConservative;
         const unclassifiedNote = content.querySelector('[data-role="energy-battery-unclassified-note"]');
         unclassifiedNote.textContent = useConservative && !conservative.dischargeComplete
             ? "Conservative · hourly price unavailable"
@@ -1114,6 +1121,7 @@
         setSummaryTooltip(elements.pnlSummary, {
             label: "Net flow",
             energy: energyNet,
+            dischargedWh: totals.discharged,
             gridImportCost: grid.import.eur,
             gridExportValue: grid.export.eur,
             gridNetCost: grid.net,

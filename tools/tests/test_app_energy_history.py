@@ -513,7 +513,7 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert 'return "—"' in energy_js
 
 
-def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_badges() -> None:
+def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     app_css = APP_CSS_FILE.read_text(encoding="utf-8")
@@ -528,11 +528,22 @@ def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_b
     assert '<dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt>' in app_index
     assert 'data-role="energy-battery-stored-value"' in app_index
     assert 'data-role="energy-battery-flow-pnl"' in app_index
+    assert 'data-role="energy-battery-discharge-home-row"' in app_index
+    assert 'data-role="energy-battery-discharge-export-row"' in app_index
+    assert 'data-role="energy-battery-no-discharge" hidden' in app_index
+    assert 'No battery discharge recorded' in app_index
+    assert 'detail.batteryDischargeHomeWh === 0' in energy_js
+    assert 'detail.batteryDischargeExportWh === 0' in energy_js
+    assert 'detail.batteryFlow?.valuedHours === 0' in energy_js
+    assert 'detail.dischargedWh === 0' in energy_js
+    assert 'noDischarge || !useConservative' in energy_js
+    assert '(detail.batteryDischargeExportWh ?? 0)' not in energy_js
     assert 'status.textContent = useConservative ? "" : batteryFlowStatusMessage' in energy_js
     assert 'badge.hidden = useConservative || !detail.batteryFlow?.partial' in energy_js
     assert "Conservative battery P&L" not in energy_js
     assert "Conservative discharge value" not in energy_js
-    assert '.app-energy-history__money-flow--unclassified[hidden]' in app_css
+    assert '.app-energy-history__money-card dl > div[hidden]' in app_css
+    assert 'margin-left: 12px;' not in app_css[app_css.index('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified'):][:200]
 
 
 def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:

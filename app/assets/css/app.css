@@ -4310,14 +4310,19 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-size: 0.62rem;
 }
 
-.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
-    margin-left: 12px;
-    padding-left: 10px;
-    border-left: 2px solid var(--gsd-border);
+.app-energy-history__money-card dl > div[hidden] {
+    display: none;
 }
 
-.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified[hidden] {
-    display: none;
+.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
+    margin: 3px 0;
+    padding: 7px 9px;
+    border-radius: 8px;
+    background: var(--gsd-warning-soft);
+}
+
+.app-energy-history__money-empty dt {
+    color: var(--gsd-text-muted);
 }
 
 .app-energy-history__money-flow--unclassified dt .app-energy-history__unclassified-tag {
