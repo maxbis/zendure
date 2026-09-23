@@ -462,13 +462,22 @@ def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_b
 
 def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
+    app_css = APP_CSS_FILE.read_text(encoding="utf-8")
 
     assert 'document.createElement("dialog")' in energy_js
-    assert "if (compactChartMedia.matches) summaryTooltip.showModal();" in energy_js
-    assert "else summaryTooltip.show();" in energy_js
+    assert "if (compactChartMedia.matches) {" in energy_js
+    assert "summaryTooltip.showModal();" in energy_js
+    assert "summaryTooltip.show();" in energy_js
     assert 'tooltip.matches(":modal") && event.target === tooltip' in energy_js
     assert 'if (summaryTooltip.open) summaryTooltip.close();' in energy_js
-    assert 'aria-label", "Close price totals"' in energy_js
+    assert '"Close energy costs" : "Close price totals"' in energy_js
+    assert 'document.documentElement.classList.add("app-energy-summary-modal-open")' in energy_js
+    assert 'document.documentElement.classList.remove("app-energy-summary-modal-open")' in energy_js
+    assert 'if (summaryTooltip.matches(":modal") || eventInsideSummaryTooltip(event.target)) return;' in energy_js
+    assert 'dialog#app-energy-summary-tooltip.app-schedule-tooltip.is-overview' in app_css
+    assert 'height: 100dvh;' in app_css
+    assert 'flex: 1 1 auto;' in app_css
+    assert '-webkit-overflow-scrolling: touch;' in app_css
     assert 'event.pointerType !== "mouse" || chartInteractionIsSuppressed()' in energy_js
     assert "if (chartInteractionIsSuppressed()) return;" in energy_js
     assert "CHART_TOUCH_SUPPRESSION_MS" not in energy_js

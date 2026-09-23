@@ -4084,6 +4084,10 @@ dialog.app-schedule-tooltip {
     gap: 4px;
 }
 
+html.app-energy-summary-modal-open {
+    overflow: hidden;
+}
+
 .app-energy-summary-tooltip__title {
     min-width: 0;
     flex: 1 1 auto;
@@ -4846,8 +4850,23 @@ dialog#app-energy-summary-tooltip.is-overview {
     }
 
     dialog#app-energy-summary-tooltip.app-schedule-tooltip.is-overview {
+        inset: 0;
         width: 100%;
-        max-height: min(82dvh, 620px);
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top);
+        border: 0;
+        border-radius: 0;
+    }
+
+    dialog#app-energy-summary-tooltip.app-schedule-tooltip.is-overview .app-energy-summary-tooltip__overview {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     dialog#app-energy-summary-tooltip::backdrop {

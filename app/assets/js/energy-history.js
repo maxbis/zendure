@@ -249,6 +249,7 @@
         }
         activeSummaryTooltipTrigger = null;
         if (summaryTooltip.open) summaryTooltip.close();
+        document.documentElement.classList.remove("app-energy-summary-modal-open");
         summaryTooltip.hidden = true;
         summaryTooltip.style.removeProperty("left");
         summaryTooltip.style.removeProperty("top");
@@ -458,7 +459,7 @@
         const close = document.createElement("button");
         close.type = "button";
         close.className = "gsd-icon-btn app-energy-summary-tooltip__close";
-        close.setAttribute("aria-label", "Close price totals");
+        close.setAttribute("aria-label", detail.label === "Net flow" ? "Close energy costs" : "Close price totals");
         close.innerHTML = '<svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>';
         close.addEventListener("click", () => hideSummaryTooltip(trigger));
         heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1), close);
@@ -467,8 +468,12 @@
         summaryTooltip.replaceChildren(header, buildSummaryTooltipContent(detail));
         summaryTooltip.hidden = false;
         summaryTooltip.style.visibility = "hidden";
-        if (compactChartMedia.matches) summaryTooltip.showModal();
-        else summaryTooltip.show();
+        if (compactChartMedia.matches) {
+            summaryTooltip.showModal();
+            document.documentElement.classList.add("app-energy-summary-modal-open");
+        } else {
+            summaryTooltip.show();
+        }
         positionSummaryTooltip(trigger);
         updateSummaryTooltipChartShield();
     }
@@ -1229,7 +1234,8 @@
         hideHourTooltip();
         updateChartScrollButtons();
     });
-    window.addEventListener("scroll", () => {
+    window.addEventListener("scroll", (event) => {
+        if (summaryTooltip.matches(":modal") || eventInsideSummaryTooltip(event.target)) return;
         hideSummaryTooltip();
         hideHourTooltip();
     }, true);
@@ -1258,6 +1264,7 @@
         trigger.focus({ preventScroll: true });
     });
     compactChartMedia.addEventListener?.("change", () => {
+        hideSummaryTooltip();
         if (payload) render();
     });
 
