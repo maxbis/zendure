@@ -528,6 +528,10 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     assert '<dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt>' in app_index
     assert 'data-role="energy-battery-stored-value"' in app_index
     assert 'data-role="energy-battery-flow-pnl"' in app_index
+    assert 'Battery flow P&amp;L<small>Discharge value − charging cost</small>' in app_index
+    assert '.app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) dt' in app_css
+    assert 'padding-left: 14px;' in app_css
+    assert '.app-energy-history__money-subtotal--flow-pnl {' in app_css
     assert 'data-role="energy-battery-discharge-home-row"' in app_index
     assert 'data-role="energy-battery-discharge-export-row"' in app_index
     assert 'data-role="energy-battery-no-discharge" hidden' in app_index
