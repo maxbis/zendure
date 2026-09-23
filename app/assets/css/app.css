@@ -4294,15 +4294,34 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-size: 0.82rem;
 }
 
-.app-energy-history__money-card dl > .app-energy-history__money-flow--conservative {
-    margin: 3px -6px;
-    padding: 7px 6px;
-    border-radius: 7px;
-    background: var(--gsd-warning-soft);
+.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
+    margin-left: 12px;
+    padding-left: 10px;
+    border-left: 2px solid var(--gsd-border);
 }
 
-.app-energy-history__money-flow--conservative dt,
-.app-energy-history__money-flow--conservative dd strong {
+.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified[hidden] {
+    display: none;
+}
+
+.app-energy-history__money-flow--unclassified dt .app-energy-history__unclassified-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--gsd-warning-soft);
+    color: var(--gsd-warning);
+    font-size: 0.64rem;
+    font-weight: 700;
+}
+
+.app-energy-history__money-flow--unclassified dt small {
+    display: block;
+    margin-top: 3px;
+    color: var(--gsd-text-muted);
+    font-size: 0.62rem;
+}
+
+.app-energy-history__money-flow--unclassified dd strong {
     color: var(--gsd-warning);
 }
 

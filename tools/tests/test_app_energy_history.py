@@ -15,6 +15,7 @@ HELPER_FILE = REPO_ROOT / "main" / "includes" / "app_energy_history.php"
 ENDPOINT_FILE = REPO_ROOT / "main" / "api" / "app_energy_history.php"
 APP_INDEX_FILE = REPO_ROOT / "app" / "index.php"
 ENERGY_HISTORY_JS_FILE = REPO_ROOT / "app" / "assets" / "js" / "energy-history.js"
+APP_CSS_FILE = REPO_ROOT / "app" / "assets" / "css" / "app.css"
 
 
 def _build_payload(rows: list[dict[str, object]]) -> dict[str, object]:
@@ -437,6 +438,26 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert "'todaySource' => $todaySource" in helper
     assert "source.complete !== true" in energy_js
     assert 'return "—"' in energy_js
+
+
+def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_badges() -> None:
+    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+    energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
+    app_css = APP_CSS_FILE.read_text(encoding="utf-8")
+
+    confirmed_export = app_index.index('data-role="energy-battery-discharge-export-value"')
+    unclassified = app_index.index('data-role="energy-battery-unclassified-row"')
+    discharge_total = app_index.index('data-role="energy-battery-discharge-value"')
+    assert confirmed_export < unclassified < discharge_total
+    assert 'class="app-energy-history__unclassified-tag">Unclassified</span>' in app_index
+    assert 'data-role="energy-battery-unclassified-note">Conservative · lower hourly price' in app_index
+    assert '<dt data-role="energy-battery-discharge-label">Total discharge value</dt>' in app_index
+    assert '<dt data-role="energy-battery-pnl-label">Estimated battery P&amp;L</dt>' in app_index
+    assert 'status.textContent = useConservative ? "" : batteryFlowStatusMessage' in energy_js
+    assert 'badge.hidden = useConservative || !detail.batteryFlow?.partial' in energy_js
+    assert "Conservative battery P&L" not in energy_js
+    assert "Conservative discharge value" not in energy_js
+    assert '.app-energy-history__money-flow--unclassified[hidden]' in app_css
 
 
 def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:

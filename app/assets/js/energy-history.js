@@ -346,35 +346,23 @@
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
         content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = !useConservative;
-        content.querySelector('[data-role="energy-battery-discharge-label"]').textContent = useConservative
-            ? (conservative.dischargeComplete ? "Conservative discharge value" : "Discharge value unavailable")
-            : "Total discharge value";
-        content.querySelector('[data-role="energy-battery-pnl-label"]').textContent = useConservative
-            ? (conservative.complete ? "Conservative battery P&L" : "Battery P&L unavailable")
-            : (detail.batteryFlow?.partial ? "Battery P&L · partial" : "Estimated battery P&L");
+        const unclassifiedNote = content.querySelector('[data-role="energy-battery-unclassified-note"]');
+        unclassifiedNote.textContent = useConservative && !conservative.dischargeComplete
+            ? "Conservative · hourly price unavailable"
+            : useConservative && !conservative.chargeComplete
+                ? "Conservative · lower hourly price; charging data missing"
+                : "Conservative · lower hourly price";
         const status = content.querySelector('[data-role="energy-battery-status"]');
-        status.textContent = batteryFlowStatusMessage(detail.batteryFlow);
+        status.textContent = useConservative ? "" : batteryFlowStatusMessage(detail.batteryFlow);
         status.hidden = status.textContent === "";
         const badge = content.querySelector('[data-role="energy-battery-partial-badge"]');
-        badge.hidden = !useConservative && !detail.batteryFlow?.partial;
-        badge.textContent = useConservative
-            ? (conservative.dischargeComplete ? "Conservative" : "Incomplete")
-            : "Partial";
+        badge.hidden = useConservative || !detail.batteryFlow?.partial;
+        badge.textContent = "Partial";
         return content;
     }
 
     function batteryFlowStatusMessage(flow) {
         if (flow?.complete === true) return "";
-        if (flow?.conservative?.unclassifiedWh > 0) {
-            const energy = formatFlowKwh(flow.conservative.unclassifiedWh);
-            if (!flow.conservative.dischargeComplete) {
-                return `${energy} discharge is unclassified, but an hourly price is missing, so its value is unavailable.`;
-            }
-            const suffix = flow.conservative.complete
-                ? "Charging costs and discharge are covered; this estimate will be replaced when home/export attribution is available."
-                : "Some charging costs or hourly prices are still unavailable, so the full-day P&L cannot be shown.";
-            return `${energy} discharge is unclassified and valued at the lower hourly price, not counted as export revenue. ${suffix}`;
-        }
         const explanations = {
             missing_boundary_sample: "a battery reading is missing",
             missing_grid_counters: "grid meter readings are missing",
