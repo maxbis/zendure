@@ -461,9 +461,11 @@ def test_unclassified_discharge_is_nested_below_confirmed_export_without_extra_b
 
 
 def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:
+    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     app_css = APP_CSS_FILE.read_text(encoding="utf-8")
 
+    assert '<meta name="apple-mobile-web-app-status-bar-style" content="black">' in app_index
     assert 'document.createElement("dialog")' in energy_js
     assert "if (compactChartMedia.matches) {" in energy_js
     assert "summaryTooltip.showModal();" in energy_js
