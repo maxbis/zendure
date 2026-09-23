@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HELPER_FILE = REPO_ROOT / "main" / "includes" / "app_energy_history.php"
 ENDPOINT_FILE = REPO_ROOT / "main" / "api" / "app_energy_history.php"
 APP_INDEX_FILE = REPO_ROOT / "app" / "index.php"
+ENERGY_OVERVIEW_TEMPLATE_FILE = REPO_ROOT / "app" / "partials" / "energy-money-overview.html"
 ENERGY_HISTORY_JS_FILE = REPO_ROOT / "app" / "assets" / "js" / "energy-history.js"
 APP_CSS_FILE = REPO_ROOT / "app" / "assets" / "css" / "app.css"
 
@@ -473,6 +474,7 @@ def test_live_report_rows_use_live_energy_and_price_ticks() -> None:
 
 def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+    overview_html = ENERGY_OVERVIEW_TEMPLATE_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     endpoint = ENDPOINT_FILE.read_text(encoding="utf-8")
 
@@ -487,7 +489,8 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
         assert role in energy_js
 
     assert 'label: "Net flow"' in energy_js
-    assert 'data-role="energy-money-overview-template"' in app_index
+    assert "readfile(__DIR__ . '/partials/energy-money-overview.html')" in app_index
+    assert 'data-role="energy-money-overview-template"' in overview_html
     assert "content.append(elements.moneyOverviewTemplate.content.cloneNode(true))" in energy_js
     assert 'trigger === elements.pnlSummary) return;' in energy_js
     assert 'detail.label === "Net flow" ? buildMoneyOverview(detail)' in energy_js
@@ -514,7 +517,7 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
 
 
 def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
-    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+    app_index = ENERGY_OVERVIEW_TEMPLATE_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     app_css = APP_CSS_FILE.read_text(encoding="utf-8")
 
@@ -556,7 +559,7 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
 
 
 def test_energy_cost_dialog_groups_flows_and_pnl_in_one_card() -> None:
-    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+    app_index = ENERGY_OVERVIEW_TEMPLATE_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     card_classes = (
         'app-energy-history__money-card--grid',

@@ -10,7 +10,7 @@ These are variable-energy estimates, not a supplier invoice. The battery figure 
 
 ## Location
 
-- Dialog and display: `app/index.php` and `app/assets/js/energy-history.js`.
+- Dialog and display: `app/partials/energy-money-overview.html` (the editable HTML template), rendered by `app/index.php`, and populated by `app/assets/js/energy-history.js`.
 - App API: `main/api/app_energy_history.php` and `main/includes/app_energy_history.php`.
 - Hourly calculation: `daily_report/tools/hourly_daily_grid_battery_report.py`.
 - Historical persistence: `daily_report/tools/update_hourly_report_inputs.py`.

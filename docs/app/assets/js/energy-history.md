@@ -10,6 +10,7 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 - `main/includes/app_energy_history.php`
 - `main/api/app_energy_history.php`
 - `app/index.php` (Battery energy section)
+- `app/partials/energy-money-overview.html` (Energy costs dialog template, rendered into `app/index.php`)
 
 ## Inputs / outputs
 

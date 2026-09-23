@@ -596,45 +596,7 @@ $appConfig = [
                     </button>
                 </div>
 
-                <template data-role="energy-money-overview-template">
-                    <div class="app-energy-history__money-overview" role="group" aria-label="Grid cost and battery profit and loss">
-                        <section class="app-energy-history__money-card app-energy-history__money-card--grid" aria-labelledby="energy-grid-cost-title">
-                            <h3 id="energy-grid-cost-title">Grid cost</h3>
-                            <dl>
-                                <div><dt>Imported <span>· consumer price</span></dt><dd data-role="energy-grid-import-cost">—</dd></div>
-                                <div><dt>Exported <span>· spot price</span></dt><dd data-role="energy-grid-export-value">—</dd></div>
-                                <div class="app-energy-history__money-total"><dt>Estimated net grid cost</dt><dd data-role="energy-grid-net-cost">—</dd></div>
-                            </dl>
-                        </section>
-                        <section class="app-energy-history__money-card app-energy-history__money-card--battery app-energy-history__money-card--flows" aria-labelledby="energy-battery-flows-title">
-                            <h3 id="energy-battery-flows-title">Battery flows <span class="app-energy-history__partial-badge" data-role="energy-battery-partial-badge" hidden>Partial</span></h3>
-                            <p class="app-energy-history__battery-status" data-role="energy-battery-status" hidden></p>
-                            <h4>Charging costs</h4>
-                            <dl>
-                                <div class="app-energy-history__money-flow"><dt>From grid <span>· consumer price</span></dt><dd><small data-role="energy-battery-charge-grid-wh">—</small><strong data-role="energy-battery-charge-grid-cost">—</strong></dd></div>
-                                <div class="app-energy-history__money-flow"><dt>From surplus solar <span>· spot price</span></dt><dd><small data-role="energy-battery-charge-solar-wh">—</small><strong data-role="energy-battery-charge-solar-cost">—</strong></dd></div>
-                                <div class="app-energy-history__money-subtotal"><dt>Total charging cost</dt><dd data-role="energy-battery-charge-cost">—</dd></div>
-                            </dl>
-                            <h4>Discharge value</h4>
-                            <dl>
-                                <div class="app-energy-history__money-flow" data-role="energy-battery-discharge-home-row"><dt>Used at home <span>· consumer price</span></dt><dd><small data-role="energy-battery-discharge-home-wh">—</small><strong data-role="energy-battery-discharge-home-value">—</strong></dd></div>
-                                <div class="app-energy-history__money-flow" data-role="energy-battery-discharge-export-row"><dt>Exported <span>· spot price</span></dt><dd><small data-role="energy-battery-discharge-export-wh">—</small><strong data-role="energy-battery-discharge-export-value">—</strong></dd></div>
-                                <div class="app-energy-history__money-flow app-energy-history__money-flow--unclassified" data-role="energy-battery-unclassified-row" hidden><dt><span class="app-energy-history__unclassified-tag">Unclassified</span><small data-role="energy-battery-unclassified-note">Conservative · lower hourly price</small></dt><dd><small data-role="energy-battery-unclassified-wh">—</small><strong data-role="energy-battery-unclassified-value">—</strong></dd></div>
-                                <div class="app-energy-history__money-empty" data-role="energy-battery-no-discharge" hidden><dt>No battery discharge recorded</dt></div>
-                                <div class="app-energy-history__money-subtotal"><dt data-role="energy-battery-discharge-label">Total discharge value</dt><dd data-role="energy-battery-discharge-value">—</dd></div>
-                                <div class="app-energy-history__money-result"><dt><strong>Battery P&amp;L</strong><small>Discharge value − charging cost</small></dt><dd data-role="energy-battery-flow-pnl">—</dd></div>
-                            </dl>
-                        </section>
-                        <section class="app-energy-history__money-card app-energy-history__money-card--battery app-energy-history__money-card--contribution" aria-labelledby="energy-battery-contribution-title">
-                            <h3 id="energy-battery-contribution-title">Stored value &amp; contribution</h3>
-                            <dl>
-                                <div class="app-energy-history__money-flow app-energy-history__money-flow--stored"><dt>Change in stored value <span>· average consumer price</span><small data-role="energy-battery-stored-note"></small></dt><dd><small data-role="energy-battery-stored-wh">—</small><strong data-role="energy-battery-stored-value">—</strong></dd></div>
-                                <div class="app-energy-history__money-total"><dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt><dd data-role="energy-battery-benefit">—</dd></div>
-                            </dl>
-                        </section>
-                    </div>
-                    <p class="app-energy-history__money-note">Stored value is the change since midnight, not the battery's whole balance. The final estimate is not measured bill savings and must not be combined with net grid cost. It excludes fixed fees and battery ownership costs.</p>
-                </template>
+                <?php readfile(__DIR__ . '/partials/energy-money-overview.html'); ?>
 
                 <p class="app-energy-history__status" data-role="energy-history-status" hidden></p>
             </div>
