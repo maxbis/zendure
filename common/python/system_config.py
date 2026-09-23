@@ -67,6 +67,8 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
     }
     if "roundTripEfficiency" in battery:
         battery_keys.add("roundTripEfficiency")
+    if "wearCostEurPerKwhDischarged" in battery:
+        battery_keys.add("wearCostEurPerKwhDischarged")
     _assert_exact_keys(battery, battery_keys, "$.battery")
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
     min_charge_percent = _require_integer(
@@ -88,6 +90,13 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             0.0,
             1.0,
             exclusive_minimum=True,
+        )
+    wear_cost_eur_per_kwh_discharged = None
+    if "wearCostEurPerKwhDischarged" in battery:
+        wear_cost_eur_per_kwh_discharged = _require_number(
+            battery["wearCostEurPerKwhDischarged"],
+            "$.battery.wearCostEurPerKwhDischarged",
+            0.0,
         )
     max_charge_power_w = _require_integer(
         battery["maxChargePowerW"], "$.battery.maxChargePowerW", 1
@@ -197,6 +206,8 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
     }
     if round_trip_efficiency is not None:
         normalized_battery["roundTripEfficiency"] = round_trip_efficiency
+    if wear_cost_eur_per_kwh_discharged is not None:
+        normalized_battery["wearCostEurPerKwhDischarged"] = wear_cost_eur_per_kwh_discharged
 
     return {
         "schemaVersion": schema_version,

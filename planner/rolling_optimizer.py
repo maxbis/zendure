@@ -41,6 +41,7 @@ class RollingDecision:
     pv_w: float
     grid_power_w: float
     expected_cost_eur: float
+    expected_battery_wear_cost_eur: float
     schedule_value: object
     min_power: Optional[int]
     max_power: Optional[int]
@@ -60,6 +61,7 @@ class RollingDecision:
             "pv_w": round(self.pv_w, 1),
             "grid_power_w": round(self.grid_power_w, 1),
             "expected_cost_eur": round(self.expected_cost_eur, 6),
+            "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
             "schedule_value": self.schedule_value,
             "reason": self.reason,
         }
@@ -78,9 +80,11 @@ class RollingPlan:
     starting_soc_percent: float
     ending_soc_percent: float
     expected_energy_cost_eur: float
+    expected_battery_wear_cost_eur: float
     terminal_energy_value_eur: float
     objective_eur: float
     round_trip_efficiency: float
+    battery_wear_cost_eur_per_kwh_discharged: float
     decisions: List[RollingDecision]
 
     def to_dict(self) -> dict:
@@ -91,9 +95,11 @@ class RollingPlan:
             "starting_soc_percent": round(self.starting_soc_percent, 2),
             "ending_soc_percent": round(self.ending_soc_percent, 2),
             "expected_energy_cost_eur": round(self.expected_energy_cost_eur, 6),
+            "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
             "terminal_energy_value_eur": round(self.terminal_energy_value_eur, 6),
             "objective_eur": round(self.objective_eur, 6),
             "round_trip_efficiency": self.round_trip_efficiency,
+            "battery_wear_cost_eur_per_kwh_discharged": self.battery_wear_cost_eur_per_kwh_discharged,
             "decisions": [decision.to_dict() for decision in self.decisions],
         }
 
@@ -138,6 +144,16 @@ def _hour_cost(grid_power_w: float, duration_hours: float, import_price: float, 
     if grid_kwh >= 0:
         return grid_kwh * import_price
     return grid_kwh * export_price
+
+
+def _battery_wear_cost(
+    battery_power_w: float,
+    duration_hours: float,
+    wear_cost_eur_per_kwh_discharged: float,
+) -> float:
+    """Return discharge-only wear cost using AC-side battery output."""
+    discharged_kwh = max(0.0, -battery_power_w) * duration_hours / 1000.0
+    return discharged_kwh * max(0.0, wear_cost_eur_per_kwh_discharged)
 
 
 def _linear_netzero_minus_price_score(
@@ -363,6 +379,7 @@ def _opportunistic_netzero_plus_candidate(
     terminal_price: float,
     terminal_value_factor: float,
     future_import_prices: List[float],
+    wear_cost_eur_per_kwh_discharged: float = 0.0,
 ) -> Optional[_ActionCandidate]:
     """Return a daylight NZ+ choice when stored solar is worth more than export."""
     if slot.pv_w <= 0 or slot.duration_hours <= 0 or max_charge_power_w <= 0:
@@ -371,7 +388,11 @@ def _opportunistic_netzero_plus_candidate(
     future_consumer_value = max(
         [terminal_price * max(0.0, terminal_value_factor)] + future_import_prices
     )
-    stored_solar_value = future_consumer_value * charge_efficiency * charge_efficiency
+    stored_solar_value = (
+        max(0.0, future_consumer_value - wear_cost_eur_per_kwh_discharged)
+        * charge_efficiency
+        * charge_efficiency
+    )
     if slot.export_price_eur_per_kwh >= stored_solar_value - 1e-12:
         return None
 
@@ -420,6 +441,7 @@ def optimize_rolling_schedule(
     power_step_w: int,
     soc_step_wh: float,
     terminal_value_factor: float = 1.0,
+    battery_wear_cost_eur_per_kwh_discharged: float = 0.0,
 ) -> RollingPlan:
     if not slots:
         raise ValueError("At least one rolling input slot is required")
@@ -427,6 +449,7 @@ def optimize_rolling_schedule(
         raise ValueError("Power and SoC steps must be greater than zero")
 
     rte = max(0.01, min(1.0, float(round_trip_efficiency)))
+    wear_rate = max(0.0, float(battery_wear_cost_eur_per_kwh_discharged))
     charge_efficiency = math.sqrt(rte)
     discharge_efficiency = charge_efficiency
     capacity_wh = float(battery_state.usable_capacity_wh)
@@ -465,7 +488,9 @@ def optimize_rolling_schedule(
             for future_slot in slots[slot_index + 1:]
         ]
         continuation_consumer_price = max(
-            [terminal_price * max(0.0, terminal_value_factor)] + future_import_prices
+            0.0,
+            max([terminal_price * max(0.0, terminal_value_factor)] + future_import_prices)
+            - wear_rate,
         )
         for _energy_key, (cost_so_far, energy_wh, path) in states.items():
             candidates = list(actions)
@@ -478,6 +503,7 @@ def optimize_rolling_schedule(
                 terminal_price=terminal_price,
                 terminal_value_factor=terminal_value_factor,
                 future_import_prices=future_import_prices,
+                wear_cost_eur_per_kwh_discharged=wear_rate,
             )
             if opportunistic is not None:
                 candidates.append(opportunistic)
@@ -498,7 +524,8 @@ def optimize_rolling_schedule(
                     slot.import_price_eur_per_kwh,
                     slot.export_price_eur_per_kwh,
                 )
-                candidate_cost = cost_so_far + hour_cost
+                wear_cost = _battery_wear_cost(action_w, duration, wear_rate)
+                candidate_cost = cost_so_far + hour_cost + wear_cost
                 previous = next_states.get(next_key)
                 previous_action = (
                     previous[2][-1][0]
@@ -546,7 +573,6 @@ def optimize_rolling_schedule(
 
     best_key: Optional[int] = None
     best_objective = float("inf")
-    best_energy_cost = 0.0
     best_path: List[Tuple[_ActionCandidate, float, float, float]] = []
     best_terminal_value = 0.0
     best_ending_energy_wh = starting_energy_wh
@@ -555,20 +581,35 @@ def optimize_rolling_schedule(
             max(0.0, energy_wh - min_energy_wh)
             * discharge_efficiency
             / 1000.0
-            * terminal_price
+            * max(0.0, terminal_price - wear_rate)
             * max(0.0, terminal_value_factor)
         )
         objective = energy_cost - terminal_value
         if objective < best_objective:
             best_key = energy_key
             best_objective = objective
-            best_energy_cost = energy_cost
             best_path = path
             best_terminal_value = terminal_value
             best_ending_energy_wh = energy_wh
 
     if best_key is None:
         raise RuntimeError("Unable to select a feasible rolling plan")
+
+    best_energy_cost = sum(
+        _hour_cost(
+            grid_power_w,
+            slot.duration_hours,
+            slot.import_price_eur_per_kwh,
+            slot.export_price_eur_per_kwh,
+        )
+        for slot, (_candidate, _start_energy_wh, _end_energy_wh, grid_power_w)
+        in zip(slots, best_path)
+    )
+    best_wear_cost = sum(
+        _battery_wear_cost(candidate.power_w, slot.duration_hours, wear_rate)
+        for slot, (candidate, _start_energy_wh, _end_energy_wh, _grid_power_w)
+        in zip(slots, best_path)
+    )
 
     decisions: List[RollingDecision] = []
     for slot_index, (slot, (candidate, start_energy_wh, end_energy_wh, grid_power_w)) in enumerate(
@@ -641,6 +682,11 @@ def optimize_rolling_schedule(
                     slot.import_price_eur_per_kwh,
                     slot.export_price_eur_per_kwh,
                 ),
+                expected_battery_wear_cost_eur=_battery_wear_cost(
+                    action_w,
+                    duration,
+                    wear_rate,
+                ),
                 schedule_value=schedule_value,
                 min_power=min_power,
                 max_power=max_power,
@@ -655,8 +701,10 @@ def optimize_rolling_schedule(
         starting_soc_percent=starting_energy_wh / capacity_wh * 100.0,
         ending_soc_percent=best_ending_energy_wh / capacity_wh * 100.0,
         expected_energy_cost_eur=best_energy_cost,
+        expected_battery_wear_cost_eur=best_wear_cost,
         terminal_energy_value_eur=best_terminal_value,
         objective_eur=best_objective,
         round_trip_efficiency=rte,
+        battery_wear_cost_eur_per_kwh_discharged=wear_rate,
         decisions=decisions,
     )

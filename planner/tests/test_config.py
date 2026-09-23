@@ -17,6 +17,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.max_discharge_power_w, 1800)
         self.assertEqual(settings.active_hour_deadband_w, 0)
         self.assertEqual(settings.round_trip_efficiency, 0.85)
+        self.assertEqual(settings.battery_wear_cost_eur_per_kwh_discharged, 0.0005)
 
     def test_active_hour_deadband_can_be_overridden(self) -> None:
         with patch.dict("os.environ", {"PLANNER_ACTIVE_HOUR_DEADBAND_W": "300"}):

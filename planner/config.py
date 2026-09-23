@@ -79,6 +79,7 @@ class PlannerSettings:
     default_household_usage_w_by_hour: List[int]
     arbitrage_min_spread_eur_per_kwh: float
     round_trip_efficiency: float
+    battery_wear_cost_eur_per_kwh_discharged: float
     cheap_hour_tolerance_eur_per_kwh: float
     expensive_hour_tolerance_eur_per_kwh: float
     netzero_market_price_threshold_eur_per_kwh: float
@@ -300,6 +301,10 @@ def load_settings() -> PlannerSettings:
                     _get_float(battery.get("roundTripEfficiency"), ROUND_TRIP_EFFICIENCY),
                 ),
             ),
+        ),
+        battery_wear_cost_eur_per_kwh_discharged=max(
+            0.0,
+            _get_float(battery.get("wearCostEurPerKwhDischarged"), 0.0),
         ),
         cheap_hour_tolerance_eur_per_kwh=_get_float(
             os.getenv("PLANNER_CHEAP_HOUR_TOLERANCE"),

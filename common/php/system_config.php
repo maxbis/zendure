@@ -22,6 +22,7 @@ function systemConfigDefaultPath(): string
  *     maxChargePercent: int,
  *     efficiency: float,
  *     roundTripEfficiency?: float,
+ *     wearCostEurPerKwhDischarged?: float,
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
  *   },
@@ -99,6 +100,9 @@ function validateSystemConfig(array $config): array
     if (array_key_exists('roundTripEfficiency', $battery)) {
         $batteryKeys[] = 'roundTripEfficiency';
     }
+    if (array_key_exists('wearCostEurPerKwhDischarged', $battery)) {
+        $batteryKeys[] = 'wearCostEurPerKwhDischarged';
+    }
     systemConfigAssertExactKeys($battery, $batteryKeys, '$.battery');
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
     $minChargePercent = systemConfigRequireInteger(
@@ -126,6 +130,13 @@ function validateSystemConfig(array $config): array
             0.0,
             1.0,
             true
+        )
+        : null;
+    $wearCostEurPerKwhDischarged = array_key_exists('wearCostEurPerKwhDischarged', $battery)
+        ? systemConfigRequireNumber(
+            $battery['wearCostEurPerKwhDischarged'],
+            '$.battery.wearCostEurPerKwhDischarged',
+            0.0
         )
         : null;
     $maxChargePowerW = systemConfigRequireInteger(
@@ -247,6 +258,9 @@ function validateSystemConfig(array $config): array
     ];
     if ($roundTripEfficiency !== null) {
         $normalizedBattery['roundTripEfficiency'] = $roundTripEfficiency;
+    }
+    if ($wearCostEurPerKwhDischarged !== null) {
+        $normalizedBattery['wearCostEurPerKwhDischarged'] = $wearCostEurPerKwhDischarged;
     }
 
     return [

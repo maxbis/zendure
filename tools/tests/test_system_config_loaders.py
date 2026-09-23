@@ -32,6 +32,7 @@ EXPECTED_CONFIG = {
         "maxChargePercent": 91,
         "efficiency": 0.9,
         "roundTripEfficiency": 0.85,
+        "wearCostEurPerKwhDischarged": 0.0005,
         "maxChargePowerW": 1200,
         "maxDischargePowerW": 2000,
     },
@@ -142,7 +143,9 @@ def test_schema_contract_matches_loader_sections():
         expected_required = set(EXPECTED_CONFIG[section])
         if section == "battery":
             expected_required.remove("roundTripEfficiency")
+            expected_required.remove("wearCostEurPerKwhDischarged")
             assert "roundTripEfficiency" in section_schema["properties"]
+            assert "wearCostEurPerKwhDischarged" in section_schema["properties"]
         if section == "schedule":
             expected_required.remove("activeHourDeadbandW")
             assert "activeHourDeadbandW" in section_schema["properties"]
@@ -169,6 +172,7 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"efficiency": 1.01}), r"efficiency must be at most 1\."),
         (lambda value: value["battery"].update({"roundTripEfficiency": 0}), r"roundTripEfficiency must be greater than 0\."),
         (lambda value: value["battery"].update({"roundTripEfficiency": 1.01}), r"roundTripEfficiency must be at most 1\."),
+        (lambda value: value["battery"].update({"wearCostEurPerKwhDischarged": -0.01}), r"wearCostEurPerKwhDischarged must be at least 0\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].pop("04:00"), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(missing: 04:00\)\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].update({"24:00": 100}), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(unknown: 24:00\)\."),

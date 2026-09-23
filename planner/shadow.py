@@ -324,7 +324,12 @@ def _recalculate_plan_trajectory(
     raw_excess_wh = max(0.0, raw_ending_energy_wh - minimum_energy_wh)
     raw_terminal_value = max(0.0, float(plan.get("terminal_energy_value_eur", 0.0)))
     terminal_value_per_excess_wh = raw_terminal_value / raw_excess_wh if raw_excess_wh > 0 else 0.0
-    total_cost = 0.0
+    wear_rate = max(
+        0.0,
+        float(plan.get("battery_wear_cost_eur_per_kwh_discharged", 0.0)),
+    )
+    total_energy_cost = 0.0
+    total_wear_cost = 0.0
 
     for decision in decisions:
         if not isinstance(decision, dict):
@@ -352,11 +357,14 @@ def _recalculate_plan_trajectory(
         grid_power_w = load_w - pv_w + power_w
         grid_kwh = grid_power_w * duration_hours / 1000.0
         expected_cost = grid_kwh * (import_price if grid_kwh >= 0 else export_price)
+        expected_wear_cost = max(0.0, -power_w) * duration_hours / 1000.0 * wear_rate
         decision["start_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
         decision["end_soc_percent"] = round(next_energy_wh / capacity_wh * 100.0, 2)
         decision["grid_power_w"] = round(grid_power_w, 1)
         decision["expected_cost_eur"] = round(expected_cost, 6)
-        total_cost += expected_cost
+        decision["expected_battery_wear_cost_eur"] = round(expected_wear_cost, 6)
+        total_energy_cost += expected_cost
+        total_wear_cost += expected_wear_cost
         energy_wh = next_energy_wh
 
     terminal_value = max(0.0, energy_wh - minimum_energy_wh) * terminal_value_per_excess_wh
@@ -367,9 +375,10 @@ def _recalculate_plan_trajectory(
         2,
     )
     stabilized["ending_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
-    stabilized["expected_energy_cost_eur"] = round(total_cost, 6)
+    stabilized["expected_energy_cost_eur"] = round(total_energy_cost, 6)
+    stabilized["expected_battery_wear_cost_eur"] = round(total_wear_cost, 6)
     stabilized["terminal_energy_value_eur"] = round(terminal_value, 6)
-    stabilized["objective_eur"] = round(total_cost - terminal_value, 6)
+    stabilized["objective_eur"] = round(total_energy_cost + total_wear_cost - terminal_value, 6)
     return stabilized
 
 
@@ -514,6 +523,9 @@ def run_shadow_once(
         power_step_w=settings.power_step_w,
         soc_step_wh=soc_step_wh,
         terminal_value_factor=terminal_value_factor,
+        battery_wear_cost_eur_per_kwh_discharged=(
+            settings.battery_wear_cost_eur_per_kwh_discharged
+        ),
     )
     payload = {
         "type": "optimizer_shadow_plan",
@@ -532,6 +544,9 @@ def run_shadow_once(
             "max_discharge_power_w": battery_state.max_discharge_power_w,
             "power_step_w": settings.power_step_w,
             "active_hour_deadband_w": settings.active_hour_deadband_w,
+            "battery_wear_cost_eur_per_kwh_discharged": (
+                settings.battery_wear_cost_eur_per_kwh_discharged
+            ),
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
             "solar_forecast_source": "shortwave_radiation",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),

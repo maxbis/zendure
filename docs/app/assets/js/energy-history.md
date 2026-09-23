@@ -35,12 +35,13 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 - When some elapsed hours have complete version 2 battery-flow attribution and others do not, then the dialog shows the sums from complete hours as **partial**, with the number of covered and excluded hours plus the first affected hour and reason. These are not full-day P&L values.
 - When an excluded hour has measured discharge and both hourly prices, then its discharge is valued at the lower price in a distinct conservative line. This does not assert that the electricity was exported. Negative spot prices can produce a negative conservative value.
 - When all hours' charging costs and discharge values are covered by classified or conservative values, then the dialog shows **Conservative battery P&L** for the selected day. If any required charging split or price remains unavailable, the full-day P&L stays unavailable even when a conservative discharge value is shown.
-- When no elapsed hour has complete battery-flow attribution, then battery-flow values and P&L are unavailable (`—`).
+- When no elapsed hour has complete battery-flow attribution but the measured discharge has both prices, then the conservative discharge value can still be shown. If required charge inputs or prices are missing, then the affected total and whole-day P&L remain unavailable (`—`).
 - When today is selected, future placeholder hours are excluded and totals cover elapsed hours through now.
 - When spot prices are negative, charging opportunity cost or export revenue can be negative.
 
 ## Related files
 
+- `docs/app/energy-costs-and-battery-pnl.md`
 - `docs/app/gui-overview.md`
 - `docs/daily_report/battery-flow-pnl.md`
 - `tools/tests/test_app_energy_history.py`

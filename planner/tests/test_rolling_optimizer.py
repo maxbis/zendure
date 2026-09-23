@@ -14,6 +14,7 @@ from planner.rolling_optimizer import (
     RollingInputSlot,
     _adaptive_netzero_bidirectional_discharge_limit_w,
     _adaptive_netzero_minus_limit_w,
+    _battery_wear_cost,
     _linear_netzero_minus_price_score,
     _normalize_netzero_plus_charge_limit,
     build_rolling_boundaries,
@@ -24,6 +25,11 @@ from planner.tests.support import build_test_settings
 
 
 class RollingOptimizerTests(unittest.TestCase):
+    def test_battery_wear_cost_is_applied_to_discharge_only(self) -> None:
+        self.assertEqual(_battery_wear_cost(1000, 1.0, 0.0005), 0.0)
+        self.assertEqual(_battery_wear_cost(0, 1.0, 0.0005), 0.0)
+        self.assertEqual(_battery_wear_cost(-1000, 1.0, 0.0005), 0.0005)
+
     def test_rolling_horizon_extends_to_midnight_after_minimum_duration(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
         now = datetime(2026, 9, 12, 17, 55, tzinfo=tz)
@@ -69,6 +75,49 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertGreater(plan.decisions[0].battery_power_w, 0)
         self.assertLess(plan.decisions[1].battery_power_w, 0)
         self.assertEqual(plan.decisions[0].schedule_value, plan.decisions[0].battery_power_w)
+
+    def test_discharge_wear_cost_can_make_marginal_arbitrage_unprofitable(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 12, 10, 0, tzinfo=tz)
+        slots = [
+            RollingInputSlot(now, now + timedelta(hours=1), 0.10, 0.10, "official", 0.0, 0.0),
+            RollingInputSlot(
+                now + timedelta(hours=1),
+                now + timedelta(hours=2),
+                0.1004,
+                0.1004,
+                "official",
+                0.0,
+                0.0,
+            ),
+        ]
+        battery_state = BatteryState(0.0, 1000.0, 1000, 1000, 0, 100)
+
+        without_wear = optimize_rolling_schedule(
+            now=now,
+            battery_state=battery_state,
+            slots=slots,
+            round_trip_efficiency=1.0,
+            power_step_w=1000,
+            soc_step_wh=1000.0,
+            terminal_value_factor=0.0,
+        )
+        with_wear = optimize_rolling_schedule(
+            now=now,
+            battery_state=battery_state,
+            slots=slots,
+            round_trip_efficiency=1.0,
+            power_step_w=1000,
+            soc_step_wh=1000.0,
+            terminal_value_factor=0.0,
+            battery_wear_cost_eur_per_kwh_discharged=0.0005,
+        )
+
+        self.assertEqual([decision.battery_power_w for decision in without_wear.decisions], [1000, -1000])
+        self.assertEqual([decision.battery_power_w for decision in with_wear.decisions], [0, 0])
+        self.assertEqual(with_wear.expected_energy_cost_eur, 0.0)
+        self.assertEqual(with_wear.expected_battery_wear_cost_eur, 0.0)
+        self.assertEqual(with_wear.battery_wear_cost_eur_per_kwh_discharged, 0.0005)
 
     def test_netzero_minus_price_score_is_linear_above_the_median(self) -> None:
         score = _linear_netzero_minus_price_score(0.35, [0.25, 0.25, 0.35, 0.45])

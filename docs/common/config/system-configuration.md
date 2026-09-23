@@ -31,6 +31,7 @@ The configuration contains:
 - Maximum state of charge: 91%.
 - Battery forecast efficiency: 0.9.
 - Battery round-trip efficiency for rolling optimization: 0.85.
+- Discharge-side battery wear cost for rolling optimization: 0.0005 EUR/kWh (0.05 euro-cent/kWh).
 - Maximum charge command magnitude: 1200 W.
 - Maximum discharge command magnitude: 2000 W.
 - Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
@@ -76,6 +77,7 @@ Required properties:
 - `maxChargePercent`: integer from 1 through 100.
 - `efficiency`: number greater than 0 and no greater than 1.
 - `roundTripEfficiency`: optional number greater than 0 and no greater than 1. It is used by the rolling optimizer and remains separate from the legacy one-way forecast efficiency.
+- `wearCostEurPerKwhDischarged`: optional non-negative number in EUR per AC-side kWh discharged. It affects only the rolling optimizer objective and is excluded from daily cash P&L.
 - `maxChargePowerW`: positive integer command magnitude.
 - `maxDischargePowerW`: positive integer command magnitude.
 

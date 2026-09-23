@@ -31,6 +31,7 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         default_household_usage_w_by_hour=[200] * 24,
         arbitrage_min_spread_eur_per_kwh=0.12,
         round_trip_efficiency=0.85,
+        battery_wear_cost_eur_per_kwh_discharged=0.0005,
         cheap_hour_tolerance_eur_per_kwh=0.01,
         expensive_hour_tolerance_eur_per_kwh=0.01,
         netzero_market_price_threshold_eur_per_kwh=0.18,

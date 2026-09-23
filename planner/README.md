@@ -164,6 +164,7 @@ profile and price conversion. Its first-version defaults are:
 
 - minimum 24-hour rolling horizon, extended to the following local midnight
 - 85% round-trip battery efficiency
+- 0.0005 EUR/kWh discharge-side battery wear cost in the optimizer objective, excluded from daily cash P&L
 - 2,640 Wp solar capacity with the existing configurable PV derate
 - 50 Wh state discretization
 - today's same-clock-hour price for an unknown future price

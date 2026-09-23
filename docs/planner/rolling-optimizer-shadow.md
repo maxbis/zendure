@@ -35,6 +35,7 @@ The optimizer reads:
 - The shared 24-hour household-usage profile.
 - Battery capacity, state-of-charge boundaries, schedule power limits and power step from shared configuration.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
+- `battery.wearCostEurPerKwhDischarged`, currently 0.0005 EUR/kWh (0.05 euro-cent/kWh). The optimizer charges this cost only to AC-side battery discharge; charging has no wear charge.
 
 The runner appends one self-contained JSON object per calculation. A record contains
 the inputs that define the run, expected financial result, starting and ending state
@@ -74,7 +75,7 @@ For every selected prediction, the viewer also estimates cash P&L per calendar d
 
 Both estimates use the prediction's prices, solar, household load, starting SoC,
 battery limits and round-trip efficiency. P&L is sale income minus purchase cost.
-Terminal battery value is deliberately excluded from daily P&L; each result therefore
+Battery wear and terminal battery value are deliberately excluded from daily P&L; each result therefore
 also shows ending SoC so retained energy remains visible.
 
 After the individual calendar-day cards, the viewer shows a matching Complete

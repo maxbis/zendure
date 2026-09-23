@@ -59,6 +59,11 @@
           "exclusiveMinimum": 0,
           "maximum": 1
         },
+        "wearCostEurPerKwhDischarged": {
+          "description": "Battery wear cost in euros per AC-side kilowatt-hour discharged, used only by the rolling optimizer objective.",
+          "type": "number",
+          "minimum": 0
+        },
         "maxChargePowerW": {
           "description": "Maximum charge command magnitude in watts.",
           "type": "integer",
