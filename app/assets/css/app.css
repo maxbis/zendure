@@ -4232,10 +4232,10 @@ dialog#app-energy-summary-tooltip.is-overview {
 }
 
 .app-energy-history__money-card h3 {
-    margin: 0 0 8px;
-    color: var(--gsd-text-secondary);
-    font-size: 0.76rem;
-    font-weight: 700;
+    margin: 0 0 10px;
+    color: var(--gsd-accent);
+    font-size: 0.9rem;
+    font-weight: 750;
 }
 
 .app-energy-history__money-card h4 {
@@ -4298,8 +4298,8 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-size: 0.82rem;
 }
 
-.app-energy-history__money-card--battery .app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) dt {
-    padding-left: 14px;
+.app-energy-history__money-card--battery dl > .app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) {
+    margin-inline: 14px;
 }
 
 .app-energy-history__money-flow--stored {
@@ -4319,7 +4319,7 @@ dialog#app-energy-summary-tooltip.is-overview {
 }
 
 .app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
-    margin: 3px 0;
+    margin-block: 3px;
     padding: 7px 0;
     border-radius: 8px;
     background: var(--gsd-warning-soft);
@@ -4363,9 +4363,9 @@ dialog#app-energy-summary-tooltip.is-overview {
 
 .app-energy-history__money-card .app-energy-history__money-subtotal--flow-pnl {
     margin-top: 8px;
-    padding: 9px 0;
-    border-top-color: var(--gsd-border);
-    border-bottom: 1px solid var(--gsd-border-subtle);
+    padding: 12px 14px;
+    border: 1px solid var(--gsd-border);
+    border-radius: 8px;
     background: var(--gsd-surface-3);
 }
 
