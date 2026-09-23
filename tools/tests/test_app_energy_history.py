@@ -530,12 +530,13 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     assert 'color: var(--gsd-accent);\n    font-size: 0.9rem;' in app_css
     assert 'data-role="energy-battery-stored-value"' in app_index
     assert 'data-role="energy-battery-flow-pnl"' in app_index
-    assert 'Battery P&amp;L<small>Discharge value − charging cost</small>' in app_index
+    assert '<dt><strong>Battery P&amp;L</strong><small>Discharge value − charging cost</small></dt><dd data-role="energy-battery-flow-pnl">' in app_index
     assert '.app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) {' in app_css
     assert 'margin-inline: 14px;' in app_css
     assert '.app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) dt' not in app_css
-    assert '.app-energy-history__money-subtotal--flow-pnl {' in app_css
-    assert 'padding: 12px 14px;' in app_css
+    assert '.app-energy-history__money-card--flows .app-energy-history__money-result {' in app_css
+    assert '.app-energy-history__money-card--contribution' in app_css
+    assert 'grid-template-columns: minmax(0, 1fr);' in app_css
     assert 'data-role="energy-battery-discharge-home-row"' in app_index
     assert 'data-role="energy-battery-discharge-export-row"' in app_index
     assert 'data-role="energy-battery-no-discharge" hidden' in app_index
@@ -552,6 +553,27 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     assert "Conservative discharge value" not in energy_js
     assert '.app-energy-history__money-card dl > div[hidden]' in app_css
     assert 'margin-left: 12px;' not in app_css[app_css.index('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified'):][:200]
+
+
+def test_energy_cost_dialog_groups_flows_and_pnl_in_one_card() -> None:
+    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+    energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
+    card_classes = (
+        'app-energy-history__money-card--grid',
+        'app-energy-history__money-card--flows',
+        'app-energy-history__money-card--contribution',
+    )
+    positions = [app_index.index(name) for name in card_classes]
+    assert positions == sorted(positions)
+    flows = app_index[positions[1]:app_index.index('</section>', positions[1])]
+    assert 'data-role="energy-battery-charge-cost"' in flows
+    assert 'data-role="energy-battery-discharge-value"' in flows
+    assert 'data-role="energy-battery-flow-pnl"' in flows
+    assert 'app-energy-history__money-card--flow-pnl' not in app_index
+    contribution = app_index[positions[-1]:app_index.index('</section>', positions[-1])]
+    assert 'data-role="energy-battery-stored-value"' in contribution
+    assert 'data-role="energy-battery-benefit"' in contribution
+    assert 'benefit.closest(".app-energy-history__money-card").dataset.benefitSign' in energy_js
 
 
 def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> None:

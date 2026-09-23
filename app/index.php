@@ -606,8 +606,8 @@ $appConfig = [
                                 <div class="app-energy-history__money-total"><dt>Estimated net grid cost</dt><dd data-role="energy-grid-net-cost">—</dd></div>
                             </dl>
                         </section>
-                        <section class="app-energy-history__money-card app-energy-history__money-card--battery" aria-labelledby="energy-battery-benefit-title">
-                            <h3 id="energy-battery-benefit-title">Battery P&amp;L <span class="app-energy-history__partial-badge" data-role="energy-battery-partial-badge" hidden>Partial</span></h3>
+                        <section class="app-energy-history__money-card app-energy-history__money-card--battery app-energy-history__money-card--flows" aria-labelledby="energy-battery-flows-title">
+                            <h3 id="energy-battery-flows-title">Battery flows <span class="app-energy-history__partial-badge" data-role="energy-battery-partial-badge" hidden>Partial</span></h3>
                             <p class="app-energy-history__battery-status" data-role="energy-battery-status" hidden></p>
                             <h4>Charging costs</h4>
                             <dl>
@@ -622,7 +622,12 @@ $appConfig = [
                                 <div class="app-energy-history__money-flow app-energy-history__money-flow--unclassified" data-role="energy-battery-unclassified-row" hidden><dt><span class="app-energy-history__unclassified-tag">Unclassified</span><small data-role="energy-battery-unclassified-note">Conservative · lower hourly price</small></dt><dd><small data-role="energy-battery-unclassified-wh">—</small><strong data-role="energy-battery-unclassified-value">—</strong></dd></div>
                                 <div class="app-energy-history__money-empty" data-role="energy-battery-no-discharge" hidden><dt>No battery discharge recorded</dt></div>
                                 <div class="app-energy-history__money-subtotal"><dt data-role="energy-battery-discharge-label">Total discharge value</dt><dd data-role="energy-battery-discharge-value">—</dd></div>
-                                <div class="app-energy-history__money-subtotal app-energy-history__money-subtotal--flow-pnl"><dt>Battery P&amp;L<small>Discharge value − charging cost</small></dt><dd data-role="energy-battery-flow-pnl">—</dd></div>
+                                <div class="app-energy-history__money-result"><dt><strong>Battery P&amp;L</strong><small>Discharge value − charging cost</small></dt><dd data-role="energy-battery-flow-pnl">—</dd></div>
+                            </dl>
+                        </section>
+                        <section class="app-energy-history__money-card app-energy-history__money-card--battery app-energy-history__money-card--contribution" aria-labelledby="energy-battery-contribution-title">
+                            <h3 id="energy-battery-contribution-title">Stored value &amp; contribution</h3>
+                            <dl>
                                 <div class="app-energy-history__money-flow app-energy-history__money-flow--stored"><dt>Change in stored value <span>· average consumer price</span><small data-role="energy-battery-stored-note"></small></dt><dd><small data-role="energy-battery-stored-wh">—</small><strong data-role="energy-battery-stored-value">—</strong></dd></div>
                                 <div class="app-energy-history__money-total"><dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt><dd data-role="energy-battery-benefit">—</dd></div>
                             </dl>

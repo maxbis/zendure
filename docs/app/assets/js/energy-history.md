@@ -16,7 +16,7 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 - Input: `../main/api/app_energy_history.php?days=3`
 - Output cards: Charged, Discharged, Net flow
 - Charged and Discharged tooltips: consumer and spot valuations of those battery flows
-- Net flow dialog: grid import cost, grid export value, net grid cost, four classified battery-flow energy and euro components, an optional conservative unclassified-discharge line, charging and discharge subtotals, stored-energy value change, and estimated battery economic contribution
+- Net flow dialog: three stacked cards for grid cost, battery flows plus Battery P&L, and stored value plus estimated economic contribution. The battery-flow card includes four classified energy/euro components, an optional conservative unclassified-discharge line, and charging and discharge subtotals.
 - Battery-flow money inputs are stored millieuro values from the version 2 daily-report calculation; grid-charging cost is split from the stored total charge cost using the hourly consumer price
 
 ## Flow / behavior
@@ -26,7 +26,7 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 3. Grid cost sums each hour's grid import at consumer price and grid export at spot price. Net grid cost is import cost minus export value.
 4. Battery flow P&L shows grid charging at consumer price, surplus-solar charging at spot opportunity cost, home discharge at consumer price, and battery export at spot price. It uses the report's stored battery-flow P&L total.
 5. When discharge is measured but its home/export destination is unavailable, each affected hour is provisionally valued at the lower of its consumer and spot prices. A separately highlighted, tagged **Unclassified** row appears alongside confirmed home use and export, with a **Conservative · lower hourly price** sublabel; it is never added to confirmed export revenue. Classified rows with zero kWh are hidden, while non-zero kWh rows remain even if the displayed euro amount rounds to zero. When no discharge is recorded, the dialog says so. Charging cost for an unclassified hour is included only when its grid/surplus split and required prices are known. A numeric full-day battery P&L is shown only when every elapsed hour's charging cost and discharge value is covered; otherwise the P&L remains unavailable.
-6. When the Net flow card is clicked, show the two stacked cost sections for the selected day. The dialog's day controls refresh both sections.
+6. When the Net flow card is clicked, show three stacked cards for the selected day. Charging costs, discharge value, and their Battery P&L result share the middle card; the change in stored value and final economic contribution share the last card. The dialog's day controls refresh all three cards.
 7. The server values the midnight-to-latest battery-level change for today, or midnight-to-end-of-day change for historical days, using configured capacity, discharge efficiency, and the day's elapsed-hour average consumer price. The dialog adds this signed stored-value change to complete battery flow P&L for the final economic contribution. No future energy movement is included in today's figure.
 8. Battery allocation is estimated by the report: concurrent grid import is attributed to charging up to charged energy, and discharge is allocated to home use first. Battery economic contribution is separate from, and not subtracted again from, net grid cost.
 

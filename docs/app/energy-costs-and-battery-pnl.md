@@ -4,6 +4,8 @@
 
 The **Net flow** card opens the app's **Energy costs** dialog for the selected day. It shows an estimated net grid cost and a separate estimate of the battery's economic contribution. The two figures answer different questions and must **not** be added or subtracted from each other: battery activity is already reflected in the measured grid flows.
 
+The dialog stacks three boxes: **Grid cost**; **Battery flows**, containing charging costs, discharge value, and their **Battery P&L** result; and **Stored value & contribution**, containing the stored-energy adjustment and final economic contribution.
+
 These are variable-energy estimates, not a supplier invoice. The battery figure includes the day's **change** in stored-energy value, not the value of the whole battery balance. Fixed fees, taxes or charges not included in the stored prices, battery purchase and degradation remain outside this P&L.
 
 ## Location
@@ -50,11 +52,11 @@ The home/export discharge split is an **estimate derived from an energy balance*
 
 If an hour has measured battery discharge but lacks a usable home/export split, the app does **not** report that discharge as zero or call it export revenue. It shows a separately highlighted **Unclassified** row at the same level as confirmed home use and export, with the sublabel **Conservative · lower hourly price**. The app values that hour's discharge at `min(consumer price, spot price)`. This is a provisional conservative value; a negative spot price can make it negative. Both hourly prices must exist for this fallback. The confirmed exported amount is not increased by unclassified discharge.
 
-Charging cost in such an hour is still included when its grid/surplus Wh split and the relevant hourly prices are available. The dialog labels the flow-only subtotal **Battery P&L** and shows a numeric amount only when every elapsed hour has both a covered charging cost and a covered discharge value. The unclassified sublabel is the visible indication that this number is conservative; there is no separate conservative heading badge or explanatory banner. Otherwise it shows the available components but leaves the whole-day flow P&L unavailable. If a required hourly price or charging input is missing, the sublabel says so. Classified home/export rows remain separate from the unclassified fallback row.
+Charging cost in such an hour is still included when its grid/surplus Wh split and the relevant hourly prices are available. The **Battery P&L** result at the bottom of the Battery flows card is numeric only when every elapsed hour has both a covered charging cost and a covered discharge value. The unclassified sublabel is the visible indication that this number is conservative; there is no separate heading badge or explanatory banner for that fallback. Otherwise the flow details remain visible but the whole-day flow P&L is unavailable. If a required hourly price or charging input is missing, the sublabel says so. Classified home/export rows remain separate from the unclassified fallback row.
 
 The discharge details omit a classified home-use or export row when its energy is exactly zero. A non-zero kWh row stays visible even when its euro amount rounds to €0.00. When there is no measured discharge, the details instead say **No battery discharge recorded**; the total remains visible. Missing classified values are not turned into confirmed zeroes when only unclassified discharge is available.
 
-When all hours have complete version-2 attribution, the dialog uses the classified values for its **Battery P&L** subtotal. A **Partial** label means only some hours have complete attribution; a partial sum must not be read as a full-day result.
+When all hours have complete version-2 attribution, the **Battery P&L** result uses the classified values. A **Partial** label means only some hours have complete attribution; a partial sum must not be read as a full-day result.
 
 ### Stored energy and final contribution
 
