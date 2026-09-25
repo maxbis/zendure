@@ -4110,6 +4110,28 @@ html.app-energy-summary-modal-open {
     height: 14px;
 }
 
+.app-energy-summary-tooltip__day-position {
+    display: flex;
+    width: 100%;
+    height: 3px;
+    gap: 3px;
+    padding: 0 1px;
+}
+
+.app-energy-summary-tooltip__day-position-segment {
+    min-width: 0;
+    flex: 1 1 0;
+    background: var(--gsd-border-strong);
+    border-radius: 999px;
+    opacity: 0.48;
+}
+
+.app-energy-summary-tooltip__day-position-segment.is-selected {
+    background: var(--gsd-accent);
+    box-shadow: 0 0 7px var(--gsd-focus-ring);
+    opacity: 1;
+}
+
 .app-energy-summary-tooltip__close {
     display: none;
     width: 32px;

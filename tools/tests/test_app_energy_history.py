@@ -613,3 +613,17 @@ def test_mobile_summary_uses_modal_top_layer_instead_of_chart_event_timing() -> 
     assert 'event.pointerType !== "mouse" || chartInteractionIsSuppressed()' in energy_js
     assert "if (chartInteractionIsSuppressed()) return;" in energy_js
     assert "CHART_TOUCH_SUPPRESSION_MS" not in energy_js
+
+
+def test_energy_cost_dialog_shows_selected_day_position_strip() -> None:
+    energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
+    app_css = APP_CSS_FILE.read_text(encoding="utf-8")
+
+    assert 'function createSummaryDayPositionIndicator()' in energy_js
+    assert 'availableDays.forEach((day) =>' in energy_js
+    assert 'segment.classList.toggle("is-selected", day === selectedDay)' in energy_js
+    assert 'if (detail.label === "Net flow") header.appendChild(createSummaryDayPositionIndicator());' in energy_js
+    assert 'if (dayPosition) dayPosition.replaceWith(createSummaryDayPositionIndicator());' in energy_js
+    assert '.app-energy-summary-tooltip__day-position {' in app_css
+    assert '.app-energy-summary-tooltip__day-position-segment.is-selected {' in app_css
+    assert 'flex: 1 1 0;' in app_css

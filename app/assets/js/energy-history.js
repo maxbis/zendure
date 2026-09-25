@@ -300,6 +300,28 @@
         return button;
     }
 
+    function createSummaryDayPositionIndicator() {
+        const indicator = document.createElement("div");
+        indicator.className = "app-energy-summary-tooltip__day-position";
+        indicator.setAttribute("role", "img");
+        const selectedIndex = availableDays.indexOf(selectedDay);
+        indicator.setAttribute(
+            "aria-label",
+            selectedIndex >= 0
+                ? `Day ${selectedIndex + 1} of ${availableDays.length}: ${formatDay(selectedDay, true)}`
+                : `${availableDays.length} available days`
+        );
+
+        availableDays.forEach((day) => {
+            const segment = document.createElement("span");
+            segment.className = "app-energy-summary-tooltip__day-position-segment";
+            segment.classList.toggle("is-selected", day === selectedDay);
+            segment.setAttribute("aria-hidden", "true");
+            indicator.appendChild(segment);
+        });
+        return indicator;
+    }
+
     function buildSummaryTooltipPrices(detail) {
         const prices = document.createElement("div");
         prices.className = "app-price-summary-tooltip__prices";
@@ -431,6 +453,9 @@
             button.disabled = !adjacentSummaryDay(direction);
         });
 
+        const dayPosition = summaryTooltip.querySelector(".app-energy-summary-tooltip__day-position");
+        if (dayPosition) dayPosition.replaceWith(createSummaryDayPositionIndicator());
+
         const content = summaryTooltip.querySelector('[data-role="energy-summary-tooltip-content"]');
         if (content) content.replaceWith(buildSummaryTooltipContent(detail));
 
@@ -492,6 +517,7 @@
         close.addEventListener("click", () => hideSummaryTooltip(trigger));
         heading.append(createSummaryDayNavButton(-1), title, createSummaryDayNavButton(1), close);
         header.appendChild(heading);
+        if (detail.label === "Net flow") header.appendChild(createSummaryDayPositionIndicator());
 
         summaryTooltip.replaceChildren(header, buildSummaryTooltipContent(detail));
         summaryTooltip.hidden = false;
