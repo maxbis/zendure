@@ -140,24 +140,36 @@ def test_mobile_overview_moves_time_labels_lower_than_desktop():
     assert "transform: translateY(9px);" in source
 
 
-def test_dynamic_power_badge_uses_signed_outer_limit():
+def test_restricted_dynamic_power_badge_stacks_signed_lower_and_upper_limits():
     source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
 
-    assert "function outerPowerLimit(slot)" in source
-    assert "Math.abs(value) > Math.abs(outer)" in source
+    assert "function effectiveDynamicPowerLimits(slot, action)" in source
+    assert "function appendPowerRange(element, slot, action)" in source
     assert 'numeric > 0 ? "+" : numeric < 0 ? "−" : ""' in source
-    assert "formatBadgePower(limit, { signed: true })" in source
-    assert "closestPowerLimit" not in source
+    assert "formatBadgePower(minimum, { signed: true })" in source
+    assert "formatBadgePower(maximum, { signed: true })" in source
+    assert 'element.dataset.limitRange = "true"' in source
+    assert ".app-power-range" in css_source
+    assert "grid-template-rows: repeat(2, minmax(0, 1fr));" in css_source
 
 
-def test_full_directional_ranges_use_netzero_icons_instead_of_redundant_limits():
+def test_full_dynamic_ranges_use_netzero_icons_instead_of_redundant_limits():
     source = PRICE_PLAN_JS.read_text(encoding="utf-8")
 
-    assert "function hasFullDirectionalPowerRange(slot, action)" in source
+    assert "function hasFullDynamicPowerRange(slot, action)" in source
     assert 'action.direction === "plus"' in source
     assert 'action.direction === "minus"' in source
     assert "maximum === shared.maximum" in source
     assert "minimum === shared.minimum" in source
-    assert "hasFullDirectionalPowerRange(slot, action)" in source
+    assert "minimum === shared.minimum && maximum === shared.maximum" in source
+    assert "!hasFullDynamicPowerRange(slot, action)" in source
     assert 'action.direction === "plus" ? "sun"' in source
     assert 'action.direction === "minus" ? "bolt"' in source
+
+
+def test_limited_range_legend_describes_the_two_value_badge():
+    partial_source = PRICE_PLAN_PARTIAL.read_text(encoding="utf-8")
+
+    assert '>Limited range</span>' in partial_source
+    assert '>Range</span>' in partial_source

@@ -2415,14 +2415,26 @@ button.app-state-pill:focus-visible {
     height: 2px;
 }
 
-.app-price-hour .app-price-hour__action[data-limit-value="true"],
-.app-schedule-tooltip__badge[data-limit-value="true"] {
-    font-style: normal;
-    font-weight: 550;
-    text-decoration-line: underline;
-    text-decoration-style: dotted;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+.app-power-range {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    place-items: center;
+    font-size: 0.47rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 0.9;
+}
+
+.app-power-range__limit {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
 }
 
 .app-netzero-token {
@@ -2763,9 +2775,8 @@ dialog.app-schedule-tooltip {
     color: var(--gsd-text-on-signal);
 }
 
-.app-price-hour__action[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]),
-.app-schedule-tooltip__badge[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]) {
-    color: color-mix(in srgb, var(--gsd-text-on-signal) 85%, transparent);
+.app-schedule-tooltip__badge .app-power-range {
+    font-size: 0.48rem;
 }
 
 .app-schedule-tooltip__limits {
@@ -2888,20 +2899,23 @@ dialog.app-schedule-tooltip {
 .app-price-legend__swatch--high { background: var(--gsd-negative); }
 .app-price-legend__swatch--plan { background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%); }
 .app-price-legend__swatch--limited {
-    width: auto;
-    height: auto;
+    display: grid;
+    width: 13px;
+    height: 14px;
+    place-items: center;
     background: none;
-    border-radius: 0;
+    border: 1px solid var(--gsd-border-strong);
+    border-radius: 3px;
     color: var(--gsd-text-secondary);
-    font-style: normal;
-    font-weight: 550;
-    text-decoration-line: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 2px;
+    font-size: 0.34rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 0.8;
+    white-space: pre;
 }
 
 .app-price-legend__swatch--limited::before {
-    content: "123";
+    content: "−1K\A 0";
 }
 
 .gsd-dialog__footer .gsd-btn--primary {
@@ -4857,10 +4871,6 @@ dialog#app-energy-summary-tooltip.is-overview {
 
     .app-price-hour__action[data-tone="neutral"] {
         border-color: var(--gsd-border-subtle);
-    }
-
-    .app-price-hour__action[data-limit-value="true"]:is([data-tone="positive"], [data-tone="negative"], [data-tone="mixed"]) {
-        color: var(--gsd-text-on-signal);
     }
 
     .app-price-plan[data-timeline-view="overview"] .app-price-hour__action[data-fallback-tone]::after {

@@ -1381,27 +1381,54 @@
         return `${prefix}${thousands}K${hundreds || ""}`;
     }
 
-    function outerPowerLimit(slot) {
-        const { minimum, maximum } = powerLimits(slot);
-        return [minimum, maximum]
-            .filter((value) => value !== null)
-            .reduce((outer, value) => (
-                outer === null || Math.abs(value) > Math.abs(outer) ? value : outer
-            ), null);
+    function effectiveDynamicPowerLimits(slot, action) {
+        const explicit = powerLimits(slot);
+        const shared = sharedPowerBounds();
+        if (action?.direction === "plus") {
+            return {
+                minimum: explicit.minimum ?? 0,
+                maximum: explicit.maximum ?? shared.maximum
+            };
+        }
+        if (action?.direction === "minus") {
+            return {
+                minimum: explicit.minimum ?? shared.minimum,
+                maximum: explicit.maximum ?? 0
+            };
+        }
+        return {
+            minimum: explicit.minimum ?? shared.minimum,
+            maximum: explicit.maximum ?? shared.maximum
+        };
     }
 
-    function hasFullDirectionalPowerRange(slot, action) {
+    function hasFullDynamicPowerRange(slot, action) {
         if (action?.type !== "netzero") return false;
 
-        const { minimum, maximum } = powerLimits(slot);
+        const { minimum, maximum } = effectiveDynamicPowerLimits(slot, action);
         const shared = sharedPowerBounds();
         if (action.direction === "plus") {
-            return (minimum === null || minimum === 0) && maximum === shared.maximum;
+            return minimum === 0 && maximum === shared.maximum;
         }
         if (action.direction === "minus") {
-            return minimum === shared.minimum && (maximum === null || maximum === 0);
+            return minimum === shared.minimum && maximum === 0;
         }
-        return false;
+        return minimum === shared.minimum && maximum === shared.maximum;
+    }
+
+    function appendPowerRange(element, slot, action) {
+        const { minimum, maximum } = effectiveDynamicPowerLimits(slot, action);
+        const range = document.createElement("span");
+        const lower = document.createElement("span");
+        const upper = document.createElement("span");
+        range.className = "app-power-range";
+        lower.className = "app-power-range__limit";
+        upper.className = "app-power-range__limit";
+        lower.textContent = formatBadgePower(minimum, { signed: true });
+        upper.textContent = formatBadgePower(maximum, { signed: true });
+        range.append(lower, upper);
+        element.dataset.limitRange = "true";
+        element.replaceChildren(range);
     }
 
     function setActionBadgeContent(element, slot, action) {
@@ -1411,12 +1438,8 @@
             return;
         }
 
-        const limit = hasFullDirectionalPowerRange(slot, action)
-            ? null
-            : outerPowerLimit(slot);
-        if (limit !== null) {
-            element.dataset.limitValue = "true";
-            element.textContent = formatBadgePower(limit, { signed: true });
+        if (action.type === "netzero" && !hasFullDynamicPowerRange(slot, action)) {
+            appendPowerRange(element, slot, action);
             return;
         }
 
