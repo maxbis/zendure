@@ -2428,10 +2428,6 @@ button.app-state-pill:focus-visible {
     line-height: 0.9;
 }
 
-.app-power-range[data-limit-count="1"] {
-    grid-template-rows: 1fr;
-}
-
 .app-power-range__limit {
     display: block;
     min-width: 0;

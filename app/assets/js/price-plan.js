@@ -1420,17 +1420,17 @@
         const { minimum, maximum } = effectiveDynamicPowerLimits(slot, action);
         const range = document.createElement("span");
         range.className = "app-power-range";
-        const visibleLimits = [
+        const limits = [
             { value: minimum, hidden: action?.direction === "plus" && minimum === 0 },
             { value: maximum, hidden: maximum === 0 }
-        ].filter((limit) => !limit.hidden);
-        visibleLimits.forEach((limit) => {
+        ];
+        limits.forEach((limit) => {
             const value = document.createElement("span");
             value.className = "app-power-range__limit";
-            value.textContent = formatBadgePower(limit.value, { signed: true });
+            value.textContent = limit.hidden ? "" : formatBadgePower(limit.value, { signed: true });
+            if (limit.hidden) value.setAttribute("aria-hidden", "true");
             range.append(value);
         });
-        range.dataset.limitCount = String(visibleLimits.length);
         element.dataset.limitRange = "true";
         element.replaceChildren(range);
     }
