@@ -2421,11 +2421,15 @@ button.app-state-pill:focus-visible {
     height: 100%;
     grid-template-rows: repeat(2, minmax(0, 1fr));
     place-items: center;
-    font-size: 0.47rem;
+    font-size: 0.54rem;
     font-variant-numeric: tabular-nums;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 0.9;
+}
+
+.app-power-range[data-limit-count="1"] {
+    grid-template-rows: 1fr;
 }
 
 .app-power-range__limit {
@@ -2776,7 +2780,7 @@ dialog.app-schedule-tooltip {
 }
 
 .app-schedule-tooltip__badge .app-power-range {
-    font-size: 0.48rem;
+    font-size: 0.54rem;
 }
 
 .app-schedule-tooltip__limits {

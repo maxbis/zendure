@@ -147,11 +147,15 @@ def test_restricted_dynamic_power_badge_stacks_signed_lower_and_upper_limits():
     assert "function effectiveDynamicPowerLimits(slot, action)" in source
     assert "function appendPowerRange(element, slot, action)" in source
     assert 'numeric > 0 ? "+" : numeric < 0 ? "−" : ""' in source
-    assert "formatBadgePower(minimum, { signed: true })" in source
-    assert "formatBadgePower(maximum, { signed: true })" in source
+    assert "formatBadgePower(limit.value, { signed: true })" in source
+    assert 'action?.direction === "plus" && minimum === 0' in source
+    assert "hidden: maximum === 0" in source
+    assert "range.dataset.limitCount = String(visibleLimits.length);" in source
     assert 'element.dataset.limitRange = "true"' in source
     assert ".app-power-range" in css_source
     assert "grid-template-rows: repeat(2, minmax(0, 1fr));" in css_source
+    assert '.app-power-range[data-limit-count="1"]' in css_source
+    assert "font-size: 0.54rem;" in css_source
 
 
 def test_full_dynamic_ranges_use_netzero_icons_instead_of_redundant_limits():

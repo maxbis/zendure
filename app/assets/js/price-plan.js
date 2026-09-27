@@ -1419,14 +1419,18 @@
     function appendPowerRange(element, slot, action) {
         const { minimum, maximum } = effectiveDynamicPowerLimits(slot, action);
         const range = document.createElement("span");
-        const lower = document.createElement("span");
-        const upper = document.createElement("span");
         range.className = "app-power-range";
-        lower.className = "app-power-range__limit";
-        upper.className = "app-power-range__limit";
-        lower.textContent = formatBadgePower(minimum, { signed: true });
-        upper.textContent = formatBadgePower(maximum, { signed: true });
-        range.append(lower, upper);
+        const visibleLimits = [
+            { value: minimum, hidden: action?.direction === "plus" && minimum === 0 },
+            { value: maximum, hidden: maximum === 0 }
+        ].filter((limit) => !limit.hidden);
+        visibleLimits.forEach((limit) => {
+            const value = document.createElement("span");
+            value.className = "app-power-range__limit";
+            value.textContent = formatBadgePower(limit.value, { signed: true });
+            range.append(value);
+        });
+        range.dataset.limitCount = String(visibleLimits.length);
         element.dataset.limitRange = "true";
         element.replaceChildren(range);
     }
