@@ -105,7 +105,16 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         battery["maxDischargePowerW"], "$.battery.maxDischargePowerW", 1
     )
 
-    _assert_exact_keys(forecast, {"defaultHouseholdUsageWByHour"}, "$.forecast")
+    forecast_keys = {"defaultHouseholdUsageWByHour"}
+    if "solarSafetyPercent" in forecast:
+        forecast_keys.add("solarSafetyPercent")
+    _assert_exact_keys(forecast, forecast_keys, "$.forecast")
+    solar_safety_percent = _require_integer(
+        forecast.get("solarSafetyPercent", 100),
+        "$.forecast.solarSafetyPercent",
+        0,
+        100,
+    )
     default_household_usage = _require_object(
         forecast["defaultHouseholdUsageWByHour"],
         "$.forecast.defaultHouseholdUsageWByHour",
@@ -213,6 +222,7 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         "schemaVersion": schema_version,
         "battery": normalized_battery,
         "forecast": {
+            "solarSafetyPercent": solar_safety_percent,
             "defaultHouseholdUsageWByHour": default_household_usage_w_by_hour,
         },
         "schedule": {

@@ -83,6 +83,13 @@
         "defaultHouseholdUsageWByHour"
       ],
       "properties": {
+        "solarSafetyPercent": {
+          "description": "Percentage of predicted PV output used by battery forecasts; omitted values default to 100.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 100
+        },
         "defaultHouseholdUsageWByHour": {
           "description": "Fallback household demand keyed by each local whole-hour start from 00:00 through 23:00, in watts.",
           "type": "object",

@@ -54,15 +54,16 @@ Each metric displays three decimal places. Daily averages exclude missing or inv
 12. When an NZ+ range spans zero through the configured maximum charging power, show the NZ+ sun icon instead of repeating the maximum as a numeric limit. When an NZ− range spans the configured maximum discharge power through zero, show the NZ− bolt icon. Keep showing a signed numeric limit for partial ranges and genuinely bidirectional ranges.
 13. Merge the authoritative forecast maps returned by the today and tomorrow schedule requests; do not calculate a browser fallback.
 14. When a current or future schedule action tooltip opens, show the server-predicted start/now percentage, end percentage, percentage-point change, effective power, and assumption source.
-15. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
-16. When a slot has a runtime battery condition, show the least-guaranteed-discharge estimate and label its source `runtime condition · least guaranteed discharge`; do not select primary or fallback from predicted SoC.
-17. When a slot was produced by the discharge-target planner, identify the Target @ solar mode, show the requested reserve, anchor time, calculated power, predicted anchor percentage, and a plain-language status and explanation. When planning falls back, explicitly identify the action used for the hour.
-18. When a runtime condition's primary and fallback actions resolve identically and have no distinct limits, show one `Action this hour` block and explain that the action applies regardless of the condition instead of repeating `When` and `Otherwise` rows.
-19. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
-20. When the header refresh runs after the component is already ready, keep the current summary and timeline visible and only mark the refresh control busy; reserve the short loading panel for the first load or retry after an error so the page does not jump.
-21. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
-22. In simulation mode, use the PHP forecast returned with the scenario, whose reference is midnight on the selected date and whose starting SoC is the supplied battery percentage.
-23. When the server forecast processes an unbounded NZ± action, preserve battery SoC with a `0 W` estimate and label the assumption `NZ± assumed neutral`; continue applying explicit NZ± bounds when present.
+15. When NZ+ has a fresh optimizer forecast, identify the effective power as `conservative solar surplus`; this power is the safety-adjusted PV prediction minus predicted household load and is calculated by the server.
+16. When the selected action is in the current hour, calculate only the minutes remaining and identify that duration in the tooltip.
+17. When a slot has a runtime battery condition, show the least-guaranteed-discharge estimate and label its source `runtime condition · least guaranteed discharge`; do not select primary or fallback from predicted SoC.
+18. When a slot was produced by the discharge-target planner, identify the Target @ solar mode, show the requested reserve, anchor time, calculated power, predicted anchor percentage, and a plain-language status and explanation. When planning falls back, explicitly identify the action used for the hour.
+19. When a runtime condition's primary and fallback actions resolve identically and have no distinct limits, show one `Action this hour` block and explain that the action applies regardless of the condition instead of repeating `When` and `Otherwise` rows.
+20. Quietly reload resolved schedules every five minutes so continuously calculated limits update without reloading prices or switching the component into its loading state.
+21. When the header refresh runs after the component is already ready, keep the current summary and timeline visible and only mark the refresh control busy; reserve the short loading panel for the first load or retry after an error so the page does not jump.
+22. When a slot was produced by `full_at_netzero_minus`, show its calculated NZ+ minimum in the limit badge and show current SoC, target, remaining eligible hours, and the next NZ- anchor in the tooltip.
+23. In simulation mode, use the PHP forecast returned with the scenario, whose reference is midnight on the selected date and whose starting SoC is the supplied battery percentage.
+24. When the server forecast processes an unbounded NZ± action, preserve battery SoC with a `0 W` estimate and label the assumption `NZ± assumed neutral`; continue applying explicit NZ± bounds when present.
 
 On wide layouts the four metrics use one row. At viewport widths up to 600 px they use a two-column grid.
 

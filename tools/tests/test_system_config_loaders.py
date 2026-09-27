@@ -37,6 +37,7 @@ EXPECTED_CONFIG = {
         "maxDischargePowerW": 2000,
     },
     "forecast": {
+        "solarSafetyPercent": 90,
         "defaultHouseholdUsageWByHour": [
             100, 100, 100, 100, 100, 100, 100, 100,
             220, 220, 220, 220, 220, 220, 220, 220,
@@ -131,6 +132,19 @@ def test_php_and_python_loaders_return_identical_configuration():
     assert json.loads(php_result.stdout) == python_config == EXPECTED_CONFIG
 
 
+def test_missing_solar_safety_percent_defaults_to_one_hundred(tmp_path: Path):
+    payload = copy.deepcopy(SOURCE_CONFIG)
+    payload["forecast"].pop("solarSafetyPercent")
+    path = _write_config(tmp_path / "system.json", payload)
+
+    python_config = load_system_config(path)
+    php_result = _run_php_loader(path)
+
+    assert php_result.returncode == 0, php_result.stderr
+    assert python_config["forecast"]["solarSafetyPercent"] == 100
+    assert json.loads(php_result.stdout)["forecast"]["solarSafetyPercent"] == 100
+
+
 def test_schema_contract_matches_loader_sections():
     schema = json.loads(SYSTEM_SCHEMA_FILE.read_text(encoding="utf-8"))
 
@@ -149,6 +163,9 @@ def test_schema_contract_matches_loader_sections():
         if section == "schedule":
             expected_required.remove("activeHourDeadbandW")
             assert "activeHourDeadbandW" in section_schema["properties"]
+        if section == "forecast":
+            expected_required.remove("solarSafetyPercent")
+            assert section_schema["properties"]["solarSafetyPercent"]["default"] == 100
         assert set(section_schema["required"]) == expected_required
 
     usage_schema = schema["properties"]["forecast"]["properties"]["defaultHouseholdUsageWByHour"]
@@ -175,6 +192,7 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"wearCostEurPerKwhDischarged": -0.01}), r"wearCostEurPerKwhDischarged must be at least 0\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].pop("04:00"), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(missing: 04:00\)\."),
+        (lambda value: value["forecast"].update({"solarSafetyPercent": 101}), r"solarSafetyPercent must be at most 100\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].update({"24:00": 100}), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(unknown: 24:00\)\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__("04:00", -1), r"defaultHouseholdUsageWByHour\.04:00 must be at least 0\."),
         (lambda value: value["schedule"].update({"minPowerW": 1}), r"minPowerW must be at most 0\."),

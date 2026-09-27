@@ -46,6 +46,8 @@ The planner reads:
 - Shared capacity and minimum/maximum battery percentages.
 - Shared `battery.efficiency`.
 - Shared `forecast.defaultHouseholdUsageWByHour`.
+- Shared `forecast.solarSafetyPercent`, expressed as a whole percentage and defaulted to `100` by the loaders when omitted.
+- Fresh optimizer PV and household-load predictions, when the published optimizer forecast is no more than one hour old.
 - Shared signed schedule range plus an optional rule-specific discharge cap.
 - Shared `schedule.powerStepW`.
 
@@ -71,7 +73,7 @@ The resolved-schedule API also returns:
 - `forecastBatteryPercent`: the live starting battery percentage, or `null` when unavailable.
 - `forecastUnavailableReason`: `null` when forecasting succeeded, otherwise the reason no forecast was produced.
 
-Each hourly prediction includes start and end percentages, percentage-point change, effective power, duration, current-hour state, assumption source, mode, and conservative primary and fallback powers when applicable. Historical simulation returns the same forecast shape for its complete two-day scenario.
+Each hourly prediction includes start and end percentages, percentage-point change, effective power, duration, current-hour state, assumption source, mode, and conservative primary and fallback powers when applicable. When fresh optimizer input exists, it also includes predicted PV, predicted load, and the applied solar-safety percentage. Historical simulation returns the same forecast shape for its complete two-day scenario.
 
 ## Flow and behavior
 
@@ -101,7 +103,7 @@ For `full_at_netzero_minus`:
 
 The current hour uses only its remaining minutes. Manual exact schedule entries continue to take priority over conditional rules during the merge.
 
-After target materialization, `tbp_build_hourly_forecast()` runs the same power model chronologically over the final resolved schedule. Fixed actions retain their signed wattage, NZ- uses the configured household profile, unbounded NZ± is neutral, NZ+ is neutral unless its positive minimum requires charging, and standby or unknown automatic actions use `0 W`. Each predicted end percentage becomes the following hour's start percentage. The schedule API returns this result to `price-plan.js`; the browser renders it without calculating or repairing a forecast.
+After target materialization, `tbp_build_hourly_forecast()` runs the same power model chronologically over the final resolved schedule. Fixed actions retain their signed wattage, NZ- uses the optimizer load prediction when available and otherwise the configured household profile, unbounded NZ± is neutral, and standby or unknown automatic actions use `0 W`. NZ+ uses conservative predicted solar surplus when a fresh optimizer forecast exists: `max(0, predicted PV × solar safety percentage ÷ 100 − predicted load)`, clamped by the slot's power bounds. Without fresh PV input, NZ+ remains neutral unless its positive minimum requires charging. Each predicted end percentage becomes the following hour's start percentage. The schedule API returns this result to `price-plan.js`; the browser renders it without calculating or repairing a forecast.
 
 For discharge, percentage change is `-(absolute watts × hours ÷ efficiency ÷ capacity Wh) × 100`. For charge, it is `(watts × hours × efficiency ÷ capacity Wh) × 100`. Results are clamped to the configured battery operating range.
 
@@ -129,7 +131,7 @@ When evaluating a calculated target action, the planner forecasts that target sl
 - When the required discharge exceeds a power cap, then emit the capped fixed value and `best_effort` status.
 - When the target rule hour has ended, then emit the fallback with `past` status.
 - When a runtime condition is present, then planning uses its least guaranteed discharge while automation continues selecting the primary or fallback action from live battery data.
-- When household usage differs from the fixed profile, then actual battery percentage can differ from the forecast.
+- When solar generation or household usage differs from the optimizer prediction or fallback profile, then actual battery percentage can differ from the forecast.
 - When live battery percentage is unavailable for a charge target, then emit its configured fallback or unbounded NZ+ and report `unavailable`.
 - When no future NZ- exists within today and tomorrow, then emit the charge fallback and explain that the anchor is unavailable.
 - When the baseline anchor forecast already reaches the charge target, emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.
@@ -139,7 +141,8 @@ When evaluating a calculated target action, the planner forecasts that target sl
 - When shared configuration is missing or invalid, then the planner fails instead of using embedded efficiency, demand-profile, power-cap or step defaults.
 - When live battery data is unavailable, then the API returns an empty forecast with `forecastUnavailableReason`; the browser does not calculate a fallback.
 - When the current hour is partially complete, then forecast only its remaining duration; omit hours that have already ended.
-- The model does not predict solar generation, unexpected household loads, controller ramping, or future schedule changes.
+- When the optimizer forecast is absent, invalid, or older than one hour, then NZ+ falls back to its former neutral model and the tooltip reports that no solar forecast is available.
+- The model does not predict controller ramping, unexpected household loads, or future schedule changes.
 
 ## Related files
 

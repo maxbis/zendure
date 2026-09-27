@@ -122,6 +122,19 @@ Meaning:
 - This is a fallback demand model for battery forecasts when measured or configured usage is unavailable.
 - It is shared forecast policy rather than a physical battery property.
 
+### Solar forecast safety percentage
+
+Canonical value:
+
+- `forecast.solarSafetyPercent`: `90` for the current installation.
+- The shared loaders default an omitted value to `100`.
+
+Meaning:
+
+- The battery forecast multiplies predicted PV by this percentage before subtracting predicted household load.
+- `90` means a factor of `0.9`; `100` means a factor of `1.0`.
+- This forecast-conservatism setting remains separate from physical battery charge efficiency.
+
 ### Installation location
 
 Intended canonical values:

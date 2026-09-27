@@ -28,8 +28,8 @@ $payload = [
         'horizon_start' => '2026-09-12T18:25:00+02:00',
         'horizon_end' => '2026-09-12T20:00:00+02:00',
         'decisions' => [
-            ['start' => '2026-09-12T18:25:00+02:00', 'end' => '2026-09-12T19:00:00+02:00', 'schedule_value' => 1200, 'reason' => 'cheap'],
-            ['start' => '2026-09-12T19:00:00+02:00', 'end' => '2026-09-12T20:00:00+02:00', 'schedule_value' => 'netzero-', 'min_power' => -900, 'max_power' => 0, 'reason' => 'load'],
+            ['start' => '2026-09-12T18:25:00+02:00', 'end' => '2026-09-12T19:00:00+02:00', 'schedule_value' => 1200, 'reason' => 'cheap', 'pv_w' => 929.0, 'load_w' => 220.0],
+            ['start' => '2026-09-12T19:00:00+02:00', 'end' => '2026-09-12T20:00:00+02:00', 'schedule_value' => 'netzero-', 'min_power' => -900, 'max_power' => 0, 'reason' => 'load', 'pv_w' => 400.0, 'load_w' => 160.0],
         ],
     ],
 ];
@@ -51,6 +51,9 @@ $rules = [
 $resolved = optimizerScheduleApplyToDay($rules, '20260912', $payload, $timezone);
 selectorAssert($resolved[0]['value'] === 1200 && $resolved[0]['source'] === 'optimizer', 'Wildcard rule was not replaced.');
 selectorAssert($resolved[1]['value'] === 0 && $resolved[1]['key'] === '202609121900', 'Exact manual override did not win.');
+$forecastInputs = optimizerScheduleForecastInputs($payload, $timezone);
+selectorAssert(abs($forecastInputs['solar_w_by_key']['202609121800'] - 929.0) < 0.000001, 'Hourly PV input was not extracted.');
+selectorAssert(abs($forecastInputs['load_w_by_key']['202609121900'] - 160.0) < 0.000001, 'Hourly load input was not extracted.');
 
 $stale = $payload;
 $stale['plan']['generated_at'] = '2026-09-12T08:00:00+02:00';

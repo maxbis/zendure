@@ -112,7 +112,7 @@ $target = tbp_build_hourly_forecast(
 forecastTestAssert($target[$date . '1200']['estimatedPowerW'] === -900.0, 'Calculated targets must use their deterministic planned action.');
 
 $chargeDay = forecastTestDay($date);
-$chargeDay['items'][14] = ['time' => '1400', 'value' => 'netzero+', 'min_power' => 100, 'max_power' => 400];
+$chargeDay['items'][14] = ['time' => '1400', 'value' => 'netzero+', 'min_power' => 100, 'max_power' => 1200];
 $charge = tbp_build_hourly_forecast(
     [$chargeDay],
     $battery,
@@ -121,5 +121,24 @@ $charge = tbp_build_hourly_forecast(
 );
 forecastTestAssert($charge[$date . '1400']['estimatedPowerW'] === 100.0, 'NZ+ minimum must be applied by the authoritative forecaster.');
 forecastTestNear((float) $charge[$date . '1400']['endPercent'], 50.0 + ((100.0 * $efficiency) / 5760.0) * 100.0);
+
+$solarCharge = tbp_build_hourly_forecast(
+    [$chargeDay],
+    $battery,
+    new DateTimeImmutable('2026-08-05 14:00:00', $timezone),
+    $options + [
+        'solar_safety_percent' => 90,
+        'solar_w_by_key' => [$date . '1400' => 929.0],
+        'load_w_by_key' => [$date . '1400' => 220.0],
+    ]
+);
+$solarHour = $solarCharge[$date . '1400'];
+$safeSurplusW = (929.0 * 0.9) - 220.0;
+forecastTestNear((float) $solarHour['estimatedPowerW'], $safeSurplusW);
+forecastTestNear((float) $solarHour['endPercent'], 50.0 + (($safeSurplusW * $efficiency) / 5760.0) * 100.0);
+forecastTestAssert($solarHour['source'] === 'solar_forecast', 'NZ+ must identify the optimizer solar forecast source.');
+forecastTestNear((float) $solarHour['solarSafetyPercent'], 90.0);
+forecastTestNear((float) $solarHour['predictedPvW'], 929.0);
+forecastTestNear((float) $solarHour['predictedLoadW'], 220.0);
 
 echo "Authoritative battery forecast tests passed.\n";

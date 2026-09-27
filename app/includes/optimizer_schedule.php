@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 # 10 hours stale, we fall back to rules
 const OPTIMIZER_SCHEDULE_MAX_AGE_SECONDS = 36000;
+const OPTIMIZER_SOLAR_FORECAST_MAX_AGE_SECONDS = 3600;
 
 function optimizerScheduleDataDir(): string
 {
@@ -229,6 +230,53 @@ function optimizerScheduleApplyToDay(array $rulesResolved, string $date, array $
     }
     usort($rulesResolved, static fn(array $a, array $b): int => strcmp((string) ($a['time'] ?? ''), (string) ($b['time'] ?? '')));
     return $rulesResolved;
+}
+
+/**
+ * Convert optimizer PV and household-load decisions to local hourly forecast inputs.
+ * Multiple decision segments in one hour are combined as a duration-weighted average.
+ *
+ * @return array{solar_w_by_key: array<string, float>, load_w_by_key: array<string, float>}
+ */
+function optimizerScheduleForecastInputs(array $payload, DateTimeZone $timezone): array
+{
+    $totals = [];
+    foreach (($payload['plan']['decisions'] ?? []) as $decision) {
+        if (
+            !is_array($decision)
+            || !isset($decision['pv_w'], $decision['load_w'])
+            || !is_numeric($decision['pv_w'])
+            || !is_numeric($decision['load_w'])
+        ) {
+            continue;
+        }
+        try {
+            $start = (new DateTimeImmutable((string) ($decision['start'] ?? '')))->setTimezone($timezone);
+            $end = (new DateTimeImmutable((string) ($decision['end'] ?? '')))->setTimezone($timezone);
+        } catch (Exception) {
+            continue;
+        }
+        $durationHours = ($end->getTimestamp() - $start->getTimestamp()) / 3600;
+        if ($durationHours <= 0) {
+            continue;
+        }
+        $key = $start->format('YmdH') . '00';
+        $totals[$key] ??= ['duration' => 0.0, 'solar_wh' => 0.0, 'load_wh' => 0.0];
+        $totals[$key]['duration'] += $durationHours;
+        $totals[$key]['solar_wh'] += max(0.0, (float) $decision['pv_w']) * $durationHours;
+        $totals[$key]['load_wh'] += max(0.0, (float) $decision['load_w']) * $durationHours;
+    }
+
+    $solar = [];
+    $load = [];
+    foreach ($totals as $key => $values) {
+        if ($values['duration'] <= 0) {
+            continue;
+        }
+        $solar[$key] = $values['solar_wh'] / $values['duration'];
+        $load[$key] = $values['load_wh'] / $values['duration'];
+    }
+    return ['solar_w_by_key' => $solar, 'load_w_by_key' => $load];
 }
 
 function optimizerScheduleAppendAudit(array $payload): void

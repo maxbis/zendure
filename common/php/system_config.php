@@ -26,7 +26,7 @@ function systemConfigDefaultPath(): string
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
  *   },
- *   forecast: array{defaultHouseholdUsageWByHour: list<int>},
+ *   forecast: array{solarSafetyPercent: int, defaultHouseholdUsageWByHour: list<int>},
  *   schedule: array{minPowerW: int, maxPowerW: int, powerStepW: int, activeHourDeadbandW?: int},
  *   installation: array{name: string, latitude: float, longitude: float, timezone: string},
  *   priceConversion: array{
@@ -150,10 +150,16 @@ function validateSystemConfig(array $config): array
         1
     );
 
-    systemConfigAssertExactKeys(
-        $forecast,
-        ['defaultHouseholdUsageWByHour'],
-        '$.forecast'
+    $forecastKeys = ['defaultHouseholdUsageWByHour'];
+    if (array_key_exists('solarSafetyPercent', $forecast)) {
+        $forecastKeys[] = 'solarSafetyPercent';
+    }
+    systemConfigAssertExactKeys($forecast, $forecastKeys, '$.forecast');
+    $solarSafetyPercent = systemConfigRequireInteger(
+        $forecast['solarSafetyPercent'] ?? 100,
+        '$.forecast.solarSafetyPercent',
+        0,
+        100
     );
     $defaultHouseholdUsage = systemConfigRequireObject(
         $forecast['defaultHouseholdUsageWByHour'],
@@ -267,6 +273,7 @@ function validateSystemConfig(array $config): array
         'schemaVersion' => $schemaVersion,
         'battery' => $normalizedBattery,
         'forecast' => [
+            'solarSafetyPercent' => $solarSafetyPercent,
             'defaultHouseholdUsageWByHour' => $defaultHouseholdUsageWByHour,
         ],
         'schedule' => [

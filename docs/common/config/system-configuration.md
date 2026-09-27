@@ -34,6 +34,7 @@ The configuration contains:
 - Discharge-side battery wear cost for rolling optimization: 0.0005 EUR/kWh (0.05 euro-cent/kWh).
 - Maximum charge command magnitude: 1200 W.
 - Maximum discharge command magnitude: 2000 W.
+- Solar forecast safety percentage for battery estimates: 90%.
 - Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
 - Schedule range: -1800 through 1200 W.
 - Schedule power step: 100 W.
@@ -91,7 +92,11 @@ Required properties:
 
 - `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, keyed by local whole-hour start (`00:00` through `23:00`). The shared loaders normalize this object to the indexed runtime list used by the planners.
 
-This fallback usage model is consumed by the new-GUI JavaScript forecast and the PHP target-battery planner.
+Optional properties:
+
+- `solarSafetyPercent`: integer from 0 through 100. Both loaders supply `100` when it is omitted, preserving the unadjusted PV forecast. The current installation uses `90`.
+
+The household model and solar safety percentage are consumed by the server-side PHP battery forecast. The browser renders the returned result without applying its own forecast adjustment.
 
 ### Schedule
 

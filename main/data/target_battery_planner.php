@@ -85,7 +85,15 @@ function tbp_flatten_days(array $days, DateTimeZone $timezone): array
     return $flat;
 }
 
-function tbp_power_details_for_value($value, array $slot, int $hour, array $usageByHour, bool $applyBounds): array
+function tbp_power_details_for_value(
+    $value,
+    array $slot,
+    int $hour,
+    array $usageByHour,
+    bool $applyBounds,
+    array $forecastPoint = [],
+    float $solarSafetyFactor = 1.0
+): array
 {
     $mode = tbp_normalize_mode($value);
     $source = 'automatic_unavailable';
@@ -99,15 +107,28 @@ function tbp_power_details_for_value($value, array $slot, int $hour, array $usag
     if (in_array($mode, ['netzero', 'netzero-', 'netzero+'], true)) {
         $power = 0.0;
         if ($mode === 'netzero-') {
-            $usage = isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
+            $usage = isset($forecastPoint['load_w']) && is_numeric($forecastPoint['load_w'])
+                ? max(0.0, (float) $forecastPoint['load_w'])
+                : (isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
                 ? max(0.0, (float) $usageByHour[$hour])
-                : 0.0;
+                : 0.0);
             $power = -$usage;
             $source = 'household_profile';
         } elseif ($mode === 'netzero') {
             $source = 'bidirectional_neutral';
         } else {
-            $source = 'solar_forecast_unavailable';
+            if (isset($forecastPoint['pv_w']) && is_numeric($forecastPoint['pv_w'])) {
+                $predictedPvW = max(0.0, (float) $forecastPoint['pv_w']);
+                $predictedLoadW = isset($forecastPoint['load_w']) && is_numeric($forecastPoint['load_w'])
+                    ? max(0.0, (float) $forecastPoint['load_w'])
+                    : (isset($usageByHour[$hour]) && is_numeric($usageByHour[$hour])
+                        ? max(0.0, (float) $usageByHour[$hour])
+                        : 0.0);
+                $power = max(0.0, ($predictedPvW * tbp_clamp($solarSafetyFactor, 0.0, 1.0)) - $predictedLoadW);
+                $source = 'solar_forecast';
+            } else {
+                $source = 'solar_forecast_unavailable';
+            }
         }
         if ($applyBounds) {
             if (isset($slot['min_power']) && is_numeric($slot['min_power'])) {
@@ -138,11 +159,18 @@ function tbp_power_for_value($value, array $slot, int $hour, array $usageByHour,
     return (float) tbp_power_details_for_value($value, $slot, $hour, $usageByHour, $applyBounds)['power_w'];
 }
 
-function tbp_power_details_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): array
+function tbp_power_details_for_slot(
+    array $slot,
+    int $hour,
+    float $batteryPercent,
+    array $usageByHour,
+    array $forecastPoint = [],
+    float $solarSafetyFactor = 1.0
+): array
 {
     $value = $slot['value'] ?? 0;
     if ($value === TARGET_BATTERY_MODE) {
-        return tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false) + [
+        return tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false, $forecastPoint, $solarSafetyFactor) + [
             'primary_power_w' => null,
             'fallback_power_w' => null,
         ];
@@ -154,14 +182,14 @@ function tbp_power_details_for_slot(array $slot, int $hour, float $batteryPercen
     $planningMode = isset($slot['planning']['mode']) ? (string) $slot['planning']['mode'] : '';
     $isCalculatedTarget = in_array($planningMode, [TARGET_BATTERY_MODE, TARGET_CHARGE_MODE], true);
     if (count($conditions) === 0 || $isCalculatedTarget) {
-        return tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true) + [
+        return tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true, $forecastPoint, $solarSafetyFactor) + [
             'primary_power_w' => null,
             'fallback_power_w' => null,
         ];
     }
 
-    $primary = tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true);
-    $fallback = tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false);
+    $primary = tbp_power_details_for_value($value, $slot, $hour, $usageByHour, true, $forecastPoint, $solarSafetyFactor);
+    $fallback = tbp_power_details_for_value(tbp_fallback_value($slot), $slot, $hour, $usageByHour, false, $forecastPoint, $solarSafetyFactor);
 
     // Runtime outcomes are uncertain during planning. Use only the least
     // guaranteed discharge and never assume conditional charging.
@@ -174,9 +202,46 @@ function tbp_power_details_for_slot(array $slot, int $hour, float $batteryPercen
     ];
 }
 
-function tbp_power_for_slot(array $slot, int $hour, float $batteryPercent, array $usageByHour): float
+function tbp_power_for_slot(
+    array $slot,
+    int $hour,
+    float $batteryPercent,
+    array $usageByHour,
+    array $forecastPoint = [],
+    float $solarSafetyFactor = 1.0
+): float
 {
-    return (float) tbp_power_details_for_slot($slot, $hour, $batteryPercent, $usageByHour)['power_w'];
+    return (float) tbp_power_details_for_slot(
+        $slot,
+        $hour,
+        $batteryPercent,
+        $usageByHour,
+        $forecastPoint,
+        $solarSafetyFactor
+    )['power_w'];
+}
+
+/** @return array<string, array{pv_w?:float, load_w?:float}> */
+function tbp_forecast_points_from_options(array $options): array
+{
+    $solarByKey = isset($options['solar_w_by_key']) && is_array($options['solar_w_by_key'])
+        ? $options['solar_w_by_key']
+        : [];
+    $loadByKey = isset($options['load_w_by_key']) && is_array($options['load_w_by_key'])
+        ? $options['load_w_by_key']
+        : [];
+    $points = [];
+    foreach ($solarByKey as $key => $value) {
+        if (is_numeric($value)) {
+            $points[(string) $key]['pv_w'] = max(0.0, (float) $value);
+        }
+    }
+    foreach ($loadByKey as $key => $value) {
+        if (is_numeric($value)) {
+            $points[(string) $key]['load_w'] = max(0.0, (float) $value);
+        }
+    }
+    return $points;
 }
 
 function tbp_apply_power(
@@ -203,7 +268,9 @@ function tbp_forecast_flat(
     DateTimeImmutable $now,
     array $battery,
     array $usageByHour,
-    float $efficiency
+    float $efficiency,
+    array $forecastByKey = [],
+    float $solarSafetyFactor = 1.0
 ): array {
     $percent = (float) $battery['percent'];
     $forecast = [];
@@ -217,7 +284,18 @@ function tbp_forecast_flat(
             continue;
         }
         $durationHours = ($entry['end']->getTimestamp() - $segmentStart->getTimestamp()) / 3600;
-        $power = tbp_power_details_for_slot($entry['slot'], (int) $entry['start']->format('G'), $percent, $usageByHour);
+        $key = $entry['date'] . $entry['time'];
+        $forecastPoint = isset($forecastByKey[$key]) && is_array($forecastByKey[$key])
+            ? $forecastByKey[$key]
+            : [];
+        $power = tbp_power_details_for_slot(
+            $entry['slot'],
+            (int) $entry['start']->format('G'),
+            $percent,
+            $usageByHour,
+            $forecastPoint,
+            $solarSafetyFactor
+        );
         $startPercent = $percent;
         $percent = tbp_apply_power(
             $startPercent,
@@ -228,7 +306,6 @@ function tbp_forecast_flat(
             (float) $battery['minimum_percent'],
             (float) $battery['maximum_percent']
         );
-        $key = $entry['date'] . $entry['time'];
         $forecast[$key] = [
             'key' => $key,
             'date' => $entry['date'],
@@ -248,6 +325,13 @@ function tbp_forecast_flat(
             'fallbackDurationHours' => null,
             'currentHour' => $entry['start'] <= $now && $entry['end'] > $now,
         ];
+        if (isset($forecastPoint['pv_w'])) {
+            $forecast[$key]['predictedPvW'] = (float) $forecastPoint['pv_w'];
+            $forecast[$key]['solarSafetyPercent'] = $solarSafetyFactor * 100.0;
+        }
+        if (isset($forecastPoint['load_w'])) {
+            $forecast[$key]['predictedLoadW'] = (float) $forecastPoint['load_w'];
+        }
     }
     return ['end_percent' => $percent, 'hours' => $forecast];
 }
@@ -258,7 +342,9 @@ function tbp_forecast_to_index(
     DateTimeImmutable $now,
     array $battery,
     array $usageByHour,
-    float $efficiency
+    float $efficiency,
+    array $forecastByKey = [],
+    float $solarSafetyFactor = 1.0
 ): float {
     return (float) tbp_forecast_flat(
         $flat,
@@ -266,7 +352,9 @@ function tbp_forecast_to_index(
         $now,
         $battery,
         $usageByHour,
-        $efficiency
+        $efficiency,
+        $forecastByKey,
+        $solarSafetyFactor
     )['end_percent'];
 }
 
@@ -283,8 +371,21 @@ function tbp_build_hourly_forecast(
     $efficiency = isset($options['efficiency']) && is_numeric($options['efficiency'])
         ? tbp_clamp((float) $options['efficiency'], 0.01, 1.0)
         : (float) $sharedConfig['battery']['efficiency'];
+    $forecastByKey = tbp_forecast_points_from_options($options);
+    $solarSafetyPercent = isset($options['solar_safety_percent']) && is_numeric($options['solar_safety_percent'])
+        ? tbp_clamp((float) $options['solar_safety_percent'], 0.0, 100.0)
+        : (float) $sharedConfig['forecast']['solarSafetyPercent'];
     $flat = tbp_flatten_days($days, $now->getTimezone());
-    return tbp_forecast_flat($flat, count($flat), $now, $battery, $usageByHour, $efficiency)['hours'];
+    return tbp_forecast_flat(
+        $flat,
+        count($flat),
+        $now,
+        $battery,
+        $usageByHour,
+        $efficiency,
+        $forecastByKey,
+        $solarSafetyPercent / 100.0
+    )['hours'];
 }
 
 function tbp_slot_allows_solar_charge(array $slot): bool
@@ -478,6 +579,11 @@ function tbp_materialize_horizon(
     $efficiency = isset($options['efficiency']) && is_numeric($options['efficiency'])
         ? tbp_clamp((float) $options['efficiency'], 0.01, 1.0)
         : (float) $sharedConfig['battery']['efficiency'];
+    $forecastByKey = tbp_forecast_points_from_options($options);
+    $solarSafetyPercent = isset($options['solar_safety_percent']) && is_numeric($options['solar_safety_percent'])
+        ? tbp_clamp((float) $options['solar_safety_percent'], 0.0, 100.0)
+        : (float) $sharedConfig['forecast']['solarSafetyPercent'];
+    $solarSafetyFactor = $solarSafetyPercent / 100.0;
     $defaultMaxDischargeW = isset($options['max_discharge_power_w']) && is_numeric($options['max_discharge_power_w'])
         ? max(1, (int) $options['max_discharge_power_w'])
         : abs((int) $sharedConfig['schedule']['minPowerW']);
@@ -510,7 +616,16 @@ function tbp_materialize_horizon(
         }
 
         $targetPercent = tbp_clamp($targetPercent, (float) $battery['minimum_percent'], (float) $battery['maximum_percent']);
-        $baselinePercent = tbp_forecast_to_index($flat, $anchorIndex, $now, $battery, $usageByHour, $efficiency);
+        $baselinePercent = tbp_forecast_to_index(
+            $flat,
+            $anchorIndex,
+            $now,
+            $battery,
+            $usageByHour,
+            $efficiency,
+            $forecastByKey,
+            $solarSafetyFactor
+        );
         $segmentStart = $entry['start'] < $now ? $now : $entry['start'];
         $durationHours = max(0.0, ($entry['end']->getTimestamp() - $segmentStart->getTimestamp()) / 3600);
 
@@ -524,7 +639,23 @@ function tbp_materialize_horizon(
             continue;
         }
 
-        $baselinePowerW = tbp_power_for_slot($entry['slot'], (int) $entry['start']->format('G'), tbp_forecast_to_index($flat, $targetIndex, $now, $battery, $usageByHour, $efficiency), $usageByHour);
+        $baselinePowerW = tbp_power_for_slot(
+            $entry['slot'],
+            (int) $entry['start']->format('G'),
+            tbp_forecast_to_index(
+                $flat,
+                $targetIndex,
+                $now,
+                $battery,
+                $usageByHour,
+                $efficiency,
+                $forecastByKey,
+                $solarSafetyFactor
+            ),
+            $usageByHour,
+            $forecastByKey[$entry['date'] . $entry['time']] ?? [],
+            $solarSafetyFactor
+        );
         $extraOutputWh = (($baselinePercent - $targetPercent) / 100.0) * (float) $battery['capacity_wh'] * $efficiency;
         $rawCalculatedPowerW = $baselinePowerW - ($extraOutputWh / $durationHours);
         $ruleMax = isset($entry['slot']['max_discharge_power']) && is_numeric($entry['slot']['max_discharge_power'])
@@ -542,7 +673,16 @@ function tbp_materialize_horizon(
         $validationTargetSlot = $entry['slot'];
         unset($validationTargetSlot['runtime_conditions']);
         $validationFlat[$targetIndex]['slot'] = $validationTargetSlot;
-        $predictedPercent = tbp_forecast_to_index($validationFlat, $anchorIndex, $now, $battery, $usageByHour, $efficiency);
+        $predictedPercent = tbp_forecast_to_index(
+            $validationFlat,
+            $anchorIndex,
+            $now,
+            $battery,
+            $usageByHour,
+            $efficiency,
+            $forecastByKey,
+            $solarSafetyFactor
+        );
         $status = $predictedPercent <= $targetPercent + 0.25 ? 'achievable' : 'best_effort';
         $reason = $status === 'achievable'
             ? 'Calculated discharge reaches the target within forecast tolerance.'
@@ -690,7 +830,9 @@ function tbp_materialize_horizon(
             $now,
             $battery,
             $usageByHour,
-            $efficiency
+            $efficiency,
+            $forecastByKey,
+            $solarSafetyFactor
         );
         $baselineAnchorPercent = tbp_forecast_to_index(
             $candidateFlat,
@@ -698,7 +840,9 @@ function tbp_materialize_horizon(
             $now,
             $battery,
             $usageByHour,
-            $efficiency
+            $efficiency,
+            $forecastByKey,
+            $solarSafetyFactor
         );
         $requiredEnergyWh = (max(0.0, $targetPercent - $baselineAnchorPercent) / 100.0)
             * (float) $battery['capacity_wh'];
@@ -731,7 +875,9 @@ function tbp_materialize_horizon(
                     $now,
                     $battery,
                     $usageByHour,
-                    $efficiency
+                    $efficiency,
+                    $forecastByKey,
+                    $solarSafetyFactor
                 );
                 if ($candidatePrediction >= $targetThresholdPercent) {
                     $calculatedMinimumW = $candidateW;

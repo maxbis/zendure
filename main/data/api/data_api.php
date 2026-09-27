@@ -462,12 +462,17 @@ function handleGetData($type) {
             : [$date, (DateTimeImmutable::createFromFormat('!Ymd', $date, $timezone) ?: $now)->modify('+1 day')->format('Ymd')];
         $planningDays = [];
         $optimizerStatus = optimizerScheduleStatus($now, $dataApiSystemConfig);
+        $optimizerValidation = optimizerScheduleValidateLatest($now, $dataApiSystemConfig);
         $optimizerPayload = null;
         $forceRules = isset($_GET['source']) && $_GET['source'] === 'rules';
         if (!$forceRules && $optimizerStatus['activeSource'] === 'optimizer') {
-            $optimizerValidation = optimizerScheduleValidateLatest($now, $dataApiSystemConfig);
             $optimizerPayload = $optimizerValidation['payload'];
         }
+        $optimizerForecastIsFresh = is_int($optimizerValidation['age_seconds'])
+            && $optimizerValidation['age_seconds'] <= OPTIMIZER_SOLAR_FORECAST_MAX_AGE_SECONDS;
+        $optimizerForecastInputs = $optimizerForecastIsFresh && is_array($optimizerValidation['payload'])
+            ? optimizerScheduleForecastInputs($optimizerValidation['payload'], $timezone)
+            : ['solar_w_by_key' => [], 'load_w_by_key' => []];
         foreach (array_values(array_unique($horizonDates)) as $horizonDate) {
             $dayItems = resolveScheduleForDate($schedule, $horizonDate);
             if (include_conditions) {
@@ -489,6 +494,9 @@ function handleGetData($type) {
         $forecastOptions = [
             'usage_w_by_hour' => $dataApiSystemConfig['forecast']['defaultHouseholdUsageWByHour'],
             'efficiency' => $dataApiSystemConfig['battery']['efficiency'],
+            'solar_safety_percent' => $dataApiSystemConfig['forecast']['solarSafetyPercent'],
+            'solar_w_by_key' => $optimizerForecastInputs['solar_w_by_key'],
+            'load_w_by_key' => $optimizerForecastInputs['load_w_by_key'],
         ];
         if (containsTargetBatteryMode($planningDays)) {
             $planningDays = tbp_materialize_horizon($planningDays, $battery, $now, $forecastOptions + [
