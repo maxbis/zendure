@@ -16,6 +16,7 @@ from planner.rolling_optimizer import (
     _adaptive_netzero_minus_limit_w,
     _battery_wear_cost,
     _linear_netzero_minus_price_score,
+    _low_soc_discharge_cost,
     _normalize_netzero_plus_charge_limit,
     build_rolling_boundaries,
     optimize_rolling_schedule,
@@ -29,6 +30,72 @@ class RollingOptimizerTests(unittest.TestCase):
         self.assertEqual(_battery_wear_cost(1000, 1.0, 0.0005), 0.0)
         self.assertEqual(_battery_wear_cost(0, 1.0, 0.0005), 0.0)
         self.assertEqual(_battery_wear_cost(-1000, 1.0, 0.0005), 0.0005)
+
+    def test_low_soc_discharge_cost_only_prices_energy_below_threshold(self) -> None:
+        self.assertAlmostEqual(
+            _low_soc_discharge_cost(
+                start_energy_wh=300.0,
+                end_energy_wh=200.0,
+                capacity_wh=1000.0,
+                threshold_percent=26,
+                discharge_efficiency=1.0,
+                cost_cents_per_kwh=10,
+            ),
+            0.006,
+        )
+        self.assertEqual(
+            _low_soc_discharge_cost(
+                start_energy_wh=400.0,
+                end_energy_wh=300.0,
+                capacity_wh=1000.0,
+                threshold_percent=26,
+                discharge_efficiency=1.0,
+                cost_cents_per_kwh=10,
+            ),
+            0.0,
+        )
+
+    def test_low_soc_discharge_cost_can_preserve_a_soft_reserve(self) -> None:
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 9, 12, 10, 0, tzinfo=tz)
+        slots = [
+            RollingInputSlot(
+                now,
+                now + timedelta(hours=1),
+                0.05,
+                0.0,
+                "official",
+                100.0,
+                0.0,
+            ),
+        ]
+        battery_state = BatteryState(20.0, 1000.0, 100, 100, 0, 100)
+
+        without_reserve_cost = optimize_rolling_schedule(
+            now=now,
+            battery_state=battery_state,
+            slots=slots,
+            round_trip_efficiency=1.0,
+            power_step_w=100,
+            soc_step_wh=10.0,
+            terminal_value_factor=0.0,
+        )
+        with_reserve_cost = optimize_rolling_schedule(
+            now=now,
+            battery_state=battery_state,
+            slots=slots,
+            round_trip_efficiency=1.0,
+            power_step_w=100,
+            soc_step_wh=10.0,
+            terminal_value_factor=0.0,
+            low_soc_discharge_threshold_percent=26,
+            low_soc_discharge_cost_cents_per_kwh=10,
+        )
+
+        self.assertEqual(without_reserve_cost.decisions[0].battery_power_w, -100)
+        self.assertEqual(with_reserve_cost.decisions[0].battery_power_w, 0)
+        self.assertEqual(with_reserve_cost.low_soc_discharge_threshold_percent, 26)
+        self.assertEqual(with_reserve_cost.low_soc_discharge_cost_cents_per_kwh, 10)
 
     def test_rolling_horizon_extends_to_midnight_after_minimum_duration(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")

@@ -80,6 +80,8 @@ class PlannerSettings:
     arbitrage_min_spread_eur_per_kwh: float
     round_trip_efficiency: float
     battery_wear_cost_eur_per_kwh_discharged: float
+    low_soc_discharge_threshold_percent: int
+    low_soc_discharge_cost_cents_per_kwh: int
     cheap_hour_tolerance_eur_per_kwh: float
     expensive_hour_tolerance_eur_per_kwh: float
     netzero_market_price_threshold_eur_per_kwh: float
@@ -305,6 +307,14 @@ def load_settings() -> PlannerSettings:
         battery_wear_cost_eur_per_kwh_discharged=max(
             0.0,
             _get_float(battery.get("wearCostEurPerKwhDischarged"), 0.0),
+        ),
+        low_soc_discharge_threshold_percent=max(
+            0,
+            min(100, _get_int(battery.get("lowSocDischargeThresholdPercent"), 0)),
+        ),
+        low_soc_discharge_cost_cents_per_kwh=max(
+            0,
+            _get_int(battery.get("lowSocDischargeCostCentsPerKwh"), 0),
         ),
         cheap_hour_tolerance_eur_per_kwh=_get_float(
             os.getenv("PLANNER_CHEAP_HOUR_TOLERANCE"),

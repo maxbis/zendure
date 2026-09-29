@@ -23,6 +23,8 @@ function systemConfigDefaultPath(): string
  *     efficiency: float,
  *     roundTripEfficiency?: float,
  *     wearCostEurPerKwhDischarged?: float,
+ *     lowSocDischargeThresholdPercent?: int,
+ *     lowSocDischargeCostCentsPerKwh?: int,
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
  *   },
@@ -103,6 +105,12 @@ function validateSystemConfig(array $config): array
     if (array_key_exists('wearCostEurPerKwhDischarged', $battery)) {
         $batteryKeys[] = 'wearCostEurPerKwhDischarged';
     }
+    if (array_key_exists('lowSocDischargeThresholdPercent', $battery)) {
+        $batteryKeys[] = 'lowSocDischargeThresholdPercent';
+    }
+    if (array_key_exists('lowSocDischargeCostCentsPerKwh', $battery)) {
+        $batteryKeys[] = 'lowSocDischargeCostCentsPerKwh';
+    }
     systemConfigAssertExactKeys($battery, $batteryKeys, '$.battery');
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
     $minChargePercent = systemConfigRequireInteger(
@@ -137,6 +145,21 @@ function validateSystemConfig(array $config): array
             $battery['wearCostEurPerKwhDischarged'],
             '$.battery.wearCostEurPerKwhDischarged',
             0.0
+        )
+        : null;
+    $lowSocDischargeThresholdPercent = array_key_exists('lowSocDischargeThresholdPercent', $battery)
+        ? systemConfigRequireInteger(
+            $battery['lowSocDischargeThresholdPercent'],
+            '$.battery.lowSocDischargeThresholdPercent',
+            $minChargePercent,
+            $maxChargePercent
+        )
+        : null;
+    $lowSocDischargeCostCentsPerKwh = array_key_exists('lowSocDischargeCostCentsPerKwh', $battery)
+        ? systemConfigRequireInteger(
+            $battery['lowSocDischargeCostCentsPerKwh'],
+            '$.battery.lowSocDischargeCostCentsPerKwh',
+            0
         )
         : null;
     $maxChargePowerW = systemConfigRequireInteger(
@@ -267,6 +290,12 @@ function validateSystemConfig(array $config): array
     }
     if ($wearCostEurPerKwhDischarged !== null) {
         $normalizedBattery['wearCostEurPerKwhDischarged'] = $wearCostEurPerKwhDischarged;
+    }
+    if ($lowSocDischargeThresholdPercent !== null) {
+        $normalizedBattery['lowSocDischargeThresholdPercent'] = $lowSocDischargeThresholdPercent;
+    }
+    if ($lowSocDischargeCostCentsPerKwh !== null) {
+        $normalizedBattery['lowSocDischargeCostCentsPerKwh'] = $lowSocDischargeCostCentsPerKwh;
     }
 
     return [

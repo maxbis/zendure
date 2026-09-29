@@ -42,6 +42,7 @@ class RollingDecision:
     grid_power_w: float
     expected_cost_eur: float
     expected_battery_wear_cost_eur: float
+    expected_low_soc_discharge_cost_eur: float
     schedule_value: object
     min_power: Optional[int]
     max_power: Optional[int]
@@ -62,6 +63,10 @@ class RollingDecision:
             "grid_power_w": round(self.grid_power_w, 1),
             "expected_cost_eur": round(self.expected_cost_eur, 6),
             "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
+            "expected_low_soc_discharge_cost_eur": round(
+                self.expected_low_soc_discharge_cost_eur,
+                6,
+            ),
             "schedule_value": self.schedule_value,
             "reason": self.reason,
         }
@@ -81,10 +86,13 @@ class RollingPlan:
     ending_soc_percent: float
     expected_energy_cost_eur: float
     expected_battery_wear_cost_eur: float
+    expected_low_soc_discharge_cost_eur: float
     terminal_energy_value_eur: float
     objective_eur: float
     round_trip_efficiency: float
     battery_wear_cost_eur_per_kwh_discharged: float
+    low_soc_discharge_threshold_percent: int
+    low_soc_discharge_cost_cents_per_kwh: int
     decisions: List[RollingDecision]
 
     def to_dict(self) -> dict:
@@ -96,10 +104,16 @@ class RollingPlan:
             "ending_soc_percent": round(self.ending_soc_percent, 2),
             "expected_energy_cost_eur": round(self.expected_energy_cost_eur, 6),
             "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
+            "expected_low_soc_discharge_cost_eur": round(
+                self.expected_low_soc_discharge_cost_eur,
+                6,
+            ),
             "terminal_energy_value_eur": round(self.terminal_energy_value_eur, 6),
             "objective_eur": round(self.objective_eur, 6),
             "round_trip_efficiency": self.round_trip_efficiency,
             "battery_wear_cost_eur_per_kwh_discharged": self.battery_wear_cost_eur_per_kwh_discharged,
+            "low_soc_discharge_threshold_percent": self.low_soc_discharge_threshold_percent,
+            "low_soc_discharge_cost_cents_per_kwh": self.low_soc_discharge_cost_cents_per_kwh,
             "decisions": [decision.to_dict() for decision in self.decisions],
         }
 
@@ -154,6 +168,35 @@ def _battery_wear_cost(
     """Return discharge-only wear cost using AC-side battery output."""
     discharged_kwh = max(0.0, -battery_power_w) * duration_hours / 1000.0
     return discharged_kwh * max(0.0, wear_cost_eur_per_kwh_discharged)
+
+
+def _low_soc_discharge_cost(
+    *,
+    start_energy_wh: float,
+    end_energy_wh: float,
+    capacity_wh: float,
+    threshold_percent: int,
+    discharge_efficiency: float,
+    cost_cents_per_kwh: int,
+) -> float:
+    """Return the virtual cost for AC energy discharged below the SoC threshold."""
+    if (
+        end_energy_wh >= start_energy_wh
+        or capacity_wh <= 0
+        or threshold_percent <= 0
+        or cost_cents_per_kwh <= 0
+    ):
+        return 0.0
+
+    threshold_energy_wh = capacity_wh * min(100, threshold_percent) / 100.0
+    internal_wh_below_threshold = max(
+        0.0,
+        min(start_energy_wh, threshold_energy_wh) - end_energy_wh,
+    )
+    ac_kwh_below_threshold = (
+        internal_wh_below_threshold * max(0.0, discharge_efficiency) / 1000.0
+    )
+    return ac_kwh_below_threshold * cost_cents_per_kwh / 100.0
 
 
 def _linear_netzero_minus_price_score(
@@ -442,6 +485,8 @@ def optimize_rolling_schedule(
     soc_step_wh: float,
     terminal_value_factor: float = 1.0,
     battery_wear_cost_eur_per_kwh_discharged: float = 0.0,
+    low_soc_discharge_threshold_percent: int = 0,
+    low_soc_discharge_cost_cents_per_kwh: int = 0,
 ) -> RollingPlan:
     if not slots:
         raise ValueError("At least one rolling input slot is required")
@@ -450,6 +495,8 @@ def optimize_rolling_schedule(
 
     rte = max(0.01, min(1.0, float(round_trip_efficiency)))
     wear_rate = max(0.0, float(battery_wear_cost_eur_per_kwh_discharged))
+    low_soc_threshold_percent = max(0, min(100, int(low_soc_discharge_threshold_percent)))
+    low_soc_cost_cents = max(0, int(low_soc_discharge_cost_cents_per_kwh))
     charge_efficiency = math.sqrt(rte)
     discharge_efficiency = charge_efficiency
     capacity_wh = float(battery_state.usable_capacity_wh)
@@ -525,7 +572,15 @@ def optimize_rolling_schedule(
                     slot.export_price_eur_per_kwh,
                 )
                 wear_cost = _battery_wear_cost(action_w, duration, wear_rate)
-                candidate_cost = cost_so_far + hour_cost + wear_cost
+                low_soc_cost = _low_soc_discharge_cost(
+                    start_energy_wh=energy_wh,
+                    end_energy_wh=next_energy_wh,
+                    capacity_wh=capacity_wh,
+                    threshold_percent=low_soc_threshold_percent,
+                    discharge_efficiency=discharge_efficiency,
+                    cost_cents_per_kwh=low_soc_cost_cents,
+                )
+                candidate_cost = cost_so_far + hour_cost + wear_cost + low_soc_cost
                 previous = next_states.get(next_key)
                 previous_action = (
                     previous[2][-1][0]
@@ -610,6 +665,18 @@ def optimize_rolling_schedule(
         for slot, (candidate, _start_energy_wh, _end_energy_wh, _grid_power_w)
         in zip(slots, best_path)
     )
+    best_low_soc_discharge_cost = sum(
+        _low_soc_discharge_cost(
+            start_energy_wh=start_energy_wh,
+            end_energy_wh=end_energy_wh,
+            capacity_wh=capacity_wh,
+            threshold_percent=low_soc_threshold_percent,
+            discharge_efficiency=discharge_efficiency,
+            cost_cents_per_kwh=low_soc_cost_cents,
+        )
+        for _slot, (_candidate, start_energy_wh, end_energy_wh, _grid_power_w)
+        in zip(slots, best_path)
+    )
 
     decisions: List[RollingDecision] = []
     for slot_index, (slot, (candidate, start_energy_wh, end_energy_wh, grid_power_w)) in enumerate(
@@ -687,6 +754,14 @@ def optimize_rolling_schedule(
                     duration,
                     wear_rate,
                 ),
+                expected_low_soc_discharge_cost_eur=_low_soc_discharge_cost(
+                    start_energy_wh=start_energy_wh,
+                    end_energy_wh=end_energy_wh,
+                    capacity_wh=capacity_wh,
+                    threshold_percent=low_soc_threshold_percent,
+                    discharge_efficiency=discharge_efficiency,
+                    cost_cents_per_kwh=low_soc_cost_cents,
+                ),
                 schedule_value=schedule_value,
                 min_power=min_power,
                 max_power=max_power,
@@ -702,9 +777,12 @@ def optimize_rolling_schedule(
         ending_soc_percent=best_ending_energy_wh / capacity_wh * 100.0,
         expected_energy_cost_eur=best_energy_cost,
         expected_battery_wear_cost_eur=best_wear_cost,
+        expected_low_soc_discharge_cost_eur=best_low_soc_discharge_cost,
         terminal_energy_value_eur=best_terminal_value,
         objective_eur=best_objective,
         round_trip_efficiency=rte,
         battery_wear_cost_eur_per_kwh_discharged=wear_rate,
+        low_soc_discharge_threshold_percent=low_soc_threshold_percent,
+        low_soc_discharge_cost_cents_per_kwh=low_soc_cost_cents,
         decisions=decisions,
     )

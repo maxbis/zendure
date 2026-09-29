@@ -64,6 +64,17 @@
           "type": "number",
           "minimum": 0
         },
+        "lowSocDischargeThresholdPercent": {
+          "description": "State-of-charge threshold below which the rolling optimizer applies the configured low-SoC discharge cost.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "lowSocDischargeCostCentsPerKwh": {
+          "description": "Virtual cost in whole euro cents per AC-side kilowatt-hour discharged below the low-SoC threshold, used only by the rolling optimizer objective.",
+          "type": "integer",
+          "minimum": 0
+        },
         "maxChargePowerW": {
           "description": "Maximum charge command magnitude in watts.",
           "type": "integer",

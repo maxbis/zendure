@@ -32,6 +32,8 @@ The configuration contains:
 - Battery forecast efficiency: 0.9.
 - Battery round-trip efficiency for rolling optimization: 0.85.
 - Discharge-side battery wear cost for rolling optimization: 0.0005 EUR/kWh (0.05 euro-cent/kWh).
+- Low-SoC discharge threshold for rolling optimization: 26%.
+- Virtual low-SoC discharge cost: 10 euro cents per AC-side kWh discharged below 26%.
 - Maximum charge command magnitude: 1200 W.
 - Maximum discharge command magnitude: 2000 W.
 - Solar forecast safety percentage for battery estimates: 90%.
@@ -79,10 +81,12 @@ Required properties:
 - `efficiency`: number greater than 0 and no greater than 1.
 - `roundTripEfficiency`: optional number greater than 0 and no greater than 1. It is used by the rolling optimizer and remains separate from the legacy one-way forecast efficiency.
 - `wearCostEurPerKwhDischarged`: optional non-negative number in EUR per AC-side kWh discharged. It affects only the rolling optimizer objective and is excluded from daily cash P&L.
+- `lowSocDischargeThresholdPercent`: optional integer between `minChargePercent` and `maxChargePercent`. Below this absolute SoC, the rolling optimizer applies the configured virtual low-SoC discharge cost.
+- `lowSocDischargeCostCentsPerKwh`: optional non-negative integer in whole euro cents per AC-side kWh. It is applied only to the portion of a discharge below `lowSocDischargeThresholdPercent`, affects only the optimizer objective and is excluded from cash P&L. Omitting either low-SoC property disables the penalty.
 - `maxChargePowerW`: positive integer command magnitude.
 - `maxDischargePowerW`: positive integer command magnitude.
 
-The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare two sibling numeric properties.
+The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent` and, when configured, `minChargePercent <= lowSocDischargeThresholdPercent <= maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare sibling numeric properties.
 
 The power-cap properties are automation inputs. Outgoing battery commands are clamped to these shared positive magnitudes.
 

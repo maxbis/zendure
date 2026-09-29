@@ -526,6 +526,12 @@ def run_shadow_once(
         battery_wear_cost_eur_per_kwh_discharged=(
             settings.battery_wear_cost_eur_per_kwh_discharged
         ),
+        low_soc_discharge_threshold_percent=(
+            settings.low_soc_discharge_threshold_percent
+        ),
+        low_soc_discharge_cost_cents_per_kwh=(
+            settings.low_soc_discharge_cost_cents_per_kwh
+        ),
     )
     payload = {
         "type": "optimizer_shadow_plan",
@@ -546,6 +552,12 @@ def run_shadow_once(
             "active_hour_deadband_w": settings.active_hour_deadband_w,
             "battery_wear_cost_eur_per_kwh_discharged": (
                 settings.battery_wear_cost_eur_per_kwh_discharged
+            ),
+            "low_soc_discharge_threshold_percent": (
+                settings.low_soc_discharge_threshold_percent
+            ),
+            "low_soc_discharge_cost_cents_per_kwh": (
+                settings.low_soc_discharge_cost_cents_per_kwh
             ),
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
             "solar_forecast_source": "shortwave_radiation",

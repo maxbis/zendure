@@ -32,6 +32,8 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         arbitrage_min_spread_eur_per_kwh=0.12,
         round_trip_efficiency=0.85,
         battery_wear_cost_eur_per_kwh_discharged=0.0005,
+        low_soc_discharge_threshold_percent=0,
+        low_soc_discharge_cost_cents_per_kwh=0,
         cheap_hour_tolerance_eur_per_kwh=0.01,
         expensive_hour_tolerance_eur_per_kwh=0.01,
         netzero_market_price_threshold_eur_per_kwh=0.18,

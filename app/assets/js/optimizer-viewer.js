@@ -20,6 +20,7 @@
         generated: root.querySelector('[data-role="generated"]'),
         soc: root.querySelector('[data-role="soc"]'),
         efficiency: root.querySelector('[data-role="efficiency"]'),
+        reservePolicy: root.querySelector('[data-role="reserve-policy"]'),
         cost: root.querySelector('[data-role="cost"]'),
         objective: root.querySelector('[data-role="objective"]'),
         differenceCount: root.querySelector('[data-role="difference-count"]'),
@@ -581,6 +582,11 @@
         elements.generated.textContent = `Calculated ${formatRunTime(plan.generated_at)}`;
         elements.soc.textContent = `${Number(plan.starting_soc_percent).toFixed(1)}% → ${Number(plan.ending_soc_percent).toFixed(1)}%`;
         elements.efficiency.textContent = `${Math.round(Number(plan.round_trip_efficiency) * 100)}% round-trip efficiency`;
+        const reserveThreshold = Number(plan.low_soc_discharge_threshold_percent || 0);
+        const reserveCost = Number(plan.low_soc_discharge_cost_cents_per_kwh || 0);
+        elements.reservePolicy.textContent = reserveThreshold > 0 && reserveCost > 0
+            ? `${Math.round(reserveCost)} ct/kWh below ${Math.round(reserveThreshold)}% SoC`
+            : "Disabled";
         elements.cost.textContent = formatMoney(plan.expected_energy_cost_eur);
         elements.objective.textContent = formatMoney(plan.objective_eur);
         elements.differenceCount.textContent = `${differenceCount} of ${(plan.decisions || []).length}`;

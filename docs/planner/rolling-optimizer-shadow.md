@@ -36,6 +36,7 @@ The optimizer reads:
 - Battery capacity, state-of-charge boundaries, schedule power limits and power step from shared configuration.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
 - `battery.wearCostEurPerKwhDischarged`, currently 0.0005 EUR/kWh (0.05 euro-cent/kWh). The optimizer charges this cost only to AC-side battery discharge; charging has no wear charge.
+- `battery.lowSocDischargeThresholdPercent`, currently 26%, and `battery.lowSocDischargeCostCentsPerKwh`, currently 10 ct/kWh. The optimizer applies this virtual cost only to the AC-side portion of a discharge that occurs below the threshold. It is a soft reserve incentive, not a hard SoC limit, and is excluded from cash P&L.
 
 The runner appends one self-contained JSON object per calculation. A record contains
 the inputs that define the run, expected financial result, starting and ending state
@@ -107,18 +108,19 @@ The hourly table remains available below the graphs for detailed inspection.
 5. Calculate the reporting valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero. Separately, calculate the optimizer's terminal price from the average consumer price across all horizon slots.
 6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
 7. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
-8. Select the full-horizon path with the lowest expected purchase cost minus sale income and remaining-energy value.
-9. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
-10. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
-11. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
-12. Normalize every selected zero-minimum `netzero+` command to the complete configured charge-only range. Keep the modeled battery power unchanged for expected P&L and SoC, but set the runtime range from zero through the configured maximum charging power.
-13. After normalizing `netzero+`, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the normalized positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
-14. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round it down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
-15. Append the plan to the comparison log under a file lock.
-16. Atomically publish the same plan as the latest executable optimizer schedule.
-17. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-18. Preserve exact dated manual schedule entries over optimizer entries.
-19. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
+8. Add the configured virtual low-SoC cost to any portion of candidate discharge below the configured threshold, including proportional treatment when a segment crosses that threshold.
+9. Select the full-horizon path with the lowest expected purchase cost minus sale income, plus battery-wear and low-SoC virtual costs, minus remaining-energy value.
+10. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
+11. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
+12. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
+13. Normalize every selected zero-minimum `netzero+` command to the complete configured charge-only range. Keep the modeled battery power unchanged for expected P&L and SoC, but set the runtime range from zero through the configured maximum charging power.
+14. After normalizing `netzero+`, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the normalized positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
+15. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
+16. Append the plan to the comparison log under a file lock.
+17. Atomically publish the same plan as the latest executable optimizer schedule.
+18. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+19. Preserve exact dated manual schedule entries over optimizer entries.
+20. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 

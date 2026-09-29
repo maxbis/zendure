@@ -165,6 +165,7 @@ $viewerConfig = [
                     <p><span>Calculated</span><strong data-role="generated">—</strong></p>
                     <p><span>Optimizer battery path</span><strong data-role="soc">—</strong></p>
                     <p><span>Round-trip efficiency</span><strong data-role="efficiency">—</strong></p>
+                    <p><span>Low-battery reserve cost</span><strong data-role="reserve-policy">—</strong></p>
                     <p><span>Optimizer energy cost</span><strong data-role="cost">—</strong></p>
                     <p><span>Objective after terminal value</span><strong data-role="objective">—</strong></p>
                     <p><span>Different schedule segments</span><strong data-role="difference-count">—</strong></p>

@@ -69,6 +69,10 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         battery_keys.add("roundTripEfficiency")
     if "wearCostEurPerKwhDischarged" in battery:
         battery_keys.add("wearCostEurPerKwhDischarged")
+    if "lowSocDischargeThresholdPercent" in battery:
+        battery_keys.add("lowSocDischargeThresholdPercent")
+    if "lowSocDischargeCostCentsPerKwh" in battery:
+        battery_keys.add("lowSocDischargeCostCentsPerKwh")
     _assert_exact_keys(battery, battery_keys, "$.battery")
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
     min_charge_percent = _require_integer(
@@ -97,6 +101,21 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             battery["wearCostEurPerKwhDischarged"],
             "$.battery.wearCostEurPerKwhDischarged",
             0.0,
+        )
+    low_soc_discharge_threshold_percent = None
+    if "lowSocDischargeThresholdPercent" in battery:
+        low_soc_discharge_threshold_percent = _require_integer(
+            battery["lowSocDischargeThresholdPercent"],
+            "$.battery.lowSocDischargeThresholdPercent",
+            min_charge_percent,
+            max_charge_percent,
+        )
+    low_soc_discharge_cost_cents_per_kwh = None
+    if "lowSocDischargeCostCentsPerKwh" in battery:
+        low_soc_discharge_cost_cents_per_kwh = _require_integer(
+            battery["lowSocDischargeCostCentsPerKwh"],
+            "$.battery.lowSocDischargeCostCentsPerKwh",
+            0,
         )
     max_charge_power_w = _require_integer(
         battery["maxChargePowerW"], "$.battery.maxChargePowerW", 1
@@ -217,6 +236,10 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_battery["roundTripEfficiency"] = round_trip_efficiency
     if wear_cost_eur_per_kwh_discharged is not None:
         normalized_battery["wearCostEurPerKwhDischarged"] = wear_cost_eur_per_kwh_discharged
+    if low_soc_discharge_threshold_percent is not None:
+        normalized_battery["lowSocDischargeThresholdPercent"] = low_soc_discharge_threshold_percent
+    if low_soc_discharge_cost_cents_per_kwh is not None:
+        normalized_battery["lowSocDischargeCostCentsPerKwh"] = low_soc_discharge_cost_cents_per_kwh
 
     return {
         "schemaVersion": schema_version,
