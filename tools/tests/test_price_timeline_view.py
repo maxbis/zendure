@@ -67,12 +67,17 @@ def test_mobile_overview_is_denser_and_uses_distinct_bar_chart_icons():
     assert '<symbol id="chart-bars-detail"' in icon_source
 
 
-def test_overview_hides_solar_time_badges_without_hiding_markers():
-    source = APP_CSS.read_text(encoding="utf-8")
+def test_solar_markers_remain_visible_and_identify_their_event_and_time():
+    js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
 
-    assert '.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__badge' in source
-    assert ".app-price-solar-marker {" in source
-    assert "border-inline-start: 1px dashed" in source
+    assert 'label.textContent = readableName;' in js_source
+    assert 'time.textContent = event.time;' in js_source
+    assert 'badge.append(icon, label, time);' in js_source
+    assert ".app-price-solar-marker {" in css_source
+    assert "z-index: 4;" in css_source
+    assert "inset-inline-start: var(--app-solar-position);" in css_source
+    assert '.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__badge' not in css_source
 
 
 def test_timeline_uses_compact_day_and_numeric_date_format():

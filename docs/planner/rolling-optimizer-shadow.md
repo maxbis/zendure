@@ -34,6 +34,7 @@ The optimizer reads:
 - The solar endpoint's `cachedAt` value, stored as `inputs.solar_forecast_updated_at` in the installation timezone.
 - The shared 24-hour household-usage profile.
 - Battery capacity, state-of-charge boundaries, schedule power limits and power step from shared configuration.
+- `schedule.activeHourDeadbandW`, currently 0 W. Zero disables stabilization. A positive multiple of the configured power step can retain the already-active hour's previous command when a recalculation proposes only a smaller modeled-power change.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
 - `battery.wearCostEurPerKwhDischarged`, currently 0.0005 EUR/kWh (0.05 euro-cent/kWh). The optimizer charges this cost only to AC-side battery discharge; charging has no wear charge.
 - `battery.lowSocDischargeThresholdPercent`, currently 26%, and `battery.lowSocDischargeCostCentsPerKwh`, currently 10 ct/kWh. The optimizer applies this virtual cost only to the AC-side portion of a discharge that occurs below the threshold. It is a soft reserve incentive, not a hard SoC limit, and is excluded from cash P&L.
@@ -116,11 +117,12 @@ The hourly table remains available below the graphs for detailed inspection.
 13. Normalize every selected zero-minimum `netzero+` command to the complete configured charge-only range. Keep the modeled battery power unchanged for expected P&L and SoC, but set the runtime range from zero through the configured maximum charging power.
 14. After normalizing `netzero+`, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the normalized positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
 15. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
-16. Append the plan to the comparison log under a file lock.
-17. Atomically publish the same plan as the latest executable optimizer schedule.
-18. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-19. Preserve exact dated manual schedule entries over optimizer entries.
-20. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
+16. Append the raw optimizer plan to the comparison log under a file lock.
+17. Before executable publication, apply the configured active-hour deadband. Within the same local clock hour, retain the previously published active command when its modeled power differs from the new proposal by less than the deadband and the retained command remains SoC-safe. Recalculate the published trajectory after retaining a command. Do not stabilize future hours.
+18. Atomically publish the resulting executable optimizer schedule.
+19. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+20. Preserve exact dated manual schedule entries over optimizer entries.
+21. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 
@@ -158,6 +160,10 @@ http://localhost/zendure/app/optimizer.php
 - When bidirectional `netzero` is selected, then its discharge limit scales linearly with the price score and remains constrained by discharge power, energy above minimum SoC and slot duration.
 - When the minimum horizon already ends exactly at midnight, then no additional day is added.
 - When `PLANNER_EXTEND_HORIZON_TO_MIDNIGHT=false`, then the optimizer uses the exact configured horizon instead.
+- When `schedule.activeHourDeadbandW` is zero, then active-hour stabilization is disabled.
+- When a recalculation occurs in a new local clock hour, then the new hour starts with the newly optimized command rather than retaining the previous hour's command.
+- When the previous active command could violate the current SoC limits or make the recalculated trajectory infeasible, then safety overrides the deadband and the new proposal is published.
+- When the modeled power difference is equal to or greater than the deadband, then the new proposal is published.
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.
 - When a current schedule action cannot be modeled, then the viewer treats it as idle and shows a warning for that day.
 - When an older optimizer calculation is selected, then its graph is compared with the rules currently resolved, not with a historical rules snapshot.

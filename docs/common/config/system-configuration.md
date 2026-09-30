@@ -40,6 +40,7 @@ The configuration contains:
 - Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
 - Schedule range: -1800 through 1200 W.
 - Schedule power step: 100 W.
+- Active-hour optimizer deadband: 0 W (disabled).
 - Installation: Amsterdam.
 - Latitude: 52.3676.
 - Longitude: 4.9041.
@@ -110,7 +111,11 @@ Required properties:
 - `maxPowerW`: non-negative integer.
 - `powerStepW`: positive integer.
 
-Both loaders additionally require `minPowerW < maxPowerW`. The range describes schedule planning and editing; it remains distinct from the smaller battery command caps.
+Optional properties:
+
+- `activeHourDeadbandW`: non-negative integer number of watts. Zero disables active-hour stabilization. A positive value allows the optimizer publisher to retain the current hour's previously published command when the newly modeled power difference is smaller than this value. Future hours are not stabilized.
+
+Both loaders additionally require `minPowerW < maxPowerW`. The planner additionally requires `activeHourDeadbandW` to be a multiple of `powerStepW`. The schedule range describes planning and editing; it remains distinct from the smaller battery command caps.
 
 ### Installation
 
@@ -147,7 +152,7 @@ Current flow after the GUI and automation integrations:
 6. Automation loads device, meter, loop and control-tuning settings from `automate/config/config.jsonc`.
 7. Automation loads the battery minimum, battery maximum, charge cap, discharge cap and installation timezone from `system.json` through the strict Python loader.
 8. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
-9. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step.
+9. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step. The rolling optimizer additionally uses the active-hour deadband when publishing an executable plan.
 10. Web-only routing and display policies remain in `main/config/config.json`. Shared battery, installation and price-conversion fields have been removed from that file.
 11. Automation-local operational and connection settings remain in `automate/config/config.jsonc`. The migrated battery keys have been removed from that local file.
 12. Parity, GUI and automation integration tests verify the ownership boundary and strict failure behavior.
@@ -173,6 +178,8 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When an unknown property is present, then schema validation fails rather than silently ignoring a likely typo.
 - When minimum is equal to or greater than maximum, then schema ranges alone may pass, but both loaders reject it.
 - When the schedule minimum is equal to or greater than its maximum, then both loaders reject it.
+- When `activeHourDeadbandW` is negative, then both loaders reject it.
+- When `activeHourDeadbandW` is not a multiple of `powerStepW`, then the shared loaders accept the structurally valid configuration but the rolling planner rejects it during settings initialization.
 - When the household-usage profile does not contain exactly 24 non-negative integer values, then both loaders reject it.
 - When either efficiency value is zero, negative or greater than one, then both loaders reject it.
 - When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.

@@ -393,9 +393,13 @@
             icon.classList.add("gsd-icon");
             use.setAttribute("href", "../themes/graphite-signal-dark/assets/icons/sprite.svg#sun");
             icon.appendChild(use);
+            const label = document.createElement("span");
+            label.className = "app-price-solar-marker__label";
+            label.textContent = readableName;
             const time = document.createElement("span");
+            time.className = "app-price-solar-marker__time";
             time.textContent = event.time;
-            badge.append(icon, time);
+            badge.append(icon, label, time);
             marker.appendChild(badge);
             fragment.appendChild(marker);
         });

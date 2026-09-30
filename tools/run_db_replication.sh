@@ -1,0 +1,1 @@
+cd /var/www/qool/zendure/db-replication/client && python3 main.py --table status_updates

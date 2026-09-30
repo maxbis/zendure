@@ -2050,12 +2050,13 @@ button.app-state-pill:focus-visible {
 
 .app-price-solar-marker {
     position: absolute;
-    z-index: 2;
+    /* Keep solar events above the day-part strip and hourly controls. */
+    z-index: 4;
     top: 0;
     bottom: 4px;
-    left: var(--app-solar-position);
+    inset-inline-start: var(--app-solar-position);
     width: 0;
-    border-inline-start: 1px dashed color-mix(in srgb, var(--gsd-warning) 58%, transparent);
+    border-inline-start: 1px dashed color-mix(in srgb, var(--gsd-warning) 76%, transparent);
     pointer-events: none;
 }
 
@@ -2092,8 +2093,12 @@ button.app-state-pill:focus-visible {
     color: var(--gsd-warning);
 }
 
-.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__badge {
-    display: none;
+.app-price-solar-marker__label {
+    color: var(--gsd-text-primary);
+}
+
+.app-price-solar-marker__time {
+    color: var(--gsd-text-secondary);
 }
 
 .app-price-hour {
