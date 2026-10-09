@@ -1,0 +1,1 @@
+sudo -u www-data php /var/www/qool/zendure/main/prices/get_prices_v7.phpZ
