@@ -2080,6 +2080,15 @@ button.app-state-pill:focus-visible {
 }
 
 .app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__badge {
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    padding: 0;
+    gap: 0;
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__label,
+.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__time {
     display: none;
 }
 
