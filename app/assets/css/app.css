@@ -2079,6 +2079,10 @@ button.app-state-pill:focus-visible {
     white-space: nowrap;
 }
 
+.app-price-plan[data-timeline-view="overview"] .app-price-solar-marker__badge {
+    display: none;
+}
+
 .app-price-solar-marker[data-event="sunrise"] .app-price-solar-marker__badge {
     left: 4px;
 }
