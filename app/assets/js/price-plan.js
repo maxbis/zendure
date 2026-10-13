@@ -471,6 +471,10 @@
         return Number.isFinite(value) ? `${(value * 100).toFixed(1)} ct` : "—";
     }
 
+    function formatPriceCentsCompact(value) {
+        return Number.isFinite(value) ? `${(value * 100).toFixed(1)} c` : "—";
+    }
+
     function setDimmedToken(element, formattedValue, token) {
         const tokenIndex = formattedValue.indexOf(token);
         if (tokenIndex < 0) {
@@ -1941,7 +1945,7 @@
 
             const priceLabel = document.createElement("span");
             priceLabel.className = "app-price-hour__price";
-            priceLabel.textContent = Number.isFinite(price) ? formatPriceCents(price) : "—";
+            priceLabel.textContent = formatPriceCentsCompact(price);
             const time = document.createElement("span");
             time.className = "app-price-hour__time";
             time.textContent = `${pad(hour)}:00`;

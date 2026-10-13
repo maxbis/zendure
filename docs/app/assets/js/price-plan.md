@@ -70,6 +70,8 @@ On wide layouts the four metrics use one row. At viewport widths up to 600 px th
 
 The timeline places sunrise and sunset badges in the date-heading row at their exact fractional-hour positions. Dashed markers extend from that row through the corresponding hourly column.
 
+Hourly price labels use the compact `c` suffix so the cent value fits within a narrow column. Tooltips and the schedule editor continue to use the full `ct` suffix.
+
 ### Solar radiation markers
 
 In the live detailed timeline, each hour with a positive radiation forecast has a centered 4 px marker over its wider price bar. Both bars start at the bottom of the same bar area, but their heights are calculated independently. The price bar uses the price range; the solar marker uses a fixed radiation scale. The markers and their legend are hidden in the 48-hour overview and in historical simulation.
