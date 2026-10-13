@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The new GUI exposes the shortwave radiation forecast from its shared More menu. The overview appears in a Graphite Signal Dark dialog, so it does not occupy permanent dashboard space or fetch data until requested.
+The new GUI exposes a detailed shortwave radiation forecast from its shared More menu. The full chart appears in a Graphite Signal Dark dialog; the live price timeline also shows a compact hourly radiation marker.
 
 ## Location
 
@@ -30,7 +30,7 @@ Outputs:
 
 ## Flow and behavior
 
-1. The page loads without requesting radiation data.
+1. The live price timeline requests radiation data independently of the dialog; its markers do not delay price rendering.
 2. The user expands More and selects Shortwave Radiation.
 3. The More panel closes and `GraphiteDialog` opens the radiation dialog.
 4. The component requests `main/api/shortwave_radiation_api.php` when no displayed payload exists or the displayed cache timestamp is at least four hours old.
@@ -39,6 +39,8 @@ Outputs:
 7. Reopening the dialog reuses a displayed payload that is still within the four-hour display window.
 8. Refresh and retry explicitly request the endpoint again; the endpoint continues to enforce its own upstream cache policy.
 9. Resizing an open dialog recalculates the chart width without making another request.
+
+The timeline and dialog make separate browser requests when both are used. The shared endpoint caches the upstream forecast. The timeline's fixed marker scale is documented in [Prices and energy plan](price-plan.md).
 
 ## Edge cases and failure modes
 

@@ -2181,6 +2181,7 @@ button.app-state-pill:focus-visible {
 }
 
 .app-price-hour__bar-zone {
+    position: relative;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -2197,6 +2198,33 @@ button.app-state-pill:focus-visible {
     transition:
         height var(--gsd-duration-medium) ease,
         background var(--gsd-duration-fast) ease;
+}
+
+.app-price-hour__solar-bar {
+    position: absolute;
+    z-index: 1;
+    bottom: 0;
+    left: calc(50% - 2px);
+    width: 4px;
+    height: var(--app-solar-height, 0%);
+    background: var(--gsd-warning);
+    border-radius: 2px 2px 0 0;
+    box-shadow: 0 0 0 1px var(--gsd-page-deep);
+    pointer-events: none;
+}
+
+.app-price-hour__solar-bar[data-capped="true"]::after {
+    position: absolute;
+    top: 0;
+    left: -2px;
+    width: 8px;
+    height: 2px;
+    background: var(--gsd-text);
+    content: "";
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-hour__solar-bar {
+    display: none;
 }
 
 .app-price-hour__edit:hover .app-price-hour__bar,
@@ -2901,6 +2929,15 @@ dialog.app-schedule-tooltip {
     gap: 5px;
 }
 
+.app-price-legend > span[hidden] {
+    display: none;
+}
+
+.app-price-plan[data-timeline-view="overview"] .app-price-legend > [data-role="solar-legend"],
+.app-price-plan[data-timeline-view="overview"] .app-price-legend > [data-role="solar-unavailable"] {
+    display: none;
+}
+
 .app-price-legend__label--mobile {
     display: none;
 }
@@ -2915,6 +2952,13 @@ dialog.app-schedule-tooltip {
 .app-price-legend__swatch--low { background: var(--gsd-positive); }
 .app-price-legend__swatch--current { background: var(--gsd-price); }
 .app-price-legend__swatch--high { background: var(--gsd-negative); }
+.app-price-legend__swatch--solar {
+    width: 4px;
+    height: 10px;
+    margin-inline: 2px;
+    background: var(--gsd-warning);
+    box-shadow: 0 0 0 1px var(--gsd-page-deep);
+}
 .app-price-legend__swatch--plan { background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%); }
 .app-price-legend__swatch--limited {
     display: grid;

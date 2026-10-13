@@ -22,6 +22,7 @@ The component reads:
 - Rule colors from the configured rules endpoint.
 - Price-conversion values from `window.GRAPHITE_APP_CONFIG` for deriving spot prices.
 - Sunrise and sunset events calculated by `app/index.php` for the configured installation.
+- Live hourly shortwave radiation from `main/api/shortwave_radiation_api.php`.
 - Server-authoritative hourly predictions returned with each resolved schedule response.
 
 The component has two modes:
@@ -69,6 +70,14 @@ On wide layouts the four metrics use one row. At viewport widths up to 600 px th
 
 The timeline places sunrise and sunset badges in the date-heading row at their exact fractional-hour positions. Dashed markers extend from that row through the corresponding hourly column.
 
+### Solar radiation markers
+
+In the live detailed timeline, each hour with a positive radiation forecast has a centered 4 px marker over its wider price bar. Both bars start at the bottom of the same bar area, but their heights are calculated independently. The price bar uses the price range; the solar marker uses a fixed radiation scale. The markers and their legend are hidden in the 48-hour overview and in historical simulation.
+
+To change the solar scale, edit `SOLAR_RADIATION_SCALE_MAX_W_M2` near the timeline constants at the top of `app/assets/js/price-plan.js`. Keep it positive; its default is `1000` W/m². Marker height is `min(100%, radiation / SOLAR_RADIATION_SCALE_MAX_W_M2 × 100%)`. The legend reads the same constant, so its label updates automatically. A forecast above the maximum fills the bar area and gets a small cap; the action tooltip and price-column accessible label retain the actual W/m² value. Zero radiation has no marker.
+
+The live timeline requests the existing shortwave endpoint alongside prices and schedules and matches local forecast timestamps to the corresponding date and hour. Only a successful, non-stale forecast is drawn. If the forecast fails or is stale, price and schedule data still render and the legend says `Solar forecast unavailable`. The detailed Shortwave Radiation dialog remains available from the More menu and continues to load on demand.
+
 ## Edge cases and failure modes
 
 - When no finite prices are available, then the low, average, and high metrics display an unavailable value and their tooltip triggers are disabled.
@@ -76,6 +85,7 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 - When the current hour has no price, then Current is unavailable even if other horizon metrics can still be calculated.
 - When price conversion is configured differently, then the tooltip's spot values use that same conversion for each contributing consumer price.
 - When sunrise or sunset data is absent or invalid, then that solar marker is omitted without preventing the price timeline from rendering.
+- When an hourly radiation value is absent or invalid, then its solar marker is omitted without affecting the price bar.
 - When all primary price and schedule requests fail, then the component displays its error state instead of stale summary metrics.
 - When the server cannot obtain live battery state, then it returns an empty forecast with a reason and the tooltip displays that reason.
 - When the schedule response omits the forecast contract, then reject it rather than calculating a browser replacement.

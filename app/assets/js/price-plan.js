@@ -29,6 +29,9 @@
         viewToggle: component.querySelector('[data-role="price-view-toggle"]'),
         viewIcon: component.querySelector('[data-role="price-view-icon"]'),
         viewStatus: component.querySelector('[data-role="price-view-status"]'),
+        solarLegend: component.querySelector('[data-role="solar-legend"]'),
+        solarScaleLabel: component.querySelector('[data-role="solar-scale-label"]'),
+        solarUnavailable: component.querySelector('[data-role="solar-unavailable"]'),
         scrollShell: component.querySelector('[data-role="price-scroll-shell"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
         scrollPrev: component.querySelector('[data-role="price-scroll-prev"]'),
@@ -77,6 +80,8 @@
     const TIMELINE_VIEW_OVERVIEW = "overview";
     const TIMELINE_TRANSITION_OUT_MS = 70;
     const TIMELINE_TRANSITION_IN_MS = 100;
+    // Full height of the narrow solar marker; change this one value to rescale it.
+    const SOLAR_RADIATION_SCALE_MAX_W_M2 = 1000;
     let timelineView = savedTimelineView();
     let timelineViewTransitioning = false;
     const summaryTooltipDetails = new Map();
@@ -92,6 +97,8 @@
         forecastAsOf: null,
         forecastUnavailableReason: null,
         optimizerSolarForecast: null,
+        solarRadiation: null,
+        solarRadiationUnavailable: false,
         controller: null
     };
 
@@ -566,6 +573,49 @@
             throw new Error(payload?.error || "Invalid schedule response");
         }
         return payload;
+    }
+
+    async function fetchSolarRadiation(signal) {
+        if (!config.shortwaveRadiationUrl) throw new Error("No solar radiation source is configured");
+        const payload = await fetchJson(new URL(config.shortwaveRadiationUrl, document.baseURI).href, signal);
+        const times = payload?.hourly?.time;
+        const values = payload?.hourly?.shortwave_radiation;
+        if (payload?.success !== true || payload.cacheStatus === "stale"
+            || !Array.isArray(times) || !Array.isArray(values)
+            || times.length === 0 || times.length !== values.length) {
+            throw new Error("Solar radiation forecast is unavailable");
+        }
+
+        const byHour = new Map();
+        times.forEach((time, index) => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):00/.exec(String(time));
+            const value = numericValue(values[index]);
+            if (match && value !== null && value >= 0) {
+                byHour.set(`${match[1]}${match[2]}${match[3]}${match[4]}`, value);
+            }
+        });
+        if (byHour.size === 0) throw new Error("Solar radiation forecast has no valid hours");
+        return byHour;
+    }
+
+    function solarRadiationForHour(date, hour) {
+        return state.solarRadiation?.get(`${date}${pad(hour)}`) ?? null;
+    }
+
+    function refreshSolarRadiation(signal) {
+        fetchSolarRadiation(signal)
+            .then((byHour) => {
+                if (signal.aborted) return;
+                state.solarRadiation = byHour;
+                state.solarRadiationUnavailable = false;
+                if (component.dataset.state === "ready") render({ preserveScroll: true });
+            })
+            .catch(() => {
+                if (signal.aborted) return;
+                state.solarRadiation = null;
+                state.solarRadiationUnavailable = true;
+                if (component.dataset.state === "ready") render({ preserveScroll: true });
+            });
     }
 
     async function fetchOptimizerSolarForecast(signal) {
@@ -1248,6 +1298,14 @@
         if (batteryForecast) content.appendChild(batteryForecast);
         const solarForecast = tooltipOptimizerSolarForecast(date, hour);
         if (solarForecast) content.appendChild(solarForecast);
+        const radiation = solarRadiationForHour(date, hour);
+        if (!isSimulation && radiation !== null) {
+            content.appendChild(tooltipSectionLabel("Solar radiation forecast"));
+            const radiationValue = document.createElement("p");
+            radiationValue.className = "app-schedule-tooltip__forecast-detail";
+            radiationValue.textContent = `${Math.round(radiation)} W/m²`;
+            content.appendChild(radiationValue);
+        }
 
         priceTooltip.replaceChildren(header, content);
         priceTooltip.hidden = false;
@@ -1868,6 +1926,18 @@
             bar.style.setProperty("--app-price-height", Number.isFinite(price) ? `${18 + position * 82}%` : "5%");
             bar.style.setProperty("--app-price-color", Number.isFinite(price) ? priceColor(position) : "var(--gsd-border-strong)");
             barZone.appendChild(bar);
+            const radiation = isSimulation ? null : solarRadiationForHour(day.date, hour);
+            if (radiation !== null && radiation > 0) {
+                const solarBar = document.createElement("span");
+                solarBar.className = "app-price-hour__solar-bar";
+                solarBar.style.setProperty("--app-solar-height", `${Math.min(100, radiation / SOLAR_RADIATION_SCALE_MAX_W_M2 * 100)}%`);
+                solarBar.dataset.capped = radiation > SOLAR_RADIATION_SCALE_MAX_W_M2 ? "true" : "false";
+                solarBar.setAttribute("aria-hidden", "true");
+                barZone.appendChild(solarBar);
+            }
+            if (radiation !== null) {
+                editButton.setAttribute("aria-label", `${editButton.getAttribute("aria-label")}. Solar radiation forecast ${Math.round(radiation)} W/m².`);
+            }
 
             const priceLabel = document.createElement("span");
             priceLabel.className = "app-price-hour__price";
@@ -2019,6 +2089,9 @@
         ];
         renderSummary(days);
         renderTimeline(days);
+        if (elements.solarLegend) elements.solarLegend.hidden = !state.solarRadiation;
+        if (elements.solarScaleLabel) elements.solarScaleLabel.textContent = `0–${SOLAR_RADIATION_SCALE_MAX_W_M2.toLocaleString()} W/m²`;
+        if (elements.solarUnavailable) elements.solarUnavailable.hidden = !state.solarRadiationUnavailable;
         if (elements.tomorrowAvailability) {
             elements.tomorrowAvailability.dataset.availability = tomorrowHasPrices ? "available" : "unavailable";
         }
@@ -2192,6 +2265,7 @@
                 setView("ready");
                 return;
             }
+            refreshSolarRadiation(state.controller.signal);
             const results = await Promise.allSettled([
                 fetchPrices(state.controller.signal),
                 fetchSchedule(dates.today, state.controller.signal),

@@ -101,6 +101,10 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--high"></i><span class="app-price-legend__label--desktop">High price</span><span class="app-price-legend__label--mobile">High</span></span>
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--plan"></i><span class="app-price-legend__label--desktop">Scheduled action</span><span class="app-price-legend__label--mobile">Plan</span></span>
                     <span><i class="app-price-legend__swatch app-price-legend__swatch--limited" aria-hidden="true"></i><span class="app-price-legend__label--desktop">Limited range</span><span class="app-price-legend__label--mobile">Range</span></span>
+                    <?php if (!$appPricePlanReadOnly): ?>
+                        <span data-role="solar-legend" hidden><i class="app-price-legend__swatch app-price-legend__swatch--solar" aria-hidden="true"></i>Solar radiation <span data-role="solar-scale-label"></span></span>
+                        <span data-role="solar-unavailable" hidden>Solar forecast unavailable</span>
+                    <?php endif; ?>
                 </div>
 
             </div>
