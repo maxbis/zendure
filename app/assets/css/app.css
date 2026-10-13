@@ -1521,6 +1521,8 @@ button.app-state-pill:focus-visible {
 }
 
 .app-price-plan {
+    --app-solar-marker-fill: #14191b;
+    --app-solar-marker-outline: #d9c27a;
     margin-top: 12px;
     overflow: hidden;
 }
@@ -2207,9 +2209,9 @@ button.app-state-pill:focus-visible {
     left: calc(50% - 2px);
     width: 4px;
     height: var(--app-solar-height, 0%);
-    background: var(--gsd-warning);
+    background: var(--app-solar-marker-fill);
     border-radius: 2px 2px 0 0;
-    box-shadow: 0 0 0 1px var(--gsd-page-deep);
+    box-shadow: 0 0 0 1px var(--app-solar-marker-outline);
     pointer-events: none;
 }
 
@@ -2956,8 +2958,8 @@ dialog.app-schedule-tooltip {
     width: 4px;
     height: 10px;
     margin-inline: 2px;
-    background: var(--gsd-warning);
-    box-shadow: 0 0 0 1px var(--gsd-page-deep);
+    background: var(--app-solar-marker-fill);
+    box-shadow: 0 0 0 1px var(--app-solar-marker-outline);
 }
 .app-price-legend__swatch--plan { background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%); }
 .app-price-legend__swatch--limited {

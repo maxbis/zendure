@@ -74,6 +74,8 @@ The timeline places sunrise and sunset badges in the date-heading row at their e
 
 In the live detailed timeline, each hour with a positive radiation forecast has a centered 4 px marker over its wider price bar. Both bars start at the bottom of the same bar area, but their heights are calculated independently. The price bar uses the price range; the solar marker uses a fixed radiation scale. The markers and their legend are hidden in the 48-hour overview and in historical simulation.
 
+The marker and legend swatch use a charcoal fill with a 1 px muted-gold outer outline. Their colors are set together by `--app-solar-marker-fill` and `--app-solar-marker-outline` on `.app-price-plan` in `app/assets/css/app.css`; the outline does not reduce the 4 px fill width.
+
 To change the solar scale, edit `SOLAR_RADIATION_SCALE_MAX_W_M2` near the timeline constants at the top of `app/assets/js/price-plan.js`. Keep it positive; its default is `1000` W/m². Marker height is `min(100%, radiation / SOLAR_RADIATION_SCALE_MAX_W_M2 × 100%)`. The legend reads the same constant, so its label updates automatically. A forecast above the maximum fills the bar area and gets a small cap; the action tooltip and price-column accessible label retain the actual W/m² value. Zero radiation has no marker.
 
 The live timeline requests the existing shortwave endpoint alongside prices and schedules and matches local forecast timestamps to the corresponding date and hour. Only a successful, non-stale forecast is drawn. If the forecast fails or is stale, price and schedule data still render and the legend says `Solar forecast unavailable`. The detailed Shortwave Radiation dialog remains available from the More menu and continues to load on demand.
