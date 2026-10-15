@@ -30,7 +30,6 @@
         viewIcon: component.querySelector('[data-role="price-view-icon"]'),
         viewStatus: component.querySelector('[data-role="price-view-status"]'),
         solarLegend: component.querySelector('[data-role="solar-legend"]'),
-        solarScaleLabel: component.querySelector('[data-role="solar-scale-label"]'),
         solarUnavailable: component.querySelector('[data-role="solar-unavailable"]'),
         scrollShell: component.querySelector('[data-role="price-scroll-shell"]'),
         scroll: component.querySelector('[data-role="price-scroll"]'),
@@ -2094,7 +2093,6 @@
         renderSummary(days);
         renderTimeline(days);
         if (elements.solarLegend) elements.solarLegend.hidden = !state.solarRadiation;
-        if (elements.solarScaleLabel) elements.solarScaleLabel.textContent = `0–${SOLAR_RADIATION_SCALE_MAX_W_M2.toLocaleString()} W/m²`;
         if (elements.solarUnavailable) elements.solarUnavailable.hidden = !state.solarRadiationUnavailable;
         if (elements.tomorrowAvailability) {
             elements.tomorrowAvailability.dataset.availability = tomorrowHasPrices ? "available" : "unavailable";

@@ -2974,22 +2974,20 @@ dialog.app-schedule-tooltip {
 .app-price-legend__swatch--plan { background: linear-gradient(135deg, var(--gsd-negative) 0 50%, var(--gsd-positive) 50% 100%); }
 .app-price-legend__swatch--limited {
     display: grid;
-    width: 13px;
+    width: 16px;
     height: 14px;
     place-items: center;
     background: none;
-    border: 1px solid var(--gsd-border-strong);
-    border-radius: 3px;
     color: var(--gsd-text-secondary);
-    font-size: 0.34rem;
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-    line-height: 0.8;
-    white-space: pre;
 }
 
 .app-price-legend__swatch--limited::before {
-    content: "−1K\A 0";
+    box-sizing: border-box;
+    width: 14px;
+    height: 9px;
+    border-inline: 2px solid currentColor;
+    background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+    content: "";
 }
 
 .gsd-dialog__footer .gsd-btn--primary {
