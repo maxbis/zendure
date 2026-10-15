@@ -27,10 +27,6 @@ NEGATIVE_EXPORT_AVOIDANCE_ENABLED = True
 SERVICE_PORT = 8765
 SERVICE_HOST = "127.0.0.1"
 HTTP_TIMEOUT_SECONDS = 12
-SHORTWAVE_RADIATION_REFERENCE_W_M2 = 1000.0
-PV_SYSTEM_CAPACITY_W = 2640.0
-PV_DERATE_FACTOR = 0.85
-PV_OUTPUT_CLIP_W = 5000.0
 MIN_ACTION_POWER_W = 50
 DEFAULT_MAX_CHARGE_LEVEL = 100
 LOAD_FORECAST_FILE_NAME = "load_forecast.json"
@@ -51,6 +47,12 @@ class PriceConversionConfig:
     vat_multiplier: float = 1.21
     consumer_precision: int = 4
     spot_precision: int = 6
+
+
+@dataclass(frozen=True)
+class PvPanel:
+    facing_degrees: float  # Compass bearing: north 0, east 90, south 180, west 270.
+    tilt_degrees: float
 
 
 @dataclass(frozen=True)
@@ -89,8 +91,11 @@ class PlannerSettings:
     price_release_hour_local: int
     shortwave_radiation_reference_w_m2: float
     pv_system_capacity_w: float
+    pv_panel_rated_power_w: float
     pv_derate_factor: float
     pv_output_clip_w: float
+    pv_panels: tuple[PvPanel, ...]
+    pv_monthly_correction_factors: tuple[float, ...]
     min_action_power_w: int
     price_conversion: PriceConversionConfig
 
@@ -111,6 +116,54 @@ def _load_json_file(path: Path) -> Dict[str, Any]:
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _load_pv_config(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        config = json.load(handle)
+    required = {
+        "panelCount", "ratedPowerWPerPanel", "panels", "irradianceReferenceWPerM2",
+        "derateFactor", "monthlyCorrectionFactors", "outputClipW",
+    }
+    if not isinstance(config, dict) or set(config) != required:
+        raise ValueError("PV config must contain exactly the documented fields")
+
+    def positive_number(value: Any, name: str) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"PV config {name} must be a positive finite number")
+        return float(value)
+
+    count = config["panelCount"]
+    raw_panels = config["panels"]
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1 or not isinstance(raw_panels, list) or len(raw_panels) != count:
+        raise ValueError("PV config panelCount must match the nonempty panels list")
+    panels = []
+    for index, panel in enumerate(raw_panels):
+        if not isinstance(panel, dict) or set(panel) != {"facingDegrees", "tiltDegrees"}:
+            raise ValueError(f"PV config panels[{index}] must specify facingDegrees and tiltDegrees")
+        facing = panel["facingDegrees"]
+        tilt = panel["tiltDegrees"]
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) for value in (facing, tilt)) or not 0 <= facing < 360 or not 0 <= tilt <= 90:
+            raise ValueError(f"PV config panels[{index}] has invalid facing or tilt")
+        panels.append(PvPanel(float(facing), float(tilt)))
+
+    corrections = config["monthlyCorrectionFactors"]
+    if not isinstance(corrections, dict) or set(corrections) != {f"{month:02d}" for month in range(1, 13)}:
+        raise ValueError("PV config monthlyCorrectionFactors must contain months 01 through 12")
+    correction_values = tuple(positive_number(corrections[f"{month:02d}"], f"month {month:02d}") for month in range(1, 13))
+    derate = positive_number(config["derateFactor"], "derateFactor")
+    if derate > 1:
+        raise ValueError("PV config derateFactor must not exceed 1")
+    rated_power = positive_number(config["ratedPowerWPerPanel"], "ratedPowerWPerPanel")
+    return {
+        "panels": tuple(panels),
+        "capacity_w": count * rated_power,
+        "panel_rated_power_w": rated_power,
+        "reference_w_m2": positive_number(config["irradianceReferenceWPerM2"], "irradianceReferenceWPerM2"),
+        "derate": derate,
+        "corrections": correction_values,
+        "clip_w": positive_number(config["outputClipW"], "outputClipW"),
+    }
 
 
 def _get_first_string(value: Any) -> Optional[str]:
@@ -231,6 +284,7 @@ def load_settings() -> PlannerSettings:
     load_forecast_path = data_dir / LOAD_FORECAST_FILE_NAME
     default_load_forecast_template_path = data_dir / DEFAULT_LOAD_FORECAST_TEMPLATE_FILE_NAME
     price_conversion = _load_price_conversion(system_config["priceConversion"])
+    pv_config = _load_pv_config(repo_root / "planner" / "pv_config.json")
 
     price_api_url = (
         os.getenv("PLANNER_PRICE_API_URL")
@@ -335,22 +389,13 @@ def load_settings() -> PlannerSettings:
             os.getenv("PLANNER_PRICE_RELEASE_HOUR"),
             PRICE_RELEASE_HOUR_LOCAL,
         ),
-        shortwave_radiation_reference_w_m2=_get_float(
-            os.getenv("PLANNER_SHORTWAVE_REFERENCE"),
-            SHORTWAVE_RADIATION_REFERENCE_W_M2,
-        ),
-        pv_system_capacity_w=_get_float(
-            os.getenv("PLANNER_PV_SYSTEM_CAPACITY_W"),
-            PV_SYSTEM_CAPACITY_W,
-        ),
-        pv_derate_factor=_get_float(
-            os.getenv("PLANNER_PV_DERATE_FACTOR"),
-            PV_DERATE_FACTOR,
-        ),
-        pv_output_clip_w=_get_float(
-            os.getenv("PLANNER_PV_OUTPUT_CLIP_W"),
-            PV_OUTPUT_CLIP_W,
-        ),
+        shortwave_radiation_reference_w_m2=pv_config["reference_w_m2"],
+        pv_system_capacity_w=pv_config["capacity_w"],
+        pv_panel_rated_power_w=pv_config["panel_rated_power_w"],
+        pv_derate_factor=pv_config["derate"],
+        pv_output_clip_w=pv_config["clip_w"],
+        pv_panels=pv_config["panels"],
+        pv_monthly_correction_factors=pv_config["corrections"],
         min_action_power_w=max(
             0,
             _get_int(os.getenv("PLANNER_MIN_ACTION_POWER_W"), MIN_ACTION_POWER_W),

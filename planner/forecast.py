@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import math
 from typing import Any, Dict, List, Tuple
 
 from zoneinfo import ZoneInfo
@@ -76,6 +77,59 @@ def derive_pv_forecast_by_date(
     shortwave_payload: Dict[str, Any],
     settings: PlannerSettings,
 ) -> Dict[str, List[float]]:
+    if settings.pv_panels:
+        expected_groups: Dict[tuple[float, float], int] = {}
+        for panel in settings.pv_panels:
+            key = (panel.facing_degrees, panel.tilt_degrees)
+            expected_groups[key] = expected_groups.get(key, 0) + 1
+        panel_irradiance = shortwave_payload.get("panel_irradiance")
+        if not isinstance(panel_irradiance, list) or len(panel_irradiance) != len(expected_groups):
+            raise ValueError("PV forecast is missing configured panel orientations")
+        hourly_power: Dict[str, float] = {}
+        seen_groups = set()
+        reference_times = None
+        reference = settings.shortwave_radiation_reference_w_m2
+        for group in panel_irradiance:
+            if not isinstance(group, dict):
+                raise ValueError("Invalid PV panel irradiation group")
+            key = (group.get("facing_degrees"), group.get("tilt_degrees"))
+            if key not in expected_groups or key in seen_groups or group.get("count") != expected_groups[key]:
+                raise ValueError("PV forecast panel groups do not match configuration")
+            seen_groups.add(key)
+            hourly_group = group.get("hourly")
+            if not isinstance(hourly_group, dict):
+                raise ValueError("PV forecast panel group has no hourly data")
+            times = hourly_group.get("time")
+            irradiance = hourly_group.get("global_tilted_irradiance")
+            if not isinstance(times, list) or not isinstance(irradiance, list) or not times or len(times) != len(irradiance):
+                raise ValueError("PV forecast panel group has mismatched hourly data")
+            if len(set(times)) != len(times) or (reference_times is not None and times != reference_times):
+                raise ValueError("PV forecast panel groups must have identical, unique hours")
+            reference_times = times
+            for raw_time, raw_irradiance in zip(times, irradiance):
+                try:
+                    value = float(raw_irradiance)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("PV forecast has nonnumeric tilted irradiation") from exc
+                if not math.isfinite(value):
+                    raise ValueError("PV forecast has nonfinite tilted irradiation")
+                timestamp = str(raw_time)
+                hourly_power[timestamp] = hourly_power.get(timestamp, 0.0) + max(0.0, value) / reference * settings.pv_panel_rated_power_w * expected_groups[key]
+        result: Dict[str, List[float]] = {}
+        tz = ZoneInfo(settings.timezone)
+        for raw_time, raw_power in hourly_power.items():
+            dt = datetime.fromisoformat(raw_time)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=tz)
+            dt = dt.astimezone(tz)
+            date_key = dt.strftime("%Y-%m-%d")
+            if date_key not in result:
+                result[date_key] = [0.0] * 24
+            correction = settings.pv_monthly_correction_factors[dt.month - 1]
+            pv_w = raw_power * settings.pv_derate_factor * correction
+            result[date_key][dt.hour] = max(0.0, min(pv_w, settings.pv_output_clip_w))
+        return result
+
     hourly = shortwave_payload.get("hourly") if isinstance(shortwave_payload.get("hourly"), dict) else {}
     times = hourly.get("time") if isinstance(hourly.get("time"), list) else []
     radiation = hourly.get("shortwave_radiation") if isinstance(hourly.get("shortwave_radiation"), list) else []
@@ -97,7 +151,7 @@ def derive_pv_forecast_by_date(
         except (TypeError, ValueError):
             radiation_value = 0.0
         normalized = radiation_value / max(settings.shortwave_radiation_reference_w_m2, 0.000001)
-        pv_w = normalized * settings.pv_system_capacity_w * settings.pv_derate_factor
+        pv_w = normalized * settings.pv_system_capacity_w * settings.pv_derate_factor * settings.pv_monthly_correction_factors[dt.month - 1]
         pv_w = max(0.0, min(pv_w, settings.pv_output_clip_w))
         result[date_key][dt.hour] = pv_w
     return result

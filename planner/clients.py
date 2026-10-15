@@ -191,13 +191,38 @@ def fetch_battery_state(settings: PlannerSettings) -> BatteryState:
 
 
 def fetch_shortwave_payload(settings: PlannerSettings) -> Dict[str, Any]:
-    params = urllib.parse.urlencode(
-        {
-            "latitude": settings.latitude,
-            "longitude": settings.longitude,
-            "timezone": settings.timezone,
-        }
-    )
+    base_params = {
+        "latitude": settings.latitude,
+        "longitude": settings.longitude,
+        "timezone": settings.timezone,
+    }
     separator = "&" if "?" in settings.shortwave_api_url else "?"
-    url = f"{settings.shortwave_api_url}{separator}{params}"
-    return fetch_json(url, settings.http_timeout_seconds)
+    def fetch(params: Dict[str, Any]) -> Dict[str, Any]:
+        url = f"{settings.shortwave_api_url}{separator}{urllib.parse.urlencode(params)}"
+        payload = fetch_json(url, settings.http_timeout_seconds)
+        if payload.get("success") is False:
+            raise UpstreamError(f"Solar forecast endpoint failed: {payload.get('error', 'unknown error')}")
+        return payload
+
+    payload = fetch(base_params)
+    groups: Dict[tuple[float, float], int] = {}
+    for panel in settings.pv_panels:
+        key = (panel.facing_degrees, panel.tilt_degrees)
+        groups[key] = groups.get(key, 0) + 1
+    panel_irradiance = []
+    cache_times = [payload.get("cachedAt")]
+    for (facing, tilt), count in groups.items():
+        # Open-Meteo azimuth is relative to south; config uses compass bearings.
+        tilted = fetch({**base_params, "tilt": tilt, "azimuth": facing - 180.0})
+        panel_irradiance.append({
+            "facing_degrees": facing,
+            "tilt_degrees": tilt,
+            "count": count,
+            "hourly": tilted.get("hourly"),
+        })
+        cache_times.append(tilted.get("cachedAt"))
+    payload["panel_irradiance"] = panel_irradiance
+    valid_cache_times = [value for value in cache_times if isinstance(value, (int, float)) and not isinstance(value, bool)]
+    if valid_cache_times:
+        payload["cachedAt"] = min(valid_cache_times)
+    return payload

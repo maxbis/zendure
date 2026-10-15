@@ -48,6 +48,7 @@ main/prices/config.json
 # All JSON files (data, caches, generated) - keep out of git
 *.json
 **/*.json
+!/planner/pv_config.json
 !/common/config/
 !/common/config/**
 /common/config/system.json

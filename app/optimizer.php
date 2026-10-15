@@ -206,7 +206,7 @@ $viewerConfig = [
                     <header>
                         <div>
                             <h3 id="optimizer-solar-graph-title">Predicted solar power</h3>
-                            <p>Hourly PV output estimated from the shortwave-radiation forecast</p>
+                            <p>Hourly PV output estimated for the configured panel orientations and tilts</p>
                         </div>
                         <span class="gsd-badge gsd-badge--warning">Shared input</span>
                     </header>

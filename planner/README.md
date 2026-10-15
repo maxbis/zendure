@@ -10,7 +10,7 @@ It:
 
 - reads upstream data in read-only mode
 - accepts planner-owned load forecast input
-- derives a PV forecast from shortwave radiation
+- derives a PV forecast from tilted radiation for the configured panel layout
 - generates a profit-oriented schedule
 - exposes the compatibility endpoint expected by the current automation runtime
 
@@ -91,9 +91,24 @@ The planner reads:
 
 - prices from `main/prices/get_prices_v6.php`
 - live battery state from automation `/api/all`
-- shortwave radiation from `main/api/shortwave_radiation_api.php`
+- horizontal and tilted radiation from `main/api/shortwave_radiation_api.php`
 
 The planner does not modify those systems.
+
+## PV configuration
+
+`planner/pv_config.json` defines the six panels, each panel's compass-facing
+direction and tilt, the rated power per panel, the irradiance reference, the
+base derate factor, the output clip, and a correction factor for each month.
+Compass bearings are 0° north, 90° east, 180° south, and 270° west. The planner
+converts them to Open-Meteo azimuths when requesting tilted radiation. Panels
+with the same facing and tilt share one forecast request.
+
+The monthly factor for an hour is selected from that hour's local calendar
+month. All twelve factors start at `1.0` because they have not yet been
+calibrated against Enphase production. Change a factor only after comparing
+saved forecasts with measured output for that month. The planner validates the
+panel count and all twelve month entries at startup.
 
 ## Log-only rolling optimizer
 
@@ -165,7 +180,7 @@ profile and price conversion. Its first-version defaults are:
 - minimum 24-hour rolling horizon, extended to the following local midnight
 - 85% round-trip battery efficiency
 - 0.0005 EUR/kWh discharge-side battery wear cost in the optimizer objective, excluded from daily cash P&L
-- 2,640 Wp solar capacity with the existing configurable PV derate
+- 2,640 Wp across the six configured panels, with orientation-specific irradiation and the configured PV derate
 - 50 Wh state discretization
 - today's same-clock-hour price for an unknown future price
 - zero-minimum `netzero+` normalized to the complete configured charge range while expected P&L and SoC retain the optimizer's modeled charging power
@@ -180,6 +195,7 @@ Relevant environment overrides are:
 - `PLANNER_SOC_STEP_WH`
 - `PLANNER_TERMINAL_VALUE_FACTOR`
 - `PLANNER_ACTIVE_HOUR_DEADBAND_W` (defaults to `schedule.activeHourDeadbandW`; `0` disables stabilization)
+- `PLANNER_SHADOW_LOG_PATH`
 
 When `schedule.activeHourDeadbandW` is greater than zero, only the already-active
 hour is stabilized. A newly proposed command whose modeled battery power differs
@@ -188,10 +204,6 @@ command. Future hours remain unfiltered, every new hour starts with a fresh
 decision, and SOC safety checks always override the deadband. The raw optimizer
 plan stays in `optimizer_schedule.log`; publication metadata records whether the
 executable current-hour decision was retained.
-- `PLANNER_PV_SYSTEM_CAPACITY_W`
-- `PLANNER_PV_DERATE_FACTOR`
-- `PLANNER_PV_OUTPUT_CLIP_W`
-- `PLANNER_SHADOW_LOG_PATH`
 
 The repeated-today price is marked `repeat_today` in the log. Official prices
 replace it automatically on the next calculation when they become available.

@@ -41,8 +41,11 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         price_release_hour_local=14,
         shortwave_radiation_reference_w_m2=1000.0,
         pv_system_capacity_w=5000.0,
+        pv_panel_rated_power_w=1000.0,
         pv_derate_factor=0.85,
         pv_output_clip_w=5000.0,
+        pv_panels=(),
+        pv_monthly_correction_factors=(1.0,) * 12,
         min_action_power_w=50,
         price_conversion=PriceConversionConfig(),
     )

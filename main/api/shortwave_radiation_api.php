@@ -43,18 +43,35 @@ $longitude = isset($_GET['longitude']) ? (float) $_GET['longitude'] : $installat
 $timezone = isset($_GET['timezone']) && is_string($_GET['timezone']) && $_GET['timezone'] !== ''
     ? $_GET['timezone']
     : $installation['timezone'];
+$tiltedRequest = isset($_GET['tilt']) || isset($_GET['azimuth']);
+if ($tiltedRequest && (!isset($_GET['tilt'], $_GET['azimuth']) || !is_numeric($_GET['tilt']) || !is_numeric($_GET['azimuth']))) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Both numeric tilt and azimuth are required.']);
+    exit();
+}
+$tilt = $tiltedRequest ? (float) $_GET['tilt'] : null;
+$azimuth = $tiltedRequest ? (float) $_GET['azimuth'] : null;
+if ($tiltedRequest && (!is_finite($tilt) || !is_finite($azimuth) || $tilt < 0 || $tilt > 90 || $azimuth < -180 || $azimuth > 180)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Tilt or azimuth is out of range.']);
+    exit();
+}
 $cacheTtlSeconds = 2 * 60 * 60;
-$cachePath = buildShortwaveCachePath($latitude, $longitude, $timezone);
+$cachePath = buildShortwaveCachePath($latitude, $longitude, $timezone, $tilt, $azimuth);
 
 $apiUrl = sprintf(
-    'https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&hourly=shortwave_radiation&timezone=%s',
+    'https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&hourly=%s&timezone=%s',
     rawurlencode((string) $latitude),
     rawurlencode((string) $longitude),
+    rawurlencode($tiltedRequest ? 'shortwave_radiation,global_tilted_irradiance' : 'shortwave_radiation'),
     rawurlencode($timezone)
 );
+if ($tiltedRequest) {
+    $apiUrl .= '&tilt=' . rawurlencode((string) $tilt) . '&azimuth=' . rawurlencode((string) $azimuth);
+}
 
 try {
-    $responsePayload = readShortwaveCache($cachePath);
+    $responsePayload = readShortwaveCache($cachePath, $tiltedRequest);
     $cacheStatus = $responsePayload === null ? 'missing' : (isCacheExpired($responsePayload, $cacheTtlSeconds) ? 'stale' : 'fresh');
     $refreshAttemptedAt = null;
     $refreshError = null;
@@ -62,7 +79,7 @@ try {
         $refreshAttemptedAt = time();
         try {
             $payload = fetchOpenMeteoJson($apiUrl);
-            $hourlySeries = extractHourlyShortwaveSeries($payload);
+            $hourlySeries = extractHourlyShortwaveSeries($payload, $tiltedRequest);
             $responsePayload = [
                 'success' => true,
                 'latitude' => $latitude,
@@ -73,6 +90,7 @@ try {
                 'hourly' => $hourlySeries,
                 'hourly_units' => [
                     'shortwave_radiation' => hourlyShortwaveUnit($payload),
+                    ...($tiltedRequest ? ['global_tilted_irradiance' => 'W/m²'] : []),
                 ],
                 'cachedAt' => time(),
             ];
@@ -160,7 +178,7 @@ function fetchOpenMeteoJson(string $url): array
     return $decoded;
 }
 
-function extractHourlyShortwaveSeries(array $payload): array
+function extractHourlyShortwaveSeries(array $payload, bool $includeTilted = false): array
 {
     $hourly = $payload['hourly'] ?? null;
     $times = is_array($hourly['time'] ?? null) ? $hourly['time'] : [];
@@ -170,10 +188,23 @@ function extractHourlyShortwaveSeries(array $payload): array
         throw new RuntimeException('The API returned invalid hourly shortwave radiation data.');
     }
 
-    return [
+    $result = [
         'time' => array_map(static fn ($time): string => (string) $time, $times),
         'shortwave_radiation' => array_map(static fn ($value): float => (float) $value, $values),
     ];
+    if ($includeTilted) {
+        $tilted = $hourly['global_tilted_irradiance'] ?? null;
+        if (!is_array($tilted) || count($tilted) !== count($times)) {
+            throw new RuntimeException('The API returned invalid tilted radiation data.');
+        }
+        foreach ($tilted as $value) {
+            if (!is_numeric($value) || !is_finite((float) $value)) {
+                throw new RuntimeException('The API returned invalid tilted radiation data.');
+            }
+        }
+        $result['global_tilted_irradiance'] = array_map(static fn ($value): float => (float) $value, $tilted);
+    }
+    return $result;
 }
 
 function extractDailyShortwaveTotals(array $times, array $values): array
@@ -208,18 +239,23 @@ function extractDailyShortwaveTotals(array $times, array $values): array
     return $days;
 }
 
-function buildShortwaveCachePath(float $latitude, float $longitude, string $timezone): string
+function buildShortwaveCachePath(float $latitude, float $longitude, string $timezone, ?float $tilt = null, ?float $azimuth = null): string
 {
-    $cacheKey = md5(json_encode([
+    $keyParts = [
         'latitude' => $latitude,
         'longitude' => $longitude,
         'timezone' => $timezone,
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    ];
+    if ($tilt !== null && $azimuth !== null) {
+        $keyParts['tilt'] = $tilt;
+        $keyParts['azimuth'] = $azimuth;
+    }
+    $cacheKey = md5(json_encode($keyParts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
     return __DIR__ . '/../data/shortwave_radiation_cache_' . $cacheKey . '.json';
 }
 
-function readShortwaveCache(string $path): ?array
+function readShortwaveCache(string $path, bool $includeTilted = false): ?array
 {
     if (!file_exists($path)) {
         return null;
@@ -248,7 +284,8 @@ function readShortwaveCache(string $path): ?array
         !is_array($decoded['hourly_units']) ||
         !is_array($decoded['hourly']['time'] ?? null) ||
         !is_array($decoded['hourly']['shortwave_radiation'] ?? null) ||
-        !isset($decoded['hourly_units']['shortwave_radiation'])
+        !isset($decoded['hourly_units']['shortwave_radiation']) ||
+        ($includeTilted && !is_array($decoded['hourly']['global_tilted_irradiance'] ?? null))
     ) {
         return null;
     }

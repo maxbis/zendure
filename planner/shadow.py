@@ -560,7 +560,7 @@ def run_shadow_once(
                 settings.low_soc_discharge_cost_cents_per_kwh
             ),
             "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
-            "solar_forecast_source": "shortwave_radiation",
+            "solar_forecast_source": "global_tilted_irradiance",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),
             **retained_energy_inputs,
         },

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -15,6 +16,7 @@ from planner.forecast import (
     select_horizon_dates,
 )
 from planner.tests.support import build_test_settings
+from planner.config import PvPanel
 
 
 class ForecastTests(unittest.TestCase):
@@ -74,6 +76,27 @@ class ForecastTests(unittest.TestCase):
             self.assertEqual(forecast["2026-04-28"][10], 4250.0)
             self.assertEqual(forecast["2026-04-28"][11], 2125.0)
             self.assertEqual(forecast["2026-04-29"][10], 0.0)
+
+    def test_tilted_panel_groups_and_monthly_correction(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            base = build_test_settings(Path(temp_dir))
+            factors = list(base.pv_monthly_correction_factors)
+            factors[9] = 0.9
+            factors[10] = 1.1
+            settings = replace(base, pv_panels=(PvPanel(90, 15), PvPanel(270, 35)),
+                               pv_monthly_correction_factors=tuple(factors))
+            times = ["2026-10-31T10:00", "2026-11-01T10:00"]
+            payload = {"panel_irradiance": [
+                {"facing_degrees": 90, "tilt_degrees": 15, "count": 1,
+                 "hourly": {"time": times, "global_tilted_irradiance": [600, 600]}},
+                {"facing_degrees": 270, "tilt_degrees": 35, "count": 1,
+                 "hourly": {"time": times, "global_tilted_irradiance": [200, 200]}},
+            ]}
+            forecast = derive_pv_forecast_by_date(payload, settings)
+            self.assertAlmostEqual(forecast["2026-10-31"][10], 612.0)
+            self.assertAlmostEqual(forecast["2026-11-01"][10], 748.0)
+            with self.assertRaisesRegex(ValueError, "missing configured panel orientations"):
+                derive_pv_forecast_by_date({"hourly": {"time": times, "shortwave_radiation": [800, 800]}}, settings)
 
 
 if __name__ == "__main__":
