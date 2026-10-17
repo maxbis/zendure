@@ -2754,7 +2754,7 @@ dialog.app-schedule-tooltip {
 }
 
 .app-schedule-tooltip__action > span:last-child > span {
-    color: var(--gsd-text-muted);
+    color: var(--gsd-text-secondary);
     font-size: 0.61rem;
 }
 
@@ -2889,7 +2889,7 @@ dialog.app-schedule-tooltip {
 }
 
 .app-schedule-tooltip__forecast-values span {
-    color: var(--gsd-text-muted);
+    color: var(--gsd-text-secondary);
 }
 
 .app-schedule-tooltip__forecast-values strong {
@@ -2908,6 +2908,16 @@ dialog.app-schedule-tooltip {
     color: var(--gsd-text-secondary);
     font-size: 0.59rem;
     line-height: 1.4;
+}
+
+.app-schedule-tooltip__forecast-detail-value,
+.app-schedule-tooltip__forecast-detail--value {
+    color: var(--gsd-text);
+    font-weight: 650;
+}
+
+.app-schedule-tooltip__forecast-detail-qualifier {
+    color: var(--gsd-text-muted);
 }
 
 .app-schedule-tooltip__forecast-reason {

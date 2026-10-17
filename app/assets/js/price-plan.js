@@ -1056,7 +1056,13 @@
         const powerDescription = forecast.transitionedToFallback && primaryMinutes > 0
             ? `${formatWatts(forecast.primaryPowerW)} → ${formatWatts(forecast.fallbackPowerW)}`
             : formatWatts(forecast.transitionedToFallback ? forecast.fallbackPowerW : forecast.estimatedPowerW);
-        detail.textContent = `${deltaPrefix}${Math.abs(forecast.deltaPercent).toFixed(1)} pp · ${powerDescription} · ${forecastSourceCopy(forecast)}${forecast.currentHour ? ` · ${durationMinutes} min remaining` : ""}`;
+        const forecastChange = document.createElement("span");
+        forecastChange.className = "app-schedule-tooltip__forecast-detail-value";
+        forecastChange.textContent = `${deltaPrefix}${Math.abs(forecast.deltaPercent).toFixed(1)} pp · ${powerDescription}`;
+        const forecastQualifier = document.createElement("span");
+        forecastQualifier.className = "app-schedule-tooltip__forecast-detail-qualifier";
+        forecastQualifier.textContent = ` · ${forecastSourceCopy(forecast)}${forecast.currentHour ? ` · ${durationMinutes} min remaining` : ""}`;
+        detail.append(forecastChange, forecastQualifier);
         section.append(values, detail);
         return section;
     }
@@ -1304,7 +1310,7 @@
         if (!isSimulation && radiation !== null) {
             content.appendChild(tooltipSectionLabel("Solar radiation forecast"));
             const radiationValue = document.createElement("p");
-            radiationValue.className = "app-schedule-tooltip__forecast-detail";
+            radiationValue.className = "app-schedule-tooltip__forecast-detail app-schedule-tooltip__forecast-detail--value";
             radiationValue.textContent = `${Math.round(radiation)} W/m²`;
             content.appendChild(radiationValue);
         }

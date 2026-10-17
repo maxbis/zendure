@@ -48,6 +48,19 @@ def test_price_bars_show_details_and_action_tiles_edit_the_schedule():
     assert "Change scheduled action for" in source
 
 
+def test_schedule_tooltip_promotes_values_and_uses_secondary_text_for_labels():
+    js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
+
+    assert 'forecastChange.className = "app-schedule-tooltip__forecast-detail-value";' in js_source
+    assert 'forecastQualifier.className = "app-schedule-tooltip__forecast-detail-qualifier";' in js_source
+    assert 'app-schedule-tooltip__forecast-detail--value' in js_source
+    assert ".app-schedule-tooltip__forecast-detail-value," in css_source
+    assert ".app-schedule-tooltip__forecast-detail-qualifier" in css_source
+    assert ".app-schedule-tooltip__forecast-values span {\n    color: var(--gsd-text-secondary);" in css_source
+    assert ".app-schedule-tooltip__action > span:last-child > span {\n    color: var(--gsd-text-secondary);" in css_source
+
+
 def test_overview_uses_half_width_columns_and_compact_header_control():
     source = APP_CSS.read_text(encoding="utf-8")
 
