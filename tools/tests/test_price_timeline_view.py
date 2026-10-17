@@ -37,6 +37,17 @@ def test_overview_preference_and_read_only_state_are_wired():
     assert 'chart-bars-${overviewActive ? "overview" : "detail"}' in source
 
 
+def test_price_bars_show_details_and_action_tiles_edit_the_schedule():
+    source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+
+    assert 'editButton.addEventListener("click", () => {' in source
+    assert "showPriceTooltip(tooltipDetail, editButton, editButton);" in source
+    assert 'actionElement.addEventListener("click", () => {' in source
+    assert "openEditDialog({ hour, price, slot: resolvedSlot, day: day.key, date: day.date }, actionElement);" in source
+    assert "Show hourly details." in source
+    assert "Change scheduled action for" in source
+
+
 def test_overview_uses_half_width_columns_and_compact_header_control():
     source = APP_CSS.read_text(encoding="utf-8")
 

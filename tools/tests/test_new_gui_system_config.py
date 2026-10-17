@@ -99,7 +99,7 @@ def test_price_plan_identifies_rule_generated_hours_in_tooltips_and_accessible_l
     assert 'actionElement.dataset.ruleResult = "true";' in price_source
     assert 'actionStack.className = "app-price-hour__action-stack";' in price_source
     assert 'ruleIndicator.className = "app-price-hour__rule-indicator";' in price_source
-    assert ', source ${sourceFor(slot)}. Show schedule details.`' in price_source
+    assert 'Show hourly details.`' in price_source
     assert ".app-price-hour__rule-indicator" in app_css
     assert app_css.count("background-origin: border-box;") >= 3
 

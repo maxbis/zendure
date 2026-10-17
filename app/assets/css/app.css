@@ -2322,9 +2322,13 @@ button.app-state-pill:focus-visible {
     line-height: 1;
 }
 
-.app-price-hour__action:hover {
+.app-price-hour__action:not(:disabled):hover {
     border-color: color-mix(in srgb, currentColor 58%, var(--gsd-border-strong));
     filter: brightness(1.06);
+}
+
+.app-price-hour__action:disabled {
+    cursor: default;
 }
 
 .app-price-hour__action:focus-visible {

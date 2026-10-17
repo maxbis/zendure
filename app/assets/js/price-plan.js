@@ -162,19 +162,18 @@
         const overview = isTimelineOverview();
         elements.timeline.querySelectorAll(".app-price-hour__edit").forEach((button) => {
             button.disabled = overview;
-            button.tabIndex = overview || isSimulation ? -1 : 0;
-            if (overview || isSimulation) {
+            button.tabIndex = overview ? -1 : 0;
+            if (overview) {
                 button.setAttribute("aria-disabled", "true");
             } else {
                 button.removeAttribute("aria-disabled");
             }
         });
         elements.timeline.querySelectorAll(".app-price-hour__action").forEach((button) => {
-            button.disabled = overview;
-            button.tabIndex = overview ? -1 : 0;
-            if (overview) {
+            button.disabled = overview || isSimulation;
+            button.tabIndex = overview || isSimulation ? -1 : 0;
+            if (overview || isSimulation) {
                 button.setAttribute("aria-disabled", "true");
-                button.setAttribute("aria-expanded", "false");
             } else {
                 button.removeAttribute("aria-disabled");
             }
@@ -926,7 +925,7 @@
         if (trigger && trigger !== activeTooltipTrigger) return;
         if (activeTooltipTrigger) {
             activeTooltipTrigger.removeAttribute("aria-describedby");
-            if (activeTooltipTrigger.matches(".app-price-kpi, .app-price-hour__action")) {
+            if (activeTooltipTrigger.matches(".app-price-kpi, .app-price-hour__edit")) {
                 activeTooltipTrigger.setAttribute("aria-expanded", "false");
             }
         }
@@ -1233,7 +1232,7 @@
         activeTooltipTrigger = trigger;
         activeScheduleTooltip = { detail: { date, hour, slot, action, limited, history, historyUnavailable }, trigger, anchor };
         trigger.setAttribute("aria-describedby", priceTooltip.id);
-        if (trigger.matches(".app-price-hour__action")) trigger.setAttribute("aria-expanded", "true");
+        if (trigger.matches(".app-price-hour__edit")) trigger.setAttribute("aria-expanded", "true");
 
         const nextHour = (hour + 1) % 24;
         const header = document.createElement("div");
@@ -1912,15 +1911,9 @@
                 editButton.setAttribute("aria-pressed", String(selectionKey === selectedHourKey));
             editButton.setAttribute(
                 "aria-label",
-                isSimulation
-                    ? `Historical price for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
-                    : `Create or edit hourly override for ${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}`
+                `${day.label}, ${pad(hour)}:00, ${dayPart.label}, ${Number.isFinite(price) ? formatPrice(price) : "price unavailable"}. Show hourly details.`
             );
-            if (isSimulation) {
-                editButton.setAttribute("aria-disabled", "true");
-                editButton.tabIndex = -1;
-                editButton.dataset.readonly = "true";
-            }
+            editButton.setAttribute("aria-expanded", "false");
 
             const barZone = document.createElement("span");
             barZone.className = "app-price-hour__bar-zone";
@@ -1984,54 +1977,56 @@
             if (history) setRuntimeHistoryBadgeContent(actionElement, history);
             else setActionBadgeContent(actionElement, slot, action);
             const tooltipDetail = { date: day.date, hour, slot, action, limited, history, historyUnavailable };
-            actionElement.setAttribute("aria-expanded", "false");
             actionElement.setAttribute(
                 "aria-label",
-                history
-                    ? `${day.label}, ${pad(hour)}:00, optimizer runtime history: ${runtimeHistoryDescription(history)}. Show schedule details.`
-                    : historyUnavailable
-                        ? `${day.label}, ${pad(hour)}:00, historical schedule unavailable. Current rule result ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}. Show schedule details.`
-                        : `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}${limited ? `, limited to ${formatPowerLimits(slot)}` : ""}, source ${sourceFor(slot)}. Show schedule details.`
+                isSimulation
+                    ? `${day.label}, ${pad(hour)}:00, scheduled action ${action.label}. Editing is unavailable in a historical simulation.`
+                    : `Change scheduled action for ${day.label}, ${pad(hour)}:00.`
             );
-            actionElement.addEventListener("mouseenter", () => {
+            if (!isSimulation) actionElement.title = "Change scheduled action";
+            if (isSimulation) {
+                actionElement.setAttribute("aria-disabled", "true");
+                actionElement.tabIndex = -1;
+            }
+            editButton.addEventListener("mouseenter", () => {
                 if (isTimelineOverview()) return;
-                if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, actionElement, actionElement);
+                if (!pinnedTooltipTrigger) showPriceTooltip(tooltipDetail, editButton, editButton);
             });
-            actionElement.addEventListener("mouseleave", () => {
+            editButton.addEventListener("mouseleave", () => {
                 window.setTimeout(() => {
-                    if (pinnedTooltipTrigger === actionElement) return;
-                    if (document.activeElement === actionElement || eventInsidePriceTooltip(document.activeElement)) return;
+                    if (pinnedTooltipTrigger === editButton) return;
+                    if (document.activeElement === editButton || eventInsidePriceTooltip(document.activeElement)) return;
                     if (priceTooltip.matches(":hover")) return;
-                    hidePriceTooltip(actionElement);
+                    hidePriceTooltip(editButton);
                 }, 80);
             });
-            actionElement.addEventListener("focus", () => showPriceTooltip(tooltipDetail, actionElement, actionElement));
-            actionElement.addEventListener("blur", () => {
+            editButton.addEventListener("focus", () => showPriceTooltip(tooltipDetail, editButton, editButton));
+            editButton.addEventListener("blur", () => {
                 window.setTimeout(() => {
-                    if (pinnedTooltipTrigger === actionElement) return;
+                    if (pinnedTooltipTrigger === editButton) return;
                     if (eventInsidePriceTooltip(document.activeElement)) return;
-                    hidePriceTooltip(actionElement);
+                    hidePriceTooltip(editButton);
                 }, 0);
             });
-            actionElement.addEventListener("click", () => {
+            editButton.addEventListener("click", () => {
                 if (isTimelineOverview()) return;
                 setSelectedHour(selectionKey);
-                if (pinnedTooltipTrigger === actionElement && activeTooltipTrigger === actionElement && !priceTooltip.hidden) {
-                    hidePriceTooltip(actionElement);
+                if (pinnedTooltipTrigger === editButton && activeTooltipTrigger === editButton && !priceTooltip.hidden) {
+                    hidePriceTooltip(editButton);
                     return;
                 }
-                pinnedTooltipTrigger = actionElement;
-                showPriceTooltip(tooltipDetail, actionElement, actionElement);
-                pinnedTooltipTrigger = actionElement;
+                pinnedTooltipTrigger = editButton;
+                showPriceTooltip(tooltipDetail, editButton, editButton);
+                pinnedTooltipTrigger = editButton;
             });
 
             editButton.append(barZone, priceLabel, time);
             if (!isSimulation) {
-                editButton.addEventListener("click", () => {
+                actionElement.addEventListener("click", () => {
                     if (isTimelineOverview()) return;
                     setSelectedHour(selectionKey);
                     hidePriceTooltip();
-                    openEditDialog({ hour, price, slot: resolvedSlot, day: day.key, date: day.date }, editButton);
+                    openEditDialog({ hour, price, slot: resolvedSlot, day: day.key, date: day.date }, actionElement);
                 });
             }
             hourColumn.append(editButton);
@@ -2399,13 +2394,13 @@
         }
     });
     document.addEventListener("pointerdown", (event) => {
-        if (!activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) return;
+        if (!activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__edit")) return;
         if (activeTooltipTrigger.contains(event.target) || eventInsidePriceTooltip(event.target)) return;
         hidePriceTooltip(activeTooltipTrigger);
     });
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
-        if (activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__action")) {
+        if (activeTooltipTrigger?.matches(".app-price-kpi, .app-price-hour__edit")) {
             const trigger = activeTooltipTrigger;
             hidePriceTooltip(trigger);
             trigger.focus({ preventScroll: true });
