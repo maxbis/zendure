@@ -45,9 +45,9 @@ The planner reads:
 - Current live battery percentage.
 - Shared capacity and minimum/maximum battery percentages.
 - Shared `battery.efficiency`.
-- Shared `forecast.defaultHouseholdUsageWByHour`.
+- Shared `forecast.defaultHouseholdUsageWByHour` as the independent PHP fallback profile.
 - Shared `forecast.solarSafetyPercent`, expressed as a whole percentage and defaulted to `100` by the loaders when omitted.
-- Fresh optimizer PV and household-load predictions, when the published optimizer forecast is no more than one hour old.
+- Fresh optimizer PV and household-load predictions, when the published optimizer forecast is no more than one hour old. The rolling optimizer derives those load predictions from the configured generated P60 profile when valid and otherwise from `forecast.defaultHouseholdUsageWByHour`.
 - Shared signed schedule range plus an optional rule-specific discharge cap.
 - Shared `schedule.powerStepW`.
 
@@ -132,6 +132,7 @@ When evaluating a calculated target action, the planner forecasts that target sl
 - When the target rule hour has ended, then emit the fallback with `past` status.
 - When a runtime condition is present, then planning uses its least guaranteed discharge while automation continues selecting the primary or fallback action from live battery data.
 - When solar generation or household usage differs from the optimizer prediction or fallback profile, then actual battery percentage can differ from the forecast.
+- When the optimizer household profile is invalid or stale, then the rolling optimizer records its fallback reason and publishes load predictions based on `forecast.defaultHouseholdUsageWByHour`; the PHP planner continues consuming those predictions while they remain fresh.
 - When live battery percentage is unavailable for a charge target, then emit its configured fallback or unbounded NZ+ and report `unavailable`.
 - When no future NZ- exists within today and tomorrow, then emit the charge fallback and explain that the anchor is unavailable.
 - When the baseline anchor forecast already reaches the charge target, emit NZ+ with `min_power = 0` so surplus may still charge but discharge remains impossible.

@@ -7,7 +7,7 @@ data-facing source files, upstream sources and downstream consumers. It supports
 the planned full redesign by separating data that should become durable domain
 records from configuration, caches, generated artifacts and fixtures.
 
-Scope captured: the repository state on 2026-10-01. The `automate/` application
+Scope captured: the repository state on 2026-10-23. The `automate/` application
 is deliberately excluded. Its HTTP API and SQLite-to-MariaDB replication boundary
 are included only where a non-automation component depends on them.
 
@@ -210,6 +210,13 @@ in `common/`, `main/`, `planner/`, `app/`, `daily_report/`, `pathlab/` and
 
 ### Optimizer artifacts
 
+- `planner/data/household_usage_profile.json`
+  - Generated 24-hour P60 household-load profile calculated from the latest 30 complete days in `hourly_report_inputs`.
+  - Atomically written by `planner/update_household_usage_profile.py` and intentionally ignored by Git.
+  - Read and validated by `planner/household_usage.py` for every rolling-optimizer calculation.
+  - Used only when its schema, method, timezone, generation timestamp, yesterday source date and all 24 non-negative hourly values are valid. Otherwise the optimizer uses the complete `forecast.defaultHouseholdUsageWByHour` preset from shared configuration.
+  - The configured file location is `forecast.householdUsageProfilePath` in deployment-local `common/config/system.json`.
+
 - `planner/data/load_forecast_default.json`
   - Persisted household-load forecast records managed by `planner/storage.py`.
   - Read by the optimizer; produced when the planner stores updated forecast
@@ -229,6 +236,7 @@ in `common/`, `main/`, `planner/`, `app/`, `daily_report/`, `pathlab/` and
   - Written by `planner/shadow.py` and `app/includes/optimizer_schedule.php`;
     read by `app/includes/optimizer_log.php`,
     `app/includes/optimizer_runtime_log.php` and optimizer APIs/pages.
+  - Successful optimizer schedule records include the selected household source, all 24 values, configured profile path, profile timestamps and any fallback reason.
 
 ### Development-only and authentication files
 

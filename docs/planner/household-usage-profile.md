@@ -34,6 +34,25 @@ The output contains:
 
 The generated JSON file is ignored by Git and contains no database credentials.
 
+Shared configuration selects the file with:
+
+```json
+{
+  "forecast": {
+    "householdUsageProfilePath": "planner/data/household_usage_profile.json"
+  }
+}
+```
+
+Each successful optimizer log and published schedule records:
+
+- `household_forecast_source`: `historical_p60` or `config_default`;
+- `household_forecast_w_by_hour`: the complete 24-value array actually passed to the optimizer;
+- `household_forecast_profile_path`: resolved configured file path;
+- `household_forecast_profile_generated_at`: generation timestamp when the profile is selected;
+- `household_forecast_profile_source_end_date`: latest historical source date when the profile is selected;
+- `household_forecast_fallback_reason`: `null` for a selected profile, otherwise a stable reason such as `profile_missing`, `profile_unreadable`, `invalid_json`, `invalid_schema`, `invalid_method`, `timezone_mismatch`, `invalid_generated_at`, `invalid_source_end_date`, `profile_stale` or `invalid_hours`.
+
 ## Flow and behavior
 
 1. Load database settings from `daily_report/.env` and environment overrides.
