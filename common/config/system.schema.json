@@ -91,9 +91,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "householdUsageProfilePath",
         "defaultHouseholdUsageWByHour"
       ],
       "properties": {
+        "householdUsageProfilePath": {
+          "description": "Repository-relative path to the generated household-usage profile JSON.",
+          "type": "string",
+          "minLength": 1
+        },
         "solarSafetyPercent": {
           "description": "Percentage of predicted PV output used by battery forecasts; omitted values default to 100.",
           "type": "integer",

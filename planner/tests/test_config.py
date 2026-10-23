@@ -23,6 +23,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.battery_wear_cost_eur_per_kwh_discharged, 0.0005)
         self.assertEqual(settings.low_soc_discharge_threshold_percent, 26)
         self.assertEqual(settings.low_soc_discharge_cost_cents_per_kwh, 10)
+        self.assertEqual(
+            settings.household_usage_profile_path,
+            settings.repo_root / "planner" / "data" / "household_usage_profile.json",
+        )
         self.assertEqual(settings.pv_system_capacity_w, 2640.0)
         self.assertEqual(len(settings.pv_panels), 6)
         self.assertEqual([(p.facing_degrees, p.tilt_degrees) for p in settings.pv_panels],

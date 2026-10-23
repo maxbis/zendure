@@ -11,6 +11,7 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         data_dir=tmp_path / "data",
         load_forecast_path=tmp_path / "data" / "load_forecast.json",
         default_load_forecast_template_path=tmp_path / "data" / "load_forecast_default.json",
+        household_usage_profile_path=tmp_path / "data" / "household_usage_profile.json",
         main_config_path=tmp_path / "main-config.json",
         timezone="Europe/Amsterdam",
         service_host="127.0.0.1",

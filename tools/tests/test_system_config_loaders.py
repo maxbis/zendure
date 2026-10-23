@@ -40,6 +40,7 @@ EXPECTED_CONFIG = {
     },
     "forecast": {
         "solarSafetyPercent": 90,
+        "householdUsageProfilePath": "planner/data/household_usage_profile.json",
         "defaultHouseholdUsageWByHour": [
             100, 100, 100, 100, 100, 100, 100, 100,
             220, 220, 220, 220, 220, 220, 220, 220,
@@ -218,6 +219,7 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].pop("04:00"), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(missing: 04:00\)\."),
         (lambda value: value["forecast"].update({"solarSafetyPercent": 101}), r"solarSafetyPercent must be at most 100\."),
+        (lambda value: value["forecast"].update({"householdUsageProfilePath": " "}), r"householdUsageProfilePath must be a non-blank string\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].update({"24:00": 100}), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(unknown: 24:00\)\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].__setitem__("04:00", -1), r"defaultHouseholdUsageWByHour\.04:00 must be at least 0\."),
         (lambda value: value["schedule"].update({"minPowerW": 1}), r"minPowerW must be at most 0\."),

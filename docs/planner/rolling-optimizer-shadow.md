@@ -32,7 +32,7 @@ The optimizer reads:
 - Spot sale prices derived with the shared price-conversion settings.
 - Expected solar production derived from the existing shortwave forecast.
 - The solar endpoint's `cachedAt` value, stored as `inputs.solar_forecast_updated_at` in the installation timezone.
-- The shared 24-hour household-usage profile.
+- The generated P60 household-usage profile at the path from shared configuration when it is valid and sourced through yesterday; otherwise the shared preset 24-hour profile.
 - Battery capacity, state-of-charge boundaries, schedule power limits and power step from shared configuration.
 - `schedule.activeHourDeadbandW`, currently 0 W. Zero disables stabilization. A positive multiple of the configured power step can retain the already-active hour's previous command when a recalculation proposes only a smaller modeled-power change.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
@@ -42,6 +42,8 @@ The optimizer reads:
 The runner appends one self-contained JSON object per calculation. A record contains
 the inputs that define the run, expected financial result, starting and ending state
 of charge, and a decision for each segment in the rolling horizon.
+
+Every successful record includes `household_forecast_source`, the actual 24 values used, the configured profile path, profile generation and source dates when available, and `household_forecast_fallback_reason`. Selection is all-or-nothing: one invalid or missing hour causes the complete configured preset to be used.
 
 The runner also atomically replaces `planner/data/optimizer_schedule_latest.json`.
 This separate file is the only optimizer artifact eligible for schedule execution;
@@ -103,26 +105,27 @@ The hourly table remains available below the graphs for detailed inspection.
 ## Flow and behavior
 
 1. Read current prices, solar forecast and battery state.
-2. Establish a minimum 24-hour horizon and extend its end through the following local midnight.
-3. Split that horizon at clock-hour boundaries, retaining a partial first hour when needed.
-4. Use official prices where available. For an unpublished future hour, use today's price at the same clock hour and mark it `repeat_today`.
-5. Calculate the reporting valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero. Separately, calculate the optimizer's terminal price from the average consumer price across all horizon slots.
-6. Evaluate feasible charge, idle and discharge powers in the configured power steps.
-7. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
-8. Add the configured virtual low-SoC cost to any portion of candidate discharge below the configured threshold, including proportional treatment when a segment crosses that threshold.
-9. Select the full-horizon path with the lowest expected purchase cost minus sale income, plus battery-wear and low-SoC virtual costs, minus remaining-energy value.
-10. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
-11. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
-12. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
-13. Normalize every selected zero-minimum `netzero+` command to the complete configured charge-only range. Keep the modeled battery power unchanged for expected P&L and SoC, but set the runtime range from zero through the configured maximum charging power.
-14. After normalizing `netzero+`, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the normalized positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
-15. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
-16. Append the raw optimizer plan to the comparison log under a file lock.
-17. Before executable publication, apply the configured active-hour deadband. Within the same local clock hour, retain the previously published active command when its modeled power differs from the new proposal by less than the deadband and the retained command remains SoC-safe. Recalculate the published trajectory after retaining a command. Do not stabilize future hours.
-18. Atomically publish the resulting executable optimizer schedule.
-19. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
-20. Preserve exact dated manual schedule entries over optimizer entries.
-21. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
+2. Validate and select the generated P60 household profile or the configured preset fallback.
+3. Establish a minimum 24-hour horizon and extend its end through the following local midnight.
+4. Split that horizon at clock-hour boundaries, retaining a partial first hour when needed.
+5. Use official prices where available. For an unpublished future hour, use today's price at the same clock hour and mark it `repeat_today`.
+6. Calculate the reporting valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero. Separately, calculate the optimizer's terminal price from the average consumer price across all horizon slots.
+7. Evaluate feasible charge, idle and discharge powers in the configured power steps.
+8. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
+9. Add the configured virtual low-SoC cost to any portion of candidate discharge below the configured threshold, including proportional treatment when a segment crosses that threshold.
+10. Select the full-horizon path with the lowest expected purchase cost minus sale income, plus battery-wear and low-SoC virtual costs, minus remaining-energy value.
+11. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
+12. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
+13. Limit adaptive `netzero-` headroom by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the modeled discharge—not the adaptive limit—in the expected P&L and SoC path.
+14. Normalize every selected zero-minimum `netzero+` command to the complete configured charge-only range. Keep the modeled battery power unchanged for expected P&L and SoC, but set the runtime range from zero through the configured maximum charging power.
+15. After normalizing `netzero+`, calculate the same linear price score. Keep `netzero+` below a score of 0.50. At a score of 0.50 or higher, emit bidirectional `netzero`, retain the normalized positive charging limit and set its negative discharge limit to the price score multiplied by the maximum feasible discharge.
+16. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
+17. Append the raw optimizer plan to the comparison log under a file lock.
+18. Before executable publication, apply the configured active-hour deadband. Within the same local clock hour, retain the previously published active command when its modeled power differs from the new proposal by less than the deadband and the retained command remains SoC-safe. Recalculate the published trajectory after retaining a command. Do not stabilize future hours.
+19. Atomically publish the resulting executable optimizer schedule.
+20. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
+21. Preserve exact dated manual schedule entries over optimizer entries.
+22. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
 
 Run once:
 
@@ -149,6 +152,7 @@ http://localhost/zendure/app/optimizer.php
 ## Edge cases and failure modes
 
 - When an upstream source cannot be read, then an error record is appended and the last executable plan is not replaced.
+- When the configured household-profile file is missing, unreadable, malformed, stale, has a timezone mismatch or lacks any valid hour, then optimization continues with the complete configured preset and records the fallback reason.
 - When tomorrow's prices become available, then the next run automatically replaces repeated-today assumptions with official prices.
 - When a `netzero-` slot's consumer price is at or below the median remaining price, then its runtime discharge limit remains equal to the modeled discharge.
 - When a `netzero-` slot has the maximum remaining consumer price, then its runtime discharge limit expands to the maximum power supported by the battery and energy available above minimum SoC.

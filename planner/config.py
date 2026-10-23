@@ -61,6 +61,7 @@ class PlannerSettings:
     data_dir: Path
     load_forecast_path: Path
     default_load_forecast_template_path: Path
+    household_usage_profile_path: Path
     main_config_path: Path
     timezone: str
     service_host: str
@@ -283,6 +284,16 @@ def load_settings() -> PlannerSettings:
     data_dir = repo_root / "planner" / "data"
     load_forecast_path = data_dir / LOAD_FORECAST_FILE_NAME
     default_load_forecast_template_path = data_dir / DEFAULT_LOAD_FORECAST_TEMPLATE_FILE_NAME
+    configured_profile_path = Path(system_config["forecast"]["householdUsageProfilePath"])
+    household_usage_profile_path = (
+        configured_profile_path
+        if configured_profile_path.is_absolute()
+        else repo_root / configured_profile_path
+    ).resolve()
+    try:
+        household_usage_profile_path.relative_to(repo_root)
+    except ValueError as error:
+        raise ValueError("householdUsageProfilePath must resolve inside the repository") from error
     price_conversion = _load_price_conversion(system_config["priceConversion"])
     pv_config = _load_pv_config(repo_root / "planner" / "pv_config.json")
 
@@ -317,6 +328,7 @@ def load_settings() -> PlannerSettings:
         data_dir=data_dir,
         load_forecast_path=load_forecast_path,
         default_load_forecast_template_path=default_load_forecast_template_path,
+        household_usage_profile_path=household_usage_profile_path,
         main_config_path=main_config_path,
         timezone=os.getenv("PLANNER_TIMEZONE", installation["timezone"] or TIMEZONE),
         service_host=os.getenv("PLANNER_SERVICE_HOST", SERVICE_HOST),

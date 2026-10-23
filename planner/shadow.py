@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from planner.clients import PricePayload, fetch_price_payload, fetch_runtime_readings, fetch_shortwave_payload
 from planner.config import PlannerSettings, load_settings
 from planner.forecast import derive_pv_forecast_by_date
+from planner.household_usage import select_household_usage
 from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
@@ -131,8 +132,14 @@ def build_shadow_slots(
     shortwave_payload: dict,
     horizon_hours: int,
     extend_to_midnight: bool = True,
+    household_usage_w_by_hour: Optional[List[float]] = None,
 ) -> List[RollingInputSlot]:
     pv_by_date = derive_pv_forecast_by_date(shortwave_payload, settings)
+    usage_by_hour = household_usage_w_by_hour or [
+        float(value) for value in settings.default_household_usage_w_by_hour
+    ]
+    if len(usage_by_hour) != 24:
+        raise ValueError("Household usage must contain exactly 24 hourly values")
     slots: List[RollingInputSlot] = []
     for start, end in build_rolling_boundaries(
         now,
@@ -144,7 +151,7 @@ def build_shadow_slots(
         import_price, export_price, price_source = _price_for_slot(prices, date_text, hour)
         pv_values = pv_by_date.get(date_text, [])
         pv_w = float(pv_values[hour]) if hour < len(pv_values) else 0.0
-        load_w = float(settings.default_household_usage_w_by_hour[hour])
+        load_w = float(usage_by_hour[hour])
         slots.append(
             RollingInputSlot(
                 start=start,
@@ -507,6 +514,12 @@ def run_shadow_once(
     battery_state = runtime_readings.battery_state
     shortwave = fetch_shortwave_payload(settings)
     retained_energy_inputs = retained_energy_valuation(prices)
+    household_usage = select_household_usage(
+        profile_path=settings.household_usage_profile_path,
+        configured_values_w_by_hour=settings.default_household_usage_w_by_hour,
+        timezone=settings.timezone,
+        now=generated_at,
+    )
     slots = build_shadow_slots(
         now=generated_at,
         settings=settings,
@@ -514,6 +527,7 @@ def run_shadow_once(
         shortwave_payload=shortwave,
         horizon_hours=horizon_hours,
         extend_to_midnight=extend_to_midnight,
+        household_usage_w_by_hour=household_usage.values_w_by_hour,
     )
     plan = optimize_rolling_schedule(
         now=generated_at,
@@ -559,7 +573,7 @@ def run_shadow_once(
             "low_soc_discharge_cost_cents_per_kwh": (
                 settings.low_soc_discharge_cost_cents_per_kwh
             ),
-            "household_forecast_source": "common.config.system.forecast.defaultHouseholdUsageWByHour",
+            **household_usage.log_fields(),
             "solar_forecast_source": "global_tilted_irradiance",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),
             **retained_energy_inputs,

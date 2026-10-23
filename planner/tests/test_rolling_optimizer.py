@@ -5,10 +5,11 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from zoneinfo import ZoneInfo
 
-from planner.clients import PricePayload
+from planner.clients import PricePayload, RuntimeReadings
 from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
@@ -21,7 +22,7 @@ from planner.rolling_optimizer import (
     build_rolling_boundaries,
     optimize_rolling_schedule,
 )
-from planner.shadow import append_json_line, build_shadow_slots, retained_energy_valuation, solar_forecast_updated_at, write_json_atomic
+from planner.shadow import append_json_line, build_shadow_slots, retained_energy_valuation, run_shadow_once, solar_forecast_updated_at, write_json_atomic
 from planner.tests.support import build_test_settings
 
 
@@ -531,6 +532,106 @@ class RollingOptimizerTests(unittest.TestCase):
             tomorrow_midnight = next(slot for slot in slots if slot.start.hour == 0)
             self.assertEqual(tomorrow_midnight.price_source, "repeat_today")
             self.assertAlmostEqual(tomorrow_midnight.import_price_eur_per_kwh, imports[0])
+
+    def test_shadow_slots_use_selected_household_profile(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            settings = build_test_settings(Path(temp_dir))
+            timezone = ZoneInfo(settings.timezone)
+            now = datetime(2026, 9, 12, 10, 0, tzinfo=timezone)
+            prices = PricePayload(
+                today_date="20260912",
+                tomorrow_date=None,
+                import_today=[0.20] * 24,
+                import_tomorrow=[None] * 24,
+                export_today=[0.05] * 24,
+                export_tomorrow=[None] * 24,
+            )
+            selected_usage = [float(100 + hour) for hour in range(24)]
+
+            slots = build_shadow_slots(
+                now=now,
+                settings=settings,
+                prices=prices,
+                shortwave_payload={"hourly": {"time": [], "shortwave_radiation": []}},
+                horizon_hours=1,
+                extend_to_midnight=False,
+                household_usage_w_by_hour=selected_usage,
+            )
+
+            self.assertEqual(len(slots), 1)
+            self.assertEqual(slots[0].load_w, 110.0)
+
+    def test_shadow_run_logs_selected_household_profile_and_values(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            settings = build_test_settings(root)
+            settings.household_usage_profile_path.parent.mkdir(parents=True, exist_ok=True)
+            settings.household_usage_profile_path.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "timezone": settings.timezone,
+                    "generated_at": "2026-09-12T02:00:00+02:00",
+                    "source_end_date": "2026-09-11",
+                    "method": "p60",
+                    "hours": {
+                        f"{hour:02d}": {"value_w": 100 + hour}
+                        for hour in range(24)
+                    },
+                }),
+                encoding="utf-8",
+            )
+            now = datetime(2026, 9, 12, 10, 0, tzinfo=ZoneInfo(settings.timezone))
+            prices = PricePayload(
+                today_date="20260912",
+                tomorrow_date=None,
+                import_today=[0.20] * 24,
+                import_tomorrow=[None] * 24,
+                export_today=[0.05] * 24,
+                export_tomorrow=[None] * 24,
+            )
+            readings = RuntimeReadings(
+                battery_state=BatteryState(50.0, 5760.0, 1200, 1600, 15, 96),
+                observed_at_timestamp=None,
+                p1_timestamp=None,
+                zendure_timestamp=None,
+                grid_power_w=None,
+                battery_power_w=None,
+                solar_power_w=None,
+                household_power_w=None,
+                net_household_power_w=None,
+            )
+            output_path = root / "optimizer.log"
+            latest_path = root / "latest.json"
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "PLANNER_HORIZON_HOURS": "1",
+                    "PLANNER_EXTEND_HORIZON_TO_MIDNIGHT": "false",
+                },
+            ), patch("planner.shadow.fetch_price_payload", return_value=prices), patch(
+                "planner.shadow.fetch_runtime_readings", return_value=readings
+            ), patch(
+                "planner.shadow.fetch_shortwave_payload",
+                return_value={"hourly": {"time": [], "shortwave_radiation": []}},
+            ), patch("planner.shadow.update_runtime_log"):
+                payload = run_shadow_once(
+                    settings,
+                    now=now,
+                    output_path=output_path,
+                    latest_path=latest_path,
+                    runtime_output_path=root / "runtime.log",
+                )
+
+            self.assertEqual(payload["inputs"]["household_forecast_source"], "historical_p60")
+            self.assertEqual(
+                payload["inputs"]["household_forecast_w_by_hour"],
+                [float(100 + hour) for hour in range(24)],
+            )
+            logged = json.loads(output_path.read_text(encoding="utf-8").strip())
+            published = json.loads(latest_path.read_text(encoding="utf-8"))
+            self.assertEqual(logged["inputs"], payload["inputs"])
+            self.assertEqual(published["inputs"], payload["inputs"])
 
     def test_json_lines_log_appends_complete_records(self) -> None:
         with TemporaryDirectory() as temp_dir:

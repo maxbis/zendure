@@ -112,6 +112,7 @@ Meaning:
 
 Canonical value:
 
+- `forecast.householdUsageProfilePath`: repository-relative path to the generated P60 household profile. The current value is `planner/data/household_usage_profile.json`.
 - `forecast.defaultHouseholdUsageWByHour`: 24 watt values keyed by local whole-hour start (`00:00` through `23:00`).
 - Hours 00 through 07 use 100 W.
 - Hours 08 through 20 use 220 W.
@@ -119,7 +120,8 @@ Canonical value:
 
 Meaning:
 
-- This is a fallback demand model for battery forecasts when measured or configured usage is unavailable.
+- The generated profile is the rolling optimizer's preferred demand model when it is valid and sourced through yesterday.
+- The 24 configured values are the all-or-nothing fallback when the generated profile is unavailable or invalid.
 - It is shared forecast policy rather than a physical battery property.
 
 ### Solar forecast safety percentage

@@ -37,7 +37,8 @@ The configuration contains:
 - Maximum charge command magnitude: 1200 W.
 - Maximum discharge command magnitude: 2000 W.
 - Solar forecast safety percentage for battery estimates: 90%.
-- Default 24-hour household-usage forecast: 100 W from 00:00 through 07:59, 220 W from 08:00 through 20:59 and 160 W from 21:00 through 23:59.
+- Generated household-usage profile path: `planner/data/household_usage_profile.json`.
+- Default 24-hour household-usage forecast used when the generated profile is unavailable or invalid.
 - Schedule range: -1800 through 1200 W.
 - Schedule power step: 100 W.
 - Active-hour optimizer deadband: 0 W (disabled).
@@ -95,13 +96,14 @@ The power-cap properties are automation inputs. Outgoing battery commands are cl
 
 Required properties:
 
+- `householdUsageProfilePath`: non-empty repository-relative path to the generated household-usage profile JSON. The planner additionally requires the resolved path to remain inside the repository.
 - `defaultHouseholdUsageWByHour`: exactly 24 non-negative integer watt values, keyed by local whole-hour start (`00:00` through `23:00`). The shared loaders normalize this object to the indexed runtime list used by the planners.
 
 Optional properties:
 
 - `solarSafetyPercent`: integer from 0 through 100. Both loaders supply `100` when it is omitted, preserving the unadjusted PV forecast. The current installation uses `90`.
 
-The household model and solar safety percentage are consumed by the server-side PHP battery forecast. The browser renders the returned result without applying its own forecast adjustment.
+The rolling optimizer uses the generated profile when it is valid and sourced through yesterday. Otherwise it uses `defaultHouseholdUsageWByHour`. The selected source and values are recorded in each optimizer output. The server-side PHP battery forecast uses fresh optimizer load predictions when available and retains the configured values as its independent fallback. The browser renders the returned result without applying its own forecast adjustment.
 
 ### Schedule
 
@@ -152,7 +154,7 @@ Current flow after the GUI and automation integrations:
 6. Automation loads device, meter, loop and control-tuning settings from `automate/config/config.jsonc`.
 7. Automation loads the battery minimum, battery maximum, charge cap, discharge cap and installation timezone from `system.json` through the strict Python loader.
 8. Schedule solar resolution, PHP price conversion, energy history, the old energy graph and old-GUI shortwave defaults use shared values through the PHP loader.
-9. Both GUIs and the PHP target-battery planner use the shared efficiency, forecast profile, schedule range and schedule power step. The rolling optimizer additionally uses the active-hour deadband when publishing an executable plan.
+9. Both GUIs and the PHP target-battery planner use the shared efficiency, fallback forecast profile, schedule range and schedule power step. The rolling optimizer additionally resolves the configured generated household profile and uses the active-hour deadband when publishing an executable plan.
 10. Web-only routing and display policies remain in `main/config/config.json`. Shared battery, installation and price-conversion fields have been removed from that file.
 11. Automation-local operational and connection settings remain in `automate/config/config.jsonc`. The migrated battery keys have been removed from that local file.
 12. Parity, GUI and automation integration tests verify the ownership boundary and strict failure behavior.
@@ -181,6 +183,9 @@ When the deployment uses Nginx or ignores `.htaccess`, then equivalent web-serve
 - When `activeHourDeadbandW` is negative, then both loaders reject it.
 - When `activeHourDeadbandW` is not a multiple of `powerStepW`, then the shared loaders accept the structurally valid configuration but the rolling planner rejects it during settings initialization.
 - When the household-usage profile does not contain exactly 24 non-negative integer values, then both loaders reject it.
+- When `householdUsageProfilePath` is blank, then both shared loaders reject the configuration.
+- When the configured profile path resolves outside the repository, then planner settings initialization rejects it.
+- When the generated profile file is missing, invalid or stale, then optimizer execution continues with the configured 24-hour fallback and records the reason.
 - When either efficiency value is zero, negative or greater than one, then both loaders reject it.
 - When the timezone is non-empty but invalid, then schema validation may pass, but both loaders reject it.
 - When the synchronized file is stale on one host, then valid JSON does not prove both hosts use the same version.
