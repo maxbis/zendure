@@ -4,7 +4,7 @@
     const config = Object.freeze({
         statusUrl: "../main/api/charge_status_all_proxy.php",
         automationStatusUrl: "../main/api/automation_status_proxy.php?type=all&limit=20",
-        pauseStatusUrl: "../automate/control/command.php?command=get_pause_status",
+        controlModeStatusUrl: "../automate/control/command.php?command=get_control_mode",
         refreshIntervalMs: 20000,
         boostRefreshIntervalMs: 5100,
         boostTickCount: 8,
@@ -1182,13 +1182,15 @@
 
         const copy = modeCopy(model);
         const pauseStatusAvailable = model.pauseStatusAvailable === true;
-        const pauseActive = pauseStatusAvailable && model.pauseActive === true;
-        const visibleModeLabel = pauseActive ? "Automation paused" : copy.label;
+        const controlMode = model.controlMode || (model.pauseActive ? "paused" : "active");
+        const pauseActive = pauseStatusAvailable && controlMode === "paused";
+        const externalControlActive = pauseStatusAvailable && controlMode === "external";
+        const visibleModeLabel = externalControlActive
+            ? "External control"
+            : (pauseActive ? "Automation paused" : copy.label);
         const batteryCountdown = batteryCountdownCopy(model);
         elements.powerHero.dataset.mode = model.mode;
-        elements.powerHero.dataset.pauseState = pauseActive
-            ? "paused"
-            : (pauseStatusAvailable ? "active" : "unknown");
+        elements.powerHero.dataset.controlMode = pauseStatusAvailable ? controlMode : "unknown";
         elements.modeLabel.textContent = visibleModeLabel;
         elements.modeLabel.title = visibleModeLabel;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
@@ -1202,7 +1204,9 @@
         );
         elements.powerSimpleFlow.dataset.direction = model.mode;
         elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
-        elements.powerSimpleCaption.textContent = pauseActive
+        elements.powerSimpleCaption.textContent = externalControlActive
+            ? "Qool is monitoring only"
+            : pauseActive
             ? "Schedule control is temporarily disabled"
             : model.mode === "charging"
             ? "Energy flowing into the battery"
@@ -1551,8 +1555,8 @@
             const automationPromise = config.automationStatusUrl
                 ? fetchJson(config.automationStatusUrl, activeController.signal).catch(() => null)
                 : Promise.resolve(null);
-            const pausePromise = config.pauseStatusUrl
-                ? fetchJson(config.pauseStatusUrl, activeController.signal).catch(() => null)
+            const pausePromise = config.controlModeStatusUrl
+                ? fetchJson(config.controlModeStatusUrl, activeController.signal).catch(() => null)
                 : Promise.resolve(null);
             const [payload, automationData, pauseData] = await Promise.all([
                 statusPromise,
@@ -1587,13 +1591,23 @@
             const directPauseData = pauseData?.upstreamBody && typeof pauseData.upstreamBody === "object"
                 ? pauseData.upstreamBody
                 : pauseData;
-            const combinedPauseAvailable = typeof automationData?.pauseActive === "boolean"
-                && automationData?.pauseStatusAvailable !== false;
-            const directPauseAvailable = typeof directPauseData?.pauseActive === "boolean";
+            const combinedControlMode = typeof automationData?.controlMode === "string"
+                ? automationData.controlMode
+                : null;
+            const directControlMode = typeof directPauseData?.controlMode === "string"
+                ? directPauseData.controlMode
+                : null;
+            const combinedPauseAvailable = ["active", "paused", "external"].includes(combinedControlMode)
+                || (typeof automationData?.pauseActive === "boolean" && automationData?.pauseStatusAvailable !== false);
+            const directPauseAvailable = ["active", "paused", "external"].includes(directControlMode)
+                || typeof directPauseData?.pauseActive === "boolean";
             model.pauseStatusAvailable = combinedPauseAvailable || directPauseAvailable;
-            model.pauseActive = combinedPauseAvailable
-                ? automationData.pauseActive
-                : (directPauseAvailable ? directPauseData.pauseActive : null);
+            model.controlMode = combinedControlMode
+                || directControlMode
+                || (combinedPauseAvailable
+                    ? (automationData.pauseActive ? "paused" : "active")
+                    : (directPauseAvailable ? (directPauseData.pauseActive ? "paused" : "active") : null));
+            model.pauseActive = model.controlMode === "paused";
             model.pending = isPowerPending(automationData, model);
             renderModel(model);
             if (shouldPulseTick) {
@@ -1715,10 +1729,11 @@
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
 
     window.addEventListener("message", (event) => {
-        if (event.origin !== window.location.origin || event.data?.type !== "zendure:pause-status") return;
-        if (typeof event.data.pauseActive !== "boolean" || !latestModel) return;
+        if (event.origin !== window.location.origin || event.data?.type !== "zendure:control-mode-status") return;
+        if (!["active", "paused", "external"].includes(event.data.controlMode) || !latestModel) return;
         latestModel.pauseStatusAvailable = true;
-        latestModel.pauseActive = event.data.pauseActive;
+        latestModel.controlMode = event.data.controlMode;
+        latestModel.pauseActive = event.data.controlMode === "paused";
         renderModel(latestModel);
     });
     [elements.batteryIcon, elements.batteryTarget, elements.batterySimpleTarget].forEach(bindBatteryPopover);

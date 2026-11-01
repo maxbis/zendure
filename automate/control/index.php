@@ -568,20 +568,31 @@ foreach ($groupedCommands as $groupKey => $commands) {
           return;
         }
         var state = upstreamBody(payload) || {};
-        var available = typeof state.pauseActive === 'boolean';
-        var active = state.pauseActive === true;
+        var mode = typeof state.controlMode === 'string'
+          ? state.controlMode
+          : (state.pauseActive === true ? 'paused' : (state.pauseActive === false ? 'active' : 'unknown'));
+        var available = mode === 'active' || mode === 'paused' || mode === 'external';
 
         pauseCurrent.classList.toggle('error', !available);
         pauseCurrentValue.textContent = available
-          ? (active ? 'Automation paused' : 'Schedule control active')
+          ? (mode === 'external'
+              ? 'External control — Qool monitoring only'
+              : (mode === 'paused' ? 'Automation paused' : 'Qool schedule control active'))
           : 'Status unavailable';
 
         buttons.forEach(function (btn) {
           var commandKey = btn.getAttribute('data-command') || '';
-          if (commandKey !== 'pause_on' && commandKey !== 'pause_off') {
+          if (!['pause_on', 'pause_off', 'external_control_on', 'external_control_release'].includes(commandKey)) {
             return;
           }
-          var isCurrent = available && ((active && commandKey === 'pause_on') || (!active && commandKey === 'pause_off'));
+          var isCurrent = available && (
+            (mode === 'paused' && commandKey === 'pause_on')
+            || (mode === 'active' && commandKey === 'pause_off')
+            || (mode === 'external' && commandKey === 'external_control_on')
+          );
+          btn.hidden = mode === 'external'
+            ? commandKey !== 'external_control_release'
+            : commandKey === 'external_control_release';
           btn.classList.toggle('is-current', isCurrent);
           btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
           if (isCurrent) {
@@ -594,8 +605,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
 
         if (available && window.parent !== window) {
           window.parent.postMessage({
-            type: 'zendure:pause-status',
-            pauseActive: active
+            type: 'zendure:control-mode-status',
+            controlMode: mode,
+            pauseActive: mode === 'paused'
           }, window.location.origin);
         }
 
@@ -606,14 +618,14 @@ foreach ($groupedCommands as $groupKey => $commands) {
       }
 
       function loadPauseStatus() {
-        fetch(proxyUrl + '?command=get_pause_status', {
+        fetch(proxyUrl + '?command=get_control_mode', {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         })
           .then(parseJsonResponse)
           .then(renderPauseStatus)
           .catch(function () {
-            renderPauseStatus({ pauseActive: null });
+            renderPauseStatus({ controlMode: 'unknown' });
           });
       }
 
@@ -744,7 +756,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
             if (commandKey.indexOf('slow_charge_') === 0) {
               renderSlowChargeStatus(payload);
             }
-            if (commandKey === 'pause_on' || commandKey === 'pause_off') {
+            if (['pause_on', 'pause_off', 'external_control_on', 'external_control_release'].includes(commandKey)) {
               renderPauseStatus(payload);
             }
             setStatus(msg, 'ok');

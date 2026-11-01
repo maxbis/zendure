@@ -182,12 +182,20 @@ def test_apply_power_settings_passes_mqtt_p1_source():
 
     captured = {}
 
-    def _set_power(desired_power, p1_data=None, schedule_entry=None, zendure_data=None, p1_source=None):
+    def _set_power(
+        desired_power,
+        p1_data=None,
+        schedule_entry=None,
+        zendure_data=None,
+        p1_source=None,
+        write_purpose="normal",
+    ):
         captured["desired_power"] = desired_power
         captured["p1_data"] = p1_data
         captured["schedule_entry"] = schedule_entry
         captured["zendure_data"] = zendure_data
         captured["p1_source"] = p1_source
+        captured["write_purpose"] = write_purpose
         return device_controller.PowerResult(
             success=True,
             power=-300,
@@ -200,6 +208,7 @@ def test_apply_power_settings_passes_mqtt_p1_source():
     app._apply_power_settings(automate_mqtt.POWER_MODE_NETZERO, {"total_power": 320})
 
     assert captured["p1_source"] == "mqtt"
+    assert captured["write_purpose"] == "normal"
     assert captured["p1_data"] == {"total_power": 320}
 
 
@@ -220,9 +229,17 @@ def test_apply_power_settings_recomputes_for_netzero_minus():
 
     captured = {}
 
-    def _set_power(desired_power, p1_data=None, schedule_entry=None, zendure_data=None, p1_source=None):
+    def _set_power(
+        desired_power,
+        p1_data=None,
+        schedule_entry=None,
+        zendure_data=None,
+        p1_source=None,
+        write_purpose="normal",
+    ):
         captured["desired_power"] = desired_power
         captured["p1_data"] = p1_data
+        captured["write_purpose"] = write_purpose
         return device_controller.PowerResult(success=True, power=-300)
 
     app.controller = SimpleNamespace(set_power=_set_power)
@@ -230,6 +247,7 @@ def test_apply_power_settings_recomputes_for_netzero_minus():
     app._apply_power_settings(automate_mqtt.POWER_MODE_NETZERO_MINUS, {"total_power": 320})
 
     assert captured["desired_power"] == automate_mqtt.POWER_MODE_NETZERO_MINUS
+    assert captured["write_purpose"] == "normal"
     assert captured["p1_data"] == {"total_power": 320}
 
 

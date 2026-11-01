@@ -247,8 +247,12 @@
     white-space: nowrap;
 }
 
-.app-power-hero[data-pause-state="paused"] {
+.app-power-hero[data-control-mode="paused"] {
     --app-mode-color: var(--gsd-warning);
+}
+
+.app-power-hero[data-control-mode="external"] {
+    --app-mode-color: var(--gsd-info);
 }
 
 /* Keep the Live control the same size as the non-button / time pills. */

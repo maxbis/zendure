@@ -33,7 +33,7 @@ def test_command_proxy_whitelists_the_slow_charge_status_read():
     assert "'ui' => false" in source
 
 
-def test_pause_control_loads_authoritative_state_and_updates_button_state():
+def test_control_mode_panel_loads_authoritative_state_and_updates_button_state():
     control_source = CONTROL_INDEX.read_text(encoding="utf-8")
     command_source = COMMANDS.read_text(encoding="utf-8")
 
@@ -43,22 +43,27 @@ def test_pause_control_loads_authoritative_state_and_updates_button_state():
     assert "function renderPauseStatus(payload)" in control_source
     assert "loadPauseStatus();" in control_source
     assert "renderPauseStatus(payload);" in control_source
-    assert "type: 'zendure:pause-status'" in control_source
-    assert "'get_pause_status' => [" in command_source
-    assert "'path' => '/api/pause'" in command_source
+    assert "type: 'zendure:control-mode-status'" in control_source
+    assert "'get_control_mode' => [" in command_source
+    assert "'path' => '/api/control_mode'" in command_source
+    assert "'external_control_on' => [" in command_source
+    assert "'external_control_release' => [" in command_source
+    assert 'External control — Qool monitoring only' in control_source
 
 
-def test_main_and_classic_guis_render_explicit_pause_status():
+def test_main_and_classic_guis_render_explicit_control_mode_status():
     app_index = APP_INDEX.read_text(encoding="utf-8")
     app_status = APP_STATUS.read_text(encoding="utf-8")
     classic_renderer = CLASSIC_RENDERER.read_text(encoding="utf-8")
 
     assert 'data-role="pause-state"' not in app_index
     assert 'data-role="power-simple-pause-state"' not in app_index
-    assert 'visibleModeLabel = pauseActive ? "Automation paused" : copy.label' in app_status
+    assert 'controlMode === "external"' in app_status
+    assert 'visibleModeLabel = externalControl' in app_status
+    assert '"External control"' in app_status
     assert '"Schedule control is temporarily disabled"' in app_status
-    assert 'pauseStatusUrl: "../automate/control/command.php?command=get_pause_status"' in app_status
-    assert "const directPauseAvailable" in app_status
-    assert 'event.data?.type !== "zendure:pause-status"' in app_status
-    assert "typeof data.pauseActive === 'boolean'" in classic_renderer
-    assert "Pause status unknown" in classic_renderer
+    assert 'controlModeStatusUrl: "../automate/control/command.php?command=get_control_mode"' in app_status
+    assert "const directControlMode" in app_status
+    assert 'event.data?.type !== "zendure:control-mode-status"' in app_status
+    assert "data.controlMode" in classic_renderer
+    assert "External control" in classic_renderer

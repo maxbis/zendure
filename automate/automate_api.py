@@ -33,6 +33,7 @@ API_PATH_STATUS_UPDATES_DELTA = "/api/status_updates_delta"
 API_PATH_REFRESH = "/api/refresh"
 API_PATH_RESTART = "/api/restart"
 API_PATH_PAUSE = "/api/pause"
+API_PATH_CONTROL_MODE = "/api/control_mode"
 API_PATH_LOG_LEVEL = "/api/loglevel"
 API_PATH_SLOW_CHARGE_MAX_POWER = "/api/slow_charge_max_power"
 API_PATH_NETZERO_TARGET_W = "/api/netzero_target_w"
@@ -52,6 +53,7 @@ TEST_ENDPOINTS = [
     {"path": API_PATH_REFRESH, "optional_params": []},
     {"path": API_PATH_RESTART, "optional_params": []},
     {"path": API_PATH_PAUSE, "optional_params": [{"name": "state", "type": "string", "allowed": ["on", "off", "true", "false", "1", "0"], "description": "POST only: set pause override state"}]},
+    {"path": API_PATH_CONTROL_MODE, "optional_params": [{"name": "mode", "type": "string", "allowed": ["active", "paused", "external"], "description": "POST only: transfer battery command ownership"}]},
     {"path": API_PATH_LOG_LEVEL, "optional_params": [{"name": "level", "alt": "loglevel|log_level", "type": "string", "allowed": ["DEBUG", "INFO", "WARNING", "ERROR"], "description": "POST only: set runtime log level"}]},
     {"path": API_PATH_SLOW_CHARGE_MAX_POWER, "optional_params": [{"name": "value", "type": "int", "min": 0, "description": "POST only: set runtime slow-charge max power; must be between 0 and MAX_CHARGE_POWER"}]},
     {"path": API_PATH_NETZERO_TARGET_W, "optional_params": [{"name": "value", "type": "int", "description": "POST only: set runtime NETZERO_TARGET_W override as a signed integer"}]},
@@ -64,6 +66,8 @@ CONTROL_COMMANDS = [
     {"path": API_PATH_PAUSE, "name": "status", "method": "GET", "description": "Get current pause override state", "example": f"{API_PATH_PAUSE}"},
     {"path": API_PATH_PAUSE, "name": "pause_on", "method": "POST", "description": "Enable pause override (forces desired power to 0)", "example": f"{API_PATH_PAUSE}?state=on"},
     {"path": API_PATH_PAUSE, "name": "pause_off", "method": "POST", "description": "Disable pause override (resume schedule control)", "example": f"{API_PATH_PAUSE}?state=off"},
+    {"path": API_PATH_CONTROL_MODE, "name": "control_mode_status", "method": "GET", "description": "Get durable battery command ownership mode", "example": f"{API_PATH_CONTROL_MODE}"},
+    {"path": API_PATH_CONTROL_MODE, "name": "control_mode_set", "method": "POST", "description": "Set active, paused, or external control mode", "example": f"{API_PATH_CONTROL_MODE}?mode=external"},
     {"path": API_PATH_RESTART, "name": "restart", "method": "POST", "description": "Request graceful restart of automation process", "example": f"{API_PATH_RESTART}"},
     {"path": API_PATH_REFRESH, "name": "refresh_schedule", "method": "GET", "description": "Force schedule refresh from API", "example": f"{API_PATH_REFRESH}"},
     {"path": API_PATH_LOG_LEVEL, "name": "log_level_status", "method": "GET", "description": "Get current runtime log level", "example": f"{API_PATH_LOG_LEVEL}"},
@@ -150,6 +154,8 @@ class AutomationTCPServer(socketserver.ThreadingTCPServer):
         self.restart_callback: Optional[Callable[[], None]] = None
         self.pause_getter: Optional[Callable[[], bool]] = None
         self.pause_setter: Optional[Callable[[bool], None]] = None
+        self.control_mode_getter: Optional[Callable[[], dict[str, Any]]] = None
+        self.control_mode_setter: Optional[Callable[[str], dict[str, Any]]] = None
         self.wh_per_hour_cache: Optional[dict[str, Any]] = None
         self.wh_per_hour_cache_lock = threading.Lock()
         self.log_level_priorities: Optional[dict[str, Any]] = None
@@ -169,6 +175,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_refresh",
         "_handle_restart",
         "_handle_pause_get",
+        "_handle_control_mode_get",
         "_handle_loglevel_get",
         "_handle_slow_charge_max_power_get",
         "_handle_netzero_target_w_get",
@@ -187,6 +194,7 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         "_handle_api_help",
         "_handle_restart",
         "_handle_pause_post",
+        "_handle_control_mode_post",
         "_handle_loglevel_post",
         "_handle_slow_charge_max_power_post",
         "_handle_netzero_target_w_post",
@@ -460,6 +468,45 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         except Exception as exc:
             active = bool(pause_getter())
             self._send_json({"ok": False, "error": str(exc), "pauseActive": active}, 500)
+        return True
+
+    def _handle_control_mode_get(self, parsed) -> bool:
+        if parsed.path != API_PATH_CONTROL_MODE:
+            return False
+        getter = getattr(self.server, "control_mode_getter", None)
+        if not callable(getter):
+            self._send_json({"ok": False, "error": "Control-mode state not available"}, 503)
+            return True
+        try:
+            payload = dict(getter())
+            payload["ok"] = True
+            self._send_json(payload)
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 500)
+        return True
+
+    def _handle_control_mode_post(self, parsed) -> bool:
+        if parsed.path != API_PATH_CONTROL_MODE:
+            return False
+        setter = getattr(self.server, "control_mode_setter", None)
+        getter = getattr(self.server, "control_mode_getter", None)
+        if not callable(setter) or not callable(getter):
+            self._send_json({"ok": False, "error": "Control-mode state not available"}, 503)
+            return True
+        query = parse_qs(parsed.query)
+        mode = str((query.get("mode") or [""])[0]).strip().lower()
+        if mode not in {"active", "paused", "external"}:
+            self._send_json({"ok": False, "error": "Invalid mode. Use active|paused|external."}, 400)
+            return True
+        try:
+            payload = dict(setter(mode))
+            payload["ok"] = True
+            payload["message"] = f"Control mode set to {payload.get('controlMode', mode)}"
+            self._send_json(payload)
+        except Exception as exc:
+            current = dict(getter())
+            current.update({"ok": False, "error": str(exc)})
+            self._send_json(current, 409)
         return True
 
     def _allowed_runtime_log_levels(self) -> list[str]:
@@ -745,10 +792,17 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         if api_state is None:
             return True
         payload = compute_automation_status_from_state(api_state, "all", 50)
+        control_mode_getter = getattr(self.server, "control_mode_getter", None)
+        if callable(control_mode_getter):
+            try:
+                payload.update(control_mode_getter())
+            except Exception:
+                pass
         pause_getter = getattr(self.server, "pause_getter", None)
-        payload["pauseActive"] = None
-        payload["pauseStatusAvailable"] = False
-        if callable(pause_getter):
+        if "pauseActive" not in payload:
+            payload["pauseActive"] = None
+        payload["pauseStatusAvailable"] = isinstance(payload.get("pauseActive"), bool)
+        if not payload["pauseStatusAvailable"] and callable(pause_getter):
             try:
                 payload["pauseActive"] = bool(pause_getter())
                 payload["pauseStatusAvailable"] = True
@@ -838,6 +892,8 @@ def create_http_server(
     manual_schedule_refresh_callback: Optional[Callable[[], None]] = None,
     port: int = HTTP_API_PORT,
     log_level_priorities: Optional[dict[str, Any]] = None,
+    control_mode_getter: Optional[Callable[[], dict[str, Any]]] = None,
+    control_mode_setter: Optional[Callable[[str], dict[str, Any]]] = None,
     ) -> AutomationTCPServer:
     server = AutomationTCPServer(("", port), ApiTestHandler)
     server.api_state = api_state
@@ -849,6 +905,8 @@ def create_http_server(
     server.restart_callback = restart_callback
     server.pause_getter = pause_getter
     server.pause_setter = pause_setter
+    server.control_mode_getter = control_mode_getter
+    server.control_mode_setter = control_mode_setter
     server.controller = controller
     server.status_updates_delta_token = status_updates_delta_token
     server.manual_schedule_refresh_callback = manual_schedule_refresh_callback

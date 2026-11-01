@@ -15,7 +15,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, date
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, Union, Literal, List
+from typing import Optional, Tuple, Dict, Any, Union, Literal, List, Callable
 from zoneinfo import ZoneInfo
 
 import requests
@@ -575,6 +575,8 @@ class AutomateController(BaseDeviceController):
         self.device_ip = device_ip
         self.device_sn = device_sn
         self.previous_power = None  # Track the last successfully set power value (internal convention)
+        self.control_write_guard: Optional[Callable[[str, Any], bool]] = None
+        self._control_write_lock = threading.RLock()
         self.limit_state = 0  # Battery limit state: -1 (MIN), 0 (OK), 1 (MAX)
         self._last_dynamic_power_context: Dict[str, Any] = {}
         try:
@@ -596,6 +598,31 @@ class AutomateController(BaseDeviceController):
             logger=self,
             log_file_path=str(self.POWER_LOG_FILE)
         )
+
+    def set_control_write_guard(self, guard: Optional[Callable[[str, Any], bool]]) -> None:
+        """Install the central ownership guard used by every battery write."""
+        self.control_write_guard = guard
+
+    def control_write_transaction(self):
+        """Serialize ownership transitions with the final device-write check."""
+        lock = getattr(self, "_control_write_lock", None)
+        if lock is None:
+            lock = threading.RLock()
+            self._control_write_lock = lock
+        return lock
+
+    def _control_write_allowed(self, purpose: str, requested_value: Any) -> bool:
+        guard = getattr(self, "control_write_guard", None)
+        if not callable(guard):
+            return True
+        try:
+            return bool(guard(purpose, requested_value))
+        except Exception as exc:
+            self.log(
+                "error",
+                f"Control write guard failed closed: purpose={purpose}, error={exc}",
+            )
+            return False
 
     def _build_device_properties(self, power_feed: int, stand_by: bool = False) -> Dict[str, Any]:
         """
@@ -1301,6 +1328,7 @@ class AutomateController(BaseDeviceController):
             schedule_entry: Optional[Dict[str, Any]] = None,
             zendure_data: Optional[Dict[str, Any]] = None,
             p1_source: Optional[str] = None,
+            write_purpose: str = "normal",
         ) -> PowerResult:
         """
         Set power feed to the Zendure battery.
@@ -1324,6 +1352,19 @@ class AutomateController(BaseDeviceController):
             Test mode is controlled by config.jsonc key "TEST_MODE".
             When enabled, operations are simulated but not applied.
         """
+        if not self._control_write_allowed(write_purpose, value):
+            power = self.previous_power if isinstance(self.previous_power, int) else 0
+            self.log(
+                "warning",
+                f"[CONTROL WRITE BLOCKED] purpose={write_purpose}, requested={value}",
+                message_key=f"control_write_blocked:{write_purpose}",
+            )
+            return PowerResult(
+                success=False,
+                power=power,
+                error="Battery write blocked by control ownership mode",
+            )
+
         try:
             target_power = self._resolve_power_target(
                 value=value,
@@ -1348,7 +1389,13 @@ class AutomateController(BaseDeviceController):
         requested_power = target_power
         runtime_context = self._get_dynamic_power_context()
         reversal_ramp_active = bool(runtime_context.get('guard_active', False))
-        target_power = self._apply_power_feed_max_delta(target_power)
+        if write_purpose in {"hold_zero", "external_handoff_zero"} and target_power == 0:
+            # Ownership transitions must reach a real zero immediately; a
+            # smoothing ramp would hand off while the battery is still active.
+            target_power = 0
+            reversal_ramp_active = False
+        else:
+            target_power = self._apply_power_feed_max_delta(target_power)
         max_delta_limited = target_power != requested_power
 
         if value in ('netzero', 'netzero+', 'netzero-') or value is None:
@@ -1367,7 +1414,25 @@ class AutomateController(BaseDeviceController):
                 message_key='netzero_target_summary',
             )
 
-        success, error_msg, actual_power = self._send_power_feed(target_power, zendure_data=zendure_data)
+        with self.control_write_transaction():
+            # Check again at the actual write boundary. The ownership mode may
+            # have changed while a dynamic target was being calculated.
+            if not self._control_write_allowed(write_purpose, value):
+                power = self.previous_power if isinstance(self.previous_power, int) else 0
+                self.log(
+                    "warning",
+                    f"[CONTROL WRITE BLOCKED] purpose={write_purpose}, requested={value}",
+                    message_key=f"control_write_blocked:{write_purpose}:preflight",
+                )
+                return PowerResult(
+                    success=False,
+                    power=power,
+                    error="Battery write blocked by control ownership mode",
+                )
+            success, error_msg, actual_power = self._send_power_feed(
+                target_power,
+                zendure_data=zendure_data,
+            )
 
         if actual_power != target_power:
             min_power = None
@@ -1418,7 +1483,7 @@ class AutomateController(BaseDeviceController):
         """
         self.log('info', "Initiating standby sequence...")
         # Step 1: Set to 1W to prime the previous_power state
-        res1 = self.set_power(1)
+        res1 = self.set_power(1, write_purpose="standby")
         if not res1.success:
             return res1
 
@@ -1426,7 +1491,7 @@ class AutomateController(BaseDeviceController):
         time.sleep(2)
 
         # Step 3: Set to 0W to trigger standby logic
-        return self.set_power(0)
+        return self.set_power(0, write_purpose="standby")
 
 
 class DeviceDataReader(BaseDeviceController):

@@ -508,13 +508,18 @@ function renderAutomationStatus(data) {
         return;
     }
 
-    const pauseAvailable = typeof data.pauseActive === 'boolean' && data.pauseStatusAvailable !== false;
+    const controlMode = ['active', 'paused', 'external'].includes(data.controlMode)
+        ? data.controlMode
+        : (typeof data.pauseActive === 'boolean' ? (data.pauseActive ? 'paused' : 'active') : 'unknown');
+    const pauseAvailable = controlMode !== 'unknown' && data.pauseStatusAvailable !== false;
     const pauseEl = document.createElement('div');
     pauseEl.id = 'automation-pause-state';
-    pauseEl.className = 'automation-pause-state ' + (pauseAvailable ? (data.pauseActive ? 'paused' : 'active') : 'unknown');
+    pauseEl.className = 'automation-pause-state ' + (pauseAvailable ? controlMode : 'unknown');
     pauseEl.setAttribute('role', 'status');
     pauseEl.innerHTML = pauseAvailable
-        ? (data.pauseActive
+        ? (controlMode === 'external'
+            ? '<strong>External control</strong><span>Qool is monitoring only.</span>'
+            : controlMode === 'paused'
             ? '<strong>Automation paused</strong><span>Schedule control is temporarily disabled.</span>'
             : '<strong>Schedule control active</strong>')
         : '<strong>Pause status unknown</strong>';

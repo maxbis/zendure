@@ -87,7 +87,7 @@ function buildAppSolarEvents(array $location): array
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'automationStatusUrl' => '../main/api/automation_status_proxy.php?type=all&limit=20',
-    'pauseStatusUrl' => '../automate/control/command.php?command=get_pause_status',
+    'controlModeStatusUrl' => '../automate/control/command.php?command=get_control_mode',
     'refreshIntervalMs' => 20000,
     'boostRefreshIntervalMs' => 5100,
     'boostTickCount' => 8,

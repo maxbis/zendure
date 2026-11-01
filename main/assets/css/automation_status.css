@@ -274,6 +274,16 @@
     color: #ffe09a;
 }
 
+.automation-pause-state.external {
+    border-color: #5aa7e7;
+    background: rgba(45, 110, 163, 0.2);
+    color: #b9dcfa;
+}
+
+.automation-pause-state.external strong {
+    color: #d7ebfc;
+}
+
 .automation-pause-state.unknown {
     color: var(--text-tertiary);
 }

@@ -30,6 +30,13 @@ from status_updates_store import (
     encode_schedule_rule,
 )
 from power_metere_loader import get_power_meter_reader
+from control_mode import (
+    ControlModeStore,
+    CONTROL_MODE_ACTIVE,
+    CONTROL_MODE_PAUSED,
+    CONTROL_MODE_EXTERNAL,
+    CONTROL_MODE_EXTERNAL_PENDING,
+)
 
 # ============================================================================
 # CONSTANTS & DEFAULT CONFIG (override via config.jsonc)
@@ -313,6 +320,7 @@ class AutomationApp:
         self.zero_power_since: Optional[float] = None
         self.standby_sent = False
         self.pause_override_active = False
+        self.control_mode_store: Optional[ControlModeStore] = None
         self.last_p1_total_power: Optional[int] = None  # last P1 meter total power (W) for status API
         self._last_p1_read_source: Optional[str] = None
         self.stop_posted = False
@@ -347,6 +355,12 @@ class AutomationApp:
             self.logger = Logger(self.controller)
 
             data_dir = self.schedule_controller.config.get("dataDir", "./data/")
+            self.control_mode_store = ControlModeStore(
+                os.path.join(data_dir.rstrip("/").rstrip("\\"), "control_mode.json"),
+                logger=self.logger,
+            )
+            self.pause_override_active = self.control_mode_store.effective_mode == CONTROL_MODE_PAUSED
+            self.controller.set_control_write_guard(self.control_mode_store.write_allowed)
             db_path = os.path.join(data_dir.rstrip("/").rstrip("\\"), "status_updates.db")
             retention_days = int(self.schedule_controller.config.get("statusUpdatesRetentionDays", 7))
             self.logger.info(f"Status updates DB path: {db_path}")
@@ -483,6 +497,8 @@ class AutomationApp:
                 restart_callback=self.request_restart,
                 pause_getter=lambda: self.pause_override_active,
                 pause_setter=self._set_pause_override,
+                control_mode_getter=self._get_control_mode_status,
+                control_mode_setter=self._set_control_mode,
                 controller=self.controller,
                 status_updates_delta_token=token or None,
                 port=HTTP_API_PORT,
@@ -601,30 +617,83 @@ class AutomationApp:
             return 0
 
     def _set_pause_override(self, active: bool) -> None:
-        active = bool(active)
-        if active == self.pause_override_active:
-            self.logger.info(f"Pause override already {'ON' if active else 'OFF'}.")
-            return
-        if active:
-            result = self.controller.set_power(0)
-            if not result.success:
-                raise RuntimeError(f"Failed to set power to 0 before enabling pause: {result.error}")
+        self._set_control_mode(CONTROL_MODE_PAUSED if active else CONTROL_MODE_ACTIVE)
 
-            self.pause_override_active = True
-            self.value = 0
-            self.old_value = 0
-            p1_w = self.last_p1_total_power
-            self.status_api.post_update(
-                EVENT_TYPE_CHANGE,
-                None,
-                0,
-                p1_total_power=p1_w,
-                rule=encode_schedule_rule(0),
-            )
-            self.logger.info("Pause override enabled after setting power to 0.")
-        else:
+    def _get_control_mode_status(self) -> dict:
+        if self.control_mode_store is None:
+            return {"controlMode": CONTROL_MODE_EXTERNAL, "controlWritesEnabled": False,
+                    "controlStateValid": False, "controlStateFailClosed": True,
+                    "pauseActive": False, "externalControlActive": True}
+        return self.control_mode_store.status()
+
+    def _battery_is_stopped(self) -> bool:
+        snapshot = self._read_zendure_snapshot()
+        if not isinstance(snapshot, dict):
+            return False
+        props = snapshot.get("properties", {}) if isinstance(snapshot, dict) else {}
+        try:
+            return abs(int(props.get("inputLimit", 0)) - int(props.get("outputLimit", 0))) <= 50
+        except (TypeError, ValueError):
+            return False
+
+    def _set_control_mode(self, mode: str) -> dict:
+        if self.control_mode_store is None:
+            raise RuntimeError("Control-mode store is not initialized")
+        with self.controller.control_write_transaction():
+            return self._set_control_mode_locked(mode)
+
+    def _set_control_mode_locked(self, mode: str) -> dict:
+        if self.control_mode_store is None:
+            raise RuntimeError("Control-mode store is not initialized")
+        current = self.control_mode_store.stored_mode
+        if mode == CONTROL_MODE_EXTERNAL:
+            if current == CONTROL_MODE_EXTERNAL:
+                return self.control_mode_store.status()
+            with self.controller.control_write_transaction():
+                self.control_mode_store.transition(
+                    CONTROL_MODE_EXTERNAL_PENDING, changed_by="automation-control-api",
+                    reason="External control handoff started", owner="external-controller",
+                )
+                result = self.controller.set_power(0, write_purpose="external_handoff_zero")
+                if not result.success:
+                    raise RuntimeError(f"Failed to set power to 0 during external handoff: {result.error}")
+                status = self.control_mode_store.transition(
+                    CONTROL_MODE_EXTERNAL, changed_by="automation-control-api",
+                    reason="External controller owns battery commands", owner="external-controller",
+                )
             self.pause_override_active = False
-            self.logger.info("Pause override disabled: schedule control resumed.")
+            self.value = self.old_value = 0
+            return status
+        if mode == CONTROL_MODE_PAUSED:
+            if current in {CONTROL_MODE_EXTERNAL, CONTROL_MODE_EXTERNAL_PENDING}:
+                if not self._battery_is_stopped():
+                    raise RuntimeError("Cannot return control while battery power is not near 0 W")
+            else:
+                result = self.controller.set_power(0, write_purpose="hold_zero")
+                if not result.success:
+                    raise RuntimeError(f"Failed to set power to 0 before pausing: {result.error}")
+            with self.controller.control_write_transaction():
+                status = self.control_mode_store.transition(
+                    CONTROL_MODE_PAUSED, changed_by="automation-control-api",
+                    reason="Qool control paused at 0 W",
+                )
+            self.pause_override_active = True
+            self.value = self.old_value = 0
+            self.status_api.post_update(EVENT_TYPE_CHANGE, None, 0,
+                                        p1_total_power=self.last_p1_total_power,
+                                        rule=encode_schedule_rule(0))
+            return status
+        if mode == CONTROL_MODE_ACTIVE:
+            if current in {CONTROL_MODE_EXTERNAL, CONTROL_MODE_EXTERNAL_PENDING}:
+                raise RuntimeError("Return to Paused before resuming Qool control")
+            with self.controller.control_write_transaction():
+                status = self.control_mode_store.transition(
+                    CONTROL_MODE_ACTIVE, changed_by="automation-control-api",
+                    reason="Qool schedule control resumed",
+                )
+            self.pause_override_active = False
+            return status
+        raise ValueError(f"Unsupported control mode: {mode}")
 
     def _warn_runtime_condition_once(self, key: str, message: str) -> None:
         if key in self._runtime_condition_warning_cache:
@@ -882,6 +951,7 @@ class AutomationApp:
             schedule_entry=schedule_entry,
             zendure_data=zendure_data,
             p1_source=self._last_p1_read_source,
+            write_purpose="hold_zero" if self.pause_override_active else "normal",
         )
 
         if not result.success:
@@ -1008,14 +1078,25 @@ class AutomationApp:
             self.input_handler.stop()
 
         self.logger.info("👋 Shutting down gracefully...")
-        if self.controller:
+        external_control_active = (
+            self.control_mode_store is not None
+            and self.control_mode_store.effective_mode == CONTROL_MODE_EXTERNAL
+        )
+        if self.controller and not external_control_active:
             self.logger.info("   Setting power to 0 before shutdown...")
-            result = self.controller.set_power(0)
+            result = self.controller.set_power(
+                0,
+                write_purpose="hold_zero" if self.pause_override_active else "normal",
+            )
             if result.success:
                 self.logger.info("   Power set to 0")
             else:
                 self.logger.error(f"   Failed to set power to 0: {result.error}")
 
+        elif external_control_active:
+            self.logger.info("   External control active; skipping shutdown battery command")
+
+        if self.controller:
             # Post 'stop' in a thread with short join so shutdown never blocks (e.g. slow/hanging HTTP on Mac)
             if self.status_api and not self.stop_posted:
                 self.stop_posted = True
@@ -1132,11 +1213,19 @@ class AutomationApp:
         zendure_data = None
         zendure_data = self._read_zendure_snapshot() # reads Zendure API once for this loop iteration
 
-        if not self.pause_override_active:
+        external_control_active = (
+            self.control_mode_store is not None
+            and self.control_mode_store.effective_mode == CONTROL_MODE_EXTERNAL
+        )
+        if not self.pause_override_active and not external_control_active:
             self.controller.check_battery_limits(zendure_data=zendure_data) # updates limit_state from the iteration snapshot
             desired_power = self._apply_runtime_conditions(desired_power) # Checks if desired power is withing battery dynamic limits (uses cached Zendure data)
             desired_power = self._check_battery_limits(desired_power, prechecked=True) # uses limit_state property to prevent charging a full battery or discharging an empty one
         self._update_zendure_state() # stores the last Zendure data in self.api_state.last_zendure, this lead to GUI data
+
+        if external_control_active:
+            self.fast_loop_active = False
+            return True
 
         # 5. Apply settings
         self._apply_power_settings(desired_power, p1_data, zendure_data=zendure_data) # translates the desired power into a (dedubbed) command to the Zendure device and sends it to the device

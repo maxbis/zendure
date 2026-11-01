@@ -1037,6 +1037,7 @@ def _start_test_api_server(
         "controller_logs": [],
     }
     pause_state = {"active": False}
+    control_mode_state = {"mode": "active"}
     controller = SimpleNamespace(
         log_level="INFO",
         min_charge_level=15,
@@ -1115,7 +1116,27 @@ def _start_test_api_server(
 
     def set_pause(value: bool):
         pause_state["active"] = value
+        control_mode_state["mode"] = "paused" if value else "active"
         events["pause_set"].append(value)
+
+    def get_control_mode():
+        mode = control_mode_state["mode"]
+        return {
+            "controlMode": mode,
+            "storedControlMode": mode,
+            "controlOwner": "external-controller" if mode == "external" else None,
+            "controlWritesEnabled": mode != "external",
+            "controlStateValid": True,
+            "controlStateRecovered": False,
+            "controlStateFailClosed": False,
+            "pauseActive": mode == "paused",
+            "externalControlActive": mode == "external",
+        }
+
+    def set_control_mode(mode: str):
+        control_mode_state["mode"] = mode
+        pause_state["active"] = mode == "paused"
+        return get_control_mode()
 
     def compute_wh_per_hour(_now: int, _days: int) -> dict:
         events["compute_wh_calls"] += 1
@@ -1159,6 +1180,8 @@ def _start_test_api_server(
         manual_schedule_refresh_callback=manual_schedule_refresh_callback,
         port=0,
         log_level_priorities={"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40},
+        control_mode_getter=get_control_mode,
+        control_mode_setter=set_control_mode,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -3136,12 +3159,20 @@ def test_apply_power_settings_passes_http_p1_source():
 
     captured = {}
 
-    def _set_power(desired_power, p1_data=None, schedule_entry=None, zendure_data=None, p1_source=None):
+    def _set_power(
+        desired_power,
+        p1_data=None,
+        schedule_entry=None,
+        zendure_data=None,
+        p1_source=None,
+        write_purpose="normal",
+    ):
         captured["desired_power"] = desired_power
         captured["p1_data"] = p1_data
         captured["schedule_entry"] = schedule_entry
         captured["zendure_data"] = zendure_data
         captured["p1_source"] = p1_source
+        captured["write_purpose"] = write_purpose
         return device_controller.PowerResult(
             success=True,
             power=-300,
@@ -3154,6 +3185,7 @@ def test_apply_power_settings_passes_http_p1_source():
     app._apply_power_settings(automate_www.POWER_MODE_NETZERO, {"total_power": 320})
 
     assert captured["p1_source"] == "http"
+    assert captured["write_purpose"] == "normal"
     assert captured["p1_data"] == {"total_power": 320}
 
 
@@ -3271,6 +3303,7 @@ def test_api_discovery_and_status_endpoints():
         assert automation_payload["lastChanges"][0]["type"] == "change"
         assert automation_payload["pauseActive"] is False
         assert automation_payload["pauseStatusAvailable"] is True
+        assert automation_payload["controlMode"] == "active"
     finally:
         runtime.cleanup()
 
@@ -3306,6 +3339,23 @@ def test_api_control_endpoints_and_unknown_path():
         assert pause_off_response.status_code == 200
         assert pause_off_response.json()["pauseActive"] is False
         assert runtime.events["pause_set"] == [True, False]
+
+        mode_get_response = requests.get(f"{runtime.base_url}/api/control_mode", timeout=2)
+        assert mode_get_response.status_code == 200
+        assert mode_get_response.json()["controlMode"] == "active"
+
+        external_response = requests.post(
+            f"{runtime.base_url}/api/control_mode?mode=external", timeout=2
+        )
+        assert external_response.status_code == 200
+        assert external_response.json()["controlMode"] == "external"
+        assert external_response.json()["controlWritesEnabled"] is False
+
+        external_status_response = requests.get(
+            f"{runtime.base_url}/api/automation_status", timeout=2
+        )
+        assert external_status_response.json()["controlMode"] == "external"
+        assert external_status_response.json()["externalControlActive"] is True
 
         loglevel_get_response = requests.get(f"{runtime.base_url}/api/loglevel", timeout=2)
         assert loglevel_get_response.status_code == 200
