@@ -251,6 +251,31 @@ foreach ($groupedCommands as $groupKey => $commands) {
       font-size: 14px;
       min-height: 34px;
     }
+    .command-group[data-command-group="automation"] .command-actions {
+      gap: 7px;
+    }
+    .command-group[data-command-group="automation"] .command-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 32px;
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: 13px;
+      line-height: 1.15;
+    }
+    .command-icon {
+      display: inline-flex;
+      width: 14px;
+      height: 14px;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 14px;
+      font-size: 13px;
+      line-height: 1;
+      font-family: system-ui, -apple-system, "Segoe UI Symbol", sans-serif;
+    }
     .btn-process {
       background: #8d4a1f;
       border-color: #c96e34;
@@ -411,7 +436,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
               $groupTitle = $commandGroups[$groupKey]['title'] ?? 'Other';
               $groupDescription = $commandGroups[$groupKey]['description'] ?? 'Additional control actions.';
             ?>
-            <div class="command-group">
+            <div class="command-group" data-command-group="<?= htmlspecialchars($groupKey, ENT_QUOTES, 'UTF-8') ?>">
               <div class="command-group-title"><?= htmlspecialchars($groupTitle, ENT_QUOTES, 'UTF-8') ?></div>
               <div class="command-group-desc"><?= htmlspecialchars($groupDescription, ENT_QUOTES, 'UTF-8') ?></div>
               <?php if ($groupKey === 'automation'): ?>
@@ -434,7 +459,10 @@ foreach ($groupedCommands as $groupKey => $commands) {
                     data-command="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"
                     title="<?= htmlspecialchars($cfg['description'], ENT_QUOTES, 'UTF-8') ?>"
                   >
-                    <?= htmlspecialchars($cfg['label'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php if (isset($cfg['icon']) && is_string($cfg['icon']) && $cfg['icon'] !== ''): ?>
+                      <span class="command-icon" aria-hidden="true"><?= htmlspecialchars($cfg['icon'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                    <span class="command-label"><?= htmlspecialchars($cfg['label'], ENT_QUOTES, 'UTF-8') ?></span>
                   </button>
                 <?php endforeach; ?>
               </div>
@@ -590,9 +618,15 @@ foreach ($groupedCommands as $groupKey => $commands) {
             || (mode === 'active' && commandKey === 'pause_off')
             || (mode === 'external' && commandKey === 'external_control_on')
           );
-          btn.hidden = mode === 'external'
-            ? commandKey !== 'external_control_release'
-            : commandKey === 'external_control_release';
+          if (mode === 'external') {
+            btn.hidden = commandKey !== 'external_control_release';
+          } else if (mode === 'active') {
+            btn.hidden = commandKey === 'pause_off' || commandKey === 'external_control_release';
+          } else if (mode === 'paused') {
+            btn.hidden = commandKey === 'pause_on' || commandKey === 'external_control_release';
+          } else {
+            btn.hidden = commandKey === 'external_control_release';
+          }
           btn.classList.toggle('is-current', isCurrent);
           btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
           if (isCurrent) {
