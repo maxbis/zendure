@@ -576,8 +576,8 @@ foreach ($groupedCommands as $groupKey => $commands) {
         pauseCurrent.classList.toggle('error', !available);
         pauseCurrentValue.textContent = available
           ? (mode === 'external'
-              ? 'External control — Qool monitoring only'
-              : (mode === 'paused' ? 'Automation paused' : 'Qool schedule control active'))
+              ? 'External control — automation is monitoring only'
+              : (mode === 'paused' ? 'Automation paused' : 'Schedule control active'))
           : 'Status unavailable';
 
         buttons.forEach(function (btn) {

@@ -675,7 +675,7 @@ class AutomationApp:
             with self.controller.control_write_transaction():
                 status = self.control_mode_store.transition(
                     CONTROL_MODE_PAUSED, changed_by="automation-control-api",
-                    reason="Qool control paused at 0 W",
+                    reason="Automation control paused at 0 W",
                 )
             self.pause_override_active = True
             self.value = self.old_value = 0
@@ -685,11 +685,11 @@ class AutomationApp:
             return status
         if mode == CONTROL_MODE_ACTIVE:
             if current in {CONTROL_MODE_EXTERNAL, CONTROL_MODE_EXTERNAL_PENDING}:
-                raise RuntimeError("Return to Paused before resuming Qool control")
+                raise RuntimeError("Return to Paused mode before resuming automation")
             with self.controller.control_write_transaction():
                 status = self.control_mode_store.transition(
                     CONTROL_MODE_ACTIVE, changed_by="automation-control-api",
-                    reason="Qool schedule control resumed",
+                    reason="Automation schedule control resumed",
                 )
             self.pause_override_active = False
             return status

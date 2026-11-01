@@ -69,12 +69,12 @@ def test_valid_transition_persists_across_restart(tmp_path):
     store.transition(
         CONTROL_MODE_PAUSED,
         changed_by="test",
-        reason="operator paused Qool",
+        reason="operator paused automation",
     )
     store.transition(
         CONTROL_MODE_ACTIVE,
         changed_by="test",
-        reason="operator resumed Qool",
+        reason="operator resumed automation",
     )
 
     reloaded = ControlModeStore(path, RecordingLogger())

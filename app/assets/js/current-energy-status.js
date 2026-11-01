@@ -1205,7 +1205,7 @@
         elements.powerSimpleFlow.dataset.direction = model.mode;
         elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
         elements.powerSimpleCaption.textContent = externalControlActive
-            ? "Qool is monitoring only"
+            ? "Automation is monitoring only"
             : pauseActive
             ? "Schedule control is temporarily disabled"
             : model.mode === "charging"

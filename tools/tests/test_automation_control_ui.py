@@ -48,7 +48,11 @@ def test_control_mode_panel_loads_authoritative_state_and_updates_button_state()
     assert "'path' => '/api/control_mode'" in command_source
     assert "'external_control_on' => [" in command_source
     assert "'external_control_release' => [" in command_source
-    assert 'External control — Qool monitoring only' in control_source
+    assert 'External control — automation is monitoring only' in control_source
+    assert "'label' => 'Pause Automation'" in command_source
+    assert "'label' => 'Resume Automation'" in command_source
+    assert "'label' => 'Enable External Control'" in command_source
+    assert "'label' => 'Return to Automation (Paused)'" in command_source
 
 
 def test_main_and_classic_guis_render_explicit_control_mode_status():

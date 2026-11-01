@@ -518,7 +518,7 @@ function renderAutomationStatus(data) {
     pauseEl.setAttribute('role', 'status');
     pauseEl.innerHTML = pauseAvailable
         ? (controlMode === 'external'
-            ? '<strong>External control</strong><span>Qool is monitoring only.</span>'
+            ? '<strong>External control</strong><span>Automation is monitoring only.</span>'
             : controlMode === 'paused'
             ? '<strong>Automation paused</strong><span>Schedule control is temporarily disabled.</span>'
             : '<strong>Schedule control active</strong>')
