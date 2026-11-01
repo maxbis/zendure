@@ -265,6 +265,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
       font-size: 13px;
       line-height: 1.15;
     }
+    .command-group[data-command-group="automation"] .command-btn[hidden] {
+      display: none !important;
+    }
     .command-icon {
       display: inline-flex;
       width: 14px;

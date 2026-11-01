@@ -52,13 +52,15 @@ def test_control_mode_panel_loads_authoritative_state_and_updates_button_state()
     assert "'label' => 'Pause Automation'" in command_source
     assert "'label' => 'Resume Automation'" in command_source
     assert "'label' => 'Enable External Control'" in command_source
-    assert "'label' => 'Return to Automation (Paused)'" in command_source
+    assert "'label' => 'Stop External Control'" in command_source
     assert "'icon' => '⏸︎'" in command_source
     assert "'icon' => '▶︎'" in command_source
     assert "'icon' => '↗'" in command_source
     assert "'icon' => '↻'" in command_source
     assert 'data-command-group="<?= htmlspecialchars($groupKey' in control_source
     assert 'class="command-icon" aria-hidden="true"' in control_source
+    assert '.command-btn[hidden]' in control_source
+    assert 'display: none !important;' in control_source
     assert "mode === 'active'" in control_source
     assert "mode === 'paused'" in control_source
 
