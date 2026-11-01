@@ -34,7 +34,6 @@
         modeLabel: component.querySelector('[data-role="mode-label"]'),
         powerValue: component.querySelector('[data-role="power-value"]'),
         freshnessLabel: component.querySelector('[data-role="freshness-label"]'),
-        pauseState: component.querySelector('[data-role="pause-state"]'),
         powerFlow: component.querySelector('[data-role="power-flow"]'),
         powerFlowNegativeFill: component.querySelector('[data-role="power-flow-fill-negative"]'),
         powerFlowPositiveFill: component.querySelector('[data-role="power-flow-fill-positive"]'),
@@ -45,7 +44,6 @@
         powerViewToggles: component.querySelectorAll(".app-power-view-toggle"),
         powerSimpleMode: component.querySelector('[data-role="power-simple-mode"]'),
         powerSimpleFreshness: component.querySelector('[data-role="power-simple-freshness"]'),
-        powerSimplePauseState: component.querySelector('[data-role="power-simple-pause-state"]'),
         powerSimpleValue: component.querySelector('[data-role="power-simple-value"]'),
         powerSimpleFlow: component.querySelector('[data-role="power-simple-flow"]'),
         powerSimpleCaption: component.querySelector('[data-role="power-simple-caption"]'),
@@ -1196,12 +1194,6 @@
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
         elements.powerSimpleMode.textContent = visibleModeLabel;
         elements.powerSimpleMode.title = visibleModeLabel;
-        [elements.pauseState, elements.powerSimplePauseState].forEach((pauseEl) => {
-            if (!pauseEl) return;
-            pauseEl.hidden = pauseStatusAvailable && !pauseActive;
-            pauseEl.dataset.state = pauseActive ? "paused" : "unknown";
-            pauseEl.textContent = pauseActive ? "Paused" : "Pause unknown";
-        });
         setSimpleValue(
             elements.powerSimpleValue,
             Math.abs(Math.round(model.powerW)).toLocaleString(),

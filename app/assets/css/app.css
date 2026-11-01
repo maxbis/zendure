@@ -233,8 +233,7 @@
 }
 
 .app-state-pill,
-.app-target-label,
-.app-pause-state {
+.app-target-label {
     display: inline-flex;
     align-items: center;
     min-height: 26px;
@@ -246,18 +245,6 @@
     font-size: 0.68rem;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.app-pause-state[data-state="paused"] {
-    background: var(--gsd-warning-soft);
-    border-color: color-mix(in srgb, var(--gsd-warning) 42%, transparent);
-    color: var(--gsd-warning);
-}
-
-.app-pause-state[data-state="unknown"] {
-    background: var(--gsd-surface-3);
-    border-color: var(--gsd-border);
-    color: var(--gsd-text-muted);
 }
 
 .app-power-hero[data-pause-state="paused"] {

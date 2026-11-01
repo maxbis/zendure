@@ -53,8 +53,8 @@ def test_main_and_classic_guis_render_explicit_pause_status():
     app_status = APP_STATUS.read_text(encoding="utf-8")
     classic_renderer = CLASSIC_RENDERER.read_text(encoding="utf-8")
 
-    assert 'data-role="pause-state"' in app_index
-    assert 'data-role="power-simple-pause-state"' in app_index
+    assert 'data-role="pause-state"' not in app_index
+    assert 'data-role="power-simple-pause-state"' not in app_index
     assert 'visibleModeLabel = pauseActive ? "Automation paused" : copy.label' in app_status
     assert '"Schedule control is temporarily disabled"' in app_status
     assert 'pauseStatusUrl: "../automate/control/command.php?command=get_pause_status"' in app_status
