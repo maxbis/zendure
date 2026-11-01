@@ -744,7 +744,20 @@ class ApiTestHandler(http.server.BaseHTTPRequestHandler):
         api_state = self._require_api_state()
         if api_state is None:
             return True
-        self._send_json(compute_automation_status_from_state(api_state, "all", 50))
+        payload = compute_automation_status_from_state(api_state, "all", 50)
+        pause_getter = getattr(self.server, "pause_getter", None)
+        payload["pauseActive"] = None
+        payload["pauseStatusAvailable"] = False
+        if callable(pause_getter):
+            try:
+                payload["pauseActive"] = bool(pause_getter())
+                payload["pauseStatusAvailable"] = True
+            except Exception:
+                # Status history remains useful when the runtime override state
+                # cannot be read. Clients must show an unknown state instead of
+                # incorrectly assuming that automation is active.
+                pass
+        self._send_json(payload)
         return True
 
     def _handle_p1(self, parsed) -> bool:

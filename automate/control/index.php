@@ -414,6 +414,12 @@ foreach ($groupedCommands as $groupKey => $commands) {
             <div class="command-group">
               <div class="command-group-title"><?= htmlspecialchars($groupTitle, ENT_QUOTES, 'UTF-8') ?></div>
               <div class="command-group-desc"><?= htmlspecialchars($groupDescription, ENT_QUOTES, 'UTF-8') ?></div>
+              <?php if ($groupKey === 'automation'): ?>
+                <div id="pauseCurrent" class="current-setting" role="status" aria-live="polite">
+                  <span class="current-setting-label">Current status</span>
+                  <strong id="pauseCurrentValue" class="current-setting-value">Loading…</strong>
+                </div>
+              <?php endif; ?>
               <?php if ($groupKey === 'slow_charge'): ?>
                 <div id="slowChargeCurrent" class="current-setting" role="status" aria-live="polite">
                   <span class="current-setting-label">Current setting</span>
@@ -509,6 +515,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
       var fullChargeCancel = document.getElementById('fullChargeCancel');
       var slowChargeCurrent = document.getElementById('slowChargeCurrent');
       var slowChargeCurrentValue = document.getElementById('slowChargeCurrentValue');
+      var pauseCurrent = document.getElementById('pauseCurrent');
+      var pauseCurrentValue = document.getElementById('pauseCurrentValue');
+      var pausePollTimer = null;
       var fullChargePollTimer = null;
       var proxyUrl = <?= json_encode($commandProxyUrl, JSON_UNESCAPED_SLASHES) ?>;
       var commands = <?= json_encode($commandUi, JSON_UNESCAPED_SLASHES) ?>;
@@ -552,6 +561,60 @@ foreach ($groupedCommands as $groupKey => $commands) {
 
       function formatPercent(value) {
         return Number.isFinite(Number(value)) ? String(Number(value)) + '%' : '--';
+      }
+
+      function renderPauseStatus(payload) {
+        if (!pauseCurrent || !pauseCurrentValue) {
+          return;
+        }
+        var state = upstreamBody(payload) || {};
+        var available = typeof state.pauseActive === 'boolean';
+        var active = state.pauseActive === true;
+
+        pauseCurrent.classList.toggle('error', !available);
+        pauseCurrentValue.textContent = available
+          ? (active ? 'Automation paused' : 'Schedule control active')
+          : 'Status unavailable';
+
+        buttons.forEach(function (btn) {
+          var commandKey = btn.getAttribute('data-command') || '';
+          if (commandKey !== 'pause_on' && commandKey !== 'pause_off') {
+            return;
+          }
+          var isCurrent = available && ((active && commandKey === 'pause_on') || (!active && commandKey === 'pause_off'));
+          btn.classList.toggle('is-current', isCurrent);
+          btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+          if (isCurrent) {
+            btn.setAttribute('data-permanent-disabled', 'true');
+          } else {
+            btn.removeAttribute('data-permanent-disabled');
+          }
+          btn.disabled = isCurrent;
+        });
+
+        if (available && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'zendure:pause-status',
+            pauseActive: active
+          }, window.location.origin);
+        }
+
+        if (pausePollTimer) {
+          window.clearTimeout(pausePollTimer);
+        }
+        pausePollTimer = window.setTimeout(loadPauseStatus, 20000);
+      }
+
+      function loadPauseStatus() {
+        fetch(proxyUrl + '?command=get_pause_status', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        })
+          .then(parseJsonResponse)
+          .then(renderPauseStatus)
+          .catch(function () {
+            renderPauseStatus({ pauseActive: null });
+          });
       }
 
       function renderSlowChargeStatus(payload) {
@@ -680,6 +743,9 @@ foreach ($groupedCommands as $groupKey => $commands) {
             var msg = payload.message || (cfg.label + ' command completed.');
             if (commandKey.indexOf('slow_charge_') === 0) {
               renderSlowChargeStatus(payload);
+            }
+            if (commandKey === 'pause_on' || commandKey === 'pause_off') {
+              renderPauseStatus(payload);
             }
             setStatus(msg, 'ok');
           })
@@ -814,6 +880,7 @@ foreach ($groupedCommands as $groupKey => $commands) {
       });
 
       loadNetzeroTarget();
+      loadPauseStatus();
       loadSlowChargeStatus();
       loadFullChargeStatus();
     })();

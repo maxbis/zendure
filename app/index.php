@@ -87,6 +87,7 @@ function buildAppSolarEvents(array $location): array
 $appConfig = [
     'statusUrl' => '../main/api/charge_status_all_proxy.php',
     'automationStatusUrl' => '../main/api/automation_status_proxy.php?type=all&limit=20',
+    'pauseStatusUrl' => '../automate/control/command.php?command=get_pause_status',
     'refreshIntervalMs' => 20000,
     'boostRefreshIntervalMs' => 5100,
     'boostTickCount' => 8,
@@ -251,6 +252,7 @@ $appConfig = [
                             >
                                 Live
                             </button>
+                            <span class="app-pause-state" data-role="pause-state" hidden>Paused</span>
                         </div>
 
                         <div class="app-compact-stat__reading app-power-reading">
@@ -314,6 +316,7 @@ $appConfig = [
                                     >
                                         Live
                                     </button>
+                                    <span class="app-pause-state" data-role="power-simple-pause-state" hidden>Paused</span>
                                 </span>
                                 <span class="app-power-simple__content">
                                     <strong class="app-power-simple__value" data-role="power-simple-value">0 <span class="app-simple-value__unit">W</span></strong>

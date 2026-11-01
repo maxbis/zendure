@@ -486,11 +486,13 @@ function renderAutomationStatus(data) {
     const errorDiv = document.getElementById('automation-status-error');
     const emptyDiv = document.getElementById('automation-status-empty');
     const wrapperDiv = document.getElementById('automation-entries-wrapper');
+    const pauseDiv = document.getElementById('automation-pause-state');
 
     // Clear existing content
     if (errorDiv) errorDiv.remove();
     if (emptyDiv) emptyDiv.remove();
     if (wrapperDiv) wrapperDiv.remove();
+    if (pauseDiv) pauseDiv.remove();
 
     // Injection target: .metric-section inside the Automation Status card
     const container = document.querySelector('[data-component="automation-status"] .metric-section');
@@ -505,6 +507,18 @@ function renderAutomationStatus(data) {
         container.appendChild(errorEl);
         return;
     }
+
+    const pauseAvailable = typeof data.pauseActive === 'boolean' && data.pauseStatusAvailable !== false;
+    const pauseEl = document.createElement('div');
+    pauseEl.id = 'automation-pause-state';
+    pauseEl.className = 'automation-pause-state ' + (pauseAvailable ? (data.pauseActive ? 'paused' : 'active') : 'unknown');
+    pauseEl.setAttribute('role', 'status');
+    pauseEl.innerHTML = pauseAvailable
+        ? (data.pauseActive
+            ? '<strong>Automation paused</strong><span>Schedule control is temporarily disabled.</span>'
+            : '<strong>Schedule control active</strong>')
+        : '<strong>Pause status unknown</strong>';
+    container.appendChild(pauseEl);
 
     const entries = data.lastChanges || [];
 

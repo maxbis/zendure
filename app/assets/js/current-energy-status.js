@@ -4,6 +4,7 @@
     const config = Object.freeze({
         statusUrl: "../main/api/charge_status_all_proxy.php",
         automationStatusUrl: "../main/api/automation_status_proxy.php?type=all&limit=20",
+        pauseStatusUrl: "../automate/control/command.php?command=get_pause_status",
         refreshIntervalMs: 20000,
         boostRefreshIntervalMs: 5100,
         boostTickCount: 8,
@@ -33,6 +34,7 @@
         modeLabel: component.querySelector('[data-role="mode-label"]'),
         powerValue: component.querySelector('[data-role="power-value"]'),
         freshnessLabel: component.querySelector('[data-role="freshness-label"]'),
+        pauseState: component.querySelector('[data-role="pause-state"]'),
         powerFlow: component.querySelector('[data-role="power-flow"]'),
         powerFlowNegativeFill: component.querySelector('[data-role="power-flow-fill-negative"]'),
         powerFlowPositiveFill: component.querySelector('[data-role="power-flow-fill-positive"]'),
@@ -43,6 +45,7 @@
         powerViewToggles: component.querySelectorAll(".app-power-view-toggle"),
         powerSimpleMode: component.querySelector('[data-role="power-simple-mode"]'),
         powerSimpleFreshness: component.querySelector('[data-role="power-simple-freshness"]'),
+        powerSimplePauseState: component.querySelector('[data-role="power-simple-pause-state"]'),
         powerSimpleValue: component.querySelector('[data-role="power-simple-value"]'),
         powerSimpleFlow: component.querySelector('[data-role="power-simple-flow"]'),
         powerSimpleCaption: component.querySelector('[data-role="power-simple-caption"]'),
@@ -1180,13 +1183,25 @@
         elements.content.hidden = false;
 
         const copy = modeCopy(model);
+        const pauseStatusAvailable = model.pauseStatusAvailable === true;
+        const pauseActive = pauseStatusAvailable && model.pauseActive === true;
+        const visibleModeLabel = pauseActive ? "Automation paused" : copy.label;
         const batteryCountdown = batteryCountdownCopy(model);
         elements.powerHero.dataset.mode = model.mode;
-        elements.modeLabel.textContent = copy.label;
-        elements.modeLabel.title = copy.label;
+        elements.powerHero.dataset.pauseState = pauseActive
+            ? "paused"
+            : (pauseStatusAvailable ? "active" : "unknown");
+        elements.modeLabel.textContent = visibleModeLabel;
+        elements.modeLabel.title = visibleModeLabel;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
-        elements.powerSimpleMode.textContent = copy.label;
-        elements.powerSimpleMode.title = copy.label;
+        elements.powerSimpleMode.textContent = visibleModeLabel;
+        elements.powerSimpleMode.title = visibleModeLabel;
+        [elements.pauseState, elements.powerSimplePauseState].forEach((pauseEl) => {
+            if (!pauseEl) return;
+            pauseEl.hidden = pauseStatusAvailable && !pauseActive;
+            pauseEl.dataset.state = pauseActive ? "paused" : "unknown";
+            pauseEl.textContent = pauseActive ? "Paused" : "Pause unknown";
+        });
         setSimpleValue(
             elements.powerSimpleValue,
             Math.abs(Math.round(model.powerW)).toLocaleString(),
@@ -1195,7 +1210,9 @@
         );
         elements.powerSimpleFlow.dataset.direction = model.mode;
         elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
-        elements.powerSimpleCaption.textContent = model.mode === "charging"
+        elements.powerSimpleCaption.textContent = pauseActive
+            ? "Schedule control is temporarily disabled"
+            : model.mode === "charging"
             ? "Energy flowing into the battery"
             : model.mode === "discharging"
                 ? "Energy flowing from the battery"
@@ -1542,8 +1559,15 @@
             const automationPromise = config.automationStatusUrl
                 ? fetchJson(config.automationStatusUrl, activeController.signal).catch(() => null)
                 : Promise.resolve(null);
-            const [payload, automationData] = await Promise.all([statusPromise, automationPromise]);
-            return { payload, automationData };
+            const pausePromise = config.pauseStatusUrl
+                ? fetchJson(config.pauseStatusUrl, activeController.signal).catch(() => null)
+                : Promise.resolve(null);
+            const [payload, automationData, pauseData] = await Promise.all([
+                statusPromise,
+                automationPromise,
+                pausePromise
+            ]);
+            return { payload, automationData, pauseData };
         } catch (error) {
             if (error.name === "AbortError") {
                 throw new Error("The energy controller did not respond in time.");
@@ -1566,8 +1590,18 @@
         if (!hasRenderedData) renderLoading();
 
         try {
-            const { payload, automationData } = await fetchStatusBundle();
+            const { payload, automationData, pauseData } = await fetchStatusBundle();
             const model = normalizePayload(payload);
+            const directPauseData = pauseData?.upstreamBody && typeof pauseData.upstreamBody === "object"
+                ? pauseData.upstreamBody
+                : pauseData;
+            const combinedPauseAvailable = typeof automationData?.pauseActive === "boolean"
+                && automationData?.pauseStatusAvailable !== false;
+            const directPauseAvailable = typeof directPauseData?.pauseActive === "boolean";
+            model.pauseStatusAvailable = combinedPauseAvailable || directPauseAvailable;
+            model.pauseActive = combinedPauseAvailable
+                ? automationData.pauseActive
+                : (directPauseAvailable ? directPauseData.pauseActive : null);
             model.pending = isPowerPending(automationData, model);
             renderModel(model);
             if (shouldPulseTick) {
@@ -1687,6 +1721,14 @@
         });
     });
     elements.retry.addEventListener("click", () => refresh({ manual: true }));
+
+    window.addEventListener("message", (event) => {
+        if (event.origin !== window.location.origin || event.data?.type !== "zendure:pause-status") return;
+        if (typeof event.data.pauseActive !== "boolean" || !latestModel) return;
+        latestModel.pauseStatusAvailable = true;
+        latestModel.pauseActive = event.data.pauseActive;
+        renderModel(latestModel);
+    });
     [elements.batteryIcon, elements.batteryTarget, elements.batterySimpleTarget].forEach(bindBatteryPopover);
     document.addEventListener("pointerdown", (event) => {
         if (!activeBatteryPopoverTrigger) return;

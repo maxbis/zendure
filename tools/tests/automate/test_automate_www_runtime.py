@@ -3269,6 +3269,8 @@ def test_api_discovery_and_status_endpoints():
         assert automation_payload["success"] is True
         assert automation_payload["entryCount"] == 2
         assert automation_payload["lastChanges"][0]["type"] == "change"
+        assert automation_payload["pauseActive"] is False
+        assert automation_payload["pauseStatusAvailable"] is True
     finally:
         runtime.cleanup()
 
@@ -3295,6 +3297,10 @@ def test_api_control_endpoints_and_unknown_path():
         pause_on_response = requests.post(f"{runtime.base_url}/api/pause?state=on", timeout=2)
         assert pause_on_response.status_code == 200
         assert pause_on_response.json()["pauseActive"] is True
+
+        paused_status_response = requests.get(f"{runtime.base_url}/api/automation_status", timeout=2)
+        assert paused_status_response.json()["pauseActive"] is True
+        assert paused_status_response.json()["pauseStatusAvailable"] is True
 
         pause_off_response = requests.post(f"{runtime.base_url}/api/pause?state=off", timeout=2)
         assert pause_off_response.status_code == 200

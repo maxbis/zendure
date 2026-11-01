@@ -247,6 +247,37 @@
     font-style: italic;
 }
 
+.automation-pause-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.automation-pause-state strong {
+    color: var(--text-primary);
+}
+
+.automation-pause-state.paused {
+    border-color: #bc8525;
+    background: rgba(122, 86, 24, 0.24);
+    color: #ffe09a;
+}
+
+.automation-pause-state.paused strong {
+    color: #ffe09a;
+}
+
+.automation-pause-state.unknown {
+    color: var(--text-tertiary);
+}
+
 .automation-entries-wrapper {
     position: relative;
 }
