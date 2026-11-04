@@ -88,15 +88,32 @@ $pageConfig = [
             </section>
 
             <section class="gsd-card scarcity-section" aria-labelledby="prices-title">
-                <div class="scarcity-section__header"><div><h2 id="prices-title">Price references</h2><p>Historical consumer prices establish what counts as cheap charging and unusually valuable battery energy.</p></div></div>
-                <dl class="scarcity-details scarcity-details--prices">
-                    <div><dt>Normal terminal price</dt><dd data-role="terminal-price">—</dd><small>The ordinary end-of-horizon value already assigned to stored energy.</small></div>
-                    <div><dt>Cheap-grid boundary</dt><dd data-role="cheap-price">—</dd><small>Grid prices at or below this value count as predicted refill.</small></div>
-                    <div><dt>History source</dt><dd data-role="history-source">—</dd><small>Price database first, with local JSON files as fallback.</small></div>
-                    <div><dt>History period</dt><dd data-role="history-period">—</dd><small>Completed local dates included in the percentile calculation.</small></div>
-                    <div><dt>Hourly samples</dt><dd data-role="sample-count">—</dd><small>At least 168 valid hourly prices are required.</small></div>
-                    <div><dt>Weighting half-life</dt><dd data-role="half-life">—</dd><small>Prices this old receive half the weight of the newest prices.</small></div>
-                </dl>
+                <div class="scarcity-section__header"><div><h2 id="prices-title">Price references</h2><p>The current forecast horizon supplies the stored-energy baseline; weighted historical prices establish the cheap-grid and scarcity thresholds.</p></div></div>
+                <div class="scarcity-reference-groups">
+                    <section class="scarcity-reference-group" aria-labelledby="horizon-reference-title">
+                        <h3 id="horizon-reference-title">Forecast-horizon reference</h3>
+                        <dl class="scarcity-details scarcity-details--horizon">
+                            <div><dt>Horizon-average terminal value</dt><dd data-role="terminal-price">—</dd><small>Average consumer price across the current optimizer horizon.</small></div>
+                        </dl>
+                    </section>
+                    <section class="scarcity-reference-group" aria-labelledby="historical-reference-title">
+                        <h3 id="historical-reference-title">Historical references</h3>
+                        <dl class="scarcity-details scarcity-details--prices">
+                            <div><dt>Cheap-grid boundary</dt><dd data-role="cheap-price">—</dd><small>Grid prices at or below this historical threshold count as predicted refill.</small></div>
+                            <div><dt>History source</dt><dd data-role="history-source">—</dd><small>Price database first, with local JSON files as fallback.</small></div>
+                            <div><dt>History period</dt><dd data-role="history-period">—</dd><small>Completed local dates included in the percentile calculation.</small></div>
+                            <div><dt>Hourly samples</dt><dd data-role="sample-count">—</dd><small>At least 168 valid hourly prices are required.</small></div>
+                            <div><dt>Weighting half-life</dt><dd data-role="half-life">—</dd><small>Prices this old receive half the weight of the newest prices.</small></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="scarcity-percentile" data-role="percentile-panel" hidden>
+                    <div class="scarcity-percentile__header">
+                        <div><h3>Weighted price percentiles</h3><p>Historical consumer price at each percentile, with the optimizer’s current references highlighted.</p></div>
+                    </div>
+                    <div class="scarcity-percentile__chart" data-role="percentile-chart"></div>
+                    <div class="scarcity-percentile__legend" data-role="percentile-legend" aria-label="Price percentile references"></div>
+                </div>
             </section>
 
             <section class="scarcity-section scarcity-bands-section" aria-labelledby="bands-title">

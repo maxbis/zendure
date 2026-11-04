@@ -52,6 +52,14 @@ class ScarcityTests(unittest.TestCase):
         self.assertEqual(context["refill"]["expected_refill_percent"], 0.0)
         self.assertTrue(all(band["active"] and band["applied"] for band in context["bands"]))
         self.assertGreater(context["bands"][0]["additional_scarcity_value_eur_per_kwh"], 0.0)
+        self.assertEqual(len(context["price_percentile_curve"]), 21)
+        self.assertEqual(context["price_percentile_curve"][0]["percentile"], 0.0)
+        self.assertEqual(context["price_percentile_curve"][-1]["percentile"], 100.0)
+        self.assertEqual(context["cheap_grid_charge_percentile"], 25.0)
+        self.assertEqual(
+            context["price_percentile_curve"][5]["price_eur_per_kwh"],
+            context["cheap_grid_charge_price_eur_per_kwh"],
+        )
 
     def test_disabled_algorithm_calculates_but_does_not_apply(self) -> None:
         config = {

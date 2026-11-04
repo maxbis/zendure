@@ -225,6 +225,13 @@ def build_scarcity_context(
         base["unavailable_reason"] = "insufficient_price_history"
         return base
     cheap_price = weighted_percentile(rows, float(config["cheapGridChargePercentile"]))
+    percentile_curve = [
+        {
+            "percentile": float(percentile),
+            "price_eur_per_kwh": weighted_percentile(rows, float(percentile)),
+        }
+        for percentile in range(0, 101, 5)
+    ]
     refill = _predicted_refill(
         battery_state,
         slots,
@@ -249,7 +256,9 @@ def build_scarcity_context(
         })
     base.update({
         "calculation_available": True,
+        "cheap_grid_charge_percentile": float(config["cheapGridChargePercentile"]),
         "cheap_grid_charge_price_eur_per_kwh": cheap_price,
+        "price_percentile_curve": percentile_curve,
         "refill": {**refill, "horizon_start": slots[0].start.isoformat(), "horizon_end": slots[-1].end.isoformat()},
         "bands": bands,
     })
