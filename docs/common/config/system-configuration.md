@@ -83,12 +83,13 @@ Required properties:
 - `efficiency`: number greater than 0 and no greater than 1.
 - `roundTripEfficiency`: optional number greater than 0 and no greater than 1. It is used by the rolling optimizer and remains separate from the legacy one-way forecast efficiency.
 - `wearCostEurPerKwhDischarged`: optional non-negative number in EUR per AC-side kWh discharged. It affects only the rolling optimizer objective and is excluded from daily cash P&L.
-- `lowSocDischargeThresholdPercent`: optional integer between `minChargePercent` and `maxChargePercent`. Below this absolute SoC, the rolling optimizer applies the configured virtual low-SoC discharge cost.
-- `lowSocDischargeCostCentsPerKwh`: optional non-negative integer in whole euro cents per AC-side kWh. It is applied only to the portion of a discharge below `lowSocDischargeThresholdPercent`, affects only the optimizer objective and is excluded from cash P&L. Omitting either low-SoC property disables the penalty.
+- `dynamicReserve`: required refill-aware scarcity configuration. `enabled` is the master switch. Its history settings define weighted consumer-price percentiles, and its contiguous `bands` define the SoC range, price percentile, and expected-refill activation boundary for each virtual scarcity cost.
+
+See [Scarcity bands](../planner/scarcity-bands.md) for the full calculation, configuration example, API contract, and operating procedure.
 - `maxChargePowerW`: positive integer command magnitude.
 - `maxDischargePowerW`: positive integer command magnitude.
 
-The portable JSON Schema validates each range independently. Both Phase 4 loaders additionally enforce `minChargePercent < maxChargePercent` and, when configured, `minChargePercent <= lowSocDischargeThresholdPercent <= maxChargePercent`, because draft 2020-12 JSON Schema cannot portably compare sibling numeric properties.
+The portable JSON Schema validates each range independently. Both strict loaders additionally enforce `minChargePercent < maxChargePercent`, require the first scarcity band to begin at `minChargePercent`, and reject gaps, overlaps, reversed ranges, or non-decreasing scarcity thresholds.
 
 The power-cap properties are automation inputs. Outgoing battery commands are clamped to these shared positive magnitudes.
 

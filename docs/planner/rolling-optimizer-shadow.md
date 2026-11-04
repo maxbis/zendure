@@ -11,6 +11,8 @@ API serves rules or the latest validated optimizer plan.
 ## Location
 
 - Optimizer: [`../../planner/rolling_optimizer.py`](../../planner/rolling_optimizer.py)
+- Scarcity calculation: [`../../planner/scarcity.py`](../../planner/scarcity.py)
+- Scarcity algorithm guide: [`scarcity-bands.md`](scarcity-bands.md)
 - Log-only runner: [`../../planner/shadow.py`](../../planner/shadow.py)
 - Settings bridge: [`../../planner/config.py`](../../planner/config.py)
 - Tests: [`../../planner/tests/test_rolling_optimizer.py`](../../planner/tests/test_rolling_optimizer.py)
@@ -18,6 +20,7 @@ API serves rules or the latest validated optimizer plan.
 - Authenticated viewer: [`../../app/optimizer.php`](../../app/optimizer.php)
 - Viewer API: [`../../app/api/optimizer_log.php`](../../app/api/optimizer_log.php)
 - Mode API: [`../../app/api/optimizer_mode.php`](../../app/api/optimizer_mode.php)
+- Scarcity API: [`../../app/api/optimizer_scarcity.php`](../../app/api/optimizer_scarcity.php)
 - Schedule selector: [`../../app/includes/optimizer_schedule.php`](../../app/includes/optimizer_schedule.php)
 - Cron template: [`../../planner/optimizer.cron.example`](../../planner/optimizer.cron.example)
 
@@ -37,7 +40,9 @@ The optimizer reads:
 - `schedule.activeHourDeadbandW`, currently 0 W. Zero disables stabilization. A positive multiple of the configured power step can retain the already-active hour's previous command when a recalculation proposes only a smaller modeled-power change.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
 - `battery.wearCostEurPerKwhDischarged`, currently 0.0005 EUR/kWh (0.05 euro-cent/kWh). The optimizer charges this cost only to AC-side battery discharge; charging has no wear charge.
-- `battery.lowSocDischargeThresholdPercent`, currently 26%, and `battery.lowSocDischargeCostCentsPerKwh`, currently 10 ct/kWh. The optimizer applies this virtual cost only to the AC-side portion of a discharge that occurs below the threshold. It is a soft reserve incentive, not a hard SoC limit, and is excluded from cash P&L.
+- `battery.dynamicReserve`. The planner calculates weighted historical price percentiles, predicted solar and cheap-grid refill, active bands, and an additional virtual scarcity value for each active SoC band. `dynamicReserve.enabled` controls whether those calculated values affect optimization. The diagnostics remain published when the switch is off.
+
+Scarcity history uses `price_ticks` first and local JSON price files as fallback, and includes completed local days only. When fewer than 168 valid hourly prices are available, the calculation reports `insufficient_price_history` and applies no scarcity cost. The refill forecast is capped at the energy required to reach `maxChargePercent` and avoids double-counting solar and grid charging power.
 
 The runner appends one self-contained JSON object per calculation. A record contains
 the inputs that define the run, expected financial result, starting and ending state

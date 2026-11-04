@@ -33,8 +33,18 @@ EXPECTED_CONFIG = {
         "efficiency": 0.9,
         "roundTripEfficiency": 0.85,
         "wearCostEurPerKwhDischarged": 0.0005,
-        "lowSocDischargeThresholdPercent": 26,
-        "lowSocDischargeCostCentsPerKwh": 10,
+        "dynamicReserve": {
+            "enabled": False,
+            "priceHistoryDays": 21,
+            "priceHistoryHalfLifeDays": 7.0,
+            "referencePriceCapEurPerKwh": 0.8,
+            "cheapGridChargePercentile": 25.0,
+            "bands": [
+                {"fromSocPercent": 15, "toSocPercent": 25, "pricePercentile": 95.0, "activateWhenExpectedRefillBelowPercent": 100.0},
+                {"fromSocPercent": 25, "toSocPercent": 40, "pricePercentile": 85.0, "activateWhenExpectedRefillBelowPercent": 60.0},
+                {"fromSocPercent": 40, "toSocPercent": 50, "pricePercentile": 75.0, "activateWhenExpectedRefillBelowPercent": 25.0},
+            ],
+        },
         "maxChargePowerW": 1200,
         "maxDischargePowerW": 2000,
     },
@@ -42,9 +52,9 @@ EXPECTED_CONFIG = {
         "solarSafetyPercent": 90,
         "householdUsageProfilePath": "planner/data/household_usage_profile.json",
         "defaultHouseholdUsageWByHour": [
-            100, 100, 100, 100, 100, 100, 100, 100,
-            220, 220, 220, 220, 220, 220, 220, 220,
-            220, 220, 220, 220, 220, 160, 160, 160,
+            115, 100, 90, 90, 90, 90, 90, 110,
+            170, 170, 200, 170, 190, 220, 240, 220,
+            170, 250, 280, 210, 210, 110, 130, 130,
         ],
     },
     "schedule": {
@@ -148,18 +158,16 @@ def test_missing_solar_safety_percent_defaults_to_one_hundred(tmp_path: Path):
     assert json.loads(php_result.stdout)["forecast"]["solarSafetyPercent"] == 100
 
 
-def test_missing_low_soc_policy_remains_backward_compatible(tmp_path: Path):
+def test_dynamic_reserve_master_switch_can_be_disabled(tmp_path: Path):
     payload = copy.deepcopy(SOURCE_CONFIG)
-    payload["battery"].pop("lowSocDischargeThresholdPercent")
-    payload["battery"].pop("lowSocDischargeCostCentsPerKwh")
+    payload["battery"]["dynamicReserve"]["enabled"] = False
     path = _write_config(tmp_path / "system.json", payload)
 
     python_config = load_system_config(path)
     php_result = _run_php_loader(path)
 
     assert php_result.returncode == 0, php_result.stderr
-    assert "lowSocDischargeThresholdPercent" not in python_config["battery"]
-    assert "lowSocDischargeCostCentsPerKwh" not in python_config["battery"]
+    assert python_config["battery"]["dynamicReserve"]["enabled"] is False
     assert json.loads(php_result.stdout) == python_config
 
 
@@ -176,12 +184,9 @@ def test_schema_contract_matches_loader_sections():
         if section == "battery":
             expected_required.remove("roundTripEfficiency")
             expected_required.remove("wearCostEurPerKwhDischarged")
-            expected_required.remove("lowSocDischargeThresholdPercent")
-            expected_required.remove("lowSocDischargeCostCentsPerKwh")
             assert "roundTripEfficiency" in section_schema["properties"]
             assert "wearCostEurPerKwhDischarged" in section_schema["properties"]
-            assert "lowSocDischargeThresholdPercent" in section_schema["properties"]
-            assert "lowSocDischargeCostCentsPerKwh" in section_schema["properties"]
+            assert "dynamicReserve" in section_schema["properties"]
         if section == "schedule":
             expected_required.remove("activeHourDeadbandW")
             assert "activeHourDeadbandW" in section_schema["properties"]
@@ -212,10 +217,8 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"roundTripEfficiency": 0}), r"roundTripEfficiency must be greater than 0\."),
         (lambda value: value["battery"].update({"roundTripEfficiency": 1.01}), r"roundTripEfficiency must be at most 1\."),
         (lambda value: value["battery"].update({"wearCostEurPerKwhDischarged": -0.01}), r"wearCostEurPerKwhDischarged must be at least 0\."),
-        (lambda value: value["battery"].update({"lowSocDischargeThresholdPercent": 14}), r"lowSocDischargeThresholdPercent must be at least 15\."),
-        (lambda value: value["battery"].update({"lowSocDischargeThresholdPercent": 92}), r"lowSocDischargeThresholdPercent must be at most 91\."),
-        (lambda value: value["battery"].update({"lowSocDischargeCostCentsPerKwh": 1.5}), r"lowSocDischargeCostCentsPerKwh must be an integer\."),
-        (lambda value: value["battery"].update({"lowSocDischargeCostCentsPerKwh": -1}), r"lowSocDischargeCostCentsPerKwh must be at least 0\."),
+        (lambda value: value["battery"]["dynamicReserve"].update({"enabled": 1}), r"dynamicReserve\.enabled must be a boolean\."),
+        (lambda value: value["battery"]["dynamicReserve"]["bands"][0].update({"fromSocPercent": 16}), r"fromSocPercent must equal \$\.battery\.minChargePercent\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),
         (lambda value: value["forecast"]["defaultHouseholdUsageWByHour"].pop("04:00"), r"Invalid properties at \$\.forecast\.defaultHouseholdUsageWByHour \(missing: 04:00\)\."),
         (lambda value: value["forecast"].update({"solarSafetyPercent": 101}), r"solarSafetyPercent must be at most 100\."),

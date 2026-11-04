@@ -23,8 +23,7 @@ function systemConfigDefaultPath(): string
  *     efficiency: float,
  *     roundTripEfficiency?: float,
  *     wearCostEurPerKwhDischarged?: float,
- *     lowSocDischargeThresholdPercent?: int,
- *     lowSocDischargeCostCentsPerKwh?: int,
+ *     dynamicReserve: array<string, mixed>,
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
  *   },
@@ -105,12 +104,7 @@ function validateSystemConfig(array $config): array
     if (array_key_exists('wearCostEurPerKwhDischarged', $battery)) {
         $batteryKeys[] = 'wearCostEurPerKwhDischarged';
     }
-    if (array_key_exists('lowSocDischargeThresholdPercent', $battery)) {
-        $batteryKeys[] = 'lowSocDischargeThresholdPercent';
-    }
-    if (array_key_exists('lowSocDischargeCostCentsPerKwh', $battery)) {
-        $batteryKeys[] = 'lowSocDischargeCostCentsPerKwh';
-    }
+    $batteryKeys[] = 'dynamicReserve';
     systemConfigAssertExactKeys($battery, $batteryKeys, '$.battery');
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
     $minChargePercent = systemConfigRequireInteger(
@@ -147,21 +141,11 @@ function validateSystemConfig(array $config): array
             0.0
         )
         : null;
-    $lowSocDischargeThresholdPercent = array_key_exists('lowSocDischargeThresholdPercent', $battery)
-        ? systemConfigRequireInteger(
-            $battery['lowSocDischargeThresholdPercent'],
-            '$.battery.lowSocDischargeThresholdPercent',
-            $minChargePercent,
-            $maxChargePercent
-        )
-        : null;
-    $lowSocDischargeCostCentsPerKwh = array_key_exists('lowSocDischargeCostCentsPerKwh', $battery)
-        ? systemConfigRequireInteger(
-            $battery['lowSocDischargeCostCentsPerKwh'],
-            '$.battery.lowSocDischargeCostCentsPerKwh',
-            0
-        )
-        : null;
+    $dynamicReserve = systemConfigValidateDynamicReserve(
+        $battery['dynamicReserve'],
+        $minChargePercent,
+        $maxChargePercent
+    );
     $maxChargePowerW = systemConfigRequireInteger(
         $battery['maxChargePowerW'],
         '$.battery.maxChargePowerW',
@@ -295,12 +279,7 @@ function validateSystemConfig(array $config): array
     if ($wearCostEurPerKwhDischarged !== null) {
         $normalizedBattery['wearCostEurPerKwhDischarged'] = $wearCostEurPerKwhDischarged;
     }
-    if ($lowSocDischargeThresholdPercent !== null) {
-        $normalizedBattery['lowSocDischargeThresholdPercent'] = $lowSocDischargeThresholdPercent;
-    }
-    if ($lowSocDischargeCostCentsPerKwh !== null) {
-        $normalizedBattery['lowSocDischargeCostCentsPerKwh'] = $lowSocDischargeCostCentsPerKwh;
-    }
+    $normalizedBattery['dynamicReserve'] = $dynamicReserve;
 
     return [
         'schemaVersion' => $schemaVersion,
@@ -329,6 +308,71 @@ function validateSystemConfig(array $config): array
             'consumerPrecision' => $consumerPrecision,
             'spotPrecision' => $spotPrecision,
         ],
+    ];
+}
+
+/** @return array<string, mixed> */
+function systemConfigValidateDynamicReserve(mixed $value, int $minSoc, int $maxSoc): array
+{
+    $path = '$.battery.dynamicReserve';
+    $reserve = systemConfigRequireObject($value, $path);
+    systemConfigAssertExactKeys($reserve, [
+        'enabled', 'priceHistoryDays', 'priceHistoryHalfLifeDays',
+        'referencePriceCapEurPerKwh', 'cheapGridChargePercentile', 'bands',
+    ], $path);
+    if (!is_bool($reserve['enabled'])) {
+        throw new SystemConfigException($path . '.enabled must be a boolean.');
+    }
+    if (!is_array($reserve['bands']) || $reserve['bands'] === []) {
+        throw new SystemConfigException($path . '.bands must be a non-empty array.');
+    }
+    $bands = [];
+    $previousTo = null;
+    $previousPercentile = null;
+    $previousRefill = null;
+    foreach ($reserve['bands'] as $index => $rawBand) {
+        $bandPath = $path . '.bands[' . $index . ']';
+        $band = systemConfigRequireObject($rawBand, $bandPath);
+        systemConfigAssertExactKeys($band, [
+            'fromSocPercent', 'toSocPercent', 'pricePercentile',
+            'activateWhenExpectedRefillBelowPercent',
+        ], $bandPath);
+        $from = systemConfigRequireInteger($band['fromSocPercent'], $bandPath . '.fromSocPercent', $minSoc, $maxSoc);
+        $to = systemConfigRequireInteger($band['toSocPercent'], $bandPath . '.toSocPercent', $minSoc, $maxSoc);
+        $percentile = systemConfigRequireNumber($band['pricePercentile'], $bandPath . '.pricePercentile', 0.0, 100.0);
+        $refill = systemConfigRequireNumber($band['activateWhenExpectedRefillBelowPercent'], $bandPath . '.activateWhenExpectedRefillBelowPercent', 0.0, 100.0);
+        if ($from >= $to) {
+            throw new SystemConfigException($bandPath . '.fromSocPercent must be lower than toSocPercent.');
+        }
+        if ($index === 0 && $from !== $minSoc) {
+            throw new SystemConfigException($bandPath . '.fromSocPercent must equal $.battery.minChargePercent.');
+        }
+        if ($previousTo !== null && $from !== $previousTo) {
+            throw new SystemConfigException($bandPath . '.fromSocPercent must equal the previous band toSocPercent.');
+        }
+        if ($previousPercentile !== null && $percentile >= $previousPercentile) {
+            throw new SystemConfigException($bandPath . '.pricePercentile must be lower than the deeper band percentile.');
+        }
+        if ($previousRefill !== null && $refill >= $previousRefill) {
+            throw new SystemConfigException($bandPath . '.activateWhenExpectedRefillBelowPercent must be lower than the deeper band boundary.');
+        }
+        $bands[] = [
+            'fromSocPercent' => $from,
+            'toSocPercent' => $to,
+            'pricePercentile' => $percentile,
+            'activateWhenExpectedRefillBelowPercent' => $refill,
+        ];
+        $previousTo = $to;
+        $previousPercentile = $percentile;
+        $previousRefill = $refill;
+    }
+    return [
+        'enabled' => $reserve['enabled'],
+        'priceHistoryDays' => systemConfigRequireInteger($reserve['priceHistoryDays'], $path . '.priceHistoryDays', 1),
+        'priceHistoryHalfLifeDays' => systemConfigRequireNumber($reserve['priceHistoryHalfLifeDays'], $path . '.priceHistoryHalfLifeDays', 0.0, null, true),
+        'referencePriceCapEurPerKwh' => systemConfigRequireNumber($reserve['referencePriceCapEurPerKwh'], $path . '.referencePriceCapEurPerKwh', 0.0),
+        'cheapGridChargePercentile' => systemConfigRequireNumber($reserve['cheapGridChargePercentile'], $path . '.cheapGridChargePercentile', 0.0, 100.0),
+        'bands' => $bands,
     ];
 }
 

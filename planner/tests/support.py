@@ -33,8 +33,16 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         arbitrage_min_spread_eur_per_kwh=0.12,
         round_trip_efficiency=0.85,
         battery_wear_cost_eur_per_kwh_discharged=0.0005,
-        low_soc_discharge_threshold_percent=0,
-        low_soc_discharge_cost_cents_per_kwh=0,
+        dynamic_reserve={
+            "enabled": False,
+            "priceHistoryDays": 21,
+            "priceHistoryHalfLifeDays": 7.0,
+            "referencePriceCapEurPerKwh": 0.8,
+            "cheapGridChargePercentile": 25.0,
+            "bands": [
+                {"fromSocPercent": 15, "toSocPercent": 25, "pricePercentile": 95.0, "activateWhenExpectedRefillBelowPercent": 100.0},
+            ],
+        },
         cheap_hour_tolerance_eur_per_kwh=0.01,
         expensive_hour_tolerance_eur_per_kwh=0.01,
         netzero_market_price_threshold_eur_per_kwh=0.18,

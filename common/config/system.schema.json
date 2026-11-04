@@ -26,6 +26,7 @@
         "minChargePercent",
         "maxChargePercent",
         "efficiency",
+        "dynamicReserve",
         "maxChargePowerW",
         "maxDischargePowerW"
       ],
@@ -64,16 +65,33 @@
           "type": "number",
           "minimum": 0
         },
-        "lowSocDischargeThresholdPercent": {
-          "description": "State-of-charge threshold below which the rolling optimizer applies the configured low-SoC discharge cost.",
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 100
-        },
-        "lowSocDischargeCostCentsPerKwh": {
-          "description": "Virtual cost in whole euro cents per AC-side kilowatt-hour discharged below the low-SoC threshold, used only by the rolling optimizer objective.",
-          "type": "integer",
-          "minimum": 0
+        "dynamicReserve": {
+          "description": "Refill-aware scarcity bands used by the rolling optimizer.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "priceHistoryDays", "priceHistoryHalfLifeDays", "referencePriceCapEurPerKwh", "cheapGridChargePercentile", "bands"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "priceHistoryDays": {"type": "integer", "minimum": 1},
+            "priceHistoryHalfLifeDays": {"type": "number", "exclusiveMinimum": 0},
+            "referencePriceCapEurPerKwh": {"type": "number", "minimum": 0},
+            "cheapGridChargePercentile": {"type": "number", "minimum": 0, "maximum": 100},
+            "bands": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["fromSocPercent", "toSocPercent", "pricePercentile", "activateWhenExpectedRefillBelowPercent"],
+                "properties": {
+                  "fromSocPercent": {"type": "integer", "minimum": 0, "maximum": 100},
+                  "toSocPercent": {"type": "integer", "minimum": 0, "maximum": 100},
+                  "pricePercentile": {"type": "number", "minimum": 0, "maximum": 100},
+                  "activateWhenExpectedRefillBelowPercent": {"type": "number", "minimum": 0, "maximum": 100}
+                }
+              }
+            }
+          }
         },
         "maxChargePowerW": {
           "description": "Maximum charge command magnitude in watts.",

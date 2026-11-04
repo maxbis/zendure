@@ -69,10 +69,7 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         battery_keys.add("roundTripEfficiency")
     if "wearCostEurPerKwhDischarged" in battery:
         battery_keys.add("wearCostEurPerKwhDischarged")
-    if "lowSocDischargeThresholdPercent" in battery:
-        battery_keys.add("lowSocDischargeThresholdPercent")
-    if "lowSocDischargeCostCentsPerKwh" in battery:
-        battery_keys.add("lowSocDischargeCostCentsPerKwh")
+    battery_keys.add("dynamicReserve")
     _assert_exact_keys(battery, battery_keys, "$.battery")
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
     min_charge_percent = _require_integer(
@@ -102,21 +99,9 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             "$.battery.wearCostEurPerKwhDischarged",
             0.0,
         )
-    low_soc_discharge_threshold_percent = None
-    if "lowSocDischargeThresholdPercent" in battery:
-        low_soc_discharge_threshold_percent = _require_integer(
-            battery["lowSocDischargeThresholdPercent"],
-            "$.battery.lowSocDischargeThresholdPercent",
-            min_charge_percent,
-            max_charge_percent,
-        )
-    low_soc_discharge_cost_cents_per_kwh = None
-    if "lowSocDischargeCostCentsPerKwh" in battery:
-        low_soc_discharge_cost_cents_per_kwh = _require_integer(
-            battery["lowSocDischargeCostCentsPerKwh"],
-            "$.battery.lowSocDischargeCostCentsPerKwh",
-            0,
-        )
+    dynamic_reserve = _validate_dynamic_reserve(
+        battery["dynamicReserve"], min_charge_percent, max_charge_percent
+    )
     max_charge_power_w = _require_integer(
         battery["maxChargePowerW"], "$.battery.maxChargePowerW", 1
     )
@@ -240,10 +225,7 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_battery["roundTripEfficiency"] = round_trip_efficiency
     if wear_cost_eur_per_kwh_discharged is not None:
         normalized_battery["wearCostEurPerKwhDischarged"] = wear_cost_eur_per_kwh_discharged
-    if low_soc_discharge_threshold_percent is not None:
-        normalized_battery["lowSocDischargeThresholdPercent"] = low_soc_discharge_threshold_percent
-    if low_soc_discharge_cost_cents_per_kwh is not None:
-        normalized_battery["lowSocDischargeCostCentsPerKwh"] = low_soc_discharge_cost_cents_per_kwh
+    normalized_battery["dynamicReserve"] = dynamic_reserve
 
     return {
         "schemaVersion": schema_version,
@@ -272,6 +254,53 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
             "consumerPrecision": consumer_precision,
             "spotPrecision": spot_precision,
         },
+    }
+
+
+def _validate_dynamic_reserve(value: Any, min_soc: int, max_soc: int) -> dict[str, Any]:
+    reserve = _require_object(value, "$.battery.dynamicReserve")
+    _assert_exact_keys(
+        reserve,
+        {"enabled", "priceHistoryDays", "priceHistoryHalfLifeDays", "referencePriceCapEurPerKwh", "cheapGridChargePercentile", "bands"},
+        "$.battery.dynamicReserve",
+    )
+    enabled = reserve["enabled"]
+    if not isinstance(enabled, bool):
+        raise SystemConfigError("$.battery.dynamicReserve.enabled must be a boolean.")
+    bands_raw = reserve["bands"]
+    if not isinstance(bands_raw, list) or not bands_raw:
+        raise SystemConfigError("$.battery.dynamicReserve.bands must be a non-empty array.")
+    bands = []
+    previous_to = None
+    previous_percentile = None
+    previous_refill = None
+    for index, raw_band in enumerate(bands_raw):
+        path = f"$.battery.dynamicReserve.bands[{index}]"
+        band = _require_object(raw_band, path)
+        _assert_exact_keys(band, {"fromSocPercent", "toSocPercent", "pricePercentile", "activateWhenExpectedRefillBelowPercent"}, path)
+        from_soc = _require_integer(band["fromSocPercent"], path + ".fromSocPercent", min_soc, max_soc)
+        to_soc = _require_integer(band["toSocPercent"], path + ".toSocPercent", min_soc, max_soc)
+        percentile = _require_number(band["pricePercentile"], path + ".pricePercentile", 0.0, 100.0)
+        refill = _require_number(band["activateWhenExpectedRefillBelowPercent"], path + ".activateWhenExpectedRefillBelowPercent", 0.0, 100.0)
+        if from_soc >= to_soc:
+            raise SystemConfigError(path + ".fromSocPercent must be lower than toSocPercent.")
+        if index == 0 and from_soc != min_soc:
+            raise SystemConfigError(path + ".fromSocPercent must equal $.battery.minChargePercent.")
+        if previous_to is not None and from_soc != previous_to:
+            raise SystemConfigError(path + ".fromSocPercent must equal the previous band toSocPercent.")
+        if previous_percentile is not None and percentile >= previous_percentile:
+            raise SystemConfigError(path + ".pricePercentile must be lower than the deeper band percentile.")
+        if previous_refill is not None and refill >= previous_refill:
+            raise SystemConfigError(path + ".activateWhenExpectedRefillBelowPercent must be lower than the deeper band boundary.")
+        bands.append({"fromSocPercent": from_soc, "toSocPercent": to_soc, "pricePercentile": percentile, "activateWhenExpectedRefillBelowPercent": refill})
+        previous_to, previous_percentile, previous_refill = to_soc, percentile, refill
+    return {
+        "enabled": enabled,
+        "priceHistoryDays": _require_integer(reserve["priceHistoryDays"], "$.battery.dynamicReserve.priceHistoryDays", 1),
+        "priceHistoryHalfLifeDays": _require_number(reserve["priceHistoryHalfLifeDays"], "$.battery.dynamicReserve.priceHistoryHalfLifeDays", 0.0, exclusive_minimum=True),
+        "referencePriceCapEurPerKwh": _require_number(reserve["referencePriceCapEurPerKwh"], "$.battery.dynamicReserve.referencePriceCapEurPerKwh", 0.0),
+        "cheapGridChargePercentile": _require_number(reserve["cheapGridChargePercentile"], "$.battery.dynamicReserve.cheapGridChargePercentile", 0.0, 100.0),
+        "bands": bands,
     }
 
 

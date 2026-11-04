@@ -582,11 +582,18 @@
         elements.generated.textContent = `Calculated ${formatRunTime(plan.generated_at)}`;
         elements.soc.textContent = `${Number(plan.starting_soc_percent).toFixed(1)}% → ${Number(plan.ending_soc_percent).toFixed(1)}%`;
         elements.efficiency.textContent = `${Math.round(Number(plan.round_trip_efficiency) * 100)}% round-trip efficiency`;
-        const reserveThreshold = Number(plan.low_soc_discharge_threshold_percent || 0);
-        const reserveCost = Number(plan.low_soc_discharge_cost_cents_per_kwh || 0);
-        elements.reservePolicy.textContent = reserveThreshold > 0 && reserveCost > 0
-            ? `${Math.round(reserveCost)} ct/kWh below ${Math.round(reserveThreshold)}% SoC`
-            : "Disabled";
+        const scarcity = plan.scarcity || {};
+        const refill = Number(scarcity.refill?.expected_refill_percent);
+        const activeBands = Array.isArray(scarcity.bands)
+            ? scarcity.bands.filter((band) => band.applied).length
+            : 0;
+        if (!scarcity.algorithm_enabled) {
+            elements.reservePolicy.textContent = "Scarcity bands disabled";
+        } else if (!scarcity.calculation_available) {
+            elements.reservePolicy.textContent = `Unavailable · ${scarcity.unavailable_reason || "missing inputs"}`;
+        } else {
+            elements.reservePolicy.textContent = `${activeBands} active band${activeBands === 1 ? "" : "s"} · ${refill.toFixed(1)}% predicted refill`;
+        }
         elements.cost.textContent = formatMoney(plan.expected_energy_cost_eur);
         elements.objective.textContent = formatMoney(plan.objective_eur);
         elements.differenceCount.textContent = `${differenceCount} of ${(plan.decisions || []).length}`;

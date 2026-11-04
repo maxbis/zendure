@@ -21,9 +21,11 @@ from planner.household_usage import select_household_usage
 from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
+    _scarcity_discharge_cost,
     build_rolling_boundaries,
     optimize_rolling_schedule,
 )
+from planner.scarcity import build_scarcity_context
 from planner.runtime_log import runtime_log_path, update_runtime_log
 
 
@@ -337,6 +339,8 @@ def _recalculate_plan_trajectory(
     )
     total_energy_cost = 0.0
     total_wear_cost = 0.0
+    total_scarcity_cost = 0.0
+    scarcity_bands = list((plan.get("scarcity") or {}).get("bands") or [])
 
     for decision in decisions:
         if not isinstance(decision, dict):
@@ -365,13 +369,22 @@ def _recalculate_plan_trajectory(
         grid_kwh = grid_power_w * duration_hours / 1000.0
         expected_cost = grid_kwh * (import_price if grid_kwh >= 0 else export_price)
         expected_wear_cost = max(0.0, -power_w) * duration_hours / 1000.0 * wear_rate
+        expected_scarcity_cost = _scarcity_discharge_cost(
+            start_energy_wh=energy_wh,
+            end_energy_wh=next_energy_wh,
+            capacity_wh=capacity_wh,
+            discharge_efficiency=efficiency,
+            bands=scarcity_bands,
+        )
         decision["start_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
         decision["end_soc_percent"] = round(next_energy_wh / capacity_wh * 100.0, 2)
         decision["grid_power_w"] = round(grid_power_w, 1)
         decision["expected_cost_eur"] = round(expected_cost, 6)
         decision["expected_battery_wear_cost_eur"] = round(expected_wear_cost, 6)
+        decision["expected_scarcity_cost_eur"] = round(expected_scarcity_cost, 6)
         total_energy_cost += expected_cost
         total_wear_cost += expected_wear_cost
+        total_scarcity_cost += expected_scarcity_cost
         energy_wh = next_energy_wh
 
     terminal_value = max(0.0, energy_wh - minimum_energy_wh) * terminal_value_per_excess_wh
@@ -384,8 +397,9 @@ def _recalculate_plan_trajectory(
     stabilized["ending_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
     stabilized["expected_energy_cost_eur"] = round(total_energy_cost, 6)
     stabilized["expected_battery_wear_cost_eur"] = round(total_wear_cost, 6)
+    stabilized["expected_scarcity_cost_eur"] = round(total_scarcity_cost, 6)
     stabilized["terminal_energy_value_eur"] = round(terminal_value, 6)
-    stabilized["objective_eur"] = round(total_energy_cost + total_wear_cost - terminal_value, 6)
+    stabilized["objective_eur"] = round(total_energy_cost + total_wear_cost + total_scarcity_cost - terminal_value, 6)
     return stabilized
 
 
@@ -529,6 +543,16 @@ def run_shadow_once(
         extend_to_midnight=extend_to_midnight,
         household_usage_w_by_hour=household_usage.values_w_by_hour,
     )
+    terminal_price = fmean(slot.import_price_eur_per_kwh for slot in slots)
+    scarcity = build_scarcity_context(
+        now=generated_at,
+        battery_state=battery_state,
+        slots=slots,
+        round_trip_efficiency=settings.round_trip_efficiency,
+        normal_terminal_price=terminal_price,
+        config=settings.dynamic_reserve,
+        price_root=settings.repo_root / "main" / "data" / "price",
+    )
     plan = optimize_rolling_schedule(
         now=generated_at,
         battery_state=battery_state,
@@ -540,12 +564,7 @@ def run_shadow_once(
         battery_wear_cost_eur_per_kwh_discharged=(
             settings.battery_wear_cost_eur_per_kwh_discharged
         ),
-        low_soc_discharge_threshold_percent=(
-            settings.low_soc_discharge_threshold_percent
-        ),
-        low_soc_discharge_cost_cents_per_kwh=(
-            settings.low_soc_discharge_cost_cents_per_kwh
-        ),
+        scarcity=scarcity,
     )
     payload = {
         "type": "optimizer_shadow_plan",
@@ -567,12 +586,7 @@ def run_shadow_once(
             "battery_wear_cost_eur_per_kwh_discharged": (
                 settings.battery_wear_cost_eur_per_kwh_discharged
             ),
-            "low_soc_discharge_threshold_percent": (
-                settings.low_soc_discharge_threshold_percent
-            ),
-            "low_soc_discharge_cost_cents_per_kwh": (
-                settings.low_soc_discharge_cost_cents_per_kwh
-            ),
+            "dynamic_reserve_enabled": settings.dynamic_reserve["enabled"],
             **household_usage.log_fields(),
             "solar_forecast_source": "global_tilted_irradiance",
             "solar_forecast_updated_at": solar_forecast_updated_at(shortwave, tz),

@@ -21,8 +21,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.active_hour_deadband_w, 0)
         self.assertEqual(settings.round_trip_efficiency, 0.85)
         self.assertEqual(settings.battery_wear_cost_eur_per_kwh_discharged, 0.0005)
-        self.assertEqual(settings.low_soc_discharge_threshold_percent, 26)
-        self.assertEqual(settings.low_soc_discharge_cost_cents_per_kwh, 10)
+        self.assertFalse(settings.dynamic_reserve["enabled"])
+        self.assertEqual(len(settings.dynamic_reserve["bands"]), 3)
         self.assertEqual(
             settings.household_usage_profile_path,
             settings.repo_root / "planner" / "data" / "household_usage_profile.json",
@@ -31,7 +31,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(len(settings.pv_panels), 6)
         self.assertEqual([(p.facing_degrees, p.tilt_degrees) for p in settings.pv_panels],
                          [(90.0, 15.0)] * 2 + [(270.0, 15.0)] * 2 + [(270.0, 35.0)] * 2)
-        self.assertEqual(settings.pv_monthly_correction_factors, (1.0,) * 12)
+        self.assertEqual(
+            settings.pv_monthly_correction_factors,
+            (0.9, 0.9, 0.9, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.9, 0.9),
+        )
 
     def test_active_hour_deadband_can_be_overridden(self) -> None:
         with patch.dict("os.environ", {"PLANNER_ACTIVE_HOUR_DEADBAND_W": "300"}):

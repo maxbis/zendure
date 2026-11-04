@@ -17,7 +17,7 @@ ending battery charge.
 - Forecast household consumption and solar production.
 - Energy lost while charging and discharging the battery.
 - A small allowance for battery wear when discharging.
-- An extra incentive to preserve charge when the battery is relatively low.
+- Refill-aware scarcity bands that preserve deeper battery energy when forecast solar and cheap grid charging cannot replenish it.
 
 Where a future electricity price has not been published, the optimizer
 temporarily uses today's price for the same clock hour. It recalculates when
@@ -35,7 +35,7 @@ The preferred sequence has the lowest combined expected value of:
 
 1. Electricity purchased, less income from exported electricity.
 2. Battery wear from discharge.
-3. An additional *virtual* cost for discharge below the low-charge threshold.
+3. An additional *virtual* cost for discharge through active scarcity bands.
 4. Less the estimated value of usable energy left in the battery at the end.
 
 The remaining-energy value prevents the optimizer from treating an almost empty
@@ -44,10 +44,11 @@ the minimum charge level using the average purchase price during the planning
 period, adjusted for the energy that can actually be delivered after losses.
 This is an estimated future value, not cash already earned.
 
-Battery wear and the low-charge cost influence the choice of plan. They are not
-electricity charges on the bill. The low-charge threshold is a **soft reserve**:
-discharging below it remains possible when the expected benefit outweighs its
-extra cost. The minimum allowed charge level is a hard limit.
+Battery wear and scarcity costs influence the choice of plan. They are not
+electricity charges on the bill. A scarcity band is a **soft reserve**:
+discharging through it remains possible when the expected benefit outweighs its
+additional value. Bands activate when predicted refill falls below their configured
+boundary. The minimum allowed charge level remains a hard limit.
 
 ## What the hourly decisions mean
 
@@ -97,7 +98,7 @@ based on the modeled power, not the full adaptive limit.
 - **Charging during a costly hour** can be rational if later energy is expected
   to be even more valuable, or if solar energy can be stored instead of exported.
 - **Keeping charge through a costly hour** can preserve energy for a still more
-  valuable hour or avoid the extra cost of discharging below the soft reserve.
+  valuable hour or avoid consuming an active scarcity band when refill is limited.
 - **Ending with energy in the battery** reflects the estimated value assigned
   to that remaining energy; the optimizer is not required to empty the battery
   at the planning boundary.
