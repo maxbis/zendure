@@ -17,6 +17,21 @@
 .scarcity-section__header { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .scarcity-section h2 { margin: 0; font-size: 1.05rem; }
 .scarcity-section__header p { max-width: 760px; margin: 4px 0 0; color: var(--gsd-text-muted); font-size: .78rem; line-height: 1.45; }
+.scarcity-forecast-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.scarcity-forecast-card { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 15px; border: 1px solid var(--gsd-border); border-radius: var(--gsd-radius-sm); background: var(--gsd-surface-2); }
+.scarcity-forecast-card--gross { border-color: color-mix(in srgb, var(--gsd-accent) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-accent-soft) 28%, var(--gsd-surface-2)); }
+.scarcity-forecast-card--outcome { border-color: color-mix(in srgb, var(--gsd-info) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-info-soft) 28%, var(--gsd-surface-2)); }
+.scarcity-forecast-card__eyebrow { color: var(--gsd-text-secondary); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.scarcity-forecast-card__value { color: var(--gsd-text); font-size: 1.65rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.scarcity-forecast-card > p, .scarcity-forecast-explanation p { margin: 0; color: var(--gsd-text-secondary); font-size: .75rem; line-height: 1.5; }
+.scarcity-forecast-card > small { color: var(--gsd-text-muted); font-size: .68rem; line-height: 1.45; }
+.scarcity-forecast-card__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 3px 0 0; }
+.scarcity-forecast-card__facts div { display: flex; justify-content: space-between; gap: 9px; padding: 7px 0; border-top: 1px solid var(--gsd-border); }
+.scarcity-forecast-card__facts .scarcity-forecast-card__wide { grid-column: 1 / -1; }
+.scarcity-forecast-card__facts dt { color: var(--gsd-text-muted); font-size: .68rem; }
+.scarcity-forecast-card__facts dd { margin: 0; color: var(--gsd-text); font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.scarcity-forecast-explanation { grid-column: 1 / -1; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 14px; align-items: baseline; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--gsd-info) 30%, var(--gsd-border)); border-radius: var(--gsd-radius-sm); background: color-mix(in srgb, var(--gsd-info-soft) 18%, var(--gsd-surface-2)); }
+.scarcity-forecast-explanation strong { color: var(--gsd-info); font-size: .75rem; }
 .scarcity-refill-bar { height: 10px; margin-bottom: 14px; overflow: hidden; border: 1px solid var(--gsd-border); border-radius: 999px; background: var(--gsd-surface-2); }
 .scarcity-refill-bar span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--gsd-accent); transition: width 180ms ease; }
 .scarcity-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
@@ -70,5 +85,5 @@
 .scarcity-empty { grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--gsd-text-muted); }
 .scarcity-explainer ol { display: grid; gap: 8px; margin: 0; padding-left: 22px; color: var(--gsd-text-secondary); font-size: .8rem; line-height: 1.5; }
 .scarcity-explainer .scarcity-section__header { align-items: center; }
-@media (max-width: 860px) { .scarcity-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .scarcity-details, .scarcity-bands { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .scarcity-shell { padding-inline: 10px; } .scarcity-summary { grid-template-columns: 1fr; } .scarcity-metric { min-height: 0; } .scarcity-topbar { align-items: flex-start; } .scarcity-topbar .app-topbar__actions .gsd-btn { display: none; } .scarcity-explainer .scarcity-section__header { align-items: flex-start; flex-direction: column; } .scarcity-percentile { padding: 11px; } .scarcity-percentile__legend { display: grid; grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .scarcity-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .scarcity-forecast-comparison, .scarcity-details, .scarcity-bands { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .scarcity-shell { padding-inline: 10px; } .scarcity-summary { grid-template-columns: 1fr; } .scarcity-metric { min-height: 0; } .scarcity-topbar { align-items: flex-start; } .scarcity-topbar .app-topbar__actions .gsd-btn { display: none; } .scarcity-explainer .scarcity-section__header { align-items: flex-start; flex-direction: column; } .scarcity-forecast-card__facts { grid-template-columns: 1fr; } .scarcity-forecast-card__facts .scarcity-forecast-card__wide { grid-column: auto; } .scarcity-forecast-explanation { grid-template-columns: 1fr; } .scarcity-percentile { padding: 11px; } .scarcity-percentile__legend { display: grid; grid-template-columns: 1fr; } }

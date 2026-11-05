@@ -10,6 +10,9 @@
         error: get("error"), errorMessage: get("error-message"), content: get("content"),
         banner: get("status-banner"), statusTitle: get("status-title"), statusCopy: get("status-copy"),
         algorithm: get("algorithm"), refillPercent: get("refill-percent"), appliedCount: get("applied-count"), age: get("age"),
+        grossRefillPercent: get("gross-refill-percent"), startingSoc: get("starting-soc"), maximumSoc: get("maximum-soc"),
+        currentGap: get("current-gap"), grossRefillPoints: get("gross-refill-points"), grossRefillCeiling: get("gross-refill-ceiling"),
+        endingSoc: get("ending-soc"), outcomeTime: get("outcome-time"), outcomeChange: get("outcome-change"),
         refillBar: get("refill-bar"), requiredRefill: get("required-refill"), solarRefill: get("solar-refill"),
         gridRefill: get("grid-refill"), totalRefill: get("total-refill"), refillFactor: get("refill-factor"), horizon: get("horizon"),
         terminalPrice: get("terminal-price"), cheapPrice: get("cheap-price"), historySource: get("history-source"),
@@ -32,6 +35,12 @@
     const money = (value) => finite(value) === null ? "—" : `€${Number(value).toFixed(4)}/kWh`;
     const energy = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(2)} kWh`;
     const percent = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(1)}%`;
+    const points = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(1)} pp`;
+    const signedPoints = (value) => {
+        const number = finite(value);
+        if (number === null) return "—";
+        return `${number > 0 ? "+" : number < 0 ? "−" : ""}${Math.abs(number).toFixed(1)} pp`;
+    };
     const dateTime = (value) => {
         if (!value) return "—";
         const date = new Date(value);
@@ -314,11 +323,13 @@
         const scarcity = payload.scarcity || {};
         const refill = scarcity.refill || {};
         const history = scarcity.price_history || {};
+        const outcome = payload.optimizerOutcome || {};
         const bands = Array.isArray(scarcity.bands) ? scarcity.bands : [];
         const applied = bands.filter((band) => band.applied).length;
         const refillValue = finite(refill.expected_refill_percent);
         elements.algorithm.textContent = scarcity.algorithm_enabled ? "Enabled" : "Disabled";
         elements.refillPercent.textContent = percent(refillValue);
+        elements.grossRefillPercent.textContent = percent(refillValue);
         elements.appliedCount.textContent = `${applied} of ${bands.length}`;
         elements.age.textContent = ageText(payload.ageSeconds);
         elements.meta.textContent = `Calculated ${dateTime(payload.generatedAt)} · automatic refresh every minute`;
@@ -329,6 +340,26 @@
         elements.totalRefill.textContent = energy(refill.predicted_total_refill_kwh);
         elements.refillFactor.textContent = finite(refill.expected_refill_factor) === null ? "—" : Number(refill.expected_refill_factor).toFixed(3);
         elements.horizon.textContent = refill.horizon_start ? `${dateTime(refill.horizon_start)} → ${dateTime(refill.horizon_end)}` : "—";
+        const startingSoc = finite(outcome.starting_soc_percent);
+        const maximumSoc = finite(outcome.maximum_soc_percent);
+        const endingSoc = finite(outcome.ending_soc_percent);
+        const capacityKwh = finite(outcome.battery_capacity_kwh);
+        const totalRefillKwh = finite(refill.predicted_total_refill_kwh);
+        const gapPoints = startingSoc === null || maximumSoc === null ? null : Math.max(0, maximumSoc - startingSoc);
+        const refillPoints = capacityKwh === null || capacityKwh <= 0 || totalRefillKwh === null
+            ? null
+            : totalRefillKwh / capacityKwh * 100;
+        const grossCeiling = startingSoc === null || refillPoints === null
+            ? null
+            : Math.min(maximumSoc ?? 100, startingSoc + refillPoints);
+        elements.startingSoc.textContent = percent(startingSoc);
+        elements.maximumSoc.textContent = percent(maximumSoc);
+        elements.currentGap.textContent = points(gapPoints);
+        elements.grossRefillPoints.textContent = points(refillPoints);
+        elements.grossRefillCeiling.textContent = percent(grossCeiling);
+        elements.endingSoc.textContent = percent(endingSoc);
+        elements.outcomeTime.textContent = dateTime(outcome.horizon_end);
+        elements.outcomeChange.textContent = startingSoc === null || endingSoc === null ? "—" : signedPoints(endingSoc - startingSoc);
         elements.terminalPrice.textContent = money(scarcity.normal_terminal_price_eur_per_kwh);
         elements.cheapPrice.textContent = money(scarcity.cheap_grid_charge_price_eur_per_kwh);
         elements.historySource.textContent = sourceLabel(history.source);
@@ -336,14 +367,17 @@
         elements.sampleCount.textContent = finite(history.sample_count) === null ? "—" : `${history.sample_count} hours`;
         elements.halfLife.textContent = finite(history.half_life_days) === null ? "—" : `${history.half_life_days} days`;
         bindRoleTooltip("algorithm", `Master scarcity-band switch from the shared system configuration. When enabled, active bands add virtual discharge cost to optimizer decisions; when disabled, bands remain diagnostic only.`);
-        bindRoleTooltip("refill-percent", `Predicted total refill divided by energy required, capped at 100%. It combines forecast solar surplus and cheap-grid charging opportunities across the optimizer horizon.`);
+        bindRoleTooltip("refill-percent", `Gross available refill divided by the battery's current energy gap, capped at 100%. It does not subtract future scheduled battery use and is not a predicted ending SoC.`);
+        bindRoleTooltip("gross-refill-percent", `Gross available refill divided by the battery's current energy gap. This is calculated before optimization and describes charging opportunity, not the final scheduled battery level.`);
+        bindRoleTooltip("gross-refill-ceiling", `Starting SoC plus gross refill opportunity, capped at maximum SoC. This is a hypothetical ceiling that assumes no intervening battery use.`);
+        bindRoleTooltip("ending-soc", `Optimizer-estimated absolute battery level at the end of the horizon after all planned charging and discharging decisions.`);
         bindRoleTooltip("applied-count", `Number of configured bands whose expected-refill condition is active and whose virtual cost is currently enabled by the master scarcity switch.`);
         bindRoleTooltip("age", `Elapsed time since the optimizer published this calculation. Derived from the plan’s generated timestamp and the current browser time.`);
         bindRoleTooltip("required-refill", `Usable battery capacity needed to move from the current live SoC to the configured maximum SoC: capacity × (maximum SoC − current SoC).`);
         bindRoleTooltip("solar-refill", `Forecast battery energy recoverable from PV surplus after predicted household load, maximum charging power and charging efficiency are applied.`);
         bindRoleTooltip("grid-refill", `Forecast battery energy available from grid charging in horizon slots whose consumer price is at or below the historical cheap-grid boundary.`);
-        bindRoleTooltip("total-refill", `Solar refill plus cheap-grid refill, capped at the energy required to reach the configured maximum SoC.`);
-        bindRoleTooltip("refill-factor", `Decimal form of predicted refill: total predicted refill ÷ energy required. A value of 1.000 means the missing energy can be fully restored within the horizon.`);
+        bindRoleTooltip("total-refill", `Solar refill plus cheap-grid refill, capped at the current energy gap. Future scheduled battery use is not subtracted.`);
+        bindRoleTooltip("refill-factor", `Decimal coverage of the current gap: gross available refill ÷ current energy gap. A value of 1.000 means enough charging opportunity exists to restore the current gap, not that ending SoC will be 100%.`);
         bindRoleTooltip("horizon", `Start and end of the slots examined for predicted solar and cheap-grid refill. Derived from the current rolling optimizer plan.`);
         bindRoleTooltip("terminal-price", `Arithmetic mean of consumer/import prices across all slots in the current optimizer horizon. This forward-looking baseline values stored energy at the end of the forecast; it does not come from historical percentiles.`);
         bindRoleTooltip("cheap-price", `Recency-weighted P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} consumer price from completed historical hours. Horizon prices at or below this value qualify as cheap-grid refill opportunities.`);

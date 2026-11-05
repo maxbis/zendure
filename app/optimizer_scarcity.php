@@ -69,20 +69,49 @@ $pageConfig = [
 
             <section class="scarcity-summary" aria-label="Scarcity calculation summary">
                 <article class="gsd-card scarcity-metric"><span>Algorithm</span><strong data-role="algorithm">—</strong><small>Whether active bands influence optimizer decisions.</small></article>
-                <article class="gsd-card scarcity-metric"><span>Expected refill</span><strong data-role="refill-percent">—</strong><small>The share of missing battery energy expected to be restored.</small></article>
+                <article class="gsd-card scarcity-metric"><span>Gross refill coverage</span><strong data-role="refill-percent">—</strong><small>Charging opportunities as a share of the current gap to maximum. Not an ending SoC.</small></article>
                 <article class="gsd-card scarcity-metric"><span>Applied bands</span><strong data-role="applied-count">—</strong><small>Active bands currently adding virtual discharge cost.</small></article>
                 <article class="gsd-card scarcity-metric"><span>Calculation age</span><strong data-role="age">—</strong><small>Age of the published optimizer calculation.</small></article>
             </section>
 
             <section class="gsd-card scarcity-section" aria-labelledby="refill-title">
-                <div class="scarcity-section__header"><div><h2 id="refill-title">Predicted refill</h2><p>How much of the energy missing below maximum SoC can be restored during this optimizer horizon.</p></div></div>
+                <div class="scarcity-section__header"><div><h2 id="refill-title">Refill opportunity vs optimized outcome</h2><p>Gross refill measures available charging energy before optimization. The optimized outcome includes every scheduled charge and discharge.</p></div></div>
+                <div class="scarcity-forecast-comparison">
+                    <article class="scarcity-forecast-card scarcity-forecast-card--gross">
+                        <span class="scarcity-forecast-card__eyebrow">Gross refill opportunity</span>
+                        <strong class="scarcity-forecast-card__value" data-role="gross-refill-percent">—</strong>
+                        <p>Share of the battery's current gap to maximum that forecast charging opportunities could restore.</p>
+                        <dl class="scarcity-forecast-card__facts">
+                            <div><dt>Starting SoC</dt><dd data-role="starting-soc">—</dd></div>
+                            <div><dt>Maximum SoC</dt><dd data-role="maximum-soc">—</dd></div>
+                            <div><dt>Current gap</dt><dd data-role="current-gap">—</dd></div>
+                            <div><dt>Gross refill</dt><dd data-role="gross-refill-points">—</dd></div>
+                            <div class="scarcity-forecast-card__wide"><dt>Gross-only SoC ceiling</dt><dd data-role="gross-refill-ceiling">—</dd></div>
+                        </dl>
+                        <small>Assumes no battery energy is consumed while these opportunities occur.</small>
+                    </article>
+                    <article class="scarcity-forecast-card scarcity-forecast-card--outcome">
+                        <span class="scarcity-forecast-card__eyebrow">Optimized horizon outcome</span>
+                        <strong class="scarcity-forecast-card__value" data-role="ending-soc">—</strong>
+                        <p>Estimated absolute battery level after applying the optimizer's complete charging and discharging schedule.</p>
+                        <dl class="scarcity-forecast-card__facts">
+                            <div class="scarcity-forecast-card__wide"><dt>Outcome time</dt><dd data-role="outcome-time">—</dd></div>
+                            <div class="scarcity-forecast-card__wide"><dt>Net SoC change</dt><dd data-role="outcome-change">—</dd></div>
+                        </dl>
+                        <small>This is the schedule outcome for the end of the optimizer horizon, not the gross refill ceiling.</small>
+                    </article>
+                    <aside class="scarcity-forecast-explanation">
+                        <strong>Why are these values different?</strong>
+                        <p>Gross refill is calculated before the optimizer chooses its schedule. It counts available solar and cheap-grid charging but does not subtract future battery use. The optimized outcome is the net result after all planned charging and discharging.</p>
+                    </aside>
+                </div>
                 <div class="scarcity-refill-bar" aria-hidden="true"><span data-role="refill-bar"></span></div>
                 <dl class="scarcity-details">
-                    <div><dt>Energy required</dt><dd data-role="required-refill">—</dd><small>Energy needed to reach the configured maximum SoC.</small></div>
+                    <div><dt>Current energy gap</dt><dd data-role="required-refill">—</dd><small>Energy needed at calculation time to reach the configured maximum SoC.</small></div>
                     <div><dt>Solar refill</dt><dd data-role="solar-refill">—</dd><small>Usable forecast solar surplus after charging limits and efficiency.</small></div>
                     <div><dt>Cheap-grid refill</dt><dd data-role="grid-refill">—</dd><small>Available charging in hours priced below the cheap-grid boundary.</small></div>
-                    <div><dt>Total predicted refill</dt><dd data-role="total-refill">—</dd><small>Solar and cheap-grid opportunities combined, capped at required energy.</small></div>
-                    <div><dt>Refill factor</dt><dd data-role="refill-factor">—</dd><small>The decimal form used to derive the expected refill percentage.</small></div>
+                    <div><dt>Gross available refill</dt><dd data-role="total-refill">—</dd><small>Solar and cheap-grid opportunities combined, before subtracting scheduled battery use.</small></div>
+                    <div><dt>Coverage of current gap</dt><dd data-role="refill-factor">—</dd><small>Gross available refill divided by the current energy gap.</small></div>
                     <div><dt>Forecast horizon</dt><dd data-role="horizon">—</dd><small>The period searched for solar and cheap-grid charging opportunities.</small></div>
                 </dl>
             </section>
