@@ -267,17 +267,14 @@
     function priceReferences(scarcity, bands) {
         return [{
             label: `P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} cheap-grid boundary`,
-            badgeLabel: `P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} · Cheap`,
             price: finite(scarcity.cheap_grid_charge_price_eur_per_kwh),
             state: "cheap"
         }].concat(bands.map((band) => ({
             label: `P${Number(band.price_percentile).toFixed(0)} ${band.from_soc_percent}–${band.to_soc_percent}% SoC`,
-            badgeLabel: `P${Number(band.price_percentile).toFixed(0)} · ${band.from_soc_percent}–${band.to_soc_percent}%`,
             price: finite(band.reference_price_eur_per_kwh),
             state: band.applied ? "applied" : "band"
         })), [{
             label: "Horizon average",
-            badgeLabel: "Average",
             price: finite(scarcity.normal_terminal_price_eur_per_kwh),
             state: "terminal"
         }]).filter((reference) => reference.price !== null);
@@ -301,31 +298,10 @@
 
         const compact = root.clientWidth <= 560;
         const width = Math.min(960, Math.max(320, root.clientWidth - (compact ? 42 : 60)));
-        const baseHeight = compact ? 250 : 270;
-        const baseMargin = compact
+        const height = compact ? 250 : 270;
+        const margin = compact
             ? { top: 20, right: 12, bottom: 48, left: 52 }
             : { top: 24, right: 24, bottom: 50, left: 66 };
-        const visibleReferences = priceReferences(scarcity, bands)
-            .filter((reference) => reference.price >= buckets[0].from && reference.price <= buckets[buckets.length - 1].to)
-            .map((reference) => {
-                const shortLabel = compact ? reference.badgeLabel.split(" · ")[0] : reference.badgeLabel;
-                const badgeText = `${shortLabel} · ${(reference.price * 100).toFixed(1)} ct`;
-                return { ...reference, badgeText, badgeWidth: Math.max(58, Math.min(126, 14 + badgeText.length * 5.5)) };
-            });
-        const referenceSpan = Math.max(0.000001, buckets[buckets.length - 1].to - buckets[0].from);
-        const referenceX = (price) => baseMargin.left + ((price - buckets[0].from) / referenceSpan) * (width - baseMargin.left - baseMargin.right);
-        const rowEnds = [];
-        visibleReferences.sort((a, b) => a.price - b.price).forEach((reference) => {
-            reference.markerX = referenceX(reference.price);
-            reference.badgeLeft = Math.max(baseMargin.left, Math.min(reference.markerX - reference.badgeWidth / 2, width - baseMargin.right - reference.badgeWidth));
-            let row = rowEnds.findIndex((right) => reference.badgeLeft >= right + 5);
-            if (row < 0) row = rowEnds.length;
-            reference.badgeRow = row;
-            rowEnds[row] = reference.badgeLeft + reference.badgeWidth;
-        });
-        const badgeRows = Math.max(1, rowEnds.length);
-        const margin = { ...baseMargin, top: 12 + badgeRows * 22 + 8 };
-        const height = baseHeight + margin.top - baseMargin.top;
         const plotWidth = width - margin.left - margin.right;
         const plotHeight = height - margin.top - margin.bottom;
         const minimum = buckets[0].from;
@@ -371,33 +347,16 @@
             bindTooltip(bar, copy);
         });
 
-        visibleReferences.forEach((reference) => {
+        priceReferences(scarcity, bands).forEach((reference) => {
+            if (reference.price < minimum || reference.price > maximum) return;
             const markerX = x(reference.price);
             const marker = svgElement("line", {
                 x1: markerX, y1: margin.top, x2: markerX, y2: height - margin.bottom,
-                class: `scarcity-distribution__reference scarcity-distribution__reference--${reference.state}`
+                class: `scarcity-distribution__reference scarcity-distribution__reference--${reference.state}`,
+                tabindex: "0"
             });
             svg.appendChild(marker);
-
-            const badgeY = 12 + reference.badgeRow * 22;
-            const badge = svgElement("g", {
-                class: `scarcity-distribution__badge scarcity-distribution__badge--${reference.state}`,
-                tabindex: "0", role: "img", "aria-label": `${reference.label}: ${money(reference.price)}`
-            });
-            badge.appendChild(svgElement("line", {
-                x1: markerX, y1: badgeY + 18, x2: markerX, y2: margin.top,
-                class: "scarcity-distribution__badge-stem"
-            }));
-            badge.appendChild(svgElement("rect", {
-                x: reference.badgeLeft, y: badgeY, width: reference.badgeWidth, height: 18, rx: 9
-            }));
-            const badgeText = svgElement("text", {
-                x: reference.badgeLeft + reference.badgeWidth / 2, y: badgeY + 12.2, "text-anchor": "middle"
-            });
-            badgeText.textContent = reference.badgeText;
-            badge.appendChild(badgeText);
-            svg.appendChild(badge);
-            bindTooltip(badge, `${reference.label}: ${money(reference.price)}.`);
+            bindTooltip(marker, `${reference.label}: ${money(reference.price)}.`);
         });
 
         elements.distributionChart.appendChild(svg);

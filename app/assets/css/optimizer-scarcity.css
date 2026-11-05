@@ -84,18 +84,6 @@
 .scarcity-distribution__reference--cheap { stroke: var(--gsd-positive); }
 .scarcity-distribution__reference--applied { stroke: var(--gsd-warning); }
 .scarcity-distribution__reference--terminal { stroke: var(--gsd-info); stroke-dasharray: 7 4; }
-.scarcity-distribution__badge { color: var(--gsd-neutral); cursor: help; }
-.scarcity-distribution__badge--cheap { color: var(--gsd-positive); }
-.scarcity-distribution__badge--applied { color: var(--gsd-warning); }
-.scarcity-distribution__badge--terminal { color: var(--gsd-info); }
-.scarcity-distribution__badge rect { fill: var(--gsd-surface-3); stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.scarcity-distribution__badge--cheap rect { fill: var(--gsd-positive-soft); }
-.scarcity-distribution__badge--applied rect { fill: var(--gsd-warning-soft); }
-.scarcity-distribution__badge--terminal rect { fill: var(--gsd-info-soft); }
-.scarcity-distribution__badge text { fill: currentColor; font-size: 7.5px; font-weight: 700; letter-spacing: .015em; pointer-events: none; }
-.scarcity-distribution__badge-stem { stroke: currentColor; stroke-width: 1; stroke-dasharray: 2 2; opacity: .72; vector-effect: non-scaling-stroke; pointer-events: none; }
-.scarcity-distribution__badge:focus { outline: none; }
-.scarcity-distribution__badge:hover rect, .scarcity-distribution__badge:focus rect { fill: var(--gsd-surface-1); stroke-width: 2; }
 .scarcity-distribution__note { padding-top: 9px; border-top: 1px solid var(--gsd-border); }
 .scarcity-bands-section { padding: 4px 0 0; }
 .scarcity-bands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
