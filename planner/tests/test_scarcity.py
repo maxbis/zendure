@@ -9,12 +9,21 @@ from zoneinfo import ZoneInfo
 
 from planner.models import BatteryState
 from planner.rolling_optimizer import RollingInputSlot
-from planner.scarcity import build_scarcity_context, weighted_percentile
+from planner.scarcity import build_price_distribution, build_scarcity_context, weighted_percentile
 
 
 class ScarcityTests(unittest.TestCase):
     def test_weighted_percentile_respects_weights(self) -> None:
         self.assertEqual(weighted_percentile([(0.10, 1.0), (0.50, 9.0)], 75), 0.50)
+
+    def test_price_distribution_reports_hours_and_weighted_share(self) -> None:
+        distribution = build_price_distribution([(0.10, 1.0), (0.11, 1.0), (0.30, 8.0)], target_bins=10)
+        buckets = distribution["buckets"]
+        self.assertEqual(distribution["sample_count"], 3)
+        self.assertEqual(sum(bucket["hour_count"] for bucket in buckets), 3)
+        self.assertAlmostEqual(sum(bucket["raw_percent"] for bucket in buckets), 100.0, places=4)
+        self.assertAlmostEqual(sum(bucket["weighted_percent"] for bucket in buckets), 100.0, places=4)
+        self.assertEqual(buckets[-1]["cumulative_weighted_percent"], 100.0)
 
     def test_context_reports_refill_and_applies_matching_bands(self) -> None:
         tz = ZoneInfo("Europe/Amsterdam")
@@ -55,6 +64,8 @@ class ScarcityTests(unittest.TestCase):
         self.assertEqual(len(context["price_percentile_curve"]), 21)
         self.assertEqual(context["price_percentile_curve"][0]["percentile"], 0.0)
         self.assertEqual(context["price_percentile_curve"][-1]["percentile"], 100.0)
+        self.assertEqual(context["price_distribution"]["sample_count"], 168)
+        self.assertEqual(sum(bucket["hour_count"] for bucket in context["price_distribution"]["buckets"]), 168)
         self.assertEqual(context["cheap_grid_charge_percentile"], 25.0)
         self.assertEqual(
             context["price_percentile_curve"][5]["price_eur_per_kwh"],

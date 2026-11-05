@@ -12,6 +12,7 @@ from planner.rolling_optimizer import RollingInputSlot
 
 
 MINIMUM_HISTORY_SAMPLES = 168
+PRICE_DISTRIBUTION_TARGET_BINS = 24
 
 
 def _load_env_file(path: Path) -> None:
@@ -40,6 +41,52 @@ def weighted_percentile(rows: Sequence[tuple[float, float]], percentile: float) 
         if cumulative >= target:
             return value
     return ordered[-1][0]
+
+
+def build_price_distribution(
+    rows: Sequence[tuple[float, float]], *, target_bins: int = PRICE_DISTRIBUTION_TARGET_BINS
+) -> dict[str, Any]:
+    values = [(float(value), float(weight)) for value, weight in rows if weight > 0]
+    if not values:
+        return {"bin_width_eur_per_kwh": None, "sample_count": 0, "buckets": []}
+
+    minimum = min(value for value, _weight in values)
+    maximum = max(value for value, _weight in values)
+    raw_width = max(0.001, (maximum - minimum) / max(1, target_bins))
+    magnitude = 10.0 ** math.floor(math.log10(raw_width))
+    normalized = raw_width / magnitude
+    nice_factor = min((1.0, 2.0, 2.5, 5.0, 10.0), key=lambda candidate: abs(math.log(normalized / candidate)))
+    width = nice_factor * magnitude
+    lower = math.floor(minimum / width) * width
+    upper = math.ceil(maximum / width) * width
+    if upper <= lower:
+        upper = lower + width
+    bucket_count = max(1, int(round((upper - lower) / width)))
+    buckets = [{"hour_count": 0, "weight": 0.0} for _index in range(bucket_count)]
+    for value, weight in values:
+        index = min(bucket_count - 1, max(0, int(math.floor((value - lower) / width))))
+        buckets[index]["hour_count"] += 1
+        buckets[index]["weight"] += weight
+
+    total_count = len(values)
+    total_weight = sum(weight for _value, weight in values)
+    cumulative_weight = 0.0
+    published = []
+    for index, bucket in enumerate(buckets):
+        cumulative_weight += bucket["weight"]
+        published.append({
+            "from_eur_per_kwh": round(lower + index * width, 6),
+            "to_eur_per_kwh": round(lower + (index + 1) * width, 6),
+            "hour_count": bucket["hour_count"],
+            "raw_percent": round(bucket["hour_count"] / total_count * 100.0, 6),
+            "weighted_percent": round(bucket["weight"] / total_weight * 100.0, 6),
+            "cumulative_weighted_percent": round(cumulative_weight / total_weight * 100.0, 6),
+        })
+    return {
+        "bin_width_eur_per_kwh": round(width, 6),
+        "sample_count": total_count,
+        "buckets": published,
+    }
 
 
 def load_weighted_price_history(
@@ -232,6 +279,7 @@ def build_scarcity_context(
         }
         for percentile in range(0, 101, 5)
     ]
+    price_distribution = build_price_distribution(rows)
     refill = _predicted_refill(
         battery_state,
         slots,
@@ -259,6 +307,7 @@ def build_scarcity_context(
         "cheap_grid_charge_percentile": float(config["cheapGridChargePercentile"]),
         "cheap_grid_charge_price_eur_per_kwh": cheap_price,
         "price_percentile_curve": percentile_curve,
+        "price_distribution": price_distribution,
         "refill": {**refill, "horizon_start": slots[0].start.isoformat(), "horizon_end": slots[-1].end.isoformat()},
         "bands": bands,
     })

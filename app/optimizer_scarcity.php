@@ -143,6 +143,17 @@ $pageConfig = [
                     <div class="scarcity-percentile__chart" data-role="percentile-chart"></div>
                     <div class="scarcity-percentile__legend" data-role="percentile-legend" aria-label="Price percentile references"></div>
                 </div>
+                <div class="scarcity-distribution" data-role="distribution-panel" hidden>
+                    <div class="scarcity-distribution__header">
+                        <div><h3>Historical price distribution</h3><p>How often completed historical hourly consumer prices occurred. Weighted share matches the recency weighting used by scarcity.</p></div>
+                        <div class="scarcity-distribution__modes" role="group" aria-label="Price distribution scale">
+                            <button type="button" data-distribution-mode="weighted" aria-pressed="true">Weighted share</button>
+                            <button type="button" data-distribution-mode="hours" aria-pressed="false">Actual hours</button>
+                        </div>
+                    </div>
+                    <div class="scarcity-distribution__chart" data-role="distribution-chart"></div>
+                    <p class="scarcity-distribution__note" data-role="distribution-note">—</p>
+                </div>
             </section>
 
             <section class="scarcity-section scarcity-bands-section" aria-labelledby="bands-title">
