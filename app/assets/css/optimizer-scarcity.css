@@ -81,9 +81,8 @@
 .scarcity-distribution__bar { fill: color-mix(in srgb, var(--gsd-price) 68%, var(--gsd-accent)); stroke: color-mix(in srgb, var(--gsd-price) 80%, var(--gsd-border)); stroke-width: 1; vector-effect: non-scaling-stroke; transition: opacity var(--gsd-duration-fast) ease; }
 .scarcity-distribution__bar:hover, .scarcity-distribution__bar:focus { opacity: .72; outline: none; }
 .scarcity-distribution__reference { stroke: var(--gsd-neutral); stroke-width: 2; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
-.scarcity-distribution__reference--cheap { stroke: var(--gsd-positive); }
-.scarcity-distribution__reference--applied { stroke: var(--gsd-warning); }
-.scarcity-distribution__reference--terminal { stroke: var(--gsd-info); stroke-dasharray: 7 4; }
+.scarcity-distribution__reference--percentile { stroke: var(--gsd-neutral); }
+.scarcity-distribution__reference--average { stroke: var(--gsd-info); stroke-dasharray: 7 4; }
 .scarcity-distribution__note { padding-top: 9px; border-top: 1px solid var(--gsd-border); }
 .scarcity-bands-section { padding: 4px 0 0; }
 .scarcity-bands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

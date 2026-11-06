@@ -264,23 +264,30 @@
         elements.percentilePanel.hidden = false;
     }
 
-    function priceReferences(scarcity, bands) {
-        return [{
-            label: `P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} cheap-grid boundary`,
-            price: finite(scarcity.cheap_grid_charge_price_eur_per_kwh),
-            state: "cheap"
-        }].concat(bands.map((band) => ({
-            label: `P${Number(band.price_percentile).toFixed(0)} ${band.from_soc_percent}–${band.to_soc_percent}% SoC`,
-            price: finite(band.reference_price_eur_per_kwh),
-            state: band.applied ? "applied" : "band"
-        })), [{
+    function distributionReferences(scarcity) {
+        const percentilePrices = new Map(
+            (Array.isArray(scarcity.price_percentile_curve) ? scarcity.price_percentile_curve : [])
+                .map((point) => [finite(point.percentile), finite(point.price_eur_per_kwh)])
+                .filter(([percentile, price]) => percentile !== null && price !== null)
+        );
+        const references = [{
             label: "Horizon average",
             price: finite(scarcity.normal_terminal_price_eur_per_kwh),
-            state: "terminal"
-        }]).filter((reference) => reference.price !== null);
+            state: "average",
+            tooltip: "Arithmetic mean of consumer/import prices across the current optimizer horizon."
+        }];
+        [25, 50, 75, 90].forEach((percentile) => {
+            references.push({
+                label: `P${percentile}`,
+                price: percentilePrices.get(percentile) ?? null,
+                state: "percentile",
+                tooltip: `Recency-weighted P${percentile} consumer price from completed historical hourly samples.`
+            });
+        });
+        return references.filter((reference) => reference.price !== null);
     }
 
-    function renderPriceDistribution(scarcity, bands) {
+    function renderPriceDistribution(scarcity) {
         const distribution = scarcity.price_distribution || {};
         const buckets = (Array.isArray(distribution.buckets) ? distribution.buckets : []).map((bucket) => ({
             from: finite(bucket.from_eur_per_kwh),
@@ -347,7 +354,7 @@
             bindTooltip(bar, copy);
         });
 
-        priceReferences(scarcity, bands).forEach((reference) => {
+        distributionReferences(scarcity).forEach((reference) => {
             if (reference.price < minimum || reference.price > maximum) return;
             const markerX = x(reference.price);
             const marker = svgElement("line", {
@@ -355,8 +362,11 @@
                 class: `scarcity-distribution__reference scarcity-distribution__reference--${reference.state}`,
                 tabindex: "0"
             });
+            const title = svgElement("title");
+            title.textContent = `${reference.label}: ${money(reference.price)}`;
+            marker.appendChild(title);
             svg.appendChild(marker);
-            bindTooltip(marker, `${reference.label}: ${money(reference.price)}.`);
+            bindTooltip(marker, `${reference.tooltip} Current value: ${money(reference.price)}.`);
         });
 
         elements.distributionChart.appendChild(svg);
@@ -490,7 +500,7 @@
         bindRoleTooltip("sample-count", `Number of finite hourly consumer-price observations loaded for the historical window. At least 168 samples are required before scarcity percentiles are calculated.`);
         bindRoleTooltip("half-life", `Recency weighting applied to historical prices: weight = 0.5^(age in days ÷ half-life). A ${history.half_life_days}-day-old price receives half the weight of the newest completed day.`);
         renderPercentileChart(scarcity, bands);
-        renderPriceDistribution(scarcity, bands);
+        renderPriceDistribution(scarcity);
         elements.bands.replaceChildren();
         if (bands.length) bands.forEach(appendBand);
         else {
@@ -545,7 +555,7 @@
             root.querySelectorAll("[data-distribution-mode]").forEach((candidate) => {
                 candidate.setAttribute("aria-pressed", String(candidate.dataset.distributionMode === distributionMode));
             });
-            if (chartState) renderPriceDistribution(chartState.scarcity, chartState.bands);
+            if (chartState) renderPriceDistribution(chartState.scarcity);
         });
     });
     document.addEventListener("pointerdown", (event) => {
@@ -560,7 +570,7 @@
         chartResizeTimer = window.setTimeout(() => {
             if (chartState && !elements.percentilePanel.hidden) {
                 renderPercentileChart(chartState.scarcity, chartState.bands);
-                renderPriceDistribution(chartState.scarcity, chartState.bands);
+                renderPriceDistribution(chartState.scarcity);
             }
         }, 120);
     });
