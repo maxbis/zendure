@@ -120,7 +120,9 @@ def _battery_flow(
         "battery_export_revenue_milli_eur": export_revenue,
         "battery_flow_pnl_milli_eur": home_savings + export_revenue - charge_cost,
         "battery_pnl_status": "complete",
-        "battery_pnl_method_version": 2,
+        "battery_pnl_method_version": 3,
+        "battery_pnl_estimation_basis": "schedule_self_consumption",
+        "battery_pnl_confidence": "high",
     }
 
 
@@ -257,7 +259,7 @@ def test_incomplete_battery_hour_keeps_covered_values_and_marks_day_partial() ->
         discharge_export=0, charge_cost=0, home_savings=0,
         export_revenue=0,
     )
-    incomplete["battery_pnl_status"] = "missing_home_load"
+    incomplete["battery_pnl_status"] = "missing_schedule"
     payload = _build_payload([_row(0, battery_flow=complete), _row(1, battery_flow=incomplete)])
     flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
     assert flow["complete"] is False
@@ -265,7 +267,7 @@ def test_incomplete_battery_hour_keeps_covered_values_and_marks_day_partial() ->
     assert flow["elapsedHours"] == 2
     assert flow["valuedHours"] == 1
     assert flow["missingHours"] == ["2026-08-01 01:00"]
-    assert flow["reasons"] == ["missing_home_load"]
+    assert flow["reasons"] == ["missing_schedule"]
     assert flow["chargeGridWh"] == 1000
     assert flow["pnlMilliEur"] == -150
 
@@ -276,7 +278,7 @@ def test_battery_pnl_stays_unavailable_when_no_hour_can_be_valued() -> None:
         discharge_export=0, charge_cost=0, home_savings=0,
         export_revenue=0,
     )
-    incomplete["battery_pnl_status"] = "missing_home_load"
+    incomplete["battery_pnl_status"] = "missing_schedule"
     flow = _build_payload([_row(0, battery_flow=incomplete)])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
     assert flow["complete"] is False
     assert flow["partial"] is False
@@ -285,62 +287,33 @@ def test_battery_pnl_stays_unavailable_when_no_hour_can_be_valued() -> None:
     assert flow["pnlMilliEur"] is None
 
 
-def test_unclassified_discharge_uses_lower_hourly_price_and_covers_charge_cost() -> None:
-    classified = _battery_flow(
-        charge_grid=1000, charge_solar=0, discharge_home=500,
-        discharge_export=0, charge_cost=300, home_savings=150,
+def test_schedule_estimates_are_aggregated_without_a_second_conservative_calculation() -> None:
+    self_consumption = _battery_flow(
+        charge_grid=0, charge_solar=0, discharge_home=750,
+        discharge_export=0, charge_cost=0, home_savings=300,
         export_revenue=0,
     )
-    unclassified = {
-        "battery_charge_grid_wh": 200,
-        "battery_charge_surplus_wh": 300,
-        "battery_pnl_status": "missing_home_load",
-        "battery_pnl_method_version": 2,
-    }
-    payload = _build_payload([
-        _row(0, charged_wh=1000, discharged_wh=500, battery_flow=classified),
-        _row(1, charged_wh=500, discharged_wh=1000, consumer=0.40, spot=0.10,
-             battery_flow=unclassified),
-        _row(2, discharged_wh=1000, consumer=0.20, spot=0.30,
-             battery_flow={"battery_pnl_status": "missing_home_load"}),
-    ])
-    flow = payload["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
-    estimate = flow["conservative"]
-    assert flow["valuedHours"] == 1
-    assert flow["pnlMilliEur"] == -150  # Classified-hours total remains separate.
-    assert estimate["unclassifiedWh"] == 2000
-    assert estimate["unclassifiedValueMilliEur"] == 300  # 1000 Wh at 0.10 and 0.20.
-    assert estimate["chargeGridWh"] == 1200
-    assert estimate["chargeSurplusWh"] == 300
-    assert estimate["chargeCostMilliEur"] == 410
-    assert estimate["dischargeValueMilliEur"] == 450
-    assert estimate["pnlMilliEur"] == 40
-    assert estimate["complete"] is True
-
-
-def test_conservative_discharge_can_be_negative_and_missing_charge_blocks_pnl() -> None:
+    fixed = _battery_flow(
+        charge_grid=0, charge_solar=0, discharge_home=300,
+        discharge_export=700, charge_cost=0, home_savings=120,
+        export_revenue=105,
+    )
+    fixed["battery_pnl_estimation_basis"] = "schedule_fixed_discharge"
+    fixed["battery_pnl_confidence"] = "medium"
     flow = _build_payload([
-        _row(0, charged_wh=100, discharged_wh=1000, consumer=0.30, spot=-0.05,
-             battery_flow={"battery_pnl_status": "missing_home_load"}),
+        _row(0, discharged_wh=750, battery_flow=self_consumption),
+        _row(1, discharged_wh=1000, battery_flow=fixed),
     ])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
-    estimate = flow["conservative"]
-    assert estimate["unclassifiedValueMilliEur"] == -50
-    assert estimate["dischargeValueMilliEur"] == -50
-    assert estimate["chargeComplete"] is False
-    assert estimate["pnlMilliEur"] is None
 
-
-def test_conservative_value_is_available_without_any_classified_hours() -> None:
-    flow = _build_payload([
-        _row(0, discharged_wh=750, consumer=0.40, spot=0.15,
-             battery_flow={"battery_pnl_status": "missing_home_load"}),
-    ])["whPerDay"]["2026-08-01"]["batteryFlowTotals"]
-    assert flow["partial"] is False
-    assert flow["dischargeHomeWh"] is None
-    assert flow["conservative"]["unclassifiedWh"] == 750
-    assert flow["conservative"]["dischargeValueMilliEur"] == 113
-    assert flow["conservative"]["chargeCostMilliEur"] == 0
-    assert flow["conservative"]["pnlMilliEur"] == 113
+    assert flow["complete"] is True
+    assert flow["dischargeHomeWh"] == 1050
+    assert flow["dischargeExportWh"] == 700
+    assert flow["homeSavingsMilliEur"] == 420
+    assert flow["exportRevenueMilliEur"] == 105
+    assert flow["pnlMilliEur"] == 525
+    assert flow["estimationBasis"] == "mixed"
+    assert flow["confidence"] == "medium"
+    assert "conservative" not in flow
 
 
 def test_today_stored_value_uses_only_midnight_to_latest_level_and_elapsed_prices() -> None:
@@ -516,7 +489,7 @@ def test_app_wires_sql_endpoint_and_summary_price_tooltips() -> None:
     assert 'return "—"' in energy_js
 
 
-def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
+def test_discharge_estimate_is_presented_as_schedule_assisted() -> None:
     app_index = ENERGY_OVERVIEW_TEMPLATE_FILE.read_text(encoding="utf-8")
     energy_js = ENERGY_HISTORY_JS_FILE.read_text(encoding="utf-8")
     app_css = APP_CSS_FILE.read_text(encoding="utf-8")
@@ -525,9 +498,10 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     unclassified = app_index.index('data-role="energy-battery-unclassified-row"')
     discharge_total = app_index.index('data-role="energy-battery-discharge-value"')
     assert confirmed_export < unclassified < discharge_total
-    assert 'class="app-energy-history__unclassified-tag">Unclassified</span>' in app_index
-    assert 'data-role="energy-battery-unclassified-note">Valued at lower hourly price' in app_index
-    assert '"Valued at lower hourly price"' in energy_js
+    assert 'class="app-energy-history__unclassified-tag">Estimated</span>' in app_index
+    assert 'data-role="energy-battery-unclassified-note">Valued from the applicable optimizer schedule' in app_index
+    assert '"Valued at consumer price · scheduled for household use"' in energy_js
+    assert '"Valued at consumer and spot prices · scheduled fixed discharge"' in energy_js
     unclassified_row_css = app_css.split('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {', 1)[1].split('}', 1)[0]
     assert 'margin-block: 3px;' in unclassified_row_css
     assert 'background:' not in unclassified_row_css
@@ -554,14 +528,11 @@ def test_zero_discharge_rows_are_hidden_and_unclassified_is_a_peer() -> None:
     assert 'data-role="energy-battery-discharge-export-row"' in app_index
     assert 'data-role="energy-battery-no-discharge" hidden' in app_index
     assert 'No battery discharge recorded' in app_index
-    assert 'detail.batteryDischargeHomeWh === 0' in energy_js
-    assert 'detail.batteryDischargeExportWh === 0' in energy_js
-    assert 'detail.batteryFlow?.valuedHours === 0' in energy_js
     assert 'detail.dischargedWh === 0' in energy_js
-    assert 'noDischarge || !useConservative' in energy_js
+    assert "detail.batteryFlow?.estimationBasis" in energy_js
     assert '(detail.batteryDischargeExportWh ?? 0)' not in energy_js
-    assert 'status.textContent = useConservative ? "" : batteryFlowStatusMessage' in energy_js
-    assert 'badge.hidden = useConservative || !detail.batteryFlow?.partial' in energy_js
+    assert 'status.textContent = batteryFlowStatusMessage' in energy_js
+    assert 'badge.hidden = !detail.batteryFlow?.partial' in energy_js
     assert "Conservative battery P&L" not in energy_js
     assert "Conservative discharge value" not in energy_js
     assert '.app-energy-history__money-card dl > div[hidden]' in app_css

@@ -702,6 +702,12 @@ $appConfig = [
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
         [
+            'href' => '../daily_report/',
+            'label' => 'Energy Reports',
+            'description' => 'Daily and monthly grid cost and battery contribution',
+            'icon' => 'chart',
+        ],
+        [
             'href' => 'optimizer.php',
             'label' => 'Optimizer Comparison',
             'description' => 'Compare shadow plans with the active schedule',

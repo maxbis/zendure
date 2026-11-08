@@ -135,7 +135,9 @@ def test_battery_flow_pnl_splits_energy_and_uses_integer_millieuros():
         end_ts=end,
         consumer_eur_per_kwh=0.30,
         spot_eur_per_kwh=0.10,
-        estimated_home_load_wh=300.0,
+        schedule_value=-1000,
+        expected_household_wh=300.0,
+        measured_grid_export_wh=200.0,
     )
 
     assert values == {
@@ -148,7 +150,9 @@ def test_battery_flow_pnl_splits_energy_and_uses_integer_millieuros():
         "battery_export_revenue_milli_eur": 20,
         "battery_flow_pnl_milli_eur": 0,
         "battery_pnl_status": "complete",
-        "battery_pnl_method_version": 2,
+        "battery_pnl_method_version": 3,
+        "battery_pnl_estimation_basis": "schedule_fixed_discharge",
+        "battery_pnl_confidence": "high",
     }
 
 
@@ -170,7 +174,7 @@ def test_battery_flow_pnl_negative_spot_rounds_half_away_from_zero():
     assert values["battery_flow_pnl_milli_eur"] == 1
 
 
-def test_battery_flow_pnl_allocates_discharge_home_first():
+def test_battery_flow_pnl_uses_expected_load_for_fixed_discharge():
     start = _ts(2025, 1, 1, 20, 0)
     end = start + 3600
 
@@ -182,7 +186,8 @@ def test_battery_flow_pnl_allocates_discharge_home_first():
         end_ts=end,
         consumer_eur_per_kwh=0.422,
         spot_eur_per_kwh=0.2371,
-        estimated_home_load_wh=101.0,
+        schedule_value=-1200,
+        expected_household_wh=101.0,
     )
 
     assert values["battery_discharge_home_wh"] == 101
@@ -190,10 +195,75 @@ def test_battery_flow_pnl_allocates_discharge_home_first():
     assert values["battery_home_savings_milli_eur"] == 43
     assert values["battery_export_revenue_milli_eur"] == 213
     assert values["battery_flow_pnl_milli_eur"] == 256
-    assert values["battery_pnl_method_version"] == 2
+    assert values["battery_pnl_method_version"] == 3
+    assert values["battery_pnl_estimation_basis"] == "schedule_fixed_discharge"
+    assert values["battery_pnl_confidence"] == "medium"
 
 
-def test_battery_flow_pnl_requires_home_load_only_during_discharge():
+def test_battery_flow_pnl_values_netzero_discharge_at_consumer_price():
+    start = _ts(2025, 1, 1, 20, 0)
+    end = start + 3600
+
+    values = report.build_battery_flow_pnl_window(
+        power_points=[(start, -600.0)],
+        grid_from_samples=[],
+        grid_to_samples=[],
+        start_ts=start,
+        end_ts=end,
+        consumer_eur_per_kwh=0.50,
+        spot_eur_per_kwh=0.28,
+        schedule_value="netzero-",
+        measured_grid_export_wh=150.0,
+    )
+
+    assert values["battery_discharge_home_wh"] == 600
+    assert values["battery_discharge_export_wh"] == 0
+    assert values["battery_home_savings_milli_eur"] == 300
+    assert values["battery_export_revenue_milli_eur"] == 0
+    assert values["battery_pnl_estimation_basis"] == "schedule_self_consumption"
+    assert values["battery_pnl_confidence"] == "high"
+
+
+def test_schedule_map_uses_last_plan_covering_the_hour(tmp_path):
+    day = datetime(2025, 1, 1, 0, 0, tzinfo=TZ)
+    path = tmp_path / "optimizer_schedule.log"
+    records = [
+        {
+            "plan": {
+                "generated_at": "2025-01-01T18:05:00+01:00",
+                "decisions": [{
+                    "start": "2025-01-01T18:05:00+01:00",
+                    "end": "2025-01-01T19:00:00+01:00",
+                    "schedule_value": "netzero-",
+                    "load_w": 320,
+                }],
+            }
+        },
+        {
+            "plan": {
+                "generated_at": "2025-01-01T18:45:00+01:00",
+                "decisions": [{
+                    "start": "2025-01-01T18:45:00+01:00",
+                    "end": "2025-01-01T19:00:00+01:00",
+                    "schedule_value": -1200,
+                    "load_w": 300,
+                }],
+            }
+        },
+    ]
+    path.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
+
+    schedule = report.load_schedule_map_for_day(
+        path,
+        target_day_start=day,
+        analysis_end_ts=_ts(2025, 1, 1, 19, 0),
+    )
+
+    assert schedule["18"]["schedule_value"] == -1200
+    assert schedule["18"]["load_w"] == 300
+
+
+def test_battery_flow_pnl_requires_schedule_only_during_discharge():
     start = _ts(2025, 1, 1, 0, 0)
     end = start + 3600
 
@@ -207,7 +277,7 @@ def test_battery_flow_pnl_requires_home_load_only_during_discharge():
         spot_eur_per_kwh=0.10,
     )
 
-    assert values["battery_pnl_status"] == "missing_home_load"
+    assert values["battery_pnl_status"] == "missing_schedule"
     assert values["battery_discharge_home_wh"] is None
     assert values["battery_flow_pnl_milli_eur"] is None
 
@@ -225,7 +295,7 @@ def test_battery_flow_pnl_reports_missing_inputs_only_when_used():
         consumer_eur_per_kwh=0.30,
         spot_eur_per_kwh=0.10,
     )
-    assert missing_counter["battery_pnl_status"] == "missing_home_load"
+    assert missing_counter["battery_pnl_status"] == "missing_schedule"
 
     idle = report.build_battery_flow_pnl_window(
         power_points=[(start, 0.0)],
@@ -417,6 +487,7 @@ def test_hourly_report_inputs_derive_home_load_and_apply_home_first_pnl():
         analysis_end_ts=_ts(2025, 1, 1, 1, 0),
         tz=TZ,
         production_by_hour={"00": 0.0},
+        schedule_by_hour={"00": {"schedule_value": "netzero-", "load_w": 100.0}},
         prices_by_hour={
             "00": {
                 "consumer_eur_per_kwh": 0.42,
@@ -431,7 +502,8 @@ def test_hourly_report_inputs_derive_home_load_and_apply_home_first_pnl():
     assert aggregate_rows[0]["battery_discharge_export_wh"] == 0
     assert aggregate_rows[0]["battery_home_savings_milli_eur"] == 42
     assert aggregate_rows[0]["battery_pnl_status"] == "complete"
-    assert aggregate_rows[0]["battery_pnl_method_version"] == 2
+    assert aggregate_rows[0]["battery_pnl_method_version"] == 3
+    assert aggregate_rows[0]["battery_pnl_estimation_basis"] == "schedule_self_consumption"
 
 
 def test_build_daily_report_partial_day_future_hours_are_empty():

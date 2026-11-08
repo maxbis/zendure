@@ -164,6 +164,7 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
             battery_charge_cost_milli_eur, battery_home_savings_milli_eur,
             battery_export_revenue_milli_eur, battery_flow_pnl_milli_eur,
             battery_pnl_status, battery_pnl_method_version,
+            battery_pnl_estimation_basis, battery_pnl_confidence,
             source_rows, computed_at, updated_at
          FROM hourly_report_inputs
          WHERE local_date = ?
@@ -306,6 +307,8 @@ function dailyReportLoadFromAggregate(PDO $pdo, string $date, DateTimeZone $tz):
             'battery_flow_pnl_milli_eur' => $pnlValues['battery_flow_pnl_milli_eur'],
             'battery_pnl_status' => $pnlStatus,
             'battery_pnl_method_version' => $rowPnlMethodVersion,
+            'battery_pnl_estimation_basis' => $row['battery_pnl_estimation_basis'] ?? null,
+            'battery_pnl_confidence' => $row['battery_pnl_confidence'] ?? null,
             'grid_from_cost' => dailyReportRoundValue($gridFromCost, 4),
             'grid_to_cost' => dailyReportRoundValue($gridToCost, 4),
             'net_cost' => dailyReportRoundValue($netCost, 4),

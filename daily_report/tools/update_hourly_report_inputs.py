@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS `{DEFAULT_AGGREGATE_TABLE}` (
     battery_flow_pnl_milli_eur INT NULL,
     battery_pnl_status VARCHAR(32) NULL,
     battery_pnl_method_version SMALLINT UNSIGNED NULL,
+    battery_pnl_estimation_basis VARCHAR(48) NULL,
+    battery_pnl_confidence VARCHAR(16) NULL,
     source_min_id BIGINT NULL,
     source_max_id BIGINT NULL,
     source_rows INT UNSIGNED NOT NULL DEFAULT 0,
@@ -130,6 +132,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--production-table", default=None, help="Default: ENPHASE_PRODUCTION_TABLE or production_hourly.")
     parser.add_argument("--production-system-id", type=int, default=None, help="Default: ENPHASE_SYSTEM_ID or 5053376.")
     parser.add_argument("--production-source", default=None, help="Default: ENPHASE_PRODUCTION_SOURCE or production_micro.")
+    parser.add_argument(
+        "--optimizer-schedule-log",
+        default=str(report.DEFAULT_OPTIMIZER_SCHEDULE_LOG),
+        help="Append-only optimizer plan journal used for discharge estimation.",
+    )
     parser.add_argument("--aggregate-table", default=DEFAULT_AGGREGATE_TABLE, help="Aggregate table.")
     parser.add_argument("--log-table", default=DEFAULT_LOG_TABLE, help="Update log table.")
     parser.add_argument(
@@ -248,6 +255,8 @@ def ensure_tables(connection: pymysql.connections.Connection, aggregate_table: s
             "battery_flow_pnl_milli_eur INT NULL",
             "battery_pnl_status VARCHAR(32) NULL",
             "battery_pnl_method_version SMALLINT UNSIGNED NULL",
+            "battery_pnl_estimation_basis VARCHAR(48) NULL",
+            "battery_pnl_confidence VARCHAR(16) NULL",
         ]
         for definition in pnl_columns:
             cursor.execute(
@@ -364,6 +373,7 @@ def build_hourly_input_rows(
     fallback_seconds: int = report.BOUNDARY_FALLBACK_MAX_SECONDS,
     prices_by_hour: dict[str, dict[str, Any]] | None = None,
     production_by_hour: dict[str, float] | None = None,
+    schedule_by_hour: dict[str, dict[str, Any]] | None = None,
     energy_targets_by_hour: dict[str, dict[str, float | None]] | None = None,
     computed_at: datetime | None = None,
 ) -> list[dict[str, Any]]:
@@ -459,7 +469,14 @@ def build_hourly_input_rows(
             end_ts=effective_bucket_end_ts,
             consumer_eur_per_kwh=price_row.get("consumer_eur_per_kwh"),
             spot_eur_per_kwh=price_row.get("spot_eur_per_kwh"),
-            estimated_home_load_wh=estimated_home_load_wh,
+            schedule_value=(schedule_by_hour or {}).get(hour_key, {}).get("schedule_value"),
+            expected_household_wh=(
+                (schedule_by_hour or {}).get(hour_key, {}).get("load_w")
+                * ((effective_bucket_end_ts - bucket_start_ts) / 3600.0)
+                if (schedule_by_hour or {}).get(hour_key, {}).get("load_w") is not None
+                else None
+            ),
+            measured_grid_export_wh=grid_to_for_home,
             expected_charged_wh=charged_for_pnl,
             expected_discharged_wh=discharged_for_pnl,
             fallback_seconds=fallback_seconds,
@@ -474,6 +491,8 @@ def build_hourly_input_rows(
             "battery_flow_pnl_milli_eur": None,
             "battery_pnl_status": "not_calculated",
             "battery_pnl_method_version": None,
+            "battery_pnl_estimation_basis": None,
+            "battery_pnl_confidence": None,
         }
 
         hourly_rows.append(
@@ -516,6 +535,7 @@ def upsert_hourly_rows(connection: pymysql.connections.Connection, table: str, r
         "battery_charge_grid_wh, battery_charge_surplus_wh, battery_discharge_home_wh, battery_discharge_export_wh, "
         "battery_charge_cost_milli_eur, battery_home_savings_milli_eur, battery_export_revenue_milli_eur, "
         "battery_flow_pnl_milli_eur, battery_pnl_status, battery_pnl_method_version, "
+        "battery_pnl_estimation_basis, battery_pnl_confidence, "
         "source_min_id, source_max_id, source_rows, computed_at"
         ") VALUES ("
         "%(local_date)s, %(local_hour)s, %(hour_start_ts)s, %(hour_end_ts)s, %(charged_wh)s, %(discharged_wh)s, "
@@ -525,6 +545,7 @@ def upsert_hourly_rows(connection: pymysql.connections.Connection, table: str, r
         "%(battery_charge_grid_wh)s, %(battery_charge_surplus_wh)s, %(battery_discharge_home_wh)s, %(battery_discharge_export_wh)s, "
         "%(battery_charge_cost_milli_eur)s, %(battery_home_savings_milli_eur)s, %(battery_export_revenue_milli_eur)s, "
         "%(battery_flow_pnl_milli_eur)s, %(battery_pnl_status)s, %(battery_pnl_method_version)s, "
+        "%(battery_pnl_estimation_basis)s, %(battery_pnl_confidence)s, "
         "%(source_min_id)s, %(source_max_id)s, %(source_rows)s, %(computed_at)s"
         ") ON DUPLICATE KEY UPDATE "
         "hour_start_ts = VALUES(hour_start_ts), "
@@ -550,6 +571,8 @@ def upsert_hourly_rows(connection: pymysql.connections.Connection, table: str, r
         "battery_flow_pnl_milli_eur = VALUES(battery_flow_pnl_milli_eur), "
         "battery_pnl_status = VALUES(battery_pnl_status), "
         "battery_pnl_method_version = VALUES(battery_pnl_method_version), "
+        "battery_pnl_estimation_basis = VALUES(battery_pnl_estimation_basis), "
+        "battery_pnl_confidence = VALUES(battery_pnl_confidence), "
         "source_min_id = VALUES(source_min_id), "
         "source_max_id = VALUES(source_max_id), "
         "source_rows = VALUES(source_rows), "
@@ -577,6 +600,8 @@ def update_pnl_rows(connection: pymysql.connections.Connection, table: str, rows
         "battery_flow_pnl_milli_eur = %(battery_flow_pnl_milli_eur)s, "
         "battery_pnl_status = %(battery_pnl_status)s, "
         "battery_pnl_method_version = %(battery_pnl_method_version)s "
+        ", battery_pnl_estimation_basis = %(battery_pnl_estimation_basis)s "
+        ", battery_pnl_confidence = %(battery_pnl_confidence)s "
         "WHERE local_date = %(local_date)s AND local_hour = %(local_hour)s"
     )
     with connection.cursor() as cursor:
@@ -670,6 +695,11 @@ def update_day(
             fallback_seconds=args.fallback_seconds,
             prices_by_hour=prices_by_hour,
             production_by_hour=production_by_hour,
+            schedule_by_hour=report.load_schedule_map_for_day(
+                args.optimizer_schedule_log,
+                target_day_start=target_day_start,
+                analysis_end_ts=analysis_end_ts,
+            ),
             energy_targets_by_hour=energy_targets,
             computed_at=started_at,
         )

@@ -1,171 +1,26 @@
 # Daily Report Calculated Values
 
-This file explains how the summary boxes in `/daily_report` are calculated.
+The canonical daily and monthly reports keep grid cost and estimated battery economic contribution separate.
 
-## Data sources
-
-- Today's base hourly values are generated live from `status_updates` by `daily_report/tools/hourly_daily_grid_battery_report.py`.
-- Yesterday and older base hourly values are read from MariaDB table `hourly_report_inputs`.
-- The summary cards are filled in `daily_report/assets/js/daily_report.js`.
-- The second-line `Spot ...` values are recalculated in the frontend from the hourly rows.
-- Hourly prices are loaded from MariaDB table `price_ticks` in the `sqlite_replication` database. The daily report does not fall back to `main/data/price` JSON files.
-- Production report APIs no longer create daily report JSON files. Saved JSON reports are legacy data only.
-
-## Price definitions
-
-### Consumer price
-
-`price_eur_per_kwh` is the normal hourly consumer price from `price_ticks.consumer_eur_per_kwh`.
-
-If a DB row is missing for an hour, `price_eur_per_kwh` is `null` for that hour. Cost values that depend on price are also `null`.
-
-### Spot price
-
-The frontend derives the spot price from the consumer price with:
+## Primary calculations
 
 ```text
-spot_price = (consumer_price / vatMultiplier) - supplierMarkupEurPerKwh - energyTaxEurPerKwh
+net grid cost = consumer-price import cost - spot-price export value
+
+estimated battery economic contribution
+    = schedule-assisted battery flow P&L
+    + change in stored-energy value
 ```
 
-This conversion comes from `main/includes/price_conversion.php`.
+The report uses the existing `hourly_report_inputs` data through `daily_report/includes/report_smart_common.php`. Its shared response builder reuses `appEnergyHistoryBuildPayload()` so the report and the app Energy Costs dialog apply the same method-version-3 schedule-assisted valuation.
 
-With the current defaults:
+The summary and detailed values are rendered by:
 
-```text
-spot_price = (consumer_price / 1.21) - 0.0219 - 0.0898
-```
+- `daily_report/assets/js/daily.js`
+- `daily_report/assets/js/monthly.js`
 
-## Box calculations
+The canonical calculation, coverage, partial-result, and failure behavior is documented in `docs/daily_report/energy-reports.md`. Battery-flow valuation details are documented in `docs/daily_report/battery-flow-pnl.md`.
 
-The existing Net Cost, Savings, Charge Costs, P&L, and Spot P&L values below remain legacy report metrics. The additive battery-flow PnL fields use interval charge attribution and hourly home-first discharge attribution, as documented in `docs/daily_report/battery-flow-pnl.md`.
+## Important interpretation
 
-### Net Cost
-
-Main number:
-
-Per hour:
-
-```text
-grid_from_cost = (grid_from_wh / 1000) * consumer_price
-grid_to_cost   = -1 * ((grid_to_wh / 1000) * consumer_price)
-net_cost_hour  = grid_from_cost + grid_to_cost
-```
-
-Daily total:
-
-```text
-net_cost = sum(net_cost_hour for all hours)
-```
-
-Meaning:
-
-- `grid_from_wh` is import from the grid, so it adds cost.
-- `grid_to_wh` is export to the grid, so it is stored as a negative value and reduces cost.
-
-Second line (`Spot ...`):
-
-```text
-grid_from_cost_consumer = (grid_from_wh / 1000) * consumer_price
-grid_to_cost_spot       = -1 * ((grid_to_wh / 1000) * spot_price)
-spot_net_cost_hour      = grid_from_cost_consumer + grid_to_cost_spot
-spot_net_cost           = sum(spot_net_cost_hour for all hours)
-```
-
-Important: in the current implementation, the `Spot` version only changes the export side to spot price. The import side still uses the consumer price.
-
-### Savings
-
-Main number:
-
-Per hour:
-
-```text
-savings_hour = (discharged_wh / 1000) * consumer_price
-```
-
-Daily total:
-
-```text
-savings = sum(savings_hour for all hours)
-```
-
-Meaning:
-
-- This treats every discharged kWh as avoided purchase at the hourly consumer price.
-- There is no separate `Spot` line for `Savings`.
-
-### Charge Costs
-
-Main number:
-
-Per hour:
-
-```text
-charge_cost_hour = (charged_wh / 1000) * consumer_price
-```
-
-Daily total:
-
-```text
-charge_cost = sum(charge_cost_hour for all hours)
-```
-
-Second line (`Spot ...`):
-
-```text
-spot_charge_cost_hour = (charged_wh / 1000) * spot_price
-spot_charge_cost      = sum(spot_charge_cost_hour for all hours)
-```
-
-### P&L
-
-Main number:
-
-```text
-pnl = (charge_cost - savings + net_cost) * -1
-```
-
-Equivalent form:
-
-```text
-pnl = savings - charge_cost - net_cost
-```
-
-Second line (`Spot ...`):
-
-```text
-spot_pnl = (spot_charge_cost - savings + spot_net_cost) * -1
-```
-
-Equivalent form:
-
-```text
-spot_pnl = savings - spot_charge_cost - spot_net_cost
-```
-
-Important: in the current implementation, `spot_pnl` still uses the normal `savings` value, not a spot-based savings value.
-
-## Where the underlying energy values come from
-
-- `charged_wh` and `discharged_wh` are calculated by integrating the signed battery power stored in `status_updates.new_value` over each hour.
-- `grid_from_wh` is calculated from the hourly delta of `total_act_x100`, divided by `100`.
-- `grid_to_wh` is calculated from the hourly delta of `total_act_ret_x100`, divided by `100`.
-
-Battery-flow PnL uses the stored `spot_eur_per_kwh` directly. It does not reconstruct spot price from consumer price.
-
-## Rounding
-
-- Report totals are summed using raw float values and then rounded in the API payload.
-- The stored totals use 4 decimals for euro values.
-- The frontend also formats the displayed box values to 4 decimals with the `EUR` prefix.
-
-## Price maintenance
-
-The price table is maintained by:
-
-```text
-main/prices/update_price_ticks.php
-main/prices/backfill_price_ticks.php
-```
-
-See `docs/prices/price-ticks.md` for schema, cron, and backfill details.
+Battery contribution is already reflected in measured grid flows. It must not be added to or subtracted from net grid cost. Fixed fees, battery ownership, and degradation are excluded.

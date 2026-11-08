@@ -364,26 +364,22 @@
         content.className = "app-energy-summary-tooltip__overview";
         content.dataset.role = "energy-summary-tooltip-content";
         content.append(elements.moneyOverviewTemplate.content.cloneNode(true));
-        const conservative = detail.batteryFlow?.conservative;
-        const useConservative = !detail.batteryFlow?.complete && conservative?.unclassifiedWh > 0;
         const milliToEur = (value) => finiteNumber(value) === null ? null : value / 1000;
-        const flowPnl = useConservative ? milliToEur(conservative.pnlMilliEur) : detail.batteryBenefit;
-        const completeFlowPnl = detail.batteryFlow?.complete
-            ? detail.batteryBenefit
-            : conservative?.complete ? milliToEur(conservative.pnlMilliEur) : null;
+        const flowPnl = detail.batteryBenefit;
+        const completeFlowPnl = detail.batteryFlow?.complete ? detail.batteryBenefit : null;
         const storedValue = detail.storedEnergyValue?.complete ? finiteNumber(detail.storedEnergyValue.valueEur) : null;
         const economicContribution = completeFlowPnl === null || storedValue === null ? null : completeFlowPnl + storedValue;
         const values = [
             ["energy-grid-import-cost", detail.gridImportCost],
             ["energy-grid-export-value", detail.gridExportValue],
             ["energy-grid-net-cost", detail.gridNetCost],
-            ["energy-battery-charge-grid-cost", useConservative ? milliToEur(conservative.chargeGridMilliEur) : detail.batteryChargeGridCost],
-            ["energy-battery-charge-solar-cost", useConservative ? milliToEur(conservative.chargeSurplusMilliEur) : detail.batteryChargeSolarCost],
-            ["energy-battery-charge-cost", useConservative ? milliToEur(conservative.chargeCostMilliEur) : detail.batteryChargeCost],
-            ["energy-battery-discharge-home-value", useConservative ? milliToEur(detail.batteryFlow.homeSavingsMilliEur ?? 0) : detail.batteryHomeValue],
-            ["energy-battery-discharge-export-value", useConservative ? milliToEur(detail.batteryFlow.exportRevenueMilliEur ?? 0) : detail.batteryExportValue],
-            ["energy-battery-unclassified-value", useConservative ? milliToEur(conservative.unclassifiedValueMilliEur) : null],
-            ["energy-battery-discharge-value", useConservative ? milliToEur(conservative.dischargeValueMilliEur) : detail.batteryDischargeValue],
+            ["energy-battery-charge-grid-cost", detail.batteryChargeGridCost],
+            ["energy-battery-charge-solar-cost", detail.batteryChargeSolarCost],
+            ["energy-battery-charge-cost", detail.batteryChargeCost],
+            ["energy-battery-discharge-home-value", detail.batteryHomeValue],
+            ["energy-battery-discharge-export-value", detail.batteryExportValue],
+            ["energy-battery-unclassified-value", detail.batteryDischargeValue],
+            ["energy-battery-discharge-value", detail.batteryDischargeValue],
             ["energy-battery-flow-pnl", flowPnl, true],
             ["energy-battery-stored-value", storedValue, true],
             ["energy-battery-benefit", economicContribution, true]
@@ -392,21 +388,18 @@
             setMoneyValue(content.querySelector(`[data-role="${role}"]`), value, signed);
         });
         [
-            ["energy-battery-charge-grid-wh", useConservative ? conservative.chargeGridWh : detail.batteryChargeGridWh],
-            ["energy-battery-charge-solar-wh", useConservative ? conservative.chargeSurplusWh : detail.batteryChargeSolarWh],
+            ["energy-battery-charge-grid-wh", detail.batteryChargeGridWh],
+            ["energy-battery-charge-solar-wh", detail.batteryChargeSolarWh],
             ["energy-battery-discharge-home-wh", detail.batteryDischargeHomeWh],
             ["energy-battery-discharge-export-wh", detail.batteryDischargeExportWh],
-            ["energy-battery-unclassified-wh", useConservative ? conservative.unclassifiedWh : null]
+            ["energy-battery-unclassified-wh", detail.dischargedWh]
         ].forEach(([role, wh]) => {
             content.querySelector(`[data-role="${role}"]`).textContent = formatFlowKwh(wh);
         });
         const noDischarge = detail.dischargedWh === 0;
-        const noClassifiedDischarge = useConservative && detail.batteryFlow?.valuedHours === 0;
-        content.querySelector('[data-role="energy-battery-discharge-home-row"]').hidden = noDischarge
-            || noClassifiedDischarge || detail.batteryDischargeHomeWh === 0;
-        content.querySelector('[data-role="energy-battery-discharge-export-row"]').hidden = noDischarge
-            || noClassifiedDischarge || detail.batteryDischargeExportWh === 0;
-        content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = noDischarge || !useConservative;
+        content.querySelector('[data-role="energy-battery-discharge-home-row"]').hidden = true;
+        content.querySelector('[data-role="energy-battery-discharge-export-row"]').hidden = true;
+        content.querySelector('[data-role="energy-battery-unclassified-row"]').hidden = noDischarge;
         content.querySelector('[data-role="energy-battery-no-discharge"]').hidden = !noDischarge;
         content.querySelector('[data-role="energy-battery-stored-wh"]').textContent = formatSignedFlowKwh(detail.storedEnergyValue?.deliverableDeltaWh);
         content.querySelector('[data-role="energy-battery-stored-note"]').textContent = detail.storedEnergyValue?.complete
@@ -418,16 +411,14 @@
         const benefit = content.querySelector('[data-role="energy-battery-benefit"]');
         benefit.closest(".app-energy-history__money-card").dataset.benefitSign = benefit.dataset.sign;
         const unclassifiedNote = content.querySelector('[data-role="energy-battery-unclassified-note"]');
-        unclassifiedNote.textContent = useConservative && !conservative.dischargeComplete
-            ? "Hourly price unavailable"
-            : useConservative && !conservative.chargeComplete
-                ? "Valued at lower hourly price; charging data missing"
-                : "Valued at lower hourly price";
+        unclassifiedNote.textContent = detail.batteryFlow?.estimationBasis === "schedule_self_consumption"
+            ? "Valued at consumer price · scheduled for household use"
+            : "Valued at consumer and spot prices · scheduled fixed discharge";
         const status = content.querySelector('[data-role="energy-battery-status"]');
-        status.textContent = useConservative ? "" : batteryFlowStatusMessage(detail.batteryFlow);
+        status.textContent = batteryFlowStatusMessage(detail.batteryFlow);
         status.hidden = status.textContent === "";
         const badge = content.querySelector('[data-role="energy-battery-partial-badge"]');
-        badge.hidden = useConservative || !detail.batteryFlow?.partial;
+        badge.hidden = !detail.batteryFlow?.partial;
         badge.textContent = "Partial";
         return content;
     }
@@ -441,6 +432,7 @@
             energy_total_mismatch: "battery energy readings do not agree",
             missing_consumer_price: "a consumer price is missing",
             missing_spot_price: "a spot price is missing",
+            missing_schedule: "the applicable optimizer schedule is missing",
             not_calculated: "the calculation is not available",
             unavailable: "the calculation is not available"
         };
