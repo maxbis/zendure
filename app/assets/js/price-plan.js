@@ -1630,6 +1630,17 @@
         return (state.entries[day] || []).find((item) => item?.key === key) || null;
     }
 
+    function exactOverrideSlot(key, day) {
+        const exact = exactEntryFor(key, day);
+        if (!exact?.entry) return null;
+
+        return {
+            ...exact.entry,
+            key: exact.key,
+            time: exact.entry.time || key.slice(-4)
+        };
+    }
+
     function setEditError(message = "") {
         if (!editElements) return;
         editElements.error.textContent = message;
@@ -1886,14 +1897,15 @@
             for (let hour = 0; hour < 24; hour += 1) {
                 const price = day.values[hour];
                 const resolvedSlot = day.slots[hour];
-                const history = runtimeHistoryForHour(day, hour, currentHour);
-                const historyUnavailable = !isSimulation && day.key === "today" && hour < currentHour && !history;
+                const exactOverride = exactOverrideSlot(`${day.date}${pad(hour)}00`, day.key);
+                const history = exactOverride ? null : runtimeHistoryForHour(day, hour, currentHour);
+                const historyUnavailable = !isSimulation && day.key === "today" && hour < currentHour && !history && !exactOverride;
                 const dominantSegment = history
                     ? history.segments.reduce((largest, segment) =>
                         (Number(segment.duration_s) || 0) > (Number(largest.duration_s) || 0) ? segment : largest
                     )
                     : null;
-                const slot = dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot;
+                const slot = exactOverride || (dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot);
                 const action = actionFor(slot);
                 const limited = hasPowerLimits(slot);
                 const position = Number.isFinite(price) ? (price - minimum) / span : 0;
