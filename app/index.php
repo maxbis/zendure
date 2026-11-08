@@ -32,16 +32,24 @@ $configLoadError = $configurationErrors === [] ? null : implode(' ', $configurat
 $reloadToken = isset($_GET['_reload']) && preg_match('/^\d{10,16}$/', (string) $_GET['_reload'])
     ? (string) $_GET['_reload']
     : null;
-$energyHistoryAssetToken = $reloadToken
-    ?? (string) filemtime(__DIR__ . '/assets/js/energy-history.js');
 
 function appAssetUrl(string $path, ?string $reloadToken): string
 {
-    if ($reloadToken === null) {
-        return $path;
+    $parameter = 'reload';
+    $token = $reloadToken;
+
+    if ($token === null) {
+        $assetPath = explode('?', $path, 2)[0];
+        $assetFile = realpath(__DIR__ . '/' . $assetPath);
+        if ($assetFile === false || !is_file($assetFile)) {
+            return $path;
+        }
+        $token = (string) filemtime($assetFile);
+        $parameter = 'v';
     }
 
-    return $path . (str_contains($path, '?') ? '&' : '?') . 'reload=' . rawurlencode($reloadToken);
+    return $path . (str_contains($path, '?') ? '&' : '?')
+        . $parameter . '=' . rawurlencode($token);
 }
 
 /**
@@ -148,7 +156,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/health-metric-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $energyHistoryAssetToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/shortwave-radiation.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/automation-control-dialog.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>

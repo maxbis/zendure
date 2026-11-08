@@ -56,7 +56,7 @@ The former second, conservative lower-price calculation has been removed. The ap
 
 - **Change in stored value** uses battery percentage at local midnight and the latest battery percentage for today, or end-of-day battery percentage for a past day. It does not count the battery's entire opening balance as today's gain.
 - Percentage change becomes stored Wh using configured capacity. Multiplication by `sqrt(roundTripEfficiency)` estimates the energy deliverable from that change, matching the app's optimizer valuation convention. Signed deliverable kWh are valued at the arithmetic average of that day's **elapsed hourly consumer prices**. For today, future hours and predicted future charge are excluded; for completed days, all 24 hourly prices are used.
-- **Estimated battery economic contribution** = complete battery flow P&L + change in stored value. It is shown only when both components are available. A partially classified flow can still contribute when the conservative fallback covers every elapsed hour. Missing midnight or closing battery readings, hourly prices, or battery configuration make stored value and the final estimate unavailable rather than zero.
+- **Estimated battery economic contribution** = complete battery flow P&L + change in stored value. It is shown only when both components are available. Missing schedule coverage, midnight or closing battery readings, hourly prices, or battery configuration make the final estimate unavailable rather than zero.
 - This is a modeled variable-energy contribution under the app's pricing and attribution assumptions, **not measured bill savings or total battery return**. It must not be added to or subtracted from net grid cost.
 
 ## Timing and freshness
