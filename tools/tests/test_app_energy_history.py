@@ -503,14 +503,18 @@ def test_discharge_estimate_is_presented_as_schedule_assisted() -> None:
     assert '"Valued at consumer price · scheduled for household use"' in energy_js
     assert '"Valued at consumer and spot prices · scheduled fixed discharge"' in energy_js
     unclassified_row_css = app_css.split('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {', 1)[1].split('}', 1)[0]
-    assert 'margin-block: 3px;' in unclassified_row_css
+    assert 'grid-template-columns: minmax(0, 1fr) auto;' in unclassified_row_css
+    assert 'align-items: start;' in unclassified_row_css
+    assert 'margin-block: 1px;' in unclassified_row_css
     assert 'background:' not in unclassified_row_css
     unclassified_tag_css = app_css.split('.app-energy-history__money-flow--unclassified dt .app-energy-history__unclassified-tag {', 1)[1].split('}', 1)[0]
     assert 'background: var(--gsd-surface-3);' in unclassified_tag_css
     assert 'color: var(--gsd-text-secondary);' in unclassified_tag_css
     assert '.app-energy-history__money-flow--unclassified dd strong' not in app_css
-    assert app_index.count('style="margin-left: 16px;" class="app-energy-history__money-flow"') == 2
-    assert '<h4 style="margin-left: 16px;">Discharge value</h4>' in app_index
+    assert 'style="margin-left: 16px;"' not in app_index
+    assert '<h4>Charging costs</h4>' in app_index
+    assert '<h4>Discharge value</h4>' in app_index
+    assert 'app-energy-history__money-subtotal--discharge' in app_index
     assert '<dt data-role="energy-battery-discharge-label">Total discharge value</dt>' in app_index
     assert '<dt data-role="energy-battery-pnl-label">Estimated battery economic contribution</dt>' in app_index
     assert '.app-energy-history__money-card h3 {' in app_css
@@ -518,10 +522,13 @@ def test_discharge_estimate_is_presented_as_schedule_assisted() -> None:
     assert 'data-role="energy-battery-stored-value"' in app_index
     assert 'data-role="energy-battery-flow-pnl"' in app_index
     assert '<dt><strong>Battery P&amp;L</strong><small>Discharge value − charging cost</small></dt><dd data-role="energy-battery-flow-pnl">' in app_index
-    assert '.app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) {' in app_css
-    assert 'margin-inline: 14px;' in app_css
-    assert '.app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) dt' not in app_css
+    assert '.app-energy-history__money-card--flows h4 {' in app_css
+    assert 'margin: 9px 0 2px;' in app_css
+    assert 'margin-inline: 14px;' not in app_css
     assert '.app-energy-history__money-card--flows .app-energy-history__money-result {' in app_css
+    result_css = app_css.split('.app-energy-history__money-card--flows .app-energy-history__money-result {', 1)[1].split('}', 1)[0]
+    assert 'background: var(--gsd-surface-3);' in result_css
+    assert 'border-radius: 8px;' in result_css
     assert '.app-energy-history__money-card--contribution' in app_css
     assert 'grid-template-columns: minmax(0, 1fr);' in app_css
     assert 'data-role="energy-battery-discharge-home-row"' in app_index

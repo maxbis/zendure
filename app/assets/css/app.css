@@ -4456,8 +4456,16 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-size: 0.82rem;
 }
 
-.app-energy-history__money-card--battery dl > .app-energy-history__money-flow:not(.app-energy-history__money-flow--stored) {
-    margin-inline: 14px;
+.app-energy-history__money-card--flows h3 {
+    margin-bottom: 8px;
+}
+
+.app-energy-history__money-card--flows h4 {
+    margin: 9px 0 2px;
+}
+
+.app-energy-history__money-card--flows dl > div {
+    padding-block: 4px;
 }
 
 .app-energy-history__money-flow--stored {
@@ -4482,8 +4490,11 @@ dialog#app-energy-summary-tooltip.is-overview {
 }
 
 .app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
-    margin-block: 3px;
-    padding: 7px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    margin-block: 1px;
+    padding-block: 5px;
 }
 
 .app-energy-history__money-empty dt {
@@ -4502,9 +4513,10 @@ dialog#app-energy-summary-tooltip.is-overview {
 
 .app-energy-history__money-flow--unclassified dt small {
     display: block;
-    margin-top: 3px;
+    margin-top: 2px;
     color: var(--gsd-text-muted);
     font-size: 0.62rem;
+    line-height: 1.25;
 }
 
 .app-energy-history__money-card .app-energy-history__money-subtotal {
@@ -4518,11 +4530,24 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-weight: 700;
 }
 
+.app-energy-history__money-card .app-energy-history__money-subtotal--discharge {
+    margin-top: 2px;
+    border-top-color: var(--gsd-border-subtle);
+}
+
+.app-energy-history__money-subtotal--discharge dt,
+.app-energy-history__money-subtotal--discharge dd {
+    color: var(--gsd-text-secondary);
+    font-weight: 650;
+}
+
 .app-energy-history__money-card--flows .app-energy-history__money-result {
     align-items: center;
-    margin-top: 10px;
-    padding: 12px 0 2px;
-    border-top: 1px solid var(--gsd-border);
+    margin-top: 8px;
+    padding: 9px 10px;
+    border: 1px solid var(--gsd-border);
+    border-radius: 8px;
+    background: var(--gsd-surface-3);
 }
 
 .app-energy-history__money-result dt strong {
