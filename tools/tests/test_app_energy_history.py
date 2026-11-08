@@ -620,10 +620,18 @@ def test_energy_cost_dialog_shows_selected_day_position_strip() -> None:
     app_css = APP_CSS_FILE.read_text(encoding="utf-8")
 
     assert 'function createSummaryDayPositionIndicator()' in energy_js
+    assert 'indicator.setAttribute("role", "group")' in energy_js
     assert 'availableDays.forEach((day) =>' in energy_js
-    assert 'segment.classList.toggle("is-selected", day === selectedDay)' in energy_js
+    assert 'const segment = document.createElement("button")' in energy_js
+    assert 'segment.dataset.day = day' in energy_js
+    assert 'segment.setAttribute("aria-label", `Show ${formatDay(day, true)}`)' in energy_js
+    assert 'selectSummaryDay(day)' in energy_js
+    assert 'function updateSummaryDayPositionIndicator(indicator)' in energy_js
+    assert 'segment.setAttribute("aria-pressed", isSelected ? "true" : "false")' in energy_js
     assert 'if (detail.label === "Net flow") header.appendChild(createSummaryDayPositionIndicator());' in energy_js
-    assert 'if (dayPosition) dayPosition.replaceWith(createSummaryDayPositionIndicator());' in energy_js
+    assert 'if (dayPosition) updateSummaryDayPositionIndicator(dayPosition);' in energy_js
     assert '.app-energy-summary-tooltip__day-position {' in app_css
-    assert '.app-energy-summary-tooltip__day-position-segment.is-selected {' in app_css
+    assert '.app-energy-summary-tooltip__day-position-segment.is-selected::before {' in app_css
+    assert '.app-energy-summary-tooltip__day-position-segment:hover::before {' in app_css
+    assert 'min-height: 24px;' in app_css
     assert 'flex: 1 1 0;' in app_css

@@ -303,23 +303,43 @@
     function createSummaryDayPositionIndicator() {
         const indicator = document.createElement("div");
         indicator.className = "app-energy-summary-tooltip__day-position";
-        indicator.setAttribute("role", "img");
-        const selectedIndex = availableDays.indexOf(selectedDay);
-        indicator.setAttribute(
-            "aria-label",
-            selectedIndex >= 0
-                ? `Day ${selectedIndex + 1} of ${availableDays.length}: ${formatDay(selectedDay, true)}`
-                : `${availableDays.length} available days`
-        );
+        indicator.setAttribute("role", "group");
+        indicator.setAttribute("aria-label", "Choose day");
 
         availableDays.forEach((day) => {
-            const segment = document.createElement("span");
+            const segment = document.createElement("button");
+            segment.type = "button";
             segment.className = "app-energy-summary-tooltip__day-position-segment";
-            segment.classList.toggle("is-selected", day === selectedDay);
-            segment.setAttribute("aria-hidden", "true");
+            segment.dataset.day = day;
+            segment.setAttribute("aria-label", `Show ${formatDay(day, true)}`);
+            segment.title = formatDay(day, true);
+            segment.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (day === selectedDay) return;
+                const trigger = activeSummaryTooltipTrigger;
+                selectSummaryDay(day);
+                if (trigger && summaryTooltip.open) {
+                    refreshSummaryTooltip(summaryTooltipDetails.get(trigger), trigger);
+                }
+            });
             indicator.appendChild(segment);
         });
+
+        updateSummaryDayPositionIndicator(indicator);
         return indicator;
+    }
+
+    function updateSummaryDayPositionIndicator(indicator) {
+        const selectedIndex = availableDays.indexOf(selectedDay);
+        indicator.setAttribute("aria-description", selectedIndex >= 0
+            ? `Day ${selectedIndex + 1} of ${availableDays.length}: ${formatDay(selectedDay, true)}`
+            : `${availableDays.length} available days`);
+        indicator.querySelectorAll(".app-energy-summary-tooltip__day-position-segment").forEach((segment) => {
+            const isSelected = segment.dataset.day === selectedDay;
+            segment.classList.toggle("is-selected", isSelected);
+            segment.setAttribute("aria-pressed", isSelected ? "true" : "false");
+        });
     }
 
     function buildSummaryTooltipPrices(detail) {
@@ -454,7 +474,7 @@
         });
 
         const dayPosition = summaryTooltip.querySelector(".app-energy-summary-tooltip__day-position");
-        if (dayPosition) dayPosition.replaceWith(createSummaryDayPositionIndicator());
+        if (dayPosition) updateSummaryDayPositionIndicator(dayPosition);
 
         const content = summaryTooltip.querySelector('[data-role="energy-summary-tooltip-content"]');
         if (content) content.replaceWith(buildSummaryTooltipContent(detail));
