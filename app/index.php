@@ -35,11 +35,21 @@ $reloadToken = isset($_GET['_reload']) && preg_match('/^\d{10,16}$/', (string) $
 
 function appAssetUrl(string $path, ?string $reloadToken): string
 {
-    if ($reloadToken === null) {
-        return $path;
+    $parameter = 'reload';
+    $token = $reloadToken;
+
+    if ($token === null) {
+        $assetPath = explode('?', $path, 2)[0];
+        $assetFile = realpath(__DIR__ . '/' . $assetPath);
+        if ($assetFile === false || !is_file($assetFile)) {
+            return $path;
+        }
+        $token = (string) filemtime($assetFile);
+        $parameter = 'v';
     }
 
-    return $path . (str_contains($path, '?') ? '&' : '?') . 'reload=' . rawurlencode($reloadToken);
+    return $path . (str_contains($path, '?') ? '&' : '?')
+        . $parameter . '=' . rawurlencode($token);
 }
 
 /**

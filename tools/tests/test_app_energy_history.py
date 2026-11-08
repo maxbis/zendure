@@ -635,3 +635,12 @@ def test_energy_cost_dialog_shows_selected_day_position_strip() -> None:
     assert '.app-energy-summary-tooltip__day-position-segment:hover::before {' in app_css
     assert 'min-height: 24px;' in app_css
     assert 'flex: 1 1 0;' in app_css
+
+
+def test_app_assets_are_versioned_to_avoid_stale_day_navigation_code() -> None:
+    app_index = APP_INDEX_FILE.read_text(encoding="utf-8")
+
+    assert "$assetFile = realpath(__DIR__ . '/' . $assetPath);" in app_index
+    assert "$token = (string) filemtime($assetFile);" in app_index
+    assert "$parameter = 'v';" in app_index
+    assert ". $parameter . '=' . rawurlencode($token);" in app_index

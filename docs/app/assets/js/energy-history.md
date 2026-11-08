@@ -15,6 +15,7 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 ## Inputs / outputs
 
 - Input: `../main/api/app_energy_history.php?days=3`
+- Frontend asset URLs include their modification time, so a deployed interaction change is not hidden by a stale browser cache.
 - Output cards: Charged, Discharged, Net flow
 - Charged and Discharged tooltips: consumer and spot valuations of those battery flows
 - Net flow dialog: three stacked cards for grid cost, battery flows plus Battery P&L, and stored value plus estimated economic contribution. The battery-flow card includes four classified energy/euro components, an optional conservative unclassified-discharge line, and charging and discharge subtotals.
