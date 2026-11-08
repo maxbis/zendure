@@ -25,7 +25,7 @@ Render the `/app` four-day battery energy chart and selected-day summary cards. 
 
 1. Load hourly energy, grid-meter flows, prices, and battery-flow attribution. Today's live report and historical hourly rows share the same aggregation path.
 2. Summary cards show signed energy: Charged as `+…`, Discharged as `−…`, Net flow as `chargedWh - dischargedWh`.
-3. Grid cost sums each hour's grid import at consumer price and grid export at spot price. Net grid cost is import cost minus export value.
+3. Grid cost shows imported/exported kWh in the shared metric column and sums each hour's grid import at consumer price and grid export at spot price. Net grid cost is import cost minus export value. Known kWh remains visible when only a required price is missing.
 4. Battery flow P&L shows grid charging at consumer price, surplus-solar charging at spot opportunity cost, home discharge at consumer price, and battery export at spot price. It uses the report's stored battery-flow P&L total.
 5. Discharge is shown as one neutral **Estimated** row. NZ− and other non-fixed schedules value measured discharge at the consumer price. Fixed negative schedules split measured discharge using expected household load, value the remainder at spot price, and optionally cap export with measured `grid_to_wh`.
 6. When the Net flow card is clicked, show three stacked cards for the selected day. Charging costs, discharge value, and their Battery P&L result share the middle card; the change in stored value and final economic contribution share the last card. The dialog's arrow controls and four-segment day strip select a day and refresh all three cards. Each strip segment is a labelled button with a visible hover and keyboard-focus state; the selected segment remains accented.

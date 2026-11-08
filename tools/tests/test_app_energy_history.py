@@ -198,10 +198,14 @@ def test_grid_cost_uses_each_hours_consumer_import_and_spot_export_prices() -> N
         ]
     )
     grid = payload["whPerDay"]["2026-08-01"]["gridPriceTotals"]
+    assert grid["import"]["wh"] == pytest.approx(1500)
+    assert grid["export"]["wh"] == pytest.approx(1500)
     assert grid["import"]["eur"] == pytest.approx(0.40)
     assert grid["export"]["eur"] == pytest.approx(0)
     assert grid["import"]["complete"] is True
     assert grid["export"]["complete"] is True
+    assert grid["import"]["energyComplete"] is True
+    assert grid["export"]["energyComplete"] is True
 
 
 def test_grid_cost_is_unavailable_when_meter_or_required_price_is_missing() -> None:
@@ -213,9 +217,13 @@ def test_grid_cost_is_unavailable_when_meter_or_required_price_is_missing() -> N
         ]
     )
     grid = payload["whPerDay"]["2026-08-01"]["gridPriceTotals"]
+    assert grid["import"]["wh"] is None
+    assert grid["import"]["energyComplete"] is False
     assert grid["import"]["eur"] is None
     assert grid["import"]["missingHours"] == ["2026-08-01 00:00"]
     assert grid["export"]["eur"] is None
+    assert grid["export"]["wh"] == pytest.approx(100)
+    assert grid["export"]["energyComplete"] is True
     assert grid["export"]["missingHours"] == ["2026-08-01 01:00"]
 
 
@@ -499,11 +507,13 @@ def test_discharge_estimate_is_presented_as_schedule_assisted() -> None:
     discharge_total = app_index.index('data-role="energy-battery-discharge-value"')
     assert confirmed_export < unclassified < discharge_total
     assert 'class="app-energy-history__unclassified-tag">Estimated</span>' in app_index
+    assert 'data-role="energy-grid-import-wh"' in app_index
+    assert 'data-role="energy-grid-export-wh"' in app_index
+    assert app_index.count('app-energy-history__money-metric') == 8
     assert 'data-role="energy-battery-unclassified-note">Valued from the applicable optimizer schedule' in app_index
     assert '"Valued at consumer price · scheduled for household use"' in energy_js
     assert '"Valued at consumer and spot prices · scheduled fixed discharge"' in energy_js
     unclassified_row_css = app_css.split('.app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {', 1)[1].split('}', 1)[0]
-    assert 'grid-template-columns: minmax(0, 1fr) auto;' in unclassified_row_css
     assert 'align-items: start;' in unclassified_row_css
     assert 'margin-block: 1px;' in unclassified_row_css
     assert 'background:' not in unclassified_row_css
@@ -525,6 +535,8 @@ def test_discharge_estimate_is_presented_as_schedule_assisted() -> None:
     assert '.app-energy-history__money-card--flows h4 {' in app_css
     assert 'margin: 9px 0 2px;' in app_css
     assert 'margin-inline: 14px;' not in app_css
+    metric_css = app_css.split('.app-energy-history__money-card dl > .app-energy-history__money-metric {', 1)[1].split('}', 1)[0]
+    assert 'grid-template-columns: minmax(0, 1fr) clamp(68px, 20vw, 84px) clamp(58px, 16vw, 68px);' in metric_css
     assert '.app-energy-history__money-card--flows .app-energy-history__money-result {' in app_css
     result_css = app_css.split('.app-energy-history__money-card--flows .app-energy-history__money-result {', 1)[1].split('}', 1)[0]
     assert 'background: var(--gsd-surface-3);' in result_css

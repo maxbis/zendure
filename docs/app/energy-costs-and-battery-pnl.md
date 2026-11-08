@@ -26,17 +26,17 @@ The app reads these sources, using local calendar dates and hours in **Europe/Am
 - Solar production: `enphase_history.production_hourly.energy_wh` remains available for household-load reporting, but later production arrival does not revalue battery discharge.
 - Historical calculated values and audit status: `sqlite_replication.hourly_report_inputs`, one row per local date/hour. Method version 3 stores the schedule-assisted attribution, estimation basis and confidence.
 
-The API returns per-hour chart values and per-day `gridPriceTotals`, `batteryFlowTotals`, and `storedEnergyValue`. Battery-flow energy is stored in whole Wh, and financial components are stored in millieuros before display as euros. `storedEnergyValue` uses the configured battery capacity and round-trip efficiency from `common/config/system.json`.
+The API returns per-hour chart values and per-day `gridPriceTotals`, `batteryFlowTotals`, and `storedEnergyValue`. Each grid direction exposes its summed `wh`, independent `energyComplete` state, euro total, and price-completeness state. Battery-flow energy is stored in whole Wh, and financial components are stored in millieuros before display as euros. `storedEnergyValue` uses the configured battery capacity and round-trip efficiency from `common/config/system.json`.
 
 ## Flow and behavior
 
 ### Grid cost
 
-- **Imported · consumer price** = sum of hourly grid-import kWh × that hour's consumer price.
-- **Exported · spot price** = sum of hourly grid-export kWh × that hour's spot price. A negative spot price can make this value negative.
+- **Imported · consumer price** shows summed grid-import kWh and its cost from each hour's consumer price.
+- **Exported · spot price** shows summed grid-export kWh and its value from each hour's spot price. A negative spot price can make this value negative.
 - **Estimated net grid cost** = imported cost − exported value. A negative result indicates estimated net revenue from variable grid exchange, not a negative supplier bill.
 
-The grid figures use grid-meter flows; they do not require solar production to split battery discharge. A missing meter total or required hourly price makes the affected full-day grid figure unavailable (`—`), rather than treating missing data as zero.
+The grid figures use grid-meter flows; they do not require solar production to split battery discharge. When a meter total is missing, then the affected full-day kWh and euro values are unavailable (`—`). When energy is complete but a required hourly price is missing, then the known kWh remains visible while only the euro value is unavailable.
 
 ### Battery P&L: schedule-assisted discharge estimate
 

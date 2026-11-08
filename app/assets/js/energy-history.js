@@ -388,6 +388,8 @@
             setMoneyValue(content.querySelector(`[data-role="${role}"]`), value, signed);
         });
         [
+            ["energy-grid-import-wh", detail.gridImportWh],
+            ["energy-grid-export-wh", detail.gridExportWh],
             ["energy-battery-charge-grid-wh", detail.batteryChargeGridWh],
             ["energy-battery-charge-solar-wh", detail.batteryChargeSolarWh],
             ["energy-battery-discharge-home-wh", detail.batteryDischargeHomeWh],
@@ -1090,14 +1092,19 @@
 
     function gridMoneyTotalsForDays(days) {
         const totals = {
-            import: { eur: 0, complete: true, missingHours: [] },
-            export: { eur: 0, complete: true, missingHours: [] }
+            import: { wh: 0, energyComplete: true, eur: 0, complete: true, missingHours: [] },
+            export: { wh: 0, energyComplete: true, eur: 0, complete: true, missingHours: [] }
         };
         days.forEach((day) => {
             const grid = payload?.whPerDay?.[day]?.gridPriceTotals;
             ["import", "export"].forEach((direction) => {
                 const source = grid?.[direction];
                 const target = totals[direction];
+                if (!source || source.energyComplete !== true || finiteNumber(source.wh) === null) {
+                    target.energyComplete = false;
+                } else {
+                    target.wh += finiteNumber(source.wh);
+                }
                 if (!source || source.complete !== true || finiteNumber(source.eur) === null) {
                     target.complete = false;
                 } else {
@@ -1107,6 +1114,7 @@
             });
         });
         ["import", "export"].forEach((direction) => {
+            if (!totals[direction].energyComplete) totals[direction].wh = null;
             if (!totals[direction].complete) totals[direction].eur = null;
         });
         totals.net = totals.import.complete && totals.export.complete
@@ -1160,6 +1168,8 @@
             label: "Net flow",
             energy: energyNet,
             dischargedWh: totals.discharged,
+            gridImportWh: grid.import.wh,
+            gridExportWh: grid.export.wh,
             gridImportCost: grid.import.eur,
             gridExportValue: grid.export.eur,
             gridNetCost: grid.net,

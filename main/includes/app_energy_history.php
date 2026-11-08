@@ -178,6 +178,17 @@ function appEnergyHistoryEmptyMoneyMetric(): array
     return ['sum' => 0.0, 'missingHours' => []];
 }
 
+/** @return array{sum:float,missingHours:array<int,string>,whSum:float,energyMissingHours:array<int,string>} */
+function appEnergyHistoryEmptyGridMetric(): array
+{
+    return [
+        'sum' => 0.0,
+        'missingHours' => [],
+        'whSum' => 0.0,
+        'energyMissingHours' => [],
+    ];
+}
+
 /** @param array{sum:float,missingHours:array<int,string>} $metric */
 function appEnergyHistoryFinishMoneyMetric(array $metric): array
 {
@@ -186,6 +197,18 @@ function appEnergyHistoryFinishMoneyMetric(array $metric): array
         'eur' => $complete ? round($metric['sum'], 6) : null,
         'complete' => $complete,
         'missingHours' => $metric['missingHours'],
+    ];
+}
+
+/** @param array{sum:float,missingHours:array<int,string>,whSum:float,energyMissingHours:array<int,string>} $metric */
+function appEnergyHistoryFinishGridMetric(array $metric): array
+{
+    $money = appEnergyHistoryFinishMoneyMetric($metric);
+    $energyComplete = $metric['energyMissingHours'] === [];
+    return [
+        'wh' => $energyComplete ? round($metric['whSum'], 2) : null,
+        'energyComplete' => $energyComplete,
+        ...$money,
     ];
 }
 
@@ -250,8 +273,8 @@ function appEnergyHistoryBuildPayload(
                     ],
                 ],
                 'gridMoney' => [
-                    'import' => appEnergyHistoryEmptyMoneyMetric(),
-                    'export' => appEnergyHistoryEmptyMoneyMetric(),
+                    'import' => appEnergyHistoryEmptyGridMetric(),
+                    'export' => appEnergyHistoryEmptyGridMetric(),
                 ],
                 'batteryFlow' => [
                     'complete' => true,
@@ -311,7 +334,13 @@ function appEnergyHistoryBuildPayload(
             'import' => [$gridFromWh, $consumerPrice],
             'export' => [$gridToWh, $spotPrice],
         ] as $direction => [$energyWh, $price]) {
-            if ($energyWh === null || $energyWh < 0 || ($energyWh > 0 && $price === null)) {
+            if ($energyWh === null || $energyWh < 0) {
+                $days[$date]['gridMoney'][$direction]['missingHours'][] = $hourLabel;
+                $days[$date]['gridMoney'][$direction]['energyMissingHours'][] = $hourLabel;
+                continue;
+            }
+            $days[$date]['gridMoney'][$direction]['whSum'] += $energyWh;
+            if ($energyWh > 0 && $price === null) {
                 $days[$date]['gridMoney'][$direction]['missingHours'][] = $hourLabel;
                 continue;
             }
@@ -456,8 +485,8 @@ function appEnergyHistoryBuildPayload(
             'neg' => round(-$day['dischargedWh'], 2),
             'priceTotals' => $priceTotals,
             'gridPriceTotals' => [
-                'import' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['import']),
-                'export' => appEnergyHistoryFinishMoneyMetric($day['gridMoney']['export']),
+                'import' => appEnergyHistoryFinishGridMetric($day['gridMoney']['import']),
+                'export' => appEnergyHistoryFinishGridMetric($day['gridMoney']['export']),
             ],
             'batteryFlowTotals' => $batteryFlow,
             'storedEnergyValue' => [

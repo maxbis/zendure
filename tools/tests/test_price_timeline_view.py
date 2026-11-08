@@ -48,10 +48,11 @@ def test_price_bars_show_details_and_action_tiles_edit_the_schedule():
     assert "Change scheduled action for" in source
 
 
-def test_exact_override_remains_primary_after_its_hour_has_passed():
+def test_non_auto_exact_override_remains_primary_after_its_hour_has_passed():
     source = PRICE_PLAN_JS.read_text(encoding="utf-8")
 
     assert "function exactOverrideSlot(key, day)" in source
+    assert 'if (String(exact.entry.value ?? "").trim().toLowerCase() === "auto") return null;' in source
     assert 'const exactOverride = exactOverrideSlot(`${day.date}${pad(hour)}00`, day.key);' in source
     assert "const history = exactOverride ? null : runtimeHistoryForHour(day, hour, currentHour);" in source
     assert "const slot = exactOverride || (dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot);" in source

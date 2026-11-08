@@ -4437,6 +4437,39 @@ dialog#app-energy-summary-tooltip.is-overview {
     font-weight: 650;
 }
 
+.app-energy-history__money-card dl > .app-energy-history__money-metric {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(68px, 20vw, 84px) clamp(58px, 16vw, 68px);
+    align-items: baseline;
+    column-gap: 8px;
+}
+
+.app-energy-history__money-card dl > .app-energy-history__money-metric > dd {
+    display: contents;
+}
+
+.app-energy-history__money-metric > dd > small,
+.app-energy-history__money-metric > dd > strong {
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.app-energy-history__money-metric > dd > small {
+    grid-column: 2;
+    color: var(--gsd-text-muted);
+    font-size: 0.64rem;
+    font-weight: 500;
+}
+
+.app-energy-history__money-metric > dd > strong {
+    grid-column: 3;
+    color: var(--gsd-text);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
 .app-energy-history__money-flow dd {
     display: flex;
     flex-direction: column;
@@ -4490,8 +4523,6 @@ dialog#app-energy-summary-tooltip.is-overview {
 }
 
 .app-energy-history__money-card dl > .app-energy-history__money-flow--unclassified {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     margin-block: 1px;
     padding-block: 5px;

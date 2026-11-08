@@ -1633,6 +1633,7 @@
     function exactOverrideSlot(key, day) {
         const exact = exactEntryFor(key, day);
         if (!exact?.entry) return null;
+        if (String(exact.entry.value ?? "").trim().toLowerCase() === "auto") return null;
 
         return {
             ...exact.entry,
