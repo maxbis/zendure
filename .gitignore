@@ -61,3 +61,4 @@ automate/config/config.jsonc
 /data/automation_status.json
 run_schedule/data/zendure_data.json
 /_archive/*
+planner/data/optimizer_runtime.jsonl
