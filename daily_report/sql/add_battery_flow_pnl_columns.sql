@@ -12,4 +12,6 @@ ALTER TABLE `hourly_report_inputs`
   ADD COLUMN IF NOT EXISTS `battery_export_revenue_milli_eur` INT NULL,
   ADD COLUMN IF NOT EXISTS `battery_flow_pnl_milli_eur` INT NULL,
   ADD COLUMN IF NOT EXISTS `battery_pnl_status` VARCHAR(32) NULL,
-  ADD COLUMN IF NOT EXISTS `battery_pnl_method_version` SMALLINT UNSIGNED NULL;
+  ADD COLUMN IF NOT EXISTS `battery_pnl_method_version` SMALLINT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS `battery_pnl_estimation_basis` VARCHAR(48) NULL,
+  ADD COLUMN IF NOT EXISTS `battery_pnl_confidence` VARCHAR(16) NULL;

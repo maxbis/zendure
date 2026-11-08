@@ -22,8 +22,9 @@ The app reads these sources, using local calendar dates and hours in **Europe/Am
 - Battery charge/discharge and battery percentage: battery-power and level records in `sqlite_replication.status_updates`. The report integrates power over time; chart bars are not solar measurements.
 - Grid import/export: cumulative meter counters `status_updates.total_act_x100` and `status_updates.total_act_ret_x100`. The report derives hourly energy from counter differences, interpolating hour boundaries where permitted.
 - Consumer and spot prices: `sqlite_replication.price_ticks`. Historical `hourly_report_inputs` rows store copies of the relevant hourly prices.
-- Solar production: `enphase_history.production_hourly.energy_wh`, filtered by the configured system ID and source (defaults: `5053376`, `production_micro`). Production is needed to estimate home load and therefore to classify battery discharge as home use or export. The Enphase source table is `production_hourly`, not merely the `enphase_history` database name.
-- Historical calculated values and audit status: `sqlite_replication.hourly_report_inputs`, one row per local date/hour. Its `battery_pnl_status` and `battery_pnl_method_version` indicate whether the four-way battery attribution is usable.
+- Optimizer schedule history: `planner/data/optimizer_schedule.log`. The last recorded plan decision covering an hour supplies the effective schedule value and expected household load used by the discharge estimate.
+- Solar production: `enphase_history.production_hourly.energy_wh` remains available for household-load reporting, but later production arrival does not revalue battery discharge.
+- Historical calculated values and audit status: `sqlite_replication.hourly_report_inputs`, one row per local date/hour. Method version 3 stores the schedule-assisted attribution, estimation basis and confidence.
 
 The API returns per-hour chart values and per-day `gridPriceTotals`, `batteryFlowTotals`, and `storedEnergyValue`. Battery-flow energy is stored in whole Wh, and financial components are stored in millieuros before display as euros. `storedEnergyValue` uses the configured battery capacity and round-trip efficiency from `common/config/system.json`.
 
@@ -37,26 +38,19 @@ The API returns per-hour chart values and per-day `gridPriceTotals`, `batteryFlo
 
 The grid figures use grid-meter flows; they do not require solar production to split battery discharge. A missing meter total or required hourly price makes the affected full-day grid figure unavailable (`—`), rather than treating missing data as zero.
 
-### Battery P&L: classified hours
+### Battery P&L: schedule-assisted discharge estimate
 
-Version 2 of the hourly report attributes charging and discharging as follows:
+Version 3 of the hourly report values charging and discharging as follows:
 
 1. Charging concurrent with grid import is attributed to **From grid · consumer price**, up to the charged energy. Remaining charge is **From surplus solar · spot price**: the spot price represents the opportunity cost of not exporting that energy.
-2. Estimated home load is `max(0, solar production + grid import − grid export + battery discharge − battery charge)` for the hour.
-3. Battery discharge is assigned to **Used at home · consumer price** up to estimated home load. Any remainder is **Exported · spot price**.
-4. **Battery flow P&L** = home-use value + battery-export value − grid-charging cost − surplus-solar charging opportunity cost.
+2. When the last applicable schedule is NZ−, limited NZ− or otherwise not a fixed negative command, measured discharge is estimated as household use and valued at the consumer price.
+3. When the schedule is a fixed negative command, expected household Wh is `plan load W × elapsed hours`. Measured discharge up to that amount is valued at the consumer price; the remainder is valued at the spot price.
+4. When measured `grid_to_wh` is available, estimated battery export is capped by that measured grid-export energy. When it is unavailable, the schedule-and-load split remains usable with medium confidence.
+5. **Battery flow P&L** = estimated home-use value + estimated battery-export value − grid-charging cost − surplus-solar charging opportunity cost.
 
 The home/export discharge split is an **estimate derived from an energy balance**, not a separately metered battery-export reading. Likewise, the four-way battery P&L is not an additional saving to subtract from net grid cost.
 
-### Battery P&L: conservative fallback
-
-If an hour has measured battery discharge but lacks a usable home/export split, the app does **not** report that discharge as zero or call it export revenue. It shows **Unclassified** as a normal detail row at the same level as confirmed home use and export, with a muted tag and the sublabel **Valued at lower hourly price**. The app values that hour's discharge at `min(consumer price, spot price)`. This is a provisional conservative value; a negative spot price can make it negative. Both hourly prices must exist for this fallback. The confirmed exported amount is not increased by unclassified discharge.
-
-Charging cost in such an hour is still included when its grid/surplus Wh split and the relevant hourly prices are available. The **Battery P&L** result at the bottom of the Battery flows card is numeric only when every elapsed hour has both a covered charging cost and a covered discharge value. The unclassified tag and lower-price sublabel identify the conservative estimate without a warning-colored row or separate banner. Otherwise the flow details remain visible but the whole-day flow P&L is unavailable. If a required hourly price or charging input is missing, the sublabel says so. Classified home/export rows remain separate from the unclassified fallback row.
-
-The discharge details omit a classified home-use or export row when its energy is exactly zero. A non-zero kWh row stays visible even when its euro amount rounds to €0.00. When there is no measured discharge, the details instead say **No battery discharge recorded**; the total remains visible. Missing classified values are not turned into confirmed zeroes when only unclassified discharge is available.
-
-When all hours have complete version-2 attribution, the **Battery P&L** result uses the classified values. A **Partial** label means only some hours have complete attribution; a partial sum must not be read as a full-day result.
+The former second, conservative lower-price calculation has been removed. The app shows one **Estimated** discharge row. Its subtitle identifies consumer-price self-consumption valuation or mixed consumer/spot valuation for fixed discharge. A missing applicable schedule leaves the hour unavailable rather than introducing a different valuation method.
 
 ### Stored energy and final contribution
 
@@ -68,7 +62,7 @@ When all hours have complete version-2 attribution, the **Battery P&L** result u
 ## Timing and freshness
 
 1. **Today:** On page load or the Battery energy refresh button, the browser requests `main/api/app_energy_history.php`. The API runs the daily-report generator for today against current `status_updates`, `price_ticks`, and available `production_hourly` rows. It counts only elapsed hours, including the current partial hour. It does not wait for the midnight updater. If this live calculation fails, the API falls back to today's stored `hourly_report_inputs` and marks the response stale.
-2. **Yesterday and older days:** The API reads stored `hourly_report_inputs`; opening or refreshing the dialog does not recompute those historical rows. The updater recomputes **yesterday and today** by default, so a later successful run can correct yesterday after late-arriving meter or Enphase data appears.
+2. **Yesterday and older days:** The API reads stored `hourly_report_inputs`; opening or refreshing the dialog does not recompute those historical rows. Later solar or derived home-load arrival does not change a version-3 discharge valuation.
 3. **Observed qool timing during the September 2026 investigation:** the production updater was observed running about **00:01 Europe/Amsterdam**, once per day. That run included the previous day, but an Enphase hourly production row was observed arriving around **01:00** afterward. Consequently, the 00:01 historical snapshot could say `missing_home_load` even though the production row was visible later. This is an observed deployment schedule and incident, not a timing guarantee encoded in this repository. Verify the current production scheduler and ingestion logs before assuming those times still apply.
 4. **Recovery:** Rerun `python3 daily_report/tools/update_hourly_report_inputs.py --date YYYY-MM-DD` **after** the relevant production and price rows have arrived, then refresh the app. For a normal daily run, omitting `--date` recomputes yesterday and today. Running it at about 02:00 is useful only if ingestion has finished by then; the condition is source-data completeness, not the clock time itself.
 
@@ -77,7 +71,7 @@ The repository's `docs/daily-report-operations.md` gives a more frequent **examp
 ## Edge cases and failure modes
 
 - An absent `production_hourly` row means **unknown production**, not zero solar. A recorded `energy_wh = 0` is an observed zero and can support home-load attribution.
-- Production is needed for the classified home/export split, but **not** for the conservative lower-price value of measured discharge. Other missing inputs, including battery boundary samples, grid counters, or prices, can still prevent a complete battery P&L.
+- Missing `grid_to_wh` does not prevent fixed-discharge estimation; it removes the measured export cap and lowers confidence from high to medium. Missing measured battery discharge is never replaced with scheduled energy.
 - An hour with no battery energy movement can have complete zero battery P&L without requiring otherwise irrelevant prices or production.
 - A price or production row arriving after the historical updater does not automatically change `hourly_report_inputs`; a rerun is required.
 - Currency displayed to cents is rounded from hourly millieuro components. Subtracting displayed rounded subtotals can therefore differ by one cent from the displayed P&L.

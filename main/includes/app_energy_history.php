@@ -60,7 +60,8 @@ function appEnergyHistoryFetchRows(PDO $pdo, string $startDate, string $endDate)
                 battery_discharge_home_wh, battery_discharge_export_wh,
                 battery_charge_cost_milli_eur, battery_home_savings_milli_eur,
                 battery_export_revenue_milli_eur, battery_flow_pnl_milli_eur,
-                battery_pnl_status, battery_pnl_method_version
+                battery_pnl_status, battery_pnl_method_version,
+                battery_pnl_estimation_basis, battery_pnl_confidence
          FROM hourly_report_inputs
          WHERE local_date BETWEEN :start_date AND :end_date
          ORDER BY local_date ASC, local_hour ASC'
@@ -140,6 +141,8 @@ function appEnergyHistoryMapLiveReportRows(array $report, array $priceRows, stri
             'battery_flow_pnl_milli_eur' => $hourRow['battery_flow_pnl_milli_eur'] ?? null,
             'battery_pnl_status' => $hourRow['battery_pnl_status'] ?? null,
             'battery_pnl_method_version' => $hourRow['battery_pnl_method_version'] ?? null,
+            'battery_pnl_estimation_basis' => $hourRow['battery_pnl_estimation_basis'] ?? null,
+            'battery_pnl_confidence' => $hourRow['battery_pnl_confidence'] ?? null,
         ];
     }
     return $mapped;
@@ -267,19 +270,8 @@ function appEnergyHistoryBuildPayload(
                     'homeSavingsMilliEur' => 0,
                     'exportRevenueMilliEur' => 0,
                     'pnlMilliEur' => 0,
-                    'conservative' => [
-                        'chargeGridWh' => 0,
-                        'chargeSurplusWh' => 0,
-                        'chargeGridMilliEur' => 0,
-                        'chargeSurplusMilliEur' => 0,
-                        'chargeCostMilliEur' => 0,
-                        'unclassifiedWh' => 0,
-                        'unclassifiedValueMilliEur' => 0,
-                        'dischargeValueMilliEur' => 0,
-                        'pnlMilliEur' => 0,
-                        'missingChargeHours' => [],
-                        'missingDischargeHours' => [],
-                    ],
+                    'estimationBases' => [],
+                    'confidenceLevels' => [],
                 ],
             ];
         }
@@ -346,7 +338,7 @@ function appEnergyHistoryBuildPayload(
         }
         $days[$date]['batteryFlow']['elapsedHours']++;
         $batteryComplete = $batteryStatus === 'complete'
-            && (int)($row['battery_pnl_method_version'] ?? 0) === 2
+            && (int)($row['battery_pnl_method_version'] ?? 0) === 3
             && !in_array(null, $batteryValues, true)
             && (
                 $batteryValues['battery_charge_grid_wh'] + $batteryValues['battery_discharge_home_wh'] === 0.0
@@ -360,46 +352,6 @@ function appEnergyHistoryBuildPayload(
             $days[$date]['batteryFlow']['complete'] = false;
             $days[$date]['batteryFlow']['missingHours'][] = $hourLabel;
             $days[$date]['batteryFlow']['reasons'][] = $batteryStatus === 'complete' ? 'unavailable' : $batteryStatus;
-
-            // Charging can still be valued when only the discharge destination is unknown.
-            $chargeGridWh = $batteryValues['battery_charge_grid_wh'];
-            $chargeSurplusWh = $batteryValues['battery_charge_surplus_wh'];
-            $chargeKnown = $chargedWh <= 0.0 || (
-                $chargeGridWh !== null && $chargeSurplusWh !== null
-                && $chargeGridWh >= 0 && $chargeSurplusWh >= 0
-                && abs($chargeGridWh + $chargeSurplusWh - $chargedWh) <= 1.0
-            );
-            if (!$chargeKnown || ($chargeGridWh > 0 && $consumerPrice === null)
-                || ($chargeSurplusWh > 0 && $spotPrice === null)) {
-                $days[$date]['batteryFlow']['conservative']['missingChargeHours'][] = $hourLabel;
-            } elseif ($chargedWh > 0.0) {
-                $conservative =& $days[$date]['batteryFlow']['conservative'];
-                $gridWh = (int)round($chargeGridWh);
-                $surplusWh = (int)round($chargeSurplusWh);
-                $gridCost = (int)round($gridWh * ($consumerPrice ?? 0.0));
-                $chargeCost = (int)round($gridWh * ($consumerPrice ?? 0.0) + $surplusWh * ($spotPrice ?? 0.0));
-                $conservative['chargeGridWh'] += $gridWh;
-                $conservative['chargeSurplusWh'] += $surplusWh;
-                $conservative['chargeGridMilliEur'] += $gridCost;
-                $conservative['chargeSurplusMilliEur'] += $chargeCost - $gridCost;
-                $conservative['chargeCostMilliEur'] += $chargeCost;
-                unset($conservative);
-            }
-
-            // Without a destination split, use the lower hourly price, not "export revenue".
-            if ($dischargedWh > 0.0) {
-                $conservative =& $days[$date]['batteryFlow']['conservative'];
-                $unclassifiedWh = (int)round($dischargedWh);
-                $conservative['unclassifiedWh'] += $unclassifiedWh;
-                if ($consumerPrice === null || $spotPrice === null) {
-                    $conservative['missingDischargeHours'][] = $hourLabel;
-                } else {
-                    $value = (int)round($unclassifiedWh * min($consumerPrice, $spotPrice));
-                    $conservative['unclassifiedValueMilliEur'] += $value;
-                    $conservative['dischargeValueMilliEur'] += $value;
-                }
-                unset($conservative);
-            }
         } else {
             $flow =& $days[$date]['batteryFlow'];
             $flow['valuedHours']++;
@@ -415,15 +367,10 @@ function appEnergyHistoryBuildPayload(
             $flow['homeSavingsMilliEur'] += (int)$batteryValues['battery_home_savings_milli_eur'];
             $flow['exportRevenueMilliEur'] += (int)$batteryValues['battery_export_revenue_milli_eur'];
             $flow['pnlMilliEur'] += (int)$batteryValues['battery_flow_pnl_milli_eur'];
-            $conservative =& $flow['conservative'];
-            $conservative['chargeGridWh'] += (int)$batteryValues['battery_charge_grid_wh'];
-            $conservative['chargeSurplusWh'] += (int)$batteryValues['battery_charge_surplus_wh'];
-            $conservative['chargeGridMilliEur'] += $gridChargeMilliEur;
-            $conservative['chargeSurplusMilliEur'] += $chargeMilliEur - $gridChargeMilliEur;
-            $conservative['chargeCostMilliEur'] += $chargeMilliEur;
-            $conservative['dischargeValueMilliEur'] += (int)$batteryValues['battery_home_savings_milli_eur']
-                + (int)$batteryValues['battery_export_revenue_milli_eur'];
-            unset($conservative);
+            $basis = trim((string)($row['battery_pnl_estimation_basis'] ?? ''));
+            $confidence = trim((string)($row['battery_pnl_confidence'] ?? ''));
+            if ($basis !== '') $flow['estimationBases'][] = $basis;
+            if ($confidence !== '') $flow['confidenceLevels'][] = $confidence;
             unset($flow);
         }
 
@@ -487,24 +434,13 @@ function appEnergyHistoryBuildPayload(
         $batteryFlow = $day['batteryFlow'];
         $batteryFlow['reasons'] = array_values(array_unique($batteryFlow['reasons']));
         $batteryFlow['partial'] = !$batteryFlow['complete'] && $batteryFlow['valuedHours'] > 0;
-        $conservative =& $batteryFlow['conservative'];
-        $conservative['chargeComplete'] = $conservative['missingChargeHours'] === [];
-        $conservative['dischargeComplete'] = $conservative['missingDischargeHours'] === [];
-        $conservative['complete'] = $conservative['chargeComplete'] && $conservative['dischargeComplete'];
-        if (!$conservative['chargeComplete']) {
-            foreach (['chargeGridWh', 'chargeSurplusWh', 'chargeGridMilliEur',
-                'chargeSurplusMilliEur', 'chargeCostMilliEur'] as $field) {
-                $conservative[$field] = null;
-            }
-        }
-        if (!$conservative['dischargeComplete']) {
-            $conservative['unclassifiedValueMilliEur'] = null;
-            $conservative['dischargeValueMilliEur'] = null;
-        }
-        $conservative['pnlMilliEur'] = $conservative['complete']
-            ? $conservative['dischargeValueMilliEur'] - $conservative['chargeCostMilliEur']
-            : null;
-        unset($conservative);
+        $bases = array_values(array_unique($batteryFlow['estimationBases']));
+        $batteryFlow['estimationBasis'] = count($bases) === 1 ? $bases[0] : ($bases === [] ? null : 'mixed');
+        $confidenceOrder = ['low' => 0, 'medium' => 1, 'high' => 2];
+        $confidenceLevels = array_values(array_unique($batteryFlow['confidenceLevels']));
+        usort($confidenceLevels, static fn(string $a, string $b): int => ($confidenceOrder[$a] ?? -1) <=> ($confidenceOrder[$b] ?? -1));
+        $batteryFlow['confidence'] = $confidenceLevels[0] ?? null;
+        unset($batteryFlow['estimationBases'], $batteryFlow['confidenceLevels']);
         if (!$batteryFlow['complete'] && !$batteryFlow['partial']) {
             foreach ([
                 'chargeGridWh', 'chargeSurplusWh', 'dischargeHomeWh', 'dischargeExportWh',

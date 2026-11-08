@@ -61,13 +61,16 @@ DEFAULT_TIMEZONE = "Europe/Amsterdam"
 EVENT_TYPE_CHANGE = "change"
 BOUNDARY_FALLBACK_MAX_SECONDS = 3600
 COUNTER_DELTA_EPSILON_WH = 1e-9
-BATTERY_PNL_METHOD_VERSION = 2
+BATTERY_PNL_METHOD_VERSION = 3
 
 # This file lives in daily_report/tools/; canonical paths for data and repo assets.
 DAILY_REPORT_TOOLS_DIR = Path(__file__).resolve().parent
 DAILY_REPORT_ROOT = DAILY_REPORT_TOOLS_DIR.parent
 REPO_ROOT = DAILY_REPORT_ROOT.parent
 DEFAULT_PRICE_ROOT = REPO_ROOT / "main" / "data" / "price"
+DEFAULT_OPTIMIZER_SCHEDULE_LOG = Path(
+    os.getenv("PLANNER_SHADOW_LOG_PATH", str(REPO_ROOT / "planner" / "data" / "optimizer_schedule.log"))
+)
 
 
 @dataclass(frozen=True)
@@ -126,6 +129,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--production-system-id", type=int, default=DEFAULT_PRODUCTION_SYSTEM_ID)
     parser.add_argument("--production-source", default=DEFAULT_PRODUCTION_SOURCE)
     parser.add_argument(
+        "--optimizer-schedule-log",
+        default=str(DEFAULT_OPTIMIZER_SCHEDULE_LOG),
+        help="Append-only optimizer plan journal used for schedule-assisted discharge valuation.",
+    )
+    parser.add_argument(
         "--timezone",
         default=DEFAULT_TIMEZONE,
         help=f"IANA timezone (default: {DEFAULT_TIMEZONE})",
@@ -148,6 +156,87 @@ def _json_default(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def load_schedule_map_for_day(
+    log_path: str | Path,
+    *,
+    target_day_start: datetime,
+    analysis_end_ts: int,
+) -> dict[str, dict[str, Any]]:
+    """Select the last recorded plan decision covering each local hour."""
+    path = Path(log_path)
+    if not path.is_file():
+        return {}
+
+    day_end = target_day_start + timedelta(days=1)
+    selected: dict[str, dict[str, Any]] = {}
+    earliest_relevant = target_day_start - timedelta(days=2)
+
+    def reverse_lines() -> Iterable[str]:
+        try:
+            handle = path.open("rb")
+        except OSError:
+            return
+        with handle:
+            handle.seek(0, os.SEEK_END)
+            position = handle.tell()
+            remainder = b""
+            while position > 0:
+                read_size = min(64 * 1024, position)
+                position -= read_size
+                handle.seek(position)
+                block = handle.read(read_size) + remainder
+                parts = block.split(b"\n")
+                remainder = parts[0]
+                for raw_line in reversed(parts[1:]):
+                    if raw_line:
+                        yield raw_line.decode("utf-8", errors="replace")
+            if remainder:
+                yield remainder.decode("utf-8", errors="replace")
+
+    for line in reverse_lines():
+        try:
+            payload = json.loads(line)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        plan = payload.get("plan") if isinstance(payload, dict) else None
+        decisions = plan.get("decisions") if isinstance(plan, dict) else None
+        try:
+            generated = datetime.fromisoformat(str(plan.get("generated_at")))
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if generated < earliest_relevant:
+            break
+        if generated.tzinfo is None or generated.timestamp() > analysis_end_ts:
+            continue
+        if not isinstance(decisions, list):
+            continue
+        for decision in decisions:
+            if not isinstance(decision, dict):
+                continue
+            try:
+                start = datetime.fromisoformat(str(decision.get("start")))
+                end = datetime.fromisoformat(str(decision.get("end")))
+            except (TypeError, ValueError):
+                continue
+            if start.tzinfo is None or end.tzinfo is None or end <= target_day_start or start >= day_end:
+                continue
+            hour = max(start, target_day_start).astimezone(target_day_start.tzinfo).hour
+            key = f"{hour:02d}"
+            if key in selected:
+                continue
+            schedule_value = decision.get("schedule_value")
+            if isinstance(schedule_value, bool) or not isinstance(schedule_value, (str, int, float)):
+                schedule_value = None
+            load_w = _parse_numeric_value(decision.get("load_w"))
+            selected[key] = {
+                "schedule_value": schedule_value,
+                "load_w": max(0.0, load_w) if load_w is not None else None,
+                "generated_at": generated.isoformat(),
+                "generated_at_ts": generated.timestamp(),
+            }
+    return selected
 
 
 def _round_or_none(value: float | None, digits: int = 2) -> float | None:
@@ -632,7 +721,9 @@ def build_battery_flow_pnl_window(
     end_ts: int,
     consumer_eur_per_kwh: float | None,
     spot_eur_per_kwh: float | None,
-    estimated_home_load_wh: float | None = None,
+    schedule_value: object = None,
+    expected_household_wh: float | None = None,
+    measured_grid_export_wh: float | None = None,
     expected_charged_wh: float | None = None,
     expected_discharged_wh: float | None = None,
     fallback_seconds: int = BOUNDARY_FALLBACK_MAX_SECONDS,
@@ -648,6 +739,8 @@ def build_battery_flow_pnl_window(
         "battery_flow_pnl_milli_eur": None,
         "battery_pnl_status": "not_calculated",
         "battery_pnl_method_version": None,
+        "battery_pnl_estimation_basis": None,
+        "battery_pnl_confidence": None,
     }
     if end_ts <= start_ts:
         return empty
@@ -717,16 +810,42 @@ def build_battery_flow_pnl_window(
     discharged_total = expected_discharged_wh if expected_discharged_wh is not None else discharged_exact
     charge_grid_wh, charge_surplus_wh = _round_split(charged_total, charge_grid_exact)
     discharged_total_wh = _round_wh(discharged_total)
-    if discharged_total_wh > 0 and estimated_home_load_wh is None:
+    estimation_basis = None
+    confidence = None
+    if discharged_total_wh <= 0:
+        discharge_home_wh = 0
+        discharge_export_wh = 0
+    elif schedule_value is None:
         return {
             **empty,
             "battery_charge_grid_wh": charge_grid_wh,
             "battery_charge_surplus_wh": charge_surplus_wh,
-            "battery_pnl_status": "missing_home_load",
+            "battery_pnl_status": "missing_schedule",
             "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
         }
-    discharge_home_wh = min(discharged_total_wh, _round_wh(estimated_home_load_wh or 0.0))
-    discharge_export_wh = discharged_total_wh - discharge_home_wh
+    elif isinstance(schedule_value, (int, float)) and not isinstance(schedule_value, bool) and schedule_value < 0:
+        if expected_household_wh is None:
+            return {
+                **empty,
+                "battery_charge_grid_wh": charge_grid_wh,
+                "battery_charge_surplus_wh": charge_surplus_wh,
+                "battery_pnl_status": "missing_schedule",
+                "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+            }
+        expected_home_wh = min(discharged_total_wh, _round_wh(max(0.0, expected_household_wh)))
+        discharge_export_wh = discharged_total_wh - expected_home_wh
+        if measured_grid_export_wh is not None:
+            discharge_export_wh = min(discharge_export_wh, _round_wh(max(0.0, measured_grid_export_wh)))
+            confidence = "high"
+        else:
+            confidence = "medium"
+        discharge_home_wh = discharged_total_wh - discharge_export_wh
+        estimation_basis = "schedule_fixed_discharge"
+    else:
+        discharge_home_wh = discharged_total_wh
+        discharge_export_wh = 0
+        estimation_basis = "schedule_self_consumption"
+        confidence = "high"
 
     if (charge_grid_wh > 0 or discharge_home_wh > 0) and consumer_eur_per_kwh is None:
         status = "missing_consumer_price"
@@ -743,6 +862,8 @@ def build_battery_flow_pnl_window(
         "battery_discharge_export_wh": discharge_export_wh,
         "battery_pnl_status": status,
         "battery_pnl_method_version": BATTERY_PNL_METHOD_VERSION,
+        "battery_pnl_estimation_basis": estimation_basis,
+        "battery_pnl_confidence": confidence,
     }
     if status != "complete":
         return result
@@ -775,6 +896,7 @@ def build_daily_report(
     prices_by_hour: dict[str, float | None] | None = None,
     spot_prices_by_hour: dict[str, float | None] | None = None,
     production_by_hour: dict[str, float] | None = None,
+    schedule_by_hour: dict[str, dict[str, Any]] | None = None,
     price_file_path: Path | None = None,
     price_file_found: bool | None = None,
     price_source: str | None = None,
@@ -913,20 +1035,14 @@ def build_daily_report(
                 end_ts=effective_bucket_end_ts,
                 consumer_eur_per_kwh=price_eur_per_kwh,
                 spot_eur_per_kwh=spot_eur_per_kwh,
-                estimated_home_load_wh=(
-                    _round_wh(
-                        production_by_hour[hour_key]
-                        + grid_from_wh
-                        - grid_to_wh
-                        + discharged_wh
-                        - charged_wh
-                    )
-                    if production_by_hour is not None
-                    and hour_key in production_by_hour
-                    and grid_from_wh is not None
-                    and grid_to_wh is not None
+                schedule_value=(schedule_by_hour or {}).get(hour_key, {}).get("schedule_value"),
+                expected_household_wh=(
+                    (schedule_by_hour or {}).get(hour_key, {}).get("load_w")
+                    * ((effective_bucket_end_ts - bucket_start_ts) / 3600.0)
+                    if (schedule_by_hour or {}).get(hour_key, {}).get("load_w") is not None
                     else None
                 ),
+                measured_grid_export_wh=grid_to_wh,
                 expected_charged_wh=round(charged_wh, 2),
                 expected_discharged_wh=round(discharged_wh, 2),
                 fallback_seconds=fallback_seconds,
@@ -948,6 +1064,8 @@ def build_daily_report(
                 "battery_flow_pnl_milli_eur": None,
                 "battery_pnl_status": "not_calculated",
                 "battery_pnl_method_version": None,
+                "battery_pnl_estimation_basis": None,
+                "battery_pnl_confidence": None,
             }
 
         hours.append(
@@ -1078,6 +1196,11 @@ def main() -> int:
             prices_by_hour=prices_by_hour,
             spot_prices_by_hour=spot_prices_by_hour,
             production_by_hour=production_by_hour,
+            schedule_by_hour=load_schedule_map_for_day(
+                args.optimizer_schedule_log,
+                target_day_start=target_day_start,
+                analysis_end_ts=analysis_end_ts,
+            ),
             price_file_path=None,
             price_file_found=price_file_found,
             price_source="db:price_ticks",

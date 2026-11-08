@@ -32,6 +32,8 @@ $configLoadError = $configurationErrors === [] ? null : implode(' ', $configurat
 $reloadToken = isset($_GET['_reload']) && preg_match('/^\d{10,16}$/', (string) $_GET['_reload'])
     ? (string) $_GET['_reload']
     : null;
+$energyHistoryAssetToken = $reloadToken
+    ?? (string) filemtime(__DIR__ . '/assets/js/energy-history.js');
 
 function appAssetUrl(string $path, ?string $reloadToken): string
 {
@@ -146,7 +148,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/health-metric-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
-    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $energyHistoryAssetToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/shortwave-radiation.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/automation-control-dialog.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </head>
@@ -691,6 +693,12 @@ $appConfig = [
     <?php
     $gsdFooterMoreSpriteHref = '../themes/graphite-signal-dark/assets/icons/sprite.svg';
     $gsdFooterMoreItems = [
+        [
+            'href' => '../daily_report/',
+            'label' => 'Energy Reports',
+            'description' => 'Daily and monthly grid cost and battery contribution',
+            'icon' => 'chart',
+        ],
         [
             'href' => 'optimizer.php',
             'label' => 'Optimizer Comparison',

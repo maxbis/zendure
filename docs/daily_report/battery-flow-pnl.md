@@ -55,11 +55,15 @@ Audit fields are:
 
 ## Flow and behavior
 
-Method version 2 keeps interval-level charge attribution and allocates discharge home-first at hourly level.
+Method version 3 keeps interval-level charge attribution and uses the last applicable optimizer plan for discharge estimation.
 
 1. When the battery charges while the meter imports, then up to the charged energy is classified as grid charge.
 2. When charged energy exceeds grid import, then the remainder is classified as surplus charge.
-3. Estimated hourly home load is derived from the hourly energy balance:
+3. When the schedule is not a fixed negative command, then measured discharge is estimated as household use.
+4. When the schedule is fixed negative, then expected household Wh comes from plan load and elapsed duration; remaining measured discharge is estimated as export.
+5. When measured grid-export Wh is available, then it caps estimated battery export. When it is unavailable, the uncapped schedule estimate remains usable with medium confidence.
+
+The separate household-load metric may still be derived for other reporting:
 
 ```text
 estimated home load Wh = round(max(0,
@@ -71,8 +75,6 @@ estimated home load Wh = round(max(0,
 ))
 ```
 
-4. Battery discharge is allocated to home first, up to estimated home load.
-5. Any remaining battery discharge is classified as export.
 6. When a battery-power interval crosses an hourly boundary, then it is split before hourly totals and prices are applied.
 
 Whole-Wh components reconcile exactly:
@@ -105,7 +107,7 @@ Negative spot prices are preserved. They can make surplus charging cost negative
 - When no battery energy moves, then missing prices or counters are not required and the complete PnL is zero.
 - When the battery state before an hour cannot be established, then status is `missing_boundary_sample`.
 - When a required import or export counter boundary is absent, then status is `missing_grid_counters`.
-- When production or an hourly grid total needed to estimate home load is absent during discharge, then status is `missing_home_load`.
+- When an applicable optimizer plan is absent during discharge, then status is `missing_schedule`.
 - When a PnL-only backfill reconstructs a battery total that differs materially from the existing stored hourly total, then status is `energy_total_mismatch`; legacy energy fields are not silently rewritten.
 - When household discharge or grid charging needs a missing consumer price, then status is `missing_consumer_price`.
 - When surplus charging or battery export needs a missing spot price, then status is `missing_spot_price`.
