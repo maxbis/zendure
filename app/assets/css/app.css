@@ -2756,6 +2756,45 @@ dialog.app-schedule-tooltip {
     gap: 1px;
 }
 
+.app-schedule-tooltip__action-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.app-schedule-tooltip__source-pill {
+    display: inline-flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: center;
+    min-height: 18px;
+    padding: 2px 7px;
+    overflow: hidden;
+    background: var(--gsd-surface-3);
+    border: 1px solid var(--gsd-border);
+    border-radius: 999px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.55rem;
+    font-weight: 750;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-schedule-tooltip__source-pill[data-source="manual"] {
+    background: var(--gsd-accent-soft);
+    border-color: color-mix(in srgb, var(--gsd-accent) 42%, transparent);
+    color: var(--gsd-accent);
+}
+
+.app-schedule-tooltip__source-pill[data-source="optimizer"] {
+    background: var(--gsd-price-soft);
+    border-color: color-mix(in srgb, var(--gsd-price) 42%, transparent);
+    color: var(--gsd-price);
+}
+
 .app-schedule-tooltip__action strong {
     color: var(--gsd-text);
     font-size: 0.7rem;
@@ -2764,6 +2803,11 @@ dialog.app-schedule-tooltip {
 .app-schedule-tooltip__action > span:last-child > span {
     color: var(--gsd-text-secondary);
     font-size: 0.61rem;
+}
+
+.app-schedule-tooltip__action > span:last-child > .app-schedule-tooltip__action-heading {
+    color: inherit;
+    font-size: inherit;
 }
 
 .app-schedule-tooltip__history {
@@ -3320,54 +3364,6 @@ dialog.app-schedule-tooltip {
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     line-height: 1.2;
-}
-
-.app-schedule-origin {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0 0 14px;
-    padding: 10px 12px;
-    border: 1px solid var(--gsd-border);
-    border-radius: 10px;
-    background: var(--gsd-surface-2);
-}
-
-.app-schedule-origin .gsd-badge {
-    flex: 0 0 auto;
-    min-height: 24px;
-    padding: 3px 8px;
-    font-size: 0.68rem;
-}
-
-.app-schedule-origin p {
-    min-width: 0;
-    margin: 0;
-    color: var(--gsd-text-secondary);
-    font-size: 0.7rem;
-    line-height: 1.35;
-}
-
-.app-schedule-origin[data-origin="manual"] {
-    border-color: color-mix(in srgb, var(--gsd-accent) 38%, var(--gsd-border));
-    background: color-mix(in srgb, var(--gsd-accent-soft) 46%, var(--gsd-surface-2));
-}
-
-.app-schedule-origin[data-origin="manual"] .gsd-badge {
-    border-color: color-mix(in srgb, var(--gsd-accent) 42%, transparent);
-    background: var(--gsd-accent-soft);
-    color: var(--gsd-accent);
-}
-
-.app-schedule-origin[data-origin="optimizer"] {
-    border-color: color-mix(in srgb, var(--gsd-price) 38%, var(--gsd-border));
-    background: color-mix(in srgb, var(--gsd-price-soft) 42%, var(--gsd-surface-2));
-}
-
-.app-schedule-origin[data-origin="optimizer"] .gsd-badge {
-    border-color: color-mix(in srgb, var(--gsd-price) 42%, transparent);
-    background: var(--gsd-price-soft);
-    color: var(--gsd-price);
 }
 
 .app-edit-fieldset {

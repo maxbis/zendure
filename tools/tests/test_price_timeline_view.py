@@ -58,25 +58,34 @@ def test_non_auto_exact_override_remains_primary_after_its_hour_has_passed():
     assert "const slot = exactOverride || (dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot);" in source
 
 
-def test_schedule_editor_identifies_manual_optimizer_and_rules_origins():
+def test_schedule_editor_uses_the_resolved_slot_after_an_auto_boundary():
     partial_source = PRICE_PLAN_PARTIAL.read_text(encoding="utf-8")
     js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
     css_source = APP_CSS.read_text(encoding="utf-8")
 
-    assert 'data-role="schedule-edit-origin"' in partial_source
-    assert 'data-role="schedule-edit-origin-label"' in partial_source
-    assert 'data-role="schedule-edit-origin-description"' in partial_source
+    assert 'data-role="schedule-edit-origin"' not in partial_source
     assert "function isManualOverride(entry)" in js_source
     assert 'String(entry.entry.value ?? "").trim().toLowerCase() !== "auto"' in js_source
-    assert "function scheduleOrigin(slot, exact)" in js_source
-    assert 'key: "manual"' in js_source
-    assert 'key: "optimizer"' in js_source
-    assert 'key: "rules"' in js_source
-    assert 'label: "User override"' in js_source
-    assert 'label: "Optimizer plan"' in js_source
     assert 'const entry = isManualOverride(exact) ? exact.entry : detail.slot' in js_source
-    assert '.app-schedule-origin[data-origin="manual"]' in css_source
-    assert '.app-schedule-origin[data-origin="optimizer"]' in css_source
+    assert ".app-schedule-origin" not in css_source
+
+
+def test_hourly_details_places_a_compact_source_pill_beside_the_action():
+    js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
+
+    assert "function tooltipSourcePill(slot)" in js_source
+    assert 'manual: "User"' in js_source
+    assert 'optimizer: "Optimizer"' in js_source
+    assert 'pill.dataset.source = origin.key;' in js_source
+    assert 'heading.className = "app-schedule-tooltip__action-heading";' in js_source
+    assert "if (showSource) heading.appendChild(tooltipSourcePill(slot));" in js_source
+    assert "tooltipActionRow(slot, action, { showSource: true })" in js_source
+    assert "const slotIsManualOverride = /^\\d{12}$/.test(slotKey)" in js_source
+    assert ".app-schedule-tooltip__action-heading" in css_source
+    assert 'justify-content: space-between;' in css_source
+    assert '.app-schedule-tooltip__source-pill[data-source="manual"]' in css_source
+    assert '.app-schedule-tooltip__source-pill[data-source="optimizer"]' in css_source
 
 
 def test_schedule_tooltip_promotes_values_and_uses_secondary_text_for_labels():

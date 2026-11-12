@@ -42,9 +42,6 @@
         form: editDialog.querySelector('[data-role="schedule-edit-form"]'),
         title: editDialog.querySelector('[data-role="schedule-edit-title"]'),
         priceSummary: editDialog.querySelector('[data-role="schedule-edit-price-summary"]'),
-        origin: editDialog.querySelector('[data-role="schedule-edit-origin"]'),
-        originLabel: editDialog.querySelector('[data-role="schedule-edit-origin-label"]'),
-        originDescription: editDialog.querySelector('[data-role="schedule-edit-origin-description"]'),
         modeInputs: Array.from(editDialog.querySelectorAll('input[name="schedule-mode"]')),
         fixedField: editDialog.querySelector('[data-role="schedule-fixed-field"]'),
         watts: editDialog.querySelector('input[name="watts"]'),
@@ -968,7 +965,23 @@
         priceTooltip.style.visibility = "visible";
     }
 
-    function tooltipActionRow(slot, action) {
+    function tooltipSourcePill(slot) {
+        const origin = scheduleOrigin(slot);
+        const labels = {
+            manual: "User",
+            optimizer: "Optimizer",
+            rules: "Rules"
+        };
+        const pill = document.createElement("span");
+        pill.className = "app-schedule-tooltip__source-pill";
+        pill.dataset.source = origin.key;
+        pill.textContent = labels[origin.key] || origin.label;
+        pill.title = origin.description;
+        pill.setAttribute("aria-label", `Schedule source: ${origin.label}. ${origin.description}`);
+        return pill;
+    }
+
+    function tooltipActionRow(slot, action, { showSource = false } = {}) {
         const row = document.createElement("div");
         row.className = "app-schedule-tooltip__action";
 
@@ -978,13 +991,17 @@
         setActionBadgeContent(badge, slot, action);
 
         const copy = document.createElement("span");
+        const heading = document.createElement("span");
+        heading.className = "app-schedule-tooltip__action-heading";
         const label = document.createElement("strong");
         label.textContent = action.label;
+        heading.appendChild(label);
+        if (showSource) heading.appendChild(tooltipSourcePill(slot));
         const description = document.createElement("span");
         const descriptionParts = [descriptionFor(action)];
         if (Number.isFinite(action.powerW) && action.powerW !== 0) descriptionParts.push(formatWatts(action.powerW));
         description.textContent = descriptionParts.join(" · ");
-        copy.append(label, description);
+        copy.append(heading, description);
         row.append(badge, copy);
         return row;
     }
@@ -1283,7 +1300,7 @@
             const fallbackAction = runtimeFallbackAction(slot);
             if (!limited && actionsMatch(action, fallbackAction)) {
                 content.appendChild(tooltipSectionLabel("Action this hour"));
-                content.appendChild(tooltipActionRow(slot, action));
+                content.appendChild(tooltipActionRow(slot, action, { showSource: true }));
                 const conditionNote = document.createElement("p");
                 conditionNote.className = "app-schedule-tooltip__condition-note";
                 conditionNote.textContent = `The action is ${action.label} whether or not ${runtimeConditions}.`;
@@ -1293,7 +1310,7 @@
                 const condition = document.createElement("p");
                 condition.className = "app-schedule-tooltip__condition";
                 condition.textContent = runtimeConditions.charAt(0).toUpperCase() + runtimeConditions.slice(1);
-                content.append(condition, tooltipActionRow(slot, action));
+                content.append(condition, tooltipActionRow(slot, action, { showSource: true }));
                 if (limited) content.appendChild(tooltipLimits(slot, true));
 
                 const otherwise = tooltipSectionLabel("Otherwise");
@@ -1301,7 +1318,7 @@
                 content.append(otherwise, tooltipActionRow(fallbackSlot, fallbackAction));
             }
         } else if (!history) {
-            content.appendChild(tooltipActionRow(slot, action));
+            content.appendChild(tooltipActionRow(slot, action, { showSource: true }));
             if (limited) content.appendChild(tooltipLimits(slot));
         }
 
@@ -1638,8 +1655,11 @@
             && String(entry.entry.value ?? "").trim().toLowerCase() !== "auto";
     }
 
-    function scheduleOrigin(slot, exact) {
-        if (isManualOverride(exact)) {
+    function scheduleOrigin(slot) {
+        const slotKey = String(slot?.key || "");
+        const slotIsManualOverride = /^\d{12}$/.test(slotKey)
+            && String(slot?.value ?? "").trim().toLowerCase() !== "auto";
+        if (slotIsManualOverride) {
             return {
                 key: "manual",
                 label: "User override",
@@ -1658,14 +1678,6 @@
             label: "Rules schedule",
             description: "Resolved from the configured schedule rules. Saving changes creates a user override for this hour."
         };
-    }
-
-    function showScheduleOrigin(slot, exact) {
-        if (!editElements?.origin) return;
-        const origin = scheduleOrigin(slot, exact);
-        editElements.origin.dataset.origin = origin.key;
-        editElements.originLabel.textContent = origin.label;
-        editElements.originDescription.textContent = origin.description;
     }
 
     function exactOverrideSlot(key, day) {
@@ -1834,7 +1846,6 @@
             document.createTextNode(`${pad(detail.hour)}:00–${pad((detail.hour + 1) % 24)}:00`)
         );
         editElements.priceSummary.textContent = `Price (${formatPriceCents(detail.price)} / ${formatPriceCents(spotPrice(detail.price))})`;
-        showScheduleOrigin(detail.slot, exact);
         editElements.modeInputs.forEach((input) => { input.checked = input.value === mode; });
         editElements.watts.value = rawNumeric !== null ? String(rawNumeric) : "0";
         editElements.minimum.value = limits.minimum ?? "";
