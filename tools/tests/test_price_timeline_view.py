@@ -58,6 +58,27 @@ def test_non_auto_exact_override_remains_primary_after_its_hour_has_passed():
     assert "const slot = exactOverride || (dominantSegment ? runtimeSegmentSlot(dominantSegment) : resolvedSlot);" in source
 
 
+def test_schedule_editor_identifies_manual_optimizer_and_rules_origins():
+    partial_source = PRICE_PLAN_PARTIAL.read_text(encoding="utf-8")
+    js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
+    css_source = APP_CSS.read_text(encoding="utf-8")
+
+    assert 'data-role="schedule-edit-origin"' in partial_source
+    assert 'data-role="schedule-edit-origin-label"' in partial_source
+    assert 'data-role="schedule-edit-origin-description"' in partial_source
+    assert "function isManualOverride(entry)" in js_source
+    assert 'String(entry.entry.value ?? "").trim().toLowerCase() !== "auto"' in js_source
+    assert "function scheduleOrigin(slot, exact)" in js_source
+    assert 'key: "manual"' in js_source
+    assert 'key: "optimizer"' in js_source
+    assert 'key: "rules"' in js_source
+    assert 'label: "User override"' in js_source
+    assert 'label: "Optimizer plan"' in js_source
+    assert 'const entry = isManualOverride(exact) ? exact.entry : detail.slot' in js_source
+    assert '.app-schedule-origin[data-origin="manual"]' in css_source
+    assert '.app-schedule-origin[data-origin="optimizer"]' in css_source
+
+
 def test_schedule_tooltip_promotes_values_and_uses_secondary_text_for_labels():
     js_source = PRICE_PLAN_JS.read_text(encoding="utf-8")
     css_source = APP_CSS.read_text(encoding="utf-8")

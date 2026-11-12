@@ -123,6 +123,10 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
         </header>
         <form data-role="schedule-edit-form">
             <div class="gsd-dialog__body">
+                <div class="app-schedule-origin" data-role="schedule-edit-origin" data-origin="rules" role="status">
+                    <span class="gsd-badge" data-role="schedule-edit-origin-label">Rules schedule</span>
+                    <p data-role="schedule-edit-origin-description">Resolved from the configured schedule rules.</p>
+                </div>
                 <fieldset class="app-edit-fieldset">
                     <legend>Battery action</legend>
                     <div class="app-mode-options">
