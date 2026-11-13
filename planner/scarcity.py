@@ -291,7 +291,7 @@ def build_scarcity_context(
     for configured in config["bands"]:
         reference = min(cap, weighted_percentile(rows, float(configured["pricePercentile"])))
         additional = max(0.0, reference - normal_terminal_price)
-        active = refill["expected_refill_percent"] < float(configured["activateWhenExpectedRefillBelowPercent"])
+        active = refill["expected_refill_percent"] <= float(configured["activateWhenExpectedRefillBelowPercent"])
         bands.append({
             "from_soc_percent": int(configured["fromSocPercent"]),
             "to_soc_percent": int(configured["toSocPercent"]),

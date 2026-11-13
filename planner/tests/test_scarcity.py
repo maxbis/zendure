@@ -97,6 +97,79 @@ class ScarcityTests(unittest.TestCase):
         self.assertTrue(context["bands"][0]["active"])
         self.assertFalse(context["bands"][0]["applied"])
 
+    def test_refill_equal_to_activation_boundary_activates_band(self) -> None:
+        config = {
+            "enabled": True,
+            "priceHistoryDays": 7,
+            "priceHistoryHalfLifeDays": 7.0,
+            "referencePriceCapEurPerKwh": 0.80,
+            "cheapGridChargePercentile": 25.0,
+            "bands": [
+                {"fromSocPercent": 15, "toSocPercent": 25, "pricePercentile": 95.0, "activateWhenExpectedRefillBelowPercent": 60.0},
+                {"fromSocPercent": 25, "toSocPercent": 40, "pricePercentile": 85.0, "activateWhenExpectedRefillBelowPercent": 50.0},
+            ],
+        }
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 11, 3, 12, tzinfo=tz)
+        state = BatteryState(30.0, 1000.0, 360, 500, 15, 90)
+        slot = RollingInputSlot(now, now + timedelta(hours=1), 0.30, 0.10, "official", 100.0, 100.0)
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for offset in range(1, 8):
+                day = now.date() - timedelta(days=offset)
+                path = root / day.strftime("%Y%m") / f"price{day:%Y%m%d}.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps({f"{hour:02d}": 0.40 for hour in range(24)}), encoding="utf-8")
+            context = build_scarcity_context(
+                now=now,
+                battery_state=state,
+                slots=[slot],
+                round_trip_efficiency=1.0,
+                normal_terminal_price=0.20,
+                config=config,
+                price_root=root,
+            )
+        self.assertEqual(context["refill"]["expected_refill_percent"], 60.0)
+        self.assertTrue(context["bands"][0]["active"])
+        self.assertTrue(context["bands"][0]["applied"])
+        self.assertFalse(context["bands"][1]["active"])
+        self.assertFalse(context["bands"][1]["applied"])
+
+    def test_full_refill_activates_band_with_100_percent_boundary(self) -> None:
+        config = {
+            "enabled": True,
+            "priceHistoryDays": 7,
+            "priceHistoryHalfLifeDays": 7.0,
+            "referencePriceCapEurPerKwh": 0.80,
+            "cheapGridChargePercentile": 25.0,
+            "bands": [
+                {"fromSocPercent": 15, "toSocPercent": 25, "pricePercentile": 95.0, "activateWhenExpectedRefillBelowPercent": 100.0},
+            ],
+        }
+        tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime(2026, 11, 3, 12, tzinfo=tz)
+        state = BatteryState(30.0, 1000.0, 600, 500, 15, 90)
+        slot = RollingInputSlot(now, now + timedelta(hours=1), 0.30, 0.10, "official", 100.0, 100.0)
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for offset in range(1, 8):
+                day = now.date() - timedelta(days=offset)
+                path = root / day.strftime("%Y%m") / f"price{day:%Y%m%d}.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps({f"{hour:02d}": 0.40 for hour in range(24)}), encoding="utf-8")
+            context = build_scarcity_context(
+                now=now,
+                battery_state=state,
+                slots=[slot],
+                round_trip_efficiency=1.0,
+                normal_terminal_price=0.20,
+                config=config,
+                price_root=root,
+            )
+        self.assertEqual(context["refill"]["expected_refill_percent"], 100.0)
+        self.assertTrue(context["bands"][0]["active"])
+        self.assertTrue(context["bands"][0]["applied"])
+
 
 if __name__ == "__main__":
     unittest.main()

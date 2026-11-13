@@ -163,7 +163,7 @@ $pageConfig = [
 
             <section class="gsd-card scarcity-section scarcity-explainer" aria-labelledby="logic-title">
                 <div class="scarcity-section__header"><div><h2 id="logic-title">How to read this page</h2><p>The optimizer applies the calculation in three steps.</p></div><a class="gsd-btn gsd-btn--secondary" href="docs.php?doc=planner%2Fscarcity-bands.md">Read full documentation</a></div>
-                <ol><li>Estimate solar and cheap-grid refill over the visible horizon.</li><li>Activate each band whose refill boundary is higher than the predicted refill percentage.</li><li>When the master switch is enabled, add the band’s scarcity value to discharge through that SoC range.</li></ol>
+                <ol><li>Estimate solar and cheap-grid refill over the visible horizon.</li><li>Activate each band whose refill boundary is at least as high as the predicted refill percentage.</li><li>When the master switch is enabled, add the band’s scarcity value to discharge through that SoC range.</li></ol>
             </section>
         </div>
     </main>

@@ -406,13 +406,13 @@
             ? "The expected-refill condition is active and the master scarcity switch is enabled, so this band’s additional virtual cost affects optimizer discharge decisions."
             : band.active
                 ? "The expected-refill condition is active, but the master scarcity switch is disabled, so the calculated value is diagnostic only."
-                : "Expected refill is at or above this band’s activation boundary, so the band does not affect the current plan.");
+                : "Expected refill is above this band’s activation boundary, so the band does not affect the current plan.");
         header.append(copy, badge);
         const list = document.createElement("dl");
         [
             ["Reference price", money(band.reference_price_eur_per_kwh), `Recency-weighted P${Number(band.price_percentile).toFixed(0)} historical consumer price, capped by the configured reference-price maximum. This is the target value for energy in this SoC band.`],
             ["Additional scarcity", money(band.additional_scarcity_value_eur_per_kwh), `Calculated as max(0, reference price − horizon-average terminal value). It is a virtual optimizer cost, not a charge on the electricity bill.`],
-            ["Activates below refill", percent(band.activate_when_expected_refill_below_percent), `Configured expected-refill boundary for this band. The condition becomes active only when predicted refill is below ${percent(band.activate_when_expected_refill_below_percent)}.`]
+            ["Activates at or below refill", percent(band.activate_when_expected_refill_below_percent), `Configured expected-refill boundary for this band. The condition becomes active when predicted refill is at or below ${percent(band.activate_when_expected_refill_below_percent)}.`]
         ].forEach(([label, value, detail]) => {
             const row = document.createElement("div");
             const dt = document.createElement("dt"); dt.textContent = label;
@@ -423,7 +423,7 @@
         const explanation = document.createElement("p");
         explanation.className = "scarcity-band__explanation";
         explanation.textContent = band.applied
-            ? "Expected refill is below this band’s boundary, so its additional virtual value affects discharge decisions."
+            ? "Expected refill is at or below this band’s boundary, so its additional virtual value affects discharge decisions."
             : band.active
                 ? "Refill conditions activate this band, but the master switch is off, so it does not affect decisions."
                 : "Expected refill is sufficient for this band, so no scarcity value is applied.";

@@ -92,13 +92,13 @@ Each band contains:
 - `fromSocPercent`: lower edge of the SoC band.
 - `toSocPercent`: upper edge of the SoC band.
 - `pricePercentile`: weighted historical consumer-price percentile used to value energy in the band.
-- `activateWhenExpectedRefillBelowPercent`: the band is active when predicted refill coverage is strictly below this percentage.
+- `activateWhenExpectedRefillBelowPercent`: the band is active when predicted refill coverage is at or below this percentage.
 
 Deeper energy uses a higher price percentile. In the example:
 
-- Energy from 15% through 25% uses P95 and activates below 100% refill coverage.
-- Energy from 25% through 40% uses P85 and activates below 60% refill coverage.
-- Energy from 40% through 50% uses P75 and activates below 25% refill coverage.
+- Energy from 15% through 25% uses P95 and activates at or below 100% refill coverage.
+- Energy from 25% through 40% uses P85 and activates at or below 60% refill coverage.
+- Energy from 40% through 50% uses P75 and activates at or below 25% refill coverage.
 - Energy above 50% has no scarcity band and follows the normal optimizer objective.
 
 The strict loaders require:
@@ -235,10 +235,10 @@ The refill percentage is not predicted ending SoC. It describes the percentage o
 
 ### 7. Activate bands
 
-The activation rule is strict:
+The activation boundary is inclusive:
 
 ```text
-active = expected refill percent < activateWhenExpectedRefillBelowPercent
+active = expected refill percent <= activateWhenExpectedRefillBelowPercent
 ```
 
 The application rule is:
@@ -249,8 +249,9 @@ applied = dynamicReserve.enabled AND active
 
 Examples:
 
-- When refill is 110%, it is capped at 100%; none of the example bands is active because the deepest band requires a value below 100%.
+- When refill reaches or exceeds 100%, it is capped at 100%; a band configured with a 100% boundary remains active.
 - When refill is 92%, the 15–25% band is active, while the 25–40% and 40–50% bands are inactive.
+- When refill is exactly 60%, both the 15–25% and 25–40% bands are active because equality activates a band.
 - When refill is 45%, the 15–25% and 25–40% bands are active.
 - When refill is 20%, all three example bands are active.
 
