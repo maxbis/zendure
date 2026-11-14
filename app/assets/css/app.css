@@ -255,6 +255,21 @@
     --app-mode-color: var(--gsd-info);
 }
 
+.app-power-hero[data-calibration-active="true"] {
+    --app-mode-color: var(--gsd-warning);
+}
+
+.app-power-hero[data-calibration-active="true"] .app-power-card__face {
+    border-color: color-mix(in srgb, var(--gsd-warning) 62%, var(--gsd-border-subtle));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gsd-warning) 12%, transparent);
+}
+
+.app-energy[data-calibration-active="true"] .app-target-label {
+    background: var(--gsd-warning-soft);
+    border-color: color-mix(in srgb, var(--gsd-warning) 38%, transparent);
+    color: var(--gsd-warning);
+}
+
 /* Keep the Live control the same size as the non-button / time pills. */
 button.app-state-pill {
     appearance: none;

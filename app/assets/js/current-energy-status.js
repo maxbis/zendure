@@ -885,6 +885,7 @@
         const packData = Array.isArray(readings.packData) ? readings.packData : [];
         const p1Readings = payload?.p1?.readings || payload?.p1?.data || null;
         const powerW = calculateBatteryPower(properties);
+        const calibrationActive = finiteNumber(properties.socStatus, 0) === 1;
         const acMode = finiteNumber(properties.acMode, 0);
         const inputLimit = finiteNumber(properties.inputLimit, 0);
         const outputLimit = finiteNumber(properties.outputLimit, 0);
@@ -921,6 +922,7 @@
         return {
             mode,
             powerW,
+            calibrationActive,
             acMode,
             deviceCommandedW,
             batteryPercent: batteryPercent === null ? null : clamp(batteryPercent, 0, 100),
@@ -947,6 +949,7 @@
     }
 
     function isPowerPending(automationData, model) {
+        if (model.calibrationActive) return false;
         if (!automationData || automationData.success === false) return false;
 
         const changes = (automationData.lastChanges || []).filter((entry) => entry.type === "change");
@@ -975,18 +978,32 @@
     }
 
     function modeCopy(model) {
+        if (model.calibrationActive) {
+            return {
+                label: "Automatic calibration",
+                description: "Zendure is calibrating the battery and temporarily overriding schedule control"
+            };
+        }
+
         if (model.mode === "charging") {
-            return { label: "Charging now" };
+            return { label: "Charging now", description: "Energy flowing into the battery" };
         }
 
         if (model.mode === "discharging") {
-            return { label: "Discharging now" };
+            return { label: "Discharging now", description: "Energy flowing from the battery" };
         }
 
-        return { label: "Standby" };
+        return { label: "Standby", description: "No active battery power flow" };
     }
 
     function batteryCountdownCopy(model) {
+        if (model.calibrationActive) {
+            return {
+                label: "Calibration active",
+                description: "Zendure automatic battery calibration is active"
+            };
+        }
+
         if (model.mode === "charging") {
             if (model.batteryPercent !== null && model.batteryPercent >= model.maximumPercent) {
                 return {
@@ -1188,14 +1205,17 @@
         const visibleModeLabel = externalControlActive
             ? "External control"
             : (pauseActive ? "Automation paused" : copy.label);
+        const displayedModeLabel = model.calibrationActive ? copy.label : visibleModeLabel;
         const batteryCountdown = batteryCountdownCopy(model);
+        component.dataset.calibrationActive = String(model.calibrationActive);
         elements.powerHero.dataset.mode = model.mode;
+        elements.powerHero.dataset.calibrationActive = String(model.calibrationActive);
         elements.powerHero.dataset.controlMode = pauseStatusAvailable ? controlMode : "unknown";
-        elements.modeLabel.textContent = visibleModeLabel;
-        elements.modeLabel.title = visibleModeLabel;
+        elements.modeLabel.textContent = displayedModeLabel;
+        elements.modeLabel.title = model.calibrationActive ? copy.description : displayedModeLabel;
         elements.powerValue.innerHTML = `${formatSignedWatts(model.powerW).replace(" W", "")} <span class="app-power-value__unit">W</span>`;
-        elements.powerSimpleMode.textContent = visibleModeLabel;
-        elements.powerSimpleMode.title = visibleModeLabel;
+        elements.powerSimpleMode.textContent = displayedModeLabel;
+        elements.powerSimpleMode.title = model.calibrationActive ? copy.description : displayedModeLabel;
         setSimpleValue(
             elements.powerSimpleValue,
             Math.abs(Math.round(model.powerW)).toLocaleString(),
@@ -1204,15 +1224,13 @@
         );
         elements.powerSimpleFlow.dataset.direction = model.mode;
         elements.powerSimpleFlow.dataset.valueSize = powerValueSize(model.powerW);
-        elements.powerSimpleCaption.textContent = externalControlActive
+        elements.powerSimpleCaption.textContent = model.calibrationActive
+            ? copy.description
+            : externalControlActive
             ? "Automation is monitoring only"
             : pauseActive
             ? "Schedule control is temporarily disabled"
-            : model.mode === "charging"
-            ? "Energy flowing into the battery"
-            : model.mode === "discharging"
-                ? "Energy flowing from the battery"
-                : "No active battery power flow";
+            : copy.description;
 
         const minPower = Math.min(-1, finiteNumber(config.powerMinW, -1200));
         const maxPower = Math.max(1, finiteNumber(config.powerMaxW, 1200));
