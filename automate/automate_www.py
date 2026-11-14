@@ -37,6 +37,7 @@ from control_mode import (
     CONTROL_MODE_EXTERNAL,
     CONTROL_MODE_EXTERNAL_PENDING,
 )
+from calibration_guard import CalibrationGuard, CalibrationUpdate
 
 # ============================================================================
 # CONSTANTS & DEFAULT CONFIG (override via config.jsonc)
@@ -331,6 +332,7 @@ class AutomationApp:
         self.api_refresh_interval_seconds = API_REFRESH_INTERVAL_SECONDS
         self._runtime_condition_warning_cache: set[str] = set()
         self._last_runtime_decision_signature: Optional[str] = None
+        self.calibration_guard = CalibrationGuard()
         self.loop_counter = 0
         self.last_retention_cleanup_ts: Optional[int] = None
         self.input_handler = None
@@ -1191,6 +1193,26 @@ class AutomationApp:
             timestamp=int(time.time()),
         )
 
+    def _update_calibration_guard(self, zendure_data: Optional[dict]) -> CalibrationUpdate:
+        update = self.calibration_guard.update(zendure_data)
+        if update.entered:
+            self.logger.warning(
+                "Zendure automatic calibration started; suppressing automation battery commands",
+                message_key="automatic_calibration_started",
+            )
+        elif update.exited:
+            self.logger.info(
+                "Zendure automatic calibration finished; refreshing schedule and resuming control",
+                message_key="automatic_calibration_finished",
+            )
+            self.old_value = None
+            self.value = None
+            self.zero_power_since = None
+            self.standby_sent = False
+            self.last_api_refresh_time = 0
+            self._refresh_schedule_if_needed()
+        return update
+
     def _run_cycle(self) -> bool:
         # 0. Sleep
         self._sleep_interrupted()
@@ -1212,6 +1234,10 @@ class AutomationApp:
         # 4. Battery limits + runtime conditions + state updates
         zendure_data = None
         zendure_data = self._read_zendure_snapshot() # reads Zendure API once for this loop iteration
+        calibration = self._update_calibration_guard(zendure_data)
+
+        if calibration.exited:
+            desired_power = 0 if self.pause_override_active else self._calculate_desired_power()
 
         external_control_active = (
             self.control_mode_store is not None
@@ -1222,6 +1248,10 @@ class AutomationApp:
             desired_power = self._apply_runtime_conditions(desired_power) # Checks if desired power is withing battery dynamic limits (uses cached Zendure data)
             desired_power = self._check_battery_limits(desired_power, prechecked=True) # uses limit_state property to prevent charging a full battery or discharging an empty one
         self._update_zendure_state() # stores the last Zendure data in self.api_state.last_zendure, this lead to GUI data
+
+        if calibration.active:
+            self.fast_loop_active = False
+            return True
 
         if external_control_active:
             self.fast_loop_active = False
