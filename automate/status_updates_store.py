@@ -11,19 +11,12 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 from zoneinfo import ZoneInfo
 
-from config_loader import load_system_config
-
-
-_SYSTEM_TIMEZONE = load_system_config()["installation"]["timezone"]
-
-# Wh-per-hour API: timezone and default days
-WH_PER_HOUR_TIMEZONE = _SYSTEM_TIMEZONE
+# Defaults support standalone callers; automation injects its validated installation timezone.
+STATUS_TIMEZONE = "UTC"
+WH_PER_HOUR_TIMEZONE = STATUS_TIMEZONE
 WH_PER_HOUR_DAYS_DEFAULT = 3
 WH_PER_HOUR_DAYS_MAX = 30
 WH_PER_HOUR_LAST_SEGMENT_MAX_SECONDS = 3600  # 1 hour
-
-# Shared timezone for status timestamps
-STATUS_TIMEZONE = _SYSTEM_TIMEZONE
 
 EVENT_TYPE_START = "start"
 EVENT_TYPE_STOP = "stop"
@@ -312,11 +305,17 @@ def _build_wh_result(
     return result
 
 
-def compute_wh_per_hour(db_path: str, now: int, days_back: int = WH_PER_HOUR_DAYS_DEFAULT) -> dict:
+def compute_wh_per_hour(
+    db_path: str,
+    now: int,
+    days_back: int = WH_PER_HOUR_DAYS_DEFAULT,
+    timezone_name: str = WH_PER_HOUR_TIMEZONE,
+) -> dict:
     store = StatusUpdatesStore(
         db_path=db_path,
         retention_days=0,
         log_warning=lambda _msg: None,
+        timezone_name=timezone_name,
     )
     return store.compute_wh_per_hour(now=now, days_back=days_back)
 
@@ -329,10 +328,13 @@ class StatusUpdatesStore:
         db_path: Optional[str],
         retention_days: int,
         log_warning: Callable[[str], None],
+        timezone_name: str = STATUS_TIMEZONE,
     ) -> None:
         self.db_path = db_path
         self.retention_days = retention_days
         self._log_warning = log_warning
+        self.timezone_name = timezone_name
+        self.timezone = ZoneInfo(timezone_name)
         self._db_initialized = False
         self._last_stored_change_power: Optional[float] = None
         self._last_stored_change_level: Optional[int] = None
@@ -347,7 +349,7 @@ class StatusUpdatesStore:
                                    "electric_level": int|null}, ... ], ... }
         for the last days_back full days including today. Hours are ordered 00, 01, ... 23.
         """
-        tz = ZoneInfo(WH_PER_HOUR_TIMEZONE)
+        tz = self.timezone
         allowed_dates = _allowed_wh_dates(now=now, days_back=days_back, tz=tz)
         window_start_ts = _wh_window_start_ts(now=now, days_back=days_back, tz=tz)
         if not self.db_path:
@@ -449,7 +451,7 @@ class StatusUpdatesStore:
         return None
 
     def _hour_window_for_timestamp(self, timestamp: int) -> tuple[int, int]:
-        tz = ZoneInfo(STATUS_TIMEZONE)
+        tz = self.timezone
         dt = datetime.fromtimestamp(int(timestamp), tz=tz)
         hour_start = datetime(dt.year, dt.month, dt.day, dt.hour, 0, 0, tzinfo=tz)
         hour_start_ts = int(hour_start.timestamp())
@@ -616,16 +618,20 @@ class StatusApi:
         db_path: Optional[str] = None,
         get_electric_level: Optional[Callable[[], Optional[int]]] = None,
         retention_days: int = 7,
+        timezone_name: str = STATUS_TIMEZONE,
     ) -> None:
         self.logger = logger
         self.on_update = on_update
         self.get_electric_level = get_electric_level
         self.db_path = db_path
         self.retention_days = retention_days  # mirrored for callers inspecting config
+        self.timezone_name = timezone_name
+        self.timezone = ZoneInfo(timezone_name)
         self.store = StatusUpdatesStore(
             db_path=db_path,
             retention_days=retention_days,
             log_warning=lambda msg: logger.warning(msg),
+            timezone_name=timezone_name,
         )
         self.http_server = None
 
@@ -645,7 +651,7 @@ class StatusApi:
         total_act_ret: Any = None,
         rule: Optional[str] = None,
     ) -> bool:
-        timestamp = int(datetime.now(ZoneInfo(STATUS_TIMEZONE)).timestamp())
+        timestamp = int(datetime.now(self.timezone).timestamp())
         if self.on_update:
             self.on_update(event_type, old_value, new_value, p1_total_power, timestamp)
 

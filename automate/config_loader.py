@@ -19,7 +19,7 @@ SYSTEM_CONFIG_PATH = PROJECT_ROOT / "common" / "config" / "system.json"
 if str(COMMON_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(COMMON_PYTHON_DIR))
 
-from system_config import load_system_config as load_shared_system_config  # noqa: E402
+from system_config import load_automation_system_config  # noqa: E402
 
 
 def strip_json_comments(text: str) -> str:
@@ -60,6 +60,6 @@ def load_config(config_path: Union[Path, str]) -> Dict[str, Any]:
 
 
 def load_system_config() -> Dict[str, Any]:
-    """Load the strict project-wide system configuration."""
+    """Load the strict subset consumed by the Pi automation process."""
 
-    return load_shared_system_config(SYSTEM_CONFIG_PATH)
+    return load_automation_system_config(SYSTEM_CONFIG_PATH)

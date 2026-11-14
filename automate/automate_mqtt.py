@@ -311,7 +311,8 @@ class AutomationApp:
                 on_update=self._on_status_update,
                 db_path=db_path,
                 get_electric_level=get_electric_level,
-                retention_days=retention_days
+                retention_days=retention_days,
+                timezone_name=self.controller.timezone_name,
             )
 
             # Set up signal handlers

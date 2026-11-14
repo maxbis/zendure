@@ -19,6 +19,22 @@ class SystemConfigError(ValueError):
 def load_system_config(config_path: Optional[Union[Path, str]] = None) -> dict[str, Any]:
     """Load, validate and normalize the shared system configuration."""
 
+    return validate_system_config(_load_decoded_config(config_path))
+
+
+def load_automation_system_config(
+    config_path: Optional[Union[Path, str]] = None,
+) -> dict[str, Any]:
+    """Load only the shared settings consumed by the Pi automation process."""
+
+    return validate_automation_system_config(_load_decoded_config(config_path))
+
+
+def _load_decoded_config(
+    config_path: Optional[Union[Path, str]] = None,
+) -> dict[str, Any]:
+    """Read and decode a shared system configuration without choosing a profile."""
+
     path = Path(config_path) if config_path is not None else DEFAULT_SYSTEM_CONFIG_PATH
     if not path.is_file():
         raise SystemConfigError(f"System configuration file not found: {path}")
@@ -38,7 +54,68 @@ def load_system_config(config_path: Optional[Union[Path, str]] = None) -> dict[s
 
     if not isinstance(decoded, dict):
         raise SystemConfigError("Expected an object at $.")
-    return validate_system_config(decoded)
+    return decoded
+
+
+def validate_automation_system_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize the subset required by the Pi automation process."""
+
+    schema_version = _require_integer(
+        _require_key(config, "schemaVersion", "$"), "$.schemaVersion", 1, 1
+    )
+    battery = _require_object(_require_key(config, "battery", "$"), "$.battery")
+    installation = _require_object(
+        _require_key(config, "installation", "$"), "$.installation"
+    )
+
+    min_charge_percent = _require_integer(
+        _require_key(battery, "minChargePercent", "$.battery"),
+        "$.battery.minChargePercent",
+        0,
+        99,
+    )
+    max_charge_percent = _require_integer(
+        _require_key(battery, "maxChargePercent", "$.battery"),
+        "$.battery.maxChargePercent",
+        1,
+        100,
+    )
+    if min_charge_percent >= max_charge_percent:
+        raise SystemConfigError(
+            "$.battery.minChargePercent must be lower than $.battery.maxChargePercent."
+        )
+
+    max_charge_power_w = _require_integer(
+        _require_key(battery, "maxChargePowerW", "$.battery"),
+        "$.battery.maxChargePowerW",
+        1,
+    )
+    max_discharge_power_w = _require_integer(
+        _require_key(battery, "maxDischargePowerW", "$.battery"),
+        "$.battery.maxDischargePowerW",
+        1,
+    )
+    timezone = _require_non_blank_string(
+        _require_key(installation, "timezone", "$.installation"),
+        "$.installation.timezone",
+    )
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise SystemConfigError(
+            "$.installation.timezone is not a recognized IANA timezone."
+        ) from error
+
+    return {
+        "schemaVersion": schema_version,
+        "battery": {
+            "minChargePercent": min_charge_percent,
+            "maxChargePercent": max_charge_percent,
+            "maxChargePowerW": max_charge_power_w,
+            "maxDischargePowerW": max_discharge_power_w,
+        },
+        "installation": {"timezone": timezone},
+    }
 
 
 def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -308,6 +385,12 @@ def _require_object(value: Any, path: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemConfigError(f"Expected an object at {path}.")
     return value
+
+
+def _require_key(value: dict[str, Any], key: str, path: str) -> Any:
+    if key not in value:
+        raise SystemConfigError(f"Invalid properties at {path} (missing: {key}).")
+    return value[key]
 
 
 def _assert_exact_keys(value: dict[str, Any], expected: set[str], path: str) -> None:
