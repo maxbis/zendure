@@ -239,7 +239,7 @@ class ScarcityTests(unittest.TestCase):
         self.assertEqual(activation["source_age_seconds"], 300.0)
 
     def test_missing_or_stale_previous_refill_falls_back_to_zero(self) -> None:
-        now = datetime(2026, 11, 14, 12, 30, tzinfo=ZoneInfo("Europe/Amsterdam"))
+        now = datetime(2026, 11, 14, 13, 30, tzinfo=ZoneInfo("Europe/Amsterdam"))
         state = BatteryState(30.0, 1000.0, 500, 500, 15, 90)
         missing = resolve_refill_activation(None, now=now, battery_state=state)
         self.assertEqual(missing["percent"], 0.0)

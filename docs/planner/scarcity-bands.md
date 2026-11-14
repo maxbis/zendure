@@ -188,7 +188,7 @@ The planner reads `scheduled_refill` from the previously published executable sc
 
 - The previous plan and scheduled-refill fields are structurally valid and finite.
 - Battery capacity and configured minimum and maximum SoC match the current battery configuration.
-- The source calculation is no more than 15 minutes old.
+- The source calculation is no more than 70 minutes old.
 - The source timestamp is not materially in the future.
 
 When validation succeeds, `refill_activation.percent` is the previous schedule's `scheduled_refill_percent`. When validation fails, `refill_activation.percent` is 0% and the output records a `conservative_fallback` source plus a reason. The gross-opportunity calculation is never used as an activation fallback.
@@ -354,7 +354,7 @@ The page explains:
 - When the master switch is disabled, then active bands remain visible for diagnostics but `applied` is false.
 - When a band reference is below the normal terminal price, then its additional scarcity value is zero.
 - When gross opportunity exceeds required refill, then the diagnostic total and coverage are capped at the required amount and 100%.
-- When the previous scheduled-refill output is missing, invalid, older than 15 minutes, timestamped materially in the future, or battery-incompatible, then activation uses a conservative 0% fallback and publishes the reason.
+- When the previous scheduled-refill output is missing, invalid, older than 70 minutes, timestamped materially in the future, or battery-incompatible, then activation uses a conservative 0% fallback and publishes the reason.
 - When solar and cheap-grid charging occur in the same slot, then their combined input power cannot exceed maximum charge power.
 - When a discharge stays above all applied bands, then scarcity cost is zero.
 - When a discharge crosses only part of a band, then only that portion receives the band’s scarcity cost.

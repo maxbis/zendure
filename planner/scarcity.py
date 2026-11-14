@@ -13,7 +13,7 @@ from planner.rolling_optimizer import RollingInputSlot
 
 MINIMUM_HISTORY_SAMPLES = 168
 PRICE_DISTRIBUTION_TARGET_BINS = 24
-SCHEDULED_REFILL_MAX_AGE_SECONDS = 900
+SCHEDULED_REFILL_MAX_AGE_SECONDS = 4200
 
 
 def _finite_number(value: object) -> float | None:

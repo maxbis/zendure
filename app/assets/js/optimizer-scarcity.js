@@ -74,7 +74,7 @@
         previous_schedule_invalid: "Previous schedule structure is invalid",
         scheduled_refill_missing: "Previous schedule predates scheduled-refill output",
         scheduled_refill_invalid: "Previous scheduled-refill values are invalid",
-        previous_schedule_stale: "Previous schedule is older than the 15-minute limit",
+        previous_schedule_stale: "Previous schedule is older than the freshness limit",
         previous_schedule_from_future: "Previous schedule timestamp is in the future",
         battery_configuration_changed: "Battery capacity or SoC limits changed"
     }[reason] || reason || "None");
