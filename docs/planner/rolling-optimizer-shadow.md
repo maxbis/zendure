@@ -40,9 +40,9 @@ The optimizer reads:
 - `schedule.activeHourDeadbandW`, currently 0 W. Zero disables stabilization. A positive multiple of the configured power step can retain the already-active hour's previous command when a recalculation proposes only a smaller modeled-power change.
 - `battery.roundTripEfficiency`, currently 0.85. The legacy one-way `battery.efficiency` remains unchanged.
 - `battery.wearCostEurPerKwhDischarged`, currently 0.0005 EUR/kWh (0.05 euro-cent/kWh). The optimizer charges this cost only to AC-side battery discharge; charging has no wear charge.
-- `battery.dynamicReserve`. The planner calculates weighted historical price percentiles, predicted solar and cheap-grid refill, active bands, and an additional virtual scarcity value for each active SoC band. `dynamicReserve.enabled` controls whether those calculated values affect optimization. The diagnostics remain published when the switch is off.
+- `battery.dynamicReserve`. The planner values bands from weighted historical price percentiles and activates them from the previous valid published schedule's normalized refill. When that input is unavailable, stale, malformed, or incompatible, activation uses a conservative 0% fallback. `dynamicReserve.enabled` controls whether active bands affect optimization. Gross solar and cheap-grid opportunity remains diagnostic only.
 
-Scarcity history uses `price_ticks` first and local JSON price files as fallback, and includes completed local days only. When fewer than 168 valid hourly prices are available, the calculation reports `insufficient_price_history` and applies no scarcity cost. The refill forecast is capped at the energy required to reach `maxChargePercent` and avoids double-counting solar and grid charging power.
+Scarcity history uses `price_ticks` first and local JSON price files as fallback, and includes completed local days only. When fewer than 168 valid hourly prices are available, the calculation reports `insufficient_price_history` and applies no scarcity cost. Gross opportunity is capped at the energy required to reach `maxChargePercent` and avoids double-counting solar and grid charging power, but it does not activate bands.
 
 The runner appends one self-contained JSON object per calculation. A record contains
 the inputs that define the run, expected financial result, starting and ending state
@@ -117,7 +117,7 @@ The hourly table remains available below the graphs for detailed inspection.
 6. Calculate the reporting valuation rate from the latest 24 official consumer-price hours; provisional repeated prices are excluded and a negative average is floored at zero. Separately, calculate the optimizer's terminal price from the average consumer price across all horizon slots.
 7. Evaluate feasible charge, idle and discharge powers in the configured power steps.
 8. During solar-capable hours, also evaluate an opportunistic `netzero+` action when the future value of stored solar, after round-trip losses, exceeds the current export price. This action models the forecast surplus and keeps the configured charge-power cap at runtime so unexpected surplus can also be absorbed.
-9. Add the configured virtual low-SoC cost to any portion of candidate discharge below the configured threshold, including proportional treatment when a segment crosses that threshold.
+9. Read scheduled refill from the previous compatible executable plan when it is no more than 15 minutes old. Otherwise use a conservative 0% activation input. Activate bands with the inclusive configured boundaries, then add their virtual cost to candidate discharge through each applied SoC band.
 10. Select the full-horizon path with the lowest expected purchase cost minus sale income, plus battery-wear and low-SoC virtual costs, minus remaining-energy value.
 11. Translate each decision into the existing schedule vocabulary: bidirectional `netzero`, `netzero+`, `netzero-`, zero or a fixed signed power.
 12. When a discharge only offsets forecast household import, emit `netzero-` and calculate a linear price-dependent runtime range. Prices at or below the median of the remaining horizon retain the modeled discharge as the limit. Prices between the median and maximum interpolate toward the maximum feasible discharge. The maximum remaining price receives the complete feasible range.
@@ -127,7 +127,7 @@ The hourly table remains available below the graphs for detailed inspection.
 16. Limit bidirectional discharge by configured discharge power, energy available above minimum SoC and the remaining slot duration, then round the limit down to the configured power step. Keep the original modeled NZ+ action in the expected P&L and SoC path.
 17. Append the raw optimizer plan to the comparison log under a file lock.
 18. Before executable publication, apply the configured active-hour deadband. Within the same local clock hour, retain the previously published active command when its modeled power differs from the new proposal by less than the deadband and the retained command remains SoC-safe. Recalculate the published trajectory after retaining a command. Do not stabilize future hours.
-19. Atomically publish the resulting executable optimizer schedule.
+19. Calculate maximum scheduled SoC and normalized scheduled refill from the final executable trajectory, then atomically publish that value for the following optimizer run.
 20. When optimizer mode is selected, validate freshness, continuity, horizon coverage, supported modes and configured power limits before serving it.
 21. Preserve exact dated manual schedule entries over optimizer entries.
 22. During the dual-testing period, when validation fails or the plan becomes older than 10 hours, serve rules automatically.
@@ -173,6 +173,8 @@ http://localhost/zendure/app/optimizer.php
 - When a recalculation occurs in a new local clock hour, then the new hour starts with the newly optimized command rather than retaining the previous hour's command.
 - When the previous active command could violate the current SoC limits or make the recalculated trajectory infeasible, then safety overrides the deadband and the new proposal is published.
 - When the modeled power difference is equal to or greater than the deadband, then the new proposal is published.
+- When the previous executable plan has no scheduled-refill record, is older than 15 minutes, has invalid values, has a future timestamp, or was produced with different battery capacity or SoC limits, then scarcity activation uses the conservative 0% fallback.
+- When the current executable plan is published, then its highest scheduled SoC and normalized refill are stored for the following optimizer cycle.
 - When the current schedule uses an NZ mode, then the viewer estimates its power from the same forecast solar and household load. Actual P&L can differ because runtime meter readings differ.
 - When a current schedule action cannot be modeled, then the viewer treats it as idle and shows a warning for that day.
 - When an older optimizer calculation is selected, then its graph is compared with the rules currently resolved, not with a historical rules snapshot.

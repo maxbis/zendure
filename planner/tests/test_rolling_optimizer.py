@@ -631,6 +631,41 @@ class RollingOptimizerTests(unittest.TestCase):
             published = json.loads(latest_path.read_text(encoding="utf-8"))
             self.assertEqual(logged["inputs"], payload["inputs"])
             self.assertEqual(published["inputs"], payload["inputs"])
+            self.assertEqual(
+                published["plan"]["scarcity"]["refill_activation"]["source"],
+                "conservative_fallback",
+            )
+            self.assertEqual(
+                published["plan"]["scarcity"]["refill_activation"]["percent"],
+                0.0,
+            )
+            self.assertIn("scheduled_refill", published["plan"]["scarcity"])
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "PLANNER_HORIZON_HOURS": "1",
+                    "PLANNER_EXTEND_HORIZON_TO_MIDNIGHT": "false",
+                },
+            ), patch("planner.shadow.fetch_price_payload", return_value=prices), patch(
+                "planner.shadow.fetch_runtime_readings", return_value=readings
+            ), patch(
+                "planner.shadow.fetch_shortwave_payload",
+                return_value={"hourly": {"time": [], "shortwave_radiation": []}},
+            ), patch("planner.shadow.update_runtime_log"):
+                run_shadow_once(
+                    settings,
+                    now=now + timedelta(minutes=5),
+                    output_path=output_path,
+                    latest_path=latest_path,
+                    runtime_output_path=root / "runtime.log",
+                )
+
+            second_published = json.loads(latest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                second_published["plan"]["scarcity"]["refill_activation"]["source"],
+                "previous_schedule",
+            )
 
     def test_json_lines_log_appends_complete_records(self) -> None:
         with TemporaryDirectory() as temp_dir:

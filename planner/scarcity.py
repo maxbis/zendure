@@ -13,6 +13,130 @@ from planner.rolling_optimizer import RollingInputSlot
 
 MINIMUM_HISTORY_SAMPLES = 168
 PRICE_DISTRIBUTION_TARGET_BINS = 24
+SCHEDULED_REFILL_MAX_AGE_SECONDS = 900
+
+
+def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def build_scheduled_refill(plan: dict[str, Any], *, maximum_soc_percent: float) -> dict[str, Any] | None:
+    """Summarize the refill achieved by a completed optimizer schedule."""
+    starting_soc = _finite_number(plan.get("starting_soc_percent"))
+    maximum_soc = _finite_number(maximum_soc_percent)
+    decisions = plan.get("decisions")
+    if starting_soc is None or maximum_soc is None or not isinstance(decisions, list) or not decisions:
+        return None
+    observed = [starting_soc]
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            return None
+        start_soc = _finite_number(decision.get("start_soc_percent"))
+        end_soc = _finite_number(decision.get("end_soc_percent"))
+        if start_soc is None or end_soc is None:
+            return None
+        observed.extend((start_soc, end_soc))
+    maximum_scheduled_soc = max(observed)
+    if not 0.0 <= starting_soc <= 100.0 or not 0.0 <= maximum_scheduled_soc <= 100.0:
+        return None
+    gap = max(0.0, maximum_soc - starting_soc)
+    gain = max(0.0, maximum_scheduled_soc - starting_soc)
+    refill_percent = 100.0 if gap <= 1e-9 else min(100.0, gain / gap * 100.0)
+    return {
+        "starting_soc_percent": round(starting_soc, 6),
+        "maximum_allowed_soc_percent": round(maximum_soc, 6),
+        "maximum_scheduled_soc_percent": round(maximum_scheduled_soc, 6),
+        "scheduled_gain_percent_points": round(gain, 6),
+        "scheduled_refill_percent": round(refill_percent, 6),
+        "calculated_at": plan.get("generated_at"),
+        "horizon_end": plan.get("horizon_end"),
+    }
+
+
+def _fallback_refill_activation(reason: str, *, max_age_seconds: int) -> dict[str, Any]:
+    return {
+        "percent": 0.0,
+        "source": "conservative_fallback",
+        "reason": reason,
+        "source_calculated_at": None,
+        "source_age_seconds": None,
+        "max_age_seconds": max_age_seconds,
+    }
+
+
+def resolve_refill_activation(
+    previous_payload: dict[str, Any] | None,
+    *,
+    now: datetime,
+    battery_state: BatteryState,
+    max_age_seconds: int = SCHEDULED_REFILL_MAX_AGE_SECONDS,
+) -> dict[str, Any]:
+    """Return the previous schedule's refill metric or a conservative zero fallback."""
+    if not isinstance(previous_payload, dict) or previous_payload.get("type") != "optimizer_executable_schedule":
+        return _fallback_refill_activation("previous_schedule_missing", max_age_seconds=max_age_seconds)
+    plan = previous_payload.get("plan")
+    inputs = previous_payload.get("inputs")
+    if not isinstance(plan, dict) or not isinstance(inputs, dict):
+        return _fallback_refill_activation("previous_schedule_invalid", max_age_seconds=max_age_seconds)
+    expected_inputs = {
+        "battery_capacity_wh": float(battery_state.usable_capacity_wh),
+        "min_soc_percent": float(battery_state.min_charge_level_percent),
+        "max_soc_percent": float(battery_state.max_charge_level_percent),
+    }
+    for key, expected in expected_inputs.items():
+        actual = _finite_number(inputs.get(key))
+        if actual is None or abs(actual - expected) > 1e-6:
+            return _fallback_refill_activation("battery_configuration_changed", max_age_seconds=max_age_seconds)
+    scarcity = plan.get("scarcity")
+    scheduled = scarcity.get("scheduled_refill") if isinstance(scarcity, dict) else None
+    if not isinstance(scheduled, dict):
+        return _fallback_refill_activation("scheduled_refill_missing", max_age_seconds=max_age_seconds)
+    percent = _finite_number(scheduled.get("scheduled_refill_percent"))
+    starting_soc = _finite_number(scheduled.get("starting_soc_percent"))
+    maximum_scheduled_soc = _finite_number(scheduled.get("maximum_scheduled_soc_percent"))
+    scheduled_gain = _finite_number(scheduled.get("scheduled_gain_percent_points"))
+    if (
+        percent is None or not 0.0 <= percent <= 100.0
+        or starting_soc is None or not 0.0 <= starting_soc <= 100.0
+        or maximum_scheduled_soc is None or not 0.0 <= maximum_scheduled_soc <= 100.0
+        or scheduled_gain is None or scheduled_gain < 0.0
+    ):
+        return _fallback_refill_activation("scheduled_refill_invalid", max_age_seconds=max_age_seconds)
+    expected_gap = max(0.0, expected_inputs["max_soc_percent"] - starting_soc)
+    expected_gain = max(0.0, maximum_scheduled_soc - starting_soc)
+    expected_percent = 100.0 if expected_gap <= 1e-9 else min(100.0, expected_gain / expected_gap * 100.0)
+    if abs(scheduled_gain - expected_gain) > 0.001 or abs(percent - expected_percent) > 0.001:
+        return _fallback_refill_activation("scheduled_refill_invalid", max_age_seconds=max_age_seconds)
+    raw_calculated_at = scheduled.get("calculated_at") or plan.get("generated_at")
+    try:
+        calculated_at = datetime.fromisoformat(str(raw_calculated_at))
+    except (TypeError, ValueError):
+        return _fallback_refill_activation("scheduled_refill_invalid", max_age_seconds=max_age_seconds)
+    if calculated_at.tzinfo is None or now.tzinfo is None:
+        return _fallback_refill_activation("scheduled_refill_invalid", max_age_seconds=max_age_seconds)
+    age_seconds = (now - calculated_at.astimezone(now.tzinfo)).total_seconds()
+    if age_seconds < -60:
+        return _fallback_refill_activation("previous_schedule_from_future", max_age_seconds=max_age_seconds)
+    if age_seconds > max_age_seconds:
+        return _fallback_refill_activation("previous_schedule_stale", max_age_seconds=max_age_seconds)
+    return {
+        "percent": round(percent, 6),
+        "source": "previous_schedule",
+        "reason": None,
+        "source_calculated_at": calculated_at.isoformat(),
+        "source_age_seconds": round(max(0.0, age_seconds), 3),
+        "max_age_seconds": max_age_seconds,
+        "source_starting_soc_percent": round(starting_soc, 6),
+        "source_maximum_scheduled_soc_percent": round(maximum_scheduled_soc, 6),
+        "source_scheduled_gain_percent_points": round(scheduled_gain, 6),
+        "source_horizon_end": scheduled.get("horizon_end"),
+    }
 
 
 def _load_env_file(path: Path) -> None:
@@ -233,6 +357,7 @@ def build_scarcity_context(
     normal_terminal_price: float | None,
     config: dict[str, Any],
     price_root: Path,
+    refill_activation: dict[str, Any],
 ) -> dict[str, Any]:
     enabled = bool(config.get("enabled", False))
     through_date = now.date() - timedelta(days=1)
@@ -263,6 +388,8 @@ def build_scarcity_context(
         "normal_terminal_price_eur_per_kwh": normal_terminal_price,
         "price_history": history,
         "refill": None,
+        "refill_activation": dict(refill_activation),
+        "scheduled_refill": None,
         "bands": [],
     }
     if normal_terminal_price is None:
@@ -291,7 +418,7 @@ def build_scarcity_context(
     for configured in config["bands"]:
         reference = min(cap, weighted_percentile(rows, float(configured["pricePercentile"])))
         additional = max(0.0, reference - normal_terminal_price)
-        active = refill["expected_refill_percent"] <= float(configured["activateWhenExpectedRefillBelowPercent"])
+        active = float(refill_activation["percent"]) <= float(configured["activateWhenExpectedRefillBelowPercent"])
         bands.append({
             "from_soc_percent": int(configured["fromSocPercent"]),
             "to_soc_percent": int(configured["toSocPercent"]),

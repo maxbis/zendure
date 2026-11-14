@@ -25,7 +25,11 @@ from planner.rolling_optimizer import (
     build_rolling_boundaries,
     optimize_rolling_schedule,
 )
-from planner.scarcity import build_scarcity_context
+from planner.scarcity import (
+    build_scarcity_context,
+    build_scheduled_refill,
+    resolve_refill_activation,
+)
 from planner.runtime_log import runtime_log_path, update_runtime_log
 
 
@@ -522,6 +526,8 @@ def run_shadow_once(
         "PLANNER_TERMINAL_VALUE_FACTOR",
         DEFAULT_TERMINAL_VALUE_FACTOR,
     )
+    published_path = latest_path or latest_schedule_path(settings)
+    previous_payload = _read_json_object(published_path)
 
     prices = fetch_price_payload(settings)
     runtime_readings = fetch_runtime_readings(settings)
@@ -544,6 +550,11 @@ def run_shadow_once(
         household_usage_w_by_hour=household_usage.values_w_by_hour,
     )
     terminal_price = fmean(slot.import_price_eur_per_kwh for slot in slots)
+    refill_activation = resolve_refill_activation(
+        previous_payload,
+        now=generated_at,
+        battery_state=battery_state,
+    )
     scarcity = build_scarcity_context(
         now=generated_at,
         battery_state=battery_state,
@@ -552,6 +563,7 @@ def run_shadow_once(
         normal_terminal_price=terminal_price,
         config=settings.dynamic_reserve,
         price_root=settings.repo_root / "main" / "data" / "price",
+        refill_activation=refill_activation,
     )
     plan = optimize_rolling_schedule(
         now=generated_at,
@@ -594,15 +606,26 @@ def run_shadow_once(
         },
         "plan": plan.to_dict(),
     }
-    published_path = latest_path or latest_schedule_path(settings)
     executable_plan, stabilization = stabilize_active_hour_plan(
         payload["plan"],
-        _read_json_object(published_path) if settings.active_hour_deadband_w > 0 else None,
+        previous_payload if settings.active_hour_deadband_w > 0 else None,
         now=generated_at,
         battery_state=battery_state,
         round_trip_efficiency=settings.round_trip_efficiency,
         deadband_w=settings.active_hour_deadband_w,
     )
+    raw_scheduled_refill = build_scheduled_refill(
+        payload["plan"],
+        maximum_soc_percent=battery_state.max_charge_level_percent,
+    )
+    if raw_scheduled_refill is not None:
+        payload["plan"]["scarcity"]["scheduled_refill"] = raw_scheduled_refill
+    executable_scheduled_refill = build_scheduled_refill(
+        executable_plan,
+        maximum_soc_percent=battery_state.max_charge_level_percent,
+    )
+    if executable_scheduled_refill is not None:
+        executable_plan["scarcity"]["scheduled_refill"] = executable_scheduled_refill
     payload["publication"] = {"active_hour_stabilization": stabilization}
     try:
         update_runtime_log(

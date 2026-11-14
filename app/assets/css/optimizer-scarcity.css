@@ -20,7 +20,9 @@
 .scarcity-forecast-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .scarcity-forecast-card { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 15px; border: 1px solid var(--gsd-border); border-radius: var(--gsd-radius-sm); background: var(--gsd-surface-2); }
 .scarcity-forecast-card--gross { border-color: color-mix(in srgb, var(--gsd-accent) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-accent-soft) 28%, var(--gsd-surface-2)); }
-.scarcity-forecast-card--outcome { border-color: color-mix(in srgb, var(--gsd-info) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-info-soft) 28%, var(--gsd-surface-2)); }
+.scarcity-forecast-card--activation { border-color: color-mix(in srgb, var(--gsd-warning) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-warning-soft) 28%, var(--gsd-surface-2)); }
+.scarcity-forecast-card--scheduled { border-color: color-mix(in srgb, var(--gsd-info) 42%, var(--gsd-border)); background: color-mix(in srgb, var(--gsd-info-soft) 28%, var(--gsd-surface-2)); }
+.scarcity-forecast-comparison--single { grid-template-columns: minmax(0, 1fr); }
 .scarcity-forecast-card__eyebrow { color: var(--gsd-text-secondary); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .scarcity-forecast-card__value { color: var(--gsd-text); font-size: 1.65rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .scarcity-forecast-card > p, .scarcity-forecast-explanation p { margin: 0; color: var(--gsd-text-secondary); font-size: .75rem; line-height: 1.5; }

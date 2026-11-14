@@ -9,11 +9,19 @@
         meta: get("page-meta"), refresh: get("refresh"), retry: get("retry"), loading: get("loading"),
         error: get("error"), errorMessage: get("error-message"), content: get("content"),
         banner: get("status-banner"), statusTitle: get("status-title"), statusCopy: get("status-copy"),
-        algorithm: get("algorithm"), refillPercent: get("refill-percent"), appliedCount: get("applied-count"), age: get("age"),
+        algorithm: get("algorithm"), activationPercent: get("activation-percent"), appliedCount: get("applied-count"), age: get("age"),
+        activationPercentLarge: get("activation-percent-large"), activationSource: get("activation-source"),
+        activationSourceAge: get("activation-source-age"), activationMaxAge: get("activation-max-age"),
+        activationSourceTime: get("activation-source-time"), activationReason: get("activation-reason"),
+        activationStartingSoc: get("activation-starting-soc"), activationMaximumSoc: get("activation-maximum-soc"),
+        activationGain: get("activation-gain"), activationHorizonEnd: get("activation-horizon-end"),
+        scheduledRefillPercent: get("scheduled-refill-percent"), scheduledStartingSoc: get("scheduled-starting-soc"),
+        maximumScheduledSoc: get("maximum-scheduled-soc"), scheduledGain: get("scheduled-gain"),
         grossRefillPercent: get("gross-refill-percent"), startingSoc: get("starting-soc"), maximumSoc: get("maximum-soc"),
+        grossMaximumSoc: get("gross-maximum-soc"),
         currentGap: get("current-gap"), grossRefillPoints: get("gross-refill-points"), grossRefillCeiling: get("gross-refill-ceiling"),
-        endingSoc: get("ending-soc"), outcomeTime: get("outcome-time"), outcomeChange: get("outcome-change"),
-        refillBar: get("refill-bar"), requiredRefill: get("required-refill"), solarRefill: get("solar-refill"),
+        endingSoc: get("ending-soc"), outcomeTime: get("outcome-time"), activationBar: get("activation-bar"),
+        requiredRefill: get("required-refill"), solarRefill: get("solar-refill"),
         gridRefill: get("grid-refill"), totalRefill: get("total-refill"), refillFactor: get("refill-factor"), horizon: get("horizon"),
         terminalPrice: get("terminal-price"), cheapPrice: get("cheap-price"), historySource: get("history-source"),
         historyPeriod: get("history-period"), sampleCount: get("sample-count"), halfLife: get("half-life"), bands: get("bands"),
@@ -57,6 +65,19 @@
         return `${(value / 3600).toFixed(1)} hr`;
     };
     const sourceLabel = (source) => ({ price_ticks: "MariaDB price_ticks", json_price_files: "Local JSON price files" }[source] || source || "—");
+    const activationSourceLabel = (source) => ({
+        previous_schedule: "Previous published schedule",
+        conservative_fallback: "Conservative 0% fallback"
+    }[source] || source || "—");
+    const activationReasonLabel = (reason) => ({
+        previous_schedule_missing: "No previous published schedule",
+        previous_schedule_invalid: "Previous schedule structure is invalid",
+        scheduled_refill_missing: "Previous schedule predates scheduled-refill output",
+        scheduled_refill_invalid: "Previous scheduled-refill values are invalid",
+        previous_schedule_stale: "Previous schedule is older than the 15-minute limit",
+        previous_schedule_from_future: "Previous schedule timestamp is in the future",
+        battery_configuration_changed: "Battery capacity or SoC limits changed"
+    }[reason] || reason || "None");
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     function hideTooltip(trigger = null) {
@@ -212,7 +233,7 @@
         }
 
         const references = [{
-            label: "Cheap-grid boundary",
+            label: "Diagnostic cheap-grid boundary",
             shortLabel: `P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)}`,
             percentile: finite(scarcity.cheap_grid_charge_percentile),
             price: finite(scarcity.cheap_grid_charge_price_eur_per_kwh),
@@ -245,7 +266,7 @@
             copy.textContent = `${reference.shortLabel} ${reference.label} · ${money(reference.price)}`;
             item.append(dot, copy);
             bindTooltip(item, reference.state === "cheap"
-                ? `${reference.shortLabel} is calculated from completed historical hourly consumer prices. Prices at or below ${money(reference.price)} can contribute to predicted cheap-grid refill.`
+                ? `${reference.shortLabel} is calculated from completed historical hourly consumer prices. Prices at or below ${money(reference.price)} contribute only to the gross-opportunity diagnostic.`
                 : `${reference.shortLabel} is calculated from completed historical hourly consumer prices using the configured recency weighting. It values energy in the ${reference.label} band at ${money(reference.price)}.`);
             elements.percentileLegend.appendChild(item);
         });
@@ -384,7 +405,7 @@
         if (message) elements.errorMessage.textContent = message;
     }
 
-    function appendBand(band) {
+    function appendBand(band, activationPercent, activationSource) {
         const card = document.createElement("article");
         card.className = "gsd-card scarcity-band";
         const state = band.applied ? "applied" : band.active ? "active" : "inactive";
@@ -406,13 +427,17 @@
             ? "The expected-refill condition is active and the master scarcity switch is enabled, so this band’s additional virtual cost affects optimizer discharge decisions."
             : band.active
                 ? "The expected-refill condition is active, but the master scarcity switch is disabled, so the calculated value is diagnostic only."
-                : "Expected refill is above this band’s activation boundary, so the band does not affect the current plan.");
+                : "Activation refill is above this band’s activation boundary, so the band does not affect the current plan.");
         header.append(copy, badge);
         const list = document.createElement("dl");
+        const comparison = activationPercent === null
+            ? "Unavailable"
+            : `${percent(activationPercent)} ≤ ${percent(band.activate_when_expected_refill_below_percent)}`;
         [
             ["Reference price", money(band.reference_price_eur_per_kwh), `Recency-weighted P${Number(band.price_percentile).toFixed(0)} historical consumer price, capped by the configured reference-price maximum. This is the target value for energy in this SoC band.`],
             ["Additional scarcity", money(band.additional_scarcity_value_eur_per_kwh), `Calculated as max(0, reference price − horizon-average terminal value). It is a virtual optimizer cost, not a charge on the electricity bill.`],
-            ["Activates at or below refill", percent(band.activate_when_expected_refill_below_percent), `Configured expected-refill boundary for this band. The condition becomes active when predicted refill is at or below ${percent(band.activate_when_expected_refill_below_percent)}.`]
+            ["Activates at or below refill", percent(band.activate_when_expected_refill_below_percent), `Configured scheduled-refill boundary for this band. The condition becomes active when the activation refill is at or below ${percent(band.activate_when_expected_refill_below_percent)}.`],
+            ["Activation comparison", comparison, `Current activation input from ${activationSourceLabel(activationSource)} compared with this inclusive band boundary.`]
         ].forEach(([label, value, detail]) => {
             const row = document.createElement("div");
             const dt = document.createElement("dt"); dt.textContent = label;
@@ -423,10 +448,10 @@
         const explanation = document.createElement("p");
         explanation.className = "scarcity-band__explanation";
         explanation.textContent = band.applied
-            ? "Expected refill is at or below this band’s boundary, so its additional virtual value affects discharge decisions."
+            ? "Activation refill is at or below this band’s boundary, so its additional virtual value affects discharge decisions."
             : band.active
                 ? "Refill conditions activate this band, but the master switch is off, so it does not affect decisions."
-                : "Expected refill is sufficient for this band, so no scarcity value is applied.";
+                : "Activation refill is above this band’s boundary, so no scarcity value is applied.";
         card.append(header, list, explanation);
         elements.bands.appendChild(card);
     }
@@ -434,18 +459,35 @@
     function render(payload) {
         const scarcity = payload.scarcity || {};
         const refill = scarcity.refill || {};
+        const activation = scarcity.refill_activation || {};
+        const scheduled = scarcity.scheduled_refill || {};
         const history = scarcity.price_history || {};
         const outcome = payload.optimizerOutcome || {};
         const bands = Array.isArray(scarcity.bands) ? scarcity.bands : [];
         const applied = bands.filter((band) => band.applied).length;
-        const refillValue = finite(refill.expected_refill_percent);
+        const activationValue = finite(activation.percent);
+        const grossRefillValue = finite(refill.expected_refill_percent);
         elements.algorithm.textContent = scarcity.algorithm_enabled ? "Enabled" : "Disabled";
-        elements.refillPercent.textContent = percent(refillValue);
-        elements.grossRefillPercent.textContent = percent(refillValue);
+        elements.activationPercent.textContent = percent(activationValue);
+        elements.activationPercentLarge.textContent = percent(activationValue);
+        elements.activationSource.textContent = activationSourceLabel(activation.source);
+        elements.activationSourceAge.textContent = activation.source === "previous_schedule" ? ageText(activation.source_age_seconds) : "Not applicable";
+        elements.activationMaxAge.textContent = ageText(activation.max_age_seconds);
+        elements.activationSourceTime.textContent = dateTime(activation.source_calculated_at);
+        elements.activationStartingSoc.textContent = percent(activation.source_starting_soc_percent);
+        elements.activationMaximumSoc.textContent = percent(activation.source_maximum_scheduled_soc_percent);
+        elements.activationGain.textContent = points(activation.source_scheduled_gain_percent_points);
+        elements.activationHorizonEnd.textContent = dateTime(activation.source_horizon_end);
+        elements.activationReason.textContent = activationReasonLabel(activation.reason);
+        elements.scheduledRefillPercent.textContent = percent(scheduled.scheduled_refill_percent);
+        elements.scheduledStartingSoc.textContent = percent(scheduled.starting_soc_percent);
+        elements.maximumScheduledSoc.textContent = percent(scheduled.maximum_scheduled_soc_percent);
+        elements.scheduledGain.textContent = points(scheduled.scheduled_gain_percent_points);
+        elements.grossRefillPercent.textContent = percent(grossRefillValue);
         elements.appliedCount.textContent = `${applied} of ${bands.length}`;
         elements.age.textContent = ageText(payload.ageSeconds);
         elements.meta.textContent = `Calculated ${dateTime(payload.generatedAt)} · automatic refresh every minute`;
-        elements.refillBar.style.width = `${Math.max(0, Math.min(100, refillValue || 0))}%`;
+        elements.activationBar.style.width = `${Math.max(0, Math.min(100, activationValue || 0))}%`;
         elements.requiredRefill.textContent = energy(refill.energy_required_kwh);
         elements.solarRefill.textContent = energy(refill.predicted_solar_refill_kwh);
         elements.gridRefill.textContent = energy(refill.predicted_cheap_grid_refill_kwh);
@@ -466,12 +508,12 @@
             : Math.min(maximumSoc ?? 100, startingSoc + refillPoints);
         elements.startingSoc.textContent = percent(startingSoc);
         elements.maximumSoc.textContent = percent(maximumSoc);
+        elements.grossMaximumSoc.textContent = percent(maximumSoc);
         elements.currentGap.textContent = points(gapPoints);
         elements.grossRefillPoints.textContent = points(refillPoints);
         elements.grossRefillCeiling.textContent = percent(grossCeiling);
         elements.endingSoc.textContent = percent(endingSoc);
         elements.outcomeTime.textContent = dateTime(outcome.horizon_end);
-        elements.outcomeChange.textContent = startingSoc === null || endingSoc === null ? "—" : signedPoints(endingSoc - startingSoc);
         elements.terminalPrice.textContent = money(scarcity.normal_terminal_price_eur_per_kwh);
         elements.cheapPrice.textContent = money(scarcity.cheap_grid_charge_price_eur_per_kwh);
         elements.historySource.textContent = sourceLabel(history.source);
@@ -479,8 +521,12 @@
         elements.sampleCount.textContent = finite(history.sample_count) === null ? "—" : `${history.sample_count} hours`;
         elements.halfLife.textContent = finite(history.half_life_days) === null ? "—" : `${history.half_life_days} days`;
         bindRoleTooltip("algorithm", `Master scarcity-band switch from the shared system configuration. When enabled, active bands add virtual discharge cost to optimizer decisions; when disabled, bands remain diagnostic only.`);
-        bindRoleTooltip("refill-percent", `Gross available refill divided by the battery's current energy gap, capped at 100%. It does not subtract future scheduled battery use and is not a predicted ending SoC.`);
-        bindRoleTooltip("gross-refill-percent", `Gross available refill divided by the battery's current energy gap. This is calculated before optimization and describes charging opportunity, not the final scheduled battery level.`);
+        bindRoleTooltip("activation-percent", `The single refill percentage used to activate bands. It comes from the previous valid published schedule, or is 0% when the conservative fallback is required.`);
+        bindRoleTooltip("activation-percent-large", `The current activation input. Every band compares this value with its inclusive configured boundary.`);
+        bindRoleTooltip("activation-source", `Identifies whether activation uses the previous published schedule or the conservative 0% fallback.`);
+        bindRoleTooltip("scheduled-refill-percent", `This schedule's maximum SoC gain divided by its starting gap to maximum. It is published for the next optimizer run.`);
+        bindRoleTooltip("maximum-scheduled-soc", `Highest start or end SoC on the final published schedule after active-hour stabilization.`);
+        bindRoleTooltip("gross-refill-percent", `Gross solar and cheap-grid opportunity divided by the current gap. This upper-bound diagnostic does not activate scarcity bands.`);
         bindRoleTooltip("gross-refill-ceiling", `Starting SoC plus gross refill opportunity, capped at maximum SoC. This is a hypothetical ceiling that assumes no intervening battery use.`);
         bindRoleTooltip("ending-soc", `Optimizer-estimated absolute battery level at the end of the horizon after all planned charging and discharging decisions.`);
         bindRoleTooltip("applied-count", `Number of configured bands whose expected-refill condition is active and whose virtual cost is currently enabled by the master scarcity switch.`);
@@ -492,7 +538,7 @@
         bindRoleTooltip("refill-factor", `Decimal coverage of the current gap: gross available refill ÷ current energy gap. A value of 1.000 means enough charging opportunity exists to restore the current gap, not that ending SoC will be 100%.`);
         bindRoleTooltip("horizon", `Start and end of the slots examined for predicted solar and cheap-grid refill. Derived from the current rolling optimizer plan.`);
         bindRoleTooltip("terminal-price", `Arithmetic mean of consumer/import prices across all slots in the current optimizer horizon. This forward-looking baseline values stored energy at the end of the forecast; it does not come from historical percentiles.`);
-        bindRoleTooltip("cheap-price", `Recency-weighted P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} consumer price from completed historical hours. Horizon prices at or below this value qualify as cheap-grid refill opportunities.`);
+        bindRoleTooltip("cheap-price", `Recency-weighted P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} consumer price from completed historical hours. It is used only for the gross-opportunity diagnostic, not band activation.`);
         bindRoleTooltip("history-source", history.source === "price_ticks"
             ? `Historical hourly consumer prices loaded from the MariaDB price_ticks table. The database is used when it contains at least the required 168 valid samples.`
             : `Historical hourly consumer prices loaded from local archived JSON price files because the database source was unavailable or did not contain enough valid samples.`);
@@ -502,7 +548,7 @@
         renderPercentileChart(scarcity, bands);
         renderPriceDistribution(scarcity);
         elements.bands.replaceChildren();
-        if (bands.length) bands.forEach(appendBand);
+        if (bands.length) bands.forEach((band) => appendBand(band, activationValue, activation.source));
         else {
             const empty = document.createElement("div");
             empty.className = "gsd-card scarcity-empty";
@@ -521,6 +567,10 @@
             elements.statusCopy.textContent = scarcity.unavailable_reason === "insufficient_price_history"
                 ? `Only ${history.sample_count || 0} historical hours are available; at least 168 are required.`
                 : `Reason: ${scarcity.unavailable_reason || "missing calculation inputs"}.`;
+        } else if (activation.source === "conservative_fallback") {
+            elements.banner.dataset.state = "warning";
+            elements.statusTitle.textContent = "Conservative refill fallback active";
+            elements.statusCopy.textContent = `${activationReasonLabel(activation.reason)}. Bands are evaluated with a 0% activation refill.`;
         } else {
             elements.banner.dataset.state = "ready";
             elements.statusTitle.textContent = scarcity.algorithm_enabled ? "Scarcity bands are enabled" : "Diagnostics ready · algorithm disabled";

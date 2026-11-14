@@ -24,6 +24,7 @@ if (!is_array($payload) || !is_array($payload['plan'] ?? null)) {
 $plan = $payload['plan'];
 $inputs = is_array($payload['inputs'] ?? null) ? $payload['inputs'] : [];
 $scarcity = is_array($plan['scarcity'] ?? null) ? $plan['scarcity'] : null;
+$scheduledRefill = is_array($scarcity['scheduled_refill'] ?? null) ? $scarcity['scheduled_refill'] : [];
 $generatedAt = isset($plan['generated_at']) ? (string)$plan['generated_at'] : null;
 $ageSeconds = null;
 if ($generatedAt !== null) {
@@ -46,6 +47,12 @@ echo json_encode([
             : null,
         'ending_soc_percent' => is_numeric($plan['ending_soc_percent'] ?? null)
             ? (float)$plan['ending_soc_percent']
+            : null,
+        'maximum_scheduled_soc_percent' => is_numeric($scheduledRefill['maximum_scheduled_soc_percent'] ?? null)
+            ? (float)$scheduledRefill['maximum_scheduled_soc_percent']
+            : null,
+        'scheduled_refill_percent' => is_numeric($scheduledRefill['scheduled_refill_percent'] ?? null)
+            ? (float)$scheduledRefill['scheduled_refill_percent']
             : null,
         'minimum_soc_percent' => is_numeric($inputs['min_soc_percent'] ?? null)
             ? (float)$inputs['min_soc_percent']
