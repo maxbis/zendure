@@ -106,6 +106,10 @@
     background: var(--gsd-negative-soft);
 }
 
+.scarcity-v1__refill-trigger {
+    cursor: help;
+}
+
 .scarcity-v1__band-dots {
     display: inline-flex;
     gap: 6px;
@@ -315,18 +319,6 @@
     transition: width var(--gsd-duration-medium) ease, height var(--gsd-duration-medium) ease;
 }
 
-.scarcity-v1__battery-scarcity[data-lowest="true"] {
-    border-radius: 4px 0 0 0;
-}
-
-.scarcity-v1__battery-scarcity[data-band-rank="1"] {
-    border-radius: 0 4px 0 0;
-}
-
-.scarcity-v1__battery-scarcity[data-lowest="true"][data-band-rank="1"] {
-    border-radius: 4px 4px 0 0;
-}
-
 .scarcity-v1__battery-scarcity-layer,
 .scarcity-v1__battery-reserve {
     position: absolute;
@@ -427,30 +419,37 @@
     background: var(--gsd-warning);
 }
 
-.scarcity-v1__bands-dialog {
+.scarcity-v1__bands-dialog,
+.scarcity-v1__refill-dialog {
+    z-index: 1200;
     width: min(360px, calc(100vw - 24px));
 }
 
-.scarcity-v1__bands-dialog[data-display-mode="desktop"] {
+.scarcity-v1__bands-dialog[data-display-mode="desktop"],
+.scarcity-v1__refill-dialog[data-display-mode="desktop"] {
     position: fixed;
     margin: 0;
     border-radius: 10px;
 }
 
-.scarcity-v1__bands-dialog[data-display-mode="desktop"][open] {
+.scarcity-v1__bands-dialog[data-display-mode="desktop"][open],
+.scarcity-v1__refill-dialog[data-display-mode="desktop"][open] {
     grid-template-rows: auto minmax(0, 1fr);
 }
 
-.scarcity-v1__bands-dialog .gsd-dialog__header {
+.scarcity-v1__bands-dialog .gsd-dialog__header,
+.scarcity-v1__refill-dialog .gsd-dialog__header {
     min-height: 54px;
     padding: 8px 8px 8px 13px;
 }
 
-.scarcity-v1__bands-dialog .gsd-dialog__title {
+.scarcity-v1__bands-dialog .gsd-dialog__title,
+.scarcity-v1__refill-dialog .gsd-dialog__title {
     font-size: 0.88rem;
 }
 
-.scarcity-v1__bands-dialog .gsd-icon-btn {
+.scarcity-v1__bands-dialog .gsd-icon-btn,
+.scarcity-v1__refill-dialog .gsd-icon-btn {
     width: 36px;
     min-width: 36px;
     min-height: 36px;
@@ -458,6 +457,55 @@
 
 .scarcity-v1__bands-dialog-body {
     padding: 10px 13px 13px;
+}
+
+.scarcity-v1__refill-dialog-body {
+    padding: 13px;
+}
+
+.scarcity-v1__refill-explanation {
+    margin: 0 0 11px;
+    color: var(--gsd-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.scarcity-v1__refill-facts {
+    display: grid;
+    margin: 0;
+}
+
+.scarcity-v1__refill-facts div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    border-top: 1px solid var(--gsd-border-subtle);
+    font-size: 0.72rem;
+}
+
+.scarcity-v1__refill-facts dt {
+    color: var(--gsd-text-muted);
+}
+
+.scarcity-v1__refill-facts dd {
+    margin: 0;
+    color: var(--gsd-text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.scarcity-v1__refill-equation {
+    margin: 10px 0 0;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in srgb, var(--gsd-positive) 32%, var(--gsd-border));
+    border-radius: var(--gsd-radius-sm);
+    background: color-mix(in srgb, var(--gsd-positive-soft) 52%, var(--gsd-surface-2));
+    color: var(--gsd-positive);
+    font-size: 0.74rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
 }
 
 .scarcity-v1__bands-list {

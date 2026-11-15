@@ -106,7 +106,15 @@ $pageConfig = [
                         <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#battery"></use></svg>
                         <h2 id="scarcity-v1-battery-title">Scheduled refill</h2>
                     </div>
-                    <span class="app-state-pill scarcity-v1__pill" data-role="refill-pill">—</span>
+                    <button
+                        class="app-state-pill scarcity-v1__pill scarcity-v1__refill-trigger"
+                        type="button"
+                        data-role="refill-pill"
+                        aria-label="Explain scheduled refill percentage"
+                        aria-haspopup="dialog"
+                        aria-controls="scarcity-v1-refill-dialog"
+                        aria-expanded="false"
+                    >—</button>
                 </div>
 
                 <div class="scarcity-v1__battery-main">
@@ -149,6 +157,25 @@ $pageConfig = [
             </header>
             <div class="gsd-dialog__body scarcity-v1__bands-dialog-body">
                 <div class="scarcity-v1__bands-list" data-role="bands-list"></div>
+            </div>
+        </dialog>
+
+        <dialog class="gsd-dialog scarcity-v1__refill-dialog" id="scarcity-v1-refill-dialog" aria-labelledby="scarcity-v1-refill-dialog-title">
+            <header class="gsd-dialog__header gsd-dialog__header--simple">
+                <h2 class="gsd-dialog__title" id="scarcity-v1-refill-dialog-title">Scheduled refill</h2>
+                <button class="gsd-icon-btn" type="button" aria-label="Close scheduled refill explanation" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </header>
+            <div class="gsd-dialog__body scarcity-v1__refill-dialog-body">
+                <p class="scarcity-v1__refill-explanation" data-role="refill-explanation">Waiting for the scheduled refill calculation.</p>
+                <dl class="scarcity-v1__refill-facts">
+                    <div><dt>Starting SoC</dt><dd data-role="refill-starting-soc">—</dd></div>
+                    <div><dt>Maximum allowed</dt><dd data-role="refill-maximum-soc">—</dd></div>
+                    <div><dt>Available gap</dt><dd data-role="refill-available-gap">—</dd></div>
+                    <div><dt>Scheduled gain</dt><dd data-role="refill-scheduled-gain">—</dd></div>
+                </dl>
+                <p class="scarcity-v1__refill-equation" data-role="refill-equation">—</p>
             </div>
         </dialog>
     </main>

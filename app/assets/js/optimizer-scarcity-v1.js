@@ -25,6 +25,12 @@
         firstLimitPrice: get("first-limit-price"),
         statusCaption: get("status-caption"),
         refillPill: get("refill-pill"),
+        refillExplanation: get("refill-explanation"),
+        refillStartingSoc: get("refill-starting-soc"),
+        refillMaximumSoc: get("refill-maximum-soc"),
+        refillAvailableGap: get("refill-available-gap"),
+        refillScheduledGain: get("refill-scheduled-gain"),
+        refillEquation: get("refill-equation"),
         currentSoc: get("current-soc"),
         battery: get("battery"),
         currentLabel: get("current-label"),
@@ -42,12 +48,14 @@
 
     const segments = Array.from(root.querySelectorAll("[data-segment]"));
     const bandsDialog = document.getElementById("scarcity-v1-bands-dialog");
+    const refillDialog = document.getElementById("scarcity-v1-refill-dialog");
     const desktopHover = window.matchMedia("(hover: hover) and (pointer: fine)");
     let controller = null;
     let lastUpdatedAt = null;
     let refreshTimer = null;
     let clockTimer = null;
     let dialogCloseTimer = null;
+    let refillDialogCloseTimer = null;
 
     const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
         ? Number(value)
@@ -257,6 +265,65 @@
         elements.bandDotsTrigger.setAttribute("aria-expanded", "true");
     }
 
+    function cancelRefillDialogClose() {
+        window.clearTimeout(refillDialogCloseTimer);
+        refillDialogCloseTimer = null;
+    }
+
+    function closeRefillDialog() {
+        cancelRefillDialogClose();
+        if (refillDialog?.open) refillDialog.close("hover-leave");
+        elements.refillPill.setAttribute("aria-expanded", "false");
+    }
+
+    function scheduleRefillDialogClose() {
+        cancelRefillDialogClose();
+        refillDialogCloseTimer = window.setTimeout(() => {
+            if (
+                desktopHover.matches
+                && (elements.refillPill.matches(":hover")
+                    || refillDialog.matches(":hover")
+                    || refillDialog.contains(document.activeElement))
+            ) {
+                return;
+            }
+            closeRefillDialog();
+        }, 140);
+    }
+
+    function positionRefillDialog() {
+        const gap = 8;
+        const viewportPadding = 12;
+        const triggerRect = elements.refillPill.getBoundingClientRect();
+        const dialogRect = refillDialog.getBoundingClientRect();
+        let left = triggerRect.right - dialogRect.width;
+        left = Math.max(viewportPadding, Math.min(left, window.innerWidth - dialogRect.width - viewportPadding));
+        let top = triggerRect.bottom + gap;
+        if (top + dialogRect.height > window.innerHeight - viewportPadding) {
+            top = triggerRect.top - dialogRect.height - gap;
+        }
+        refillDialog.style.left = `${Math.round(left)}px`;
+        refillDialog.style.top = `${Math.max(viewportPadding, Math.round(top))}px`;
+    }
+
+    function openDesktopRefillDialog() {
+        if (!desktopHover.matches || !refillDialog) return;
+        cancelRefillDialogClose();
+        refillDialog.dataset.displayMode = "desktop";
+        if (!refillDialog.open) refillDialog.show();
+        positionRefillDialog();
+        elements.refillPill.setAttribute("aria-expanded", "true");
+    }
+
+    function openMobileRefillDialog() {
+        if (!refillDialog || desktopHover.matches) return;
+        refillDialog.dataset.displayMode = "mobile";
+        refillDialog.style.removeProperty("left");
+        refillDialog.style.removeProperty("top");
+        window.GraphiteDialog.open(refillDialog, { trigger: elements.refillPill });
+        elements.refillPill.setAttribute("aria-expanded", "true");
+    }
+
     function render(payload) {
         const scarcity = payload.scarcity || {};
         const activation = scarcity.refill_activation || {};
@@ -268,8 +335,12 @@
         const currentSoc = finite(outcome.starting_soc_percent ?? scheduled.starting_soc_percent);
         const maximumScheduledSoc = finite(outcome.maximum_scheduled_soc_percent ?? scheduled.maximum_scheduled_soc_percent);
         const minimumSoc = finite(outcome.minimum_soc_percent);
+        const maximumSoc = finite(outcome.maximum_soc_percent);
         const scheduledGain = finite(scheduled.scheduled_gain_percent_points);
         const refillPercent = finite(scheduled.scheduled_refill_percent);
+        const availableGap = currentSoc === null || maximumSoc === null
+            ? null
+            : Math.max(0, maximumSoc - currentSoc);
 
         const appliedBands = bands
             .filter((band) => {
@@ -322,6 +393,22 @@
         elements.scheduledLabel.textContent = `Scheduled ${percent(maximumScheduledSoc)}`;
         elements.refillPill.textContent = refillPercent === null ? "No schedule" : `${percent(refillPercent)} of gap`;
         elements.refillPill.dataset.state = maximumScheduledSoc === null ? "warning" : "ready";
+        elements.refillPill.setAttribute(
+            "aria-label",
+            refillPercent === null
+                ? "Explain scheduled refill. No scheduled refill is available."
+                : `Explain scheduled refill: ${percent(refillPercent)} of the available battery gap.`
+        );
+        elements.refillExplanation.textContent = refillPercent === null
+            ? "No scheduled refill is available for the current optimizer plan. This percentage normally shows how much of the available space up to the maximum SoC is expected to be refilled."
+            : `The optimizer plans to refill ${percent(refillPercent)} of the available space between the starting battery level and the configured maximum SoC.`;
+        elements.refillStartingSoc.textContent = percent(currentSoc);
+        elements.refillMaximumSoc.textContent = percent(maximumSoc);
+        elements.refillAvailableGap.textContent = availableGap === null ? "—" : `${availableGap.toFixed(1)} pp`;
+        elements.refillScheduledGain.textContent = scheduledGain === null ? "—" : `${scheduledGain.toFixed(1)} pp`;
+        elements.refillEquation.textContent = scheduledGain === null || availableGap === null || refillPercent === null
+            ? "Scheduled refill calculation unavailable"
+            : `${scheduledGain.toFixed(1)} pp ÷ ${availableGap.toFixed(1)} pp = ${refillPercent.toFixed(1)}% of gap`;
         elements.batteryCaption.textContent = maximumScheduledSoc === null
             ? "Maximum scheduled battery level unavailable"
             : `Expected maximum ${percent(maximumScheduledSoc)}${scheduledGain === null ? "" : ` · ${points(scheduledGain)} scheduled`}`;
@@ -374,8 +461,25 @@
         bandsDialog.style.removeProperty("left");
         bandsDialog.style.removeProperty("top");
     });
+    elements.refillPill.addEventListener("pointerenter", openDesktopRefillDialog);
+    elements.refillPill.addEventListener("pointerleave", scheduleRefillDialogClose);
+    elements.refillPill.addEventListener("focus", openDesktopRefillDialog);
+    elements.refillPill.addEventListener("blur", () => {
+        if (desktopHover.matches && !refillDialog.matches(":hover")) scheduleRefillDialogClose();
+    });
+    elements.refillPill.addEventListener("click", openMobileRefillDialog);
+    refillDialog.addEventListener("pointerenter", cancelRefillDialogClose);
+    refillDialog.addEventListener("pointerleave", () => {
+        if (desktopHover.matches) scheduleRefillDialogClose();
+    });
+    refillDialog.addEventListener("close", () => {
+        elements.refillPill.setAttribute("aria-expanded", "false");
+        refillDialog.style.removeProperty("left");
+        refillDialog.style.removeProperty("top");
+    });
     window.addEventListener("resize", () => {
         if (bandsDialog.open && desktopHover.matches) positionDesktopDialog();
+        if (refillDialog.open && desktopHover.matches) positionRefillDialog();
     });
 
     load();
@@ -385,6 +489,7 @@
     window.addEventListener("pagehide", () => {
         controller?.abort();
         cancelDialogClose();
+        cancelRefillDialogClose();
         window.clearInterval(refreshTimer);
         window.clearInterval(clockTimer);
     }, { once: true });
