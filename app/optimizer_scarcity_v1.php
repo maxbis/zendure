@@ -88,8 +88,8 @@ $pageConfig = [
 
                 <div class="scarcity-v1__status-overview">
                     <div class="scarcity-v1__status-main">
+                        <span class="scarcity-v1__status-metric-label">Applied bands</span>
                         <strong class="scarcity-v1__status-value" data-role="status-value">—</strong>
-                        <span class="scarcity-v1__status-label" data-role="status-label">bands applied</span>
                     </div>
                     <div class="scarcity-v1__first-limit" data-role="first-limit">
                         <span class="scarcity-v1__first-limit-label">First applied limit</span>
@@ -97,7 +97,7 @@ $pageConfig = [
                         <span data-role="first-limit-price">Determining price…</span>
                     </div>
                 </div>
-                <p class="scarcity-v1__caption" data-role="status-caption">Waiting for the current activation input</p>
+                <p class="scarcity-v1__caption scarcity-v1__status-footer" data-role="status-caption">Waiting for the current activation input</p>
             </section>
 
             <section class="gsd-card scarcity-v1__panel scarcity-v1__battery-panel" aria-labelledby="scarcity-v1-battery-title">

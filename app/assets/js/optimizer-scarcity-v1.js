@@ -20,7 +20,6 @@
         bandsList: get("bands-list"),
         statusPill: get("status-pill"),
         statusValue: get("status-value"),
-        statusLabel: get("status-label"),
         firstLimit: get("first-limit"),
         firstLimitBoundary: get("first-limit-boundary"),
         firstLimitPrice: get("first-limit-price"),
@@ -215,7 +214,6 @@
         renderBattery(currentSoc, maximumScheduledSoc);
 
         elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
-        elements.statusLabel.textContent = appliedCount === 1 ? "band applied" : "bands applied";
         const firstAppliedBand = bands
             .filter((band) => band.applied && finite(band.to_soc_percent) !== null)
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent))[0] || null;

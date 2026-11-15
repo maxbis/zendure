@@ -154,9 +154,9 @@
 }
 
 .scarcity-v1__status-main {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
+    display: grid;
+    justify-items: start;
+    align-content: end;
 }
 
 .scarcity-v1__status-value,
@@ -177,9 +177,12 @@
     color: var(--gsd-negative);
 }
 
-.scarcity-v1__status-label {
+.scarcity-v1__status-metric-label,
+.scarcity-v1__first-limit-label {
+    margin-bottom: 3px;
     color: var(--gsd-text-muted);
-    font-size: 0.78rem;
+    font-size: 0.68rem;
+    font-weight: 650;
 }
 
 .scarcity-v1__first-limit {
@@ -189,13 +192,6 @@
     min-width: 0;
     color: var(--gsd-warning);
     font-variant-numeric: tabular-nums;
-}
-
-.scarcity-v1__first-limit-label {
-    margin-bottom: 3px;
-    color: var(--gsd-text-muted);
-    font-size: 0.68rem;
-    font-weight: 650;
 }
 
 .scarcity-v1__first-limit strong {
@@ -230,6 +226,11 @@
     color: var(--gsd-text-muted);
     font-size: 0.78rem;
     text-align: center;
+}
+
+.scarcity-v1__status-footer {
+    padding-top: 13px;
+    border-top: 1px solid var(--gsd-border-subtle);
 }
 
 .scarcity-v1__battery-main {
