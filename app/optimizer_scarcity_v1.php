@@ -114,9 +114,7 @@ $pageConfig = [
                     <div class="scarcity-v1__battery" data-role="battery" role="meter" aria-label="Current and maximum scheduled battery level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                         <span class="scarcity-v1__battery-segments" aria-hidden="true">
                             <?php for ($segment = 0; $segment < 10; $segment++): ?>
-                                <span class="scarcity-v1__battery-segment" data-segment="<?= $segment; ?>">
-                                    <span class="scarcity-v1__battery-scarcity"></span>
-                                </span>
+                                <span class="scarcity-v1__battery-segment" data-segment="<?= $segment; ?>"></span>
                             <?php endfor; ?>
                             <span class="scarcity-v1__battery-limit-marker" data-role="battery-limit-marker"></span>
                         </span>

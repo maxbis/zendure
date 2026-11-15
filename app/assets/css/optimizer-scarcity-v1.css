@@ -307,10 +307,11 @@
     bottom: 0;
     left: var(--scarcity-start, 0%);
     width: var(--scarcity-fill, 0%);
-    height: 5px;
+    height: min(var(--scarcity-height, 0px), 100%);
     background: var(--gsd-warning);
     box-shadow: 0 -2px 7px color-mix(in srgb, var(--gsd-warning) 36%, transparent);
     pointer-events: none;
+    transition: width var(--gsd-duration-medium) ease, height var(--gsd-duration-medium) ease;
 }
 
 .scarcity-v1__battery-limit-marker {

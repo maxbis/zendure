@@ -48,6 +48,7 @@
         ? Number(value)
         : null;
     const percent = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(1)}%`;
+    const wholePercent = (value) => finite(value) === null ? "—" : `${Math.round(Number(value))}%`;
     const points = (value) => finite(value) === null ? "—" : `${Number(value) >= 0 ? "+" : "−"}${Math.abs(Number(value)).toFixed(1)} pp`;
     const money = (value) => finite(value) === null ? "Unavailable" : `€${Number(value).toFixed(4)}/kWh`;
     const cents = (value) => {
@@ -98,10 +99,11 @@
         };
     }
 
-    function renderBattery(currentSoc, maximumScheduledSoc, firstAppliedBand) {
+    function renderBattery(currentSoc, maximumScheduledSoc, appliedBands) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
         const scheduledLevel = current === null ? scheduled : scheduled === null ? current : Math.max(current, scheduled);
+        const firstAppliedBand = appliedBands[0] || null;
         const bandFrom = finite(firstAppliedBand?.from_soc_percent);
         const bandTo = finite(firstAppliedBand?.to_soc_percent);
         const hasScarcityBand = bandFrom !== null && bandTo !== null && bandTo > bandFrom;
@@ -109,18 +111,28 @@
         segments.forEach((segment, index) => {
             segment.style.setProperty("--scheduled-fill", `${segmentFill(scheduledLevel, index)}%`);
             segment.style.setProperty("--current-fill", `${segmentFill(current, index)}%`);
-            const scarcityRange = hasScarcityBand
-                ? scarcitySegmentRange(bandFrom, bandTo, index)
-                : { start: 0, width: 0 };
-            segment.style.setProperty("--scarcity-start", `${scarcityRange.start}%`);
-            segment.style.setProperty("--scarcity-fill", `${scarcityRange.width}%`);
+            segment.querySelectorAll(".scarcity-v1__battery-scarcity").forEach((overlay) => overlay.remove());
+            appliedBands.forEach((band, rank) => {
+                const from = finite(band.from_soc_percent);
+                const to = finite(band.to_soc_percent);
+                if (from === null || to === null || to <= from) return;
+                const scarcityRange = scarcitySegmentRange(from, to, index);
+                if (scarcityRange.width <= 0) return;
+                const overlay = document.createElement("span");
+                overlay.className = "scarcity-v1__battery-scarcity";
+                overlay.dataset.bandRank = String(rank + 1);
+                overlay.style.setProperty("--scarcity-start", `${scarcityRange.start}%`);
+                overlay.style.setProperty("--scarcity-fill", `${scarcityRange.width}%`);
+                overlay.style.setProperty("--scarcity-height", `${(rank + 1) * 5}px`);
+                segment.appendChild(overlay);
+            });
         });
 
         elements.batteryLimitMarker.hidden = !hasScarcityBand;
         elements.scarcityLegend.hidden = !hasScarcityBand;
         if (hasScarcityBand) {
             elements.batteryLimitMarker.style.setProperty("--scarcity-limit", `${Math.max(0, Math.min(100, bandTo))}%`);
-            elements.scarcityLabel.textContent = `Scarcity ${bandFrom.toFixed(0)}–${bandTo.toFixed(0)}% · ${cents(firstAppliedBand.reference_price_eur_per_kwh)}`;
+            elements.scarcityLabel.textContent = `Scarcity ${appliedBands.length} band${appliedBands.length === 1 ? "" : "s"}`;
         } else {
             elements.batteryLimitMarker.style.removeProperty("--scarcity-limit");
             elements.scarcityLabel.textContent = "Scarcity —";
@@ -131,7 +143,7 @@
             "aria-valuetext",
             current === null || scheduled === null
                 ? "Battery schedule unavailable"
-                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasScarcityBand ? `, first scarcity band ${percent(bandFrom)} to ${percent(bandTo)}` : ""}`
+                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasScarcityBand ? `, ${appliedBands.length} applied scarcity band${appliedBands.length === 1 ? "" : "s"}` : ""}`
         );
     }
 
@@ -243,11 +255,16 @@
         const scheduledGain = finite(scheduled.scheduled_gain_percent_points);
         const refillPercent = finite(scheduled.scheduled_refill_percent);
 
-        const firstAppliedBand = bands
-            .filter((band) => band.applied && finite(band.to_soc_percent) !== null)
-            .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent))[0] || null;
+        const appliedBands = bands
+            .filter((band) => {
+                const from = finite(band.from_soc_percent);
+                const to = finite(band.to_soc_percent);
+                return band.applied && from !== null && to !== null && to > from;
+            })
+            .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent));
+        const firstAppliedBand = appliedBands[0] || null;
         renderBands(bands);
-        renderBattery(currentSoc, maximumScheduledSoc, firstAppliedBand);
+        renderBattery(currentSoc, maximumScheduledSoc, appliedBands);
 
         elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         if (firstAppliedBand) {
@@ -284,7 +301,7 @@
             elements.connectionBadge.textContent = "Live";
         }
 
-        elements.currentSoc.textContent = percent(currentSoc);
+        elements.currentSoc.textContent = wholePercent(currentSoc);
         elements.currentLabel.textContent = `Current ${percent(currentSoc)}`;
         elements.scheduledLabel.textContent = `Scheduled ${percent(maximumScheduledSoc)}`;
         elements.refillPill.textContent = refillPercent === null ? "No schedule" : `${percent(refillPercent)} of gap`;
