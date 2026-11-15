@@ -126,7 +126,11 @@ $pageConfig = [
                             <?php endfor; ?>
                             <span class="scarcity-v1__battery-reserve" data-role="battery-reserve"></span>
                             <span class="scarcity-v1__battery-upper-buffer" data-role="battery-upper-buffer"></span>
-                            <span class="scarcity-v1__battery-scarcity-layer" data-role="battery-scarcity-layer"></span>
+                            <span class="scarcity-v1__battery-scarcity-layer" data-role="battery-scarcity-layer">
+                                <?php for ($segment = 0; $segment < 10; $segment++): ?>
+                                    <span class="scarcity-v1__battery-scarcity-clip" data-scarcity-segment="<?= $segment; ?>"></span>
+                                <?php endfor; ?>
+                            </span>
                             <span class="scarcity-v1__battery-reserve-marker" data-role="battery-reserve-marker"></span>
                             <span class="scarcity-v1__battery-upper-marker" data-role="battery-upper-marker"></span>
                             <span class="scarcity-v1__battery-limit-marker" data-role="battery-limit-marker"></span>

@@ -329,6 +329,14 @@
 
 .scarcity-v1__battery-scarcity-layer {
     z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(10, minmax(4px, 1fr));
+    gap: 4px;
+}
+
+.scarcity-v1__battery-scarcity-clip {
+    position: relative;
+    overflow: hidden;
 }
 
 .scarcity-v1__battery-reserve {
@@ -642,7 +650,8 @@
         height: 19px;
     }
 
-    .scarcity-v1__battery-segments {
+    .scarcity-v1__battery-segments,
+    .scarcity-v1__battery-scarcity-layer {
         gap: 3px;
     }
 

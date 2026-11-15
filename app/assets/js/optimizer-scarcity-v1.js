@@ -43,12 +43,12 @@
         batteryReserveMarker: get("battery-reserve-marker"),
         batteryUpperBuffer: get("battery-upper-buffer"),
         batteryUpperMarker: get("battery-upper-marker"),
-        batteryScarcityLayer: get("battery-scarcity-layer"),
         batteryLimitMarker: get("battery-limit-marker"),
         batteryCaption: get("battery-caption")
     };
 
     const segments = Array.from(root.querySelectorAll("[data-segment]"));
+    const scarcityClips = Array.from(root.querySelectorAll("[data-scarcity-segment]"));
     const bandsDialog = document.getElementById("scarcity-v1-bands-dialog");
     const refillDialog = document.getElementById("scarcity-v1-refill-dialog");
     const desktopHover = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -102,6 +102,18 @@
         return Math.max(0, Math.min(100, (level - index * 10) * 10));
     }
 
+    function scarcitySegmentRange(fromSoc, toSoc, index) {
+        const segmentStart = index * 10;
+        const segmentEnd = segmentStart + 10;
+        const overlapStart = Math.max(fromSoc, segmentStart);
+        const overlapEnd = Math.min(toSoc, segmentEnd);
+        if (overlapEnd <= overlapStart) return { start: 0, width: 0 };
+        return {
+            start: (overlapStart - segmentStart) * 10,
+            width: (overlapEnd - overlapStart) * 10
+        };
+    }
+
     function renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, maximumSoc, appliedBands) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
@@ -118,21 +130,22 @@
             segment.style.setProperty("--current-fill", `${segmentFill(current, index)}%`);
         });
 
-        elements.batteryScarcityLayer.replaceChildren();
-        appliedBands.forEach((band, rank) => {
-            const from = finite(band.from_soc_percent);
-            const to = finite(band.to_soc_percent);
-            if (from === null || to === null || to <= from) return;
-            const clampedFrom = Math.max(0, Math.min(100, from));
-            const clampedTo = Math.max(clampedFrom, Math.min(100, to));
-            const overlay = document.createElement("span");
-            overlay.className = "scarcity-v1__battery-scarcity";
-            overlay.dataset.bandRank = String(rank + 1);
-            overlay.dataset.lowest = String(rank === appliedBands.length - 1);
-            overlay.style.setProperty("--scarcity-start", `${clampedFrom}%`);
-            overlay.style.setProperty("--scarcity-fill", `${clampedTo - clampedFrom}%`);
-            overlay.style.setProperty("--scarcity-height", `${(rank + 1) * 5}px`);
-            elements.batteryScarcityLayer.appendChild(overlay);
+        scarcityClips.forEach((clip, index) => {
+            clip.replaceChildren();
+            appliedBands.forEach((band, rank) => {
+                const from = finite(band.from_soc_percent);
+                const to = finite(band.to_soc_percent);
+                if (from === null || to === null || to <= from) return;
+                const range = scarcitySegmentRange(from, to, index);
+                if (range.width <= 0) return;
+                const overlay = document.createElement("span");
+                overlay.className = "scarcity-v1__battery-scarcity";
+                overlay.dataset.bandRank = String(rank + 1);
+                overlay.style.setProperty("--scarcity-start", `${range.start}%`);
+                overlay.style.setProperty("--scarcity-fill", `${range.width}%`);
+                overlay.style.setProperty("--scarcity-height", `${(rank + 1) * 5}px`);
+                clip.appendChild(overlay);
+            });
         });
 
         const lowestBandStart = appliedBands.length
