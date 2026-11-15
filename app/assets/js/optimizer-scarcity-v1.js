@@ -31,6 +31,11 @@
         scheduledLabel: get("scheduled-label"),
         scarcityLegend: get("scarcity-legend"),
         scarcityLabel: get("scarcity-label"),
+        reserveLegend: get("reserve-legend"),
+        reserveLabel: get("reserve-label"),
+        batteryReserve: get("battery-reserve"),
+        batteryReserveMarker: get("battery-reserve-marker"),
+        batteryScarcityLayer: get("battery-scarcity-layer"),
         batteryLimitMarker: get("battery-limit-marker"),
         batteryCaption: get("battery-caption")
     };
@@ -87,21 +92,10 @@
         return Math.max(0, Math.min(100, (level - index * 10) * 10));
     }
 
-    function scarcitySegmentRange(fromSoc, toSoc, index) {
-        const segmentStart = index * 10;
-        const segmentEnd = segmentStart + 10;
-        const overlapStart = Math.max(fromSoc, segmentStart);
-        const overlapEnd = Math.min(toSoc, segmentEnd);
-        if (overlapEnd <= overlapStart) return { start: 0, width: 0 };
-        return {
-            start: (overlapStart - segmentStart) * 10,
-            width: (overlapEnd - overlapStart) * 10
-        };
-    }
-
-    function renderBattery(currentSoc, maximumScheduledSoc, appliedBands) {
+    function renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, appliedBands) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
+        const minimum = finite(minimumSoc);
         const scheduledLevel = current === null ? scheduled : scheduled === null ? current : Math.max(current, scheduled);
         const firstAppliedBand = appliedBands[0] || null;
         const bandFrom = finite(firstAppliedBand?.from_soc_percent);
@@ -111,22 +105,43 @@
         segments.forEach((segment, index) => {
             segment.style.setProperty("--scheduled-fill", `${segmentFill(scheduledLevel, index)}%`);
             segment.style.setProperty("--current-fill", `${segmentFill(current, index)}%`);
-            segment.querySelectorAll(".scarcity-v1__battery-scarcity").forEach((overlay) => overlay.remove());
-            appliedBands.forEach((band, rank) => {
-                const from = finite(band.from_soc_percent);
-                const to = finite(band.to_soc_percent);
-                if (from === null || to === null || to <= from) return;
-                const scarcityRange = scarcitySegmentRange(from, to, index);
-                if (scarcityRange.width <= 0) return;
-                const overlay = document.createElement("span");
-                overlay.className = "scarcity-v1__battery-scarcity";
-                overlay.dataset.bandRank = String(rank + 1);
-                overlay.style.setProperty("--scarcity-start", `${scarcityRange.start}%`);
-                overlay.style.setProperty("--scarcity-fill", `${scarcityRange.width}%`);
-                overlay.style.setProperty("--scarcity-height", `${(rank + 1) * 5}px`);
-                segment.appendChild(overlay);
-            });
         });
+
+        elements.batteryScarcityLayer.replaceChildren();
+        appliedBands.forEach((band, rank) => {
+            const from = finite(band.from_soc_percent);
+            const to = finite(band.to_soc_percent);
+            if (from === null || to === null || to <= from) return;
+            const clampedFrom = Math.max(0, Math.min(100, from));
+            const clampedTo = Math.max(clampedFrom, Math.min(100, to));
+            const overlay = document.createElement("span");
+            overlay.className = "scarcity-v1__battery-scarcity";
+            overlay.dataset.bandRank = String(rank + 1);
+            overlay.dataset.lowest = String(rank === appliedBands.length - 1);
+            overlay.style.setProperty("--scarcity-start", `${clampedFrom}%`);
+            overlay.style.setProperty("--scarcity-fill", `${clampedTo - clampedFrom}%`);
+            overlay.style.setProperty("--scarcity-height", `${(rank + 1) * 5}px`);
+            elements.batteryScarcityLayer.appendChild(overlay);
+        });
+
+        const lowestBandStart = appliedBands.length
+            ? Math.min(...appliedBands.map((band) => Number(band.from_soc_percent)))
+            : null;
+        const reserveEnd = minimum ?? lowestBandStart;
+        const hasReserve = reserveEnd !== null && reserveEnd > 0;
+        elements.batteryReserve.hidden = !hasReserve;
+        elements.batteryReserveMarker.hidden = !hasReserve;
+        elements.reserveLegend.hidden = !hasReserve;
+        if (hasReserve) {
+            const clampedReserve = Math.max(0, Math.min(100, reserveEnd));
+            elements.batteryReserve.style.setProperty("--reserve-end", `${clampedReserve}%`);
+            elements.batteryReserveMarker.style.setProperty("--reserve-end", `${clampedReserve}%`);
+            elements.reserveLabel.textContent = `Reserve 0–${clampedReserve.toFixed(0)}%`;
+        } else {
+            elements.batteryReserve.style.removeProperty("--reserve-end");
+            elements.batteryReserveMarker.style.removeProperty("--reserve-end");
+            elements.reserveLabel.textContent = "Reserve —";
+        }
 
         elements.batteryLimitMarker.hidden = !hasScarcityBand;
         elements.scarcityLegend.hidden = !hasScarcityBand;
@@ -143,7 +158,7 @@
             "aria-valuetext",
             current === null || scheduled === null
                 ? "Battery schedule unavailable"
-                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasScarcityBand ? `, ${appliedBands.length} applied scarcity band${appliedBands.length === 1 ? "" : "s"}` : ""}`
+                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasReserve ? `, minimum reserve ${percent(reserveEnd)}` : ""}${hasScarcityBand ? `, ${appliedBands.length} applied scarcity band${appliedBands.length === 1 ? "" : "s"}` : ""}`
         );
     }
 
@@ -252,6 +267,7 @@
         const totalCount = bands.length;
         const currentSoc = finite(outcome.starting_soc_percent ?? scheduled.starting_soc_percent);
         const maximumScheduledSoc = finite(outcome.maximum_scheduled_soc_percent ?? scheduled.maximum_scheduled_soc_percent);
+        const minimumSoc = finite(outcome.minimum_soc_percent);
         const scheduledGain = finite(scheduled.scheduled_gain_percent_points);
         const refillPercent = finite(scheduled.scheduled_refill_percent);
 
@@ -264,7 +280,7 @@
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent));
         const firstAppliedBand = appliedBands[0] || null;
         renderBands(bands);
-        renderBattery(currentSoc, maximumScheduledSoc, appliedBands);
+        renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, appliedBands);
 
         elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         if (firstAppliedBand) {

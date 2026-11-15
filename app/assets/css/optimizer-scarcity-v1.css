@@ -273,6 +273,7 @@
 
 .scarcity-v1__battery-segment {
     position: relative;
+    z-index: 1;
     overflow: hidden;
     border-radius: 3px;
     background: var(--gsd-page-deep);
@@ -302,7 +303,7 @@
 
 .scarcity-v1__battery-scarcity {
     position: absolute;
-    z-index: 3;
+    z-index: 1;
     right: auto;
     bottom: 0;
     left: var(--scarcity-start, 0%);
@@ -312,6 +313,58 @@
     box-shadow: 0 -2px 7px color-mix(in srgb, var(--gsd-warning) 36%, transparent);
     pointer-events: none;
     transition: width var(--gsd-duration-medium) ease, height var(--gsd-duration-medium) ease;
+}
+
+.scarcity-v1__battery-scarcity[data-lowest="true"] {
+    border-radius: 4px 0 0 0;
+}
+
+.scarcity-v1__battery-scarcity[data-band-rank="1"] {
+    border-radius: 0 4px 0 0;
+}
+
+.scarcity-v1__battery-scarcity[data-lowest="true"][data-band-rank="1"] {
+    border-radius: 4px 4px 0 0;
+}
+
+.scarcity-v1__battery-scarcity-layer,
+.scarcity-v1__battery-reserve {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.scarcity-v1__battery-scarcity-layer {
+    z-index: 3;
+}
+
+.scarcity-v1__battery-reserve {
+    z-index: 2;
+    right: auto;
+    width: var(--reserve-end, 0%);
+    border-radius: 3px 0 0 3px;
+    background: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--gsd-text-muted) 12%, transparent) 0 3px,
+        color-mix(in srgb, var(--gsd-page-deep) 42%, transparent) 3px 6px
+    );
+}
+
+.scarcity-v1__battery-reserve[hidden],
+.scarcity-v1__battery-reserve-marker[hidden] {
+    display: none;
+}
+
+.scarcity-v1__battery-reserve-marker {
+    position: absolute;
+    z-index: 4;
+    top: -2px;
+    bottom: -2px;
+    left: var(--reserve-end, 0%);
+    width: 1px;
+    background: var(--gsd-text-muted);
+    opacity: 0.85;
+    pointer-events: none;
 }
 
 .scarcity-v1__battery-limit-marker {
@@ -359,6 +412,15 @@
 
 .scarcity-v1__legend-key--scheduled {
     background: var(--gsd-positive);
+}
+
+.scarcity-v1__legend-key--reserve {
+    border: 1px solid var(--gsd-border-strong);
+    background: repeating-linear-gradient(
+        135deg,
+        var(--gsd-text-muted) 0 2px,
+        var(--gsd-surface-3) 2px 4px
+    );
 }
 
 .scarcity-v1__legend-key--scarcity {
