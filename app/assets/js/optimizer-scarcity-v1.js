@@ -21,6 +21,7 @@
         statusPill: get("status-pill"),
         statusValue: get("status-value"),
         statusLabel: get("status-label"),
+        firstLimit: get("first-limit"),
         statusCaption: get("status-caption"),
         refillPill: get("refill-pill"),
         currentSoc: get("current-soc"),
@@ -45,6 +46,12 @@
     const percent = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(1)}%`;
     const points = (value) => finite(value) === null ? "—" : `${Number(value) >= 0 ? "+" : "−"}${Math.abs(Number(value)).toFixed(1)} pp`;
     const money = (value) => finite(value) === null ? "Unavailable" : `€${Number(value).toFixed(4)}/kWh`;
+    const cents = (value) => {
+        const number = finite(value);
+        if (number === null) return "Unavailable";
+        const formatted = (number * 100).toFixed(2).replace(/\.?0+$/, "");
+        return `${formatted} ct/kWh`;
+    };
 
     function ageText(milliseconds) {
         const seconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -207,6 +214,16 @@
 
         elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         elements.statusLabel.textContent = appliedCount === 1 ? "band applied" : "bands applied";
+        const firstAppliedBand = bands
+            .filter((band) => band.applied && finite(band.to_soc_percent) !== null)
+            .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent))[0] || null;
+        if (firstAppliedBand) {
+            elements.firstLimit.dataset.state = "applied";
+            elements.firstLimit.textContent = `${Number(firstAppliedBand.to_soc_percent).toFixed(0)}% limit · ${cents(firstAppliedBand.reference_price_eur_per_kwh)}`;
+        } else {
+            elements.firstLimit.dataset.state = "empty";
+            elements.firstLimit.textContent = "No scarcity limit applied";
+        }
         elements.statusCaption.textContent = finite(activation.percent) === null
             ? "Activation input unavailable"
             : `Activation input ${percent(activation.percent)} · previous published schedule`;

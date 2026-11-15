@@ -90,6 +90,7 @@ $pageConfig = [
                     <strong class="scarcity-v1__status-value" data-role="status-value">—</strong>
                     <span class="scarcity-v1__status-label" data-role="status-label">bands applied</span>
                 </div>
+                <p class="scarcity-v1__first-limit" data-role="first-limit">Determining the first applied limit…</p>
                 <p class="scarcity-v1__caption" data-role="status-caption">Waiting for the current activation input</p>
             </section>
 

@@ -175,8 +175,30 @@
     font-size: 0.78rem;
 }
 
+.scarcity-v1__first-limit {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 7px;
+    margin: 16px 0 0;
+    padding: 5px 9px;
+    border: 1px solid color-mix(in srgb, var(--gsd-warning) 34%, var(--gsd-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gsd-warning-soft) 58%, var(--gsd-surface-2));
+    color: var(--gsd-warning);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.scarcity-v1__first-limit[data-state="empty"] {
+    border-color: var(--gsd-border);
+    background: var(--gsd-surface-3);
+    color: var(--gsd-text-muted);
+}
+
 .scarcity-v1__caption {
-    margin: 20px 0 0;
+    margin: 12px 0 0;
     color: var(--gsd-text-muted);
     font-size: 0.78rem;
     text-align: center;
