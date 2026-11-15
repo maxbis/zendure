@@ -78,6 +78,7 @@
         });
 
         dialog.querySelectorAll("[data-gsd-dialog-close]").forEach((button) => {
+            if (button.closest("dialog") !== dialog) return;
             button.addEventListener("click", () => {
                 GraphiteDialog.close(dialog, button.dataset.gsdDialogClose || "close");
             });

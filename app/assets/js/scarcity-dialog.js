@@ -16,7 +16,17 @@
         errorMessage: get("scarcity-error-message"),
         retry: get("scarcity-retry"),
         content: get("scarcity-content"),
+        bandsTrigger: get("scarcity-bands-trigger"),
+        bandsDialog: document.getElementById("app-scarcity-bands-dialog"),
+        bandsList: get("scarcity-bands-list"),
         refillPill: get("scarcity-refill-pill"),
+        refillDialog: document.getElementById("app-scarcity-refill-dialog"),
+        refillExplanation: get("scarcity-refill-explanation"),
+        refillStartingSoc: get("scarcity-refill-starting-soc"),
+        refillMaximumSoc: get("scarcity-refill-maximum-soc"),
+        refillAvailableGap: get("scarcity-refill-available-gap"),
+        refillScheduledGain: get("scarcity-refill-scheduled-gain"),
+        refillEquation: get("scarcity-refill-equation"),
         currentSoc: get("current-soc", batteryRoot),
         battery: get("battery", batteryRoot),
         currentLabel: get("current-label", batteryRoot),
@@ -37,6 +47,7 @@
     let controller = null;
     let refreshTimer = null;
     let lastLoadedAt = 0;
+    const desktopHover = window.matchMedia("(hover: hover) and (pointer: fine)");
 
     const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
         ? Number(value)
@@ -44,6 +55,7 @@
     const percent = (value) => finite(value) === null ? "—" : `${Number(value).toFixed(1)}%`;
     const wholePercent = (value) => finite(value) === null ? "—" : `${Math.round(Number(value))}%`;
     const points = (value) => finite(value) === null ? "—" : `${Number(value) >= 0 ? "+" : "−"}${Math.abs(Number(value)).toFixed(1)} pp`;
+    const money = (value) => finite(value) === null ? "Unavailable" : `€${Number(value).toFixed(4)}/kWh`;
 
     function setView(view, message = "") {
         dialog.dataset.state = view;
@@ -70,6 +82,31 @@
                 const dot = document.createElement("i");
                 dot.dataset.state = band.applied ? "on" : "off";
                 dotGroups.forEach((group) => group.appendChild(dot.cloneNode(true)));
+            });
+    }
+
+    function renderBandDetails(bands) {
+        elements.bandsList.replaceChildren();
+        [...bands]
+            .sort((left, right) => Number(left.from_soc_percent) - Number(right.from_soc_percent))
+            .forEach((band) => {
+                const row = document.createElement("div");
+                row.className = "scarcity-v1__band-row";
+                row.dataset.state = band.applied ? "on" : "off";
+
+                const label = document.createElement("span");
+                label.className = "scarcity-v1__band-row-label";
+                const indicator = document.createElement("i");
+                indicator.setAttribute("aria-hidden", "true");
+                const range = document.createElement("span");
+                range.textContent = `SoC ${Number(band.from_soc_percent).toFixed(0)}%–${Number(band.to_soc_percent).toFixed(0)}%`;
+                label.append(indicator, range);
+
+                const price = document.createElement("span");
+                price.className = "scarcity-v1__band-row-price";
+                price.textContent = `Min. price ${money(band.reference_price_eur_per_kwh)}`;
+                row.append(label, price);
+                elements.bandsList.appendChild(row);
             });
     }
 
@@ -200,6 +237,9 @@
         const maximumSoc = finite(outcome.maximum_soc_percent);
         const scheduledGain = finite(scheduled.scheduled_gain_percent_points);
         const refillPercent = finite(scheduled.scheduled_refill_percent);
+        const availableGap = currentSoc === null || maximumSoc === null
+            ? null
+            : Math.max(0, maximumSoc - currentSoc);
         const appliedBands = bands
             .filter((band) => {
                 const from = finite(band.from_soc_percent);
@@ -209,6 +249,7 @@
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent));
 
         renderDots(bands);
+        renderBandDetails(bands);
         renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, maximumSoc, appliedBands);
 
         const appliedCount = bands.filter((band) => band.applied).length;
@@ -222,12 +263,114 @@
         elements.scheduledLabel.textContent = `Scheduled ${percent(maximumScheduledSoc)}`;
         elements.refillPill.textContent = refillPercent === null ? "No schedule" : `${percent(refillPercent)} of gap`;
         elements.refillPill.dataset.state = maximumScheduledSoc === null || payload.stale ? "warning" : "ready";
+        elements.refillPill.setAttribute(
+            "aria-label",
+            refillPercent === null
+                ? "Explain scheduled refill. No scheduled refill is available."
+                : `Explain scheduled refill: ${percent(refillPercent)} of the available battery gap.`
+        );
+        elements.refillExplanation.textContent = refillPercent === null
+            ? "No scheduled refill is available for the current optimizer plan. This percentage normally shows how much of the available space up to the maximum SoC is expected to be refilled."
+            : `The optimizer plans to refill ${percent(refillPercent)} of the available space between the starting battery level and the configured maximum SoC.`;
+        elements.refillStartingSoc.textContent = percent(currentSoc);
+        elements.refillMaximumSoc.textContent = percent(maximumSoc);
+        elements.refillAvailableGap.textContent = availableGap === null ? "—" : `${availableGap.toFixed(1)} pp`;
+        elements.refillScheduledGain.textContent = scheduledGain === null ? "—" : `${scheduledGain.toFixed(1)} pp`;
+        elements.refillEquation.textContent = scheduledGain === null || availableGap === null || refillPercent === null
+            ? "Scheduled refill calculation unavailable"
+            : `${scheduledGain.toFixed(1)} pp ÷ ${availableGap.toFixed(1)} pp = ${refillPercent.toFixed(1)}% of gap`;
         elements.batteryCaption.textContent = maximumScheduledSoc === null
             ? "Maximum scheduled battery level unavailable"
             : `Expected maximum ${percent(maximumScheduledSoc)}${scheduledGain === null ? "" : ` · ${points(scheduledGain)} scheduled`}`;
 
         lastLoadedAt = Date.now();
         setView("ready");
+    }
+
+    function attachDetailDialog(triggerElement, detailDialog, align = "left") {
+        if (!(triggerElement instanceof HTMLElement) || !(detailDialog instanceof HTMLDialogElement)) return;
+        let closeTimer = null;
+        let pinnedOpen = false;
+        let suppressFocusOpen = false;
+
+        const cancelClose = () => {
+            window.clearTimeout(closeTimer);
+            closeTimer = null;
+        };
+        const close = () => {
+            cancelClose();
+            if (detailDialog.open) detailDialog.close("hover-leave");
+            triggerElement.setAttribute("aria-expanded", "false");
+        };
+        const position = () => {
+            const gap = 8;
+            const viewportPadding = 12;
+            const triggerRect = triggerElement.getBoundingClientRect();
+            const detailRect = detailDialog.getBoundingClientRect();
+            let left = align === "right" ? triggerRect.right - detailRect.width : triggerRect.left;
+            left = Math.max(viewportPadding, Math.min(left, window.innerWidth - detailRect.width - viewportPadding));
+            let top = triggerRect.bottom + gap;
+            if (top + detailRect.height > window.innerHeight - viewportPadding) {
+                top = triggerRect.top - detailRect.height - gap;
+            }
+            detailDialog.style.left = `${Math.round(left)}px`;
+            detailDialog.style.top = `${Math.max(viewportPadding, Math.round(top))}px`;
+        };
+        const openHover = () => {
+            if (!desktopHover.matches) return;
+            cancelClose();
+            detailDialog.dataset.displayMode = "desktop";
+            if (!detailDialog.open) detailDialog.show();
+            position();
+            triggerElement.setAttribute("aria-expanded", "true");
+        };
+        const scheduleClose = () => {
+            cancelClose();
+            closeTimer = window.setTimeout(() => {
+                if (desktopHover.matches && (
+                    triggerElement.matches(":hover")
+                    || detailDialog.matches(":hover")
+                    || detailDialog.contains(document.activeElement)
+                )) return;
+                close();
+            }, 140);
+        };
+        const openPinned = () => {
+            cancelClose();
+            if (detailDialog.open) detailDialog.close("promote-to-modal");
+            detailDialog.dataset.displayMode = "mobile";
+            detailDialog.style.removeProperty("left");
+            detailDialog.style.removeProperty("top");
+            pinnedOpen = true;
+            window.GraphiteDialog.open(detailDialog, { trigger: triggerElement });
+            triggerElement.setAttribute("aria-expanded", "true");
+        };
+
+        triggerElement.addEventListener("pointerenter", openHover);
+        triggerElement.addEventListener("pointerleave", scheduleClose);
+        triggerElement.addEventListener("focus", () => {
+            if (suppressFocusOpen) {
+                suppressFocusOpen = false;
+                return;
+            }
+            openHover();
+        });
+        triggerElement.addEventListener("blur", scheduleClose);
+        triggerElement.addEventListener("click", openPinned);
+        detailDialog.addEventListener("pointerenter", cancelClose);
+        detailDialog.addEventListener("pointerleave", scheduleClose);
+        detailDialog.addEventListener("close", () => {
+            if (pinnedOpen) {
+                suppressFocusOpen = true;
+                pinnedOpen = false;
+            }
+            triggerElement.setAttribute("aria-expanded", "false");
+            detailDialog.style.removeProperty("left");
+            detailDialog.style.removeProperty("top");
+        });
+        window.addEventListener("resize", () => {
+            if (detailDialog.open && detailDialog.dataset.displayMode === "desktop") position();
+        });
     }
 
     async function load({ preserveContent = false } = {}) {
@@ -263,6 +406,8 @@
     });
     elements.retry.addEventListener("click", () => load());
     elements.priceRefresh?.addEventListener("click", () => load({ preserveContent: !elements.content.hidden }));
+    attachDetailDialog(elements.bandsTrigger, elements.bandsDialog, "left");
+    attachDetailDialog(elements.refillPill, elements.refillDialog, "right");
 
     load();
     refreshTimer = window.setInterval(() => load({ preserveContent: !elements.content.hidden }), 60000);
