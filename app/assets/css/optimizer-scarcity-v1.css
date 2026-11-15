@@ -329,15 +329,10 @@
     transition: width var(--gsd-duration-medium) ease, height var(--gsd-duration-medium) ease;
 }
 
-.scarcity-v1__battery-scarcity-layer,
-.scarcity-v1__battery-reserve,
-.scarcity-v1__battery-upper-buffer {
+.scarcity-v1__battery-scarcity-layer {
     position: absolute;
     inset: 0;
     pointer-events: none;
-}
-
-.scarcity-v1__battery-scarcity-layer {
     z-index: 3;
     display: grid;
     grid-template-columns: repeat(10, minmax(4px, 1fr));
@@ -349,11 +344,16 @@
     overflow: hidden;
 }
 
-.scarcity-v1__battery-reserve {
-    z-index: 2;
-    right: auto;
-    width: var(--reserve-end, 0%);
-    border-radius: 3px 0 0 3px;
+.scarcity-v1__battery-tile-buffer {
+    position: absolute;
+    z-index: 0;
+    inset-block: 0;
+    left: var(--buffer-start, 0%);
+    width: var(--buffer-fill, 0%);
+    pointer-events: none;
+}
+
+.scarcity-v1__battery-tile-buffer--lower {
     background: repeating-linear-gradient(
         135deg,
         color-mix(in srgb, var(--gsd-text-muted) 12%, transparent) 0 3px,
@@ -361,20 +361,12 @@
     );
 }
 
-.scarcity-v1__battery-upper-buffer {
-    z-index: 2;
-    left: var(--upper-start, 100%);
-    border-radius: 0 3px 3px 0;
+.scarcity-v1__battery-tile-buffer--upper {
     background: repeating-linear-gradient(
         135deg,
         color-mix(in srgb, var(--gsd-text-secondary) 46%, transparent) 0 3px,
         color-mix(in srgb, var(--gsd-surface-3) 24%, transparent) 3px 6px
     );
-}
-
-.scarcity-v1__battery-reserve[hidden],
-.scarcity-v1__battery-upper-buffer[hidden] {
-    display: none;
 }
 
 .scarcity-v1__battery-tile-marker {

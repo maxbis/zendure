@@ -37,8 +37,6 @@
         scarcityLabel: get("scarcity-label"),
         reserveLegend: get("reserve-legend"),
         reserveLabel: get("reserve-label"),
-        batteryReserve: get("battery-reserve"),
-        batteryUpperBuffer: get("battery-upper-buffer"),
         batteryCaption: get("battery-caption")
     };
 
@@ -142,6 +140,12 @@
         const bandFrom = finite(firstAppliedBand?.from_soc_percent);
         const bandTo = finite(firstAppliedBand?.to_soc_percent);
         const hasScarcityBand = bandFrom !== null && bandTo !== null && bandTo > bandFrom;
+        const lowestBandStart = appliedBands.length
+            ? Math.min(...appliedBands.map((band) => Number(band.from_soc_percent)))
+            : null;
+        const reserveEnd = minimum ?? lowestBandStart;
+        const hasReserve = reserveEnd !== null && reserveEnd > 0;
+        const hasUpperBuffer = maximum !== null && maximum < 100;
 
         segments.forEach((segment, index) => {
             segment.style.setProperty("--scheduled-fill", `${segmentFill(scheduledLevel, index)}%`);
@@ -150,6 +154,18 @@
 
         scarcityClips.forEach((clip, index) => {
             clip.replaceChildren();
+            [
+                ["lower", 0, hasReserve ? reserveEnd : 0],
+                ["upper", hasUpperBuffer ? maximum : 100, 100]
+            ].forEach(([modifier, from, to]) => {
+                const range = scarcitySegmentRange(Number(from), Number(to), index);
+                if (range.width <= 0) return;
+                const buffer = document.createElement("span");
+                buffer.className = `scarcity-v1__battery-tile-buffer scarcity-v1__battery-tile-buffer--${modifier}`;
+                buffer.style.setProperty("--buffer-start", `${range.start}%`);
+                buffer.style.setProperty("--buffer-fill", `${range.width}%`);
+                clip.appendChild(buffer);
+            });
             appliedBands.forEach((band, rank) => {
                 const from = finite(band.from_soc_percent);
                 const to = finite(band.to_soc_percent);
@@ -166,27 +182,7 @@
             });
         });
 
-        const lowestBandStart = appliedBands.length
-            ? Math.min(...appliedBands.map((band) => Number(band.from_soc_percent)))
-            : null;
-        const reserveEnd = minimum ?? lowestBandStart;
-        const hasReserve = reserveEnd !== null && reserveEnd > 0;
-        const hasUpperBuffer = maximum !== null && maximum < 100;
-        elements.batteryReserve.hidden = !hasReserve;
-        elements.batteryUpperBuffer.hidden = !hasUpperBuffer;
         elements.reserveLegend.hidden = !hasReserve && !hasUpperBuffer;
-        if (hasReserve) {
-            const clampedReserve = Math.max(0, Math.min(100, reserveEnd));
-            elements.batteryReserve.style.setProperty("--reserve-end", `${clampedReserve}%`);
-        } else {
-            elements.batteryReserve.style.removeProperty("--reserve-end");
-        }
-        if (hasUpperBuffer) {
-            const clampedMaximum = Math.max(0, Math.min(100, maximum));
-            elements.batteryUpperBuffer.style.setProperty("--upper-start", `${clampedMaximum}%`);
-        } else {
-            elements.batteryUpperBuffer.style.removeProperty("--upper-start");
-        }
         elements.reserveLabel.textContent = hasReserve && hasUpperBuffer
             ? `Operating range ${Math.max(0, Math.min(100, reserveEnd)).toFixed(0)}–${Math.max(0, Math.min(100, maximum)).toFixed(0)}%`
             : hasReserve
