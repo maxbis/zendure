@@ -15,8 +15,6 @@
         refresh: get("refresh"),
         lastUpdate: get("last-update"),
         connectionBadge: get("connection-badge"),
-        bandDotsTrigger: get("band-dots-trigger"),
-        bandDots: get("band-dots"),
         bandsList: get("bands-list"),
         statusPill: get("status-pill"),
         statusValue: get("status-value"),
@@ -44,6 +42,8 @@
         batteryCaption: get("battery-caption")
     };
 
+    const bandDialogTriggers = Array.from(root.querySelectorAll("[data-band-dialog-trigger]"));
+    const bandDotGroups = Array.from(root.querySelectorAll("[data-band-dots]"));
     const segments = Array.from(root.querySelectorAll("[data-segment]"));
     const scarcityClips = Array.from(root.querySelectorAll("[data-scarcity-segment]"));
     const bandsDialog = document.getElementById("scarcity-v1-bands-dialog");
@@ -55,6 +55,7 @@
     let clockTimer = null;
     let dialogCloseTimer = null;
     let refillDialogCloseTimer = null;
+    let activeBandDialogTrigger = null;
 
     const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
         ? Number(value)
@@ -215,7 +216,7 @@
     }
 
     function renderBands(bands) {
-        elements.bandDots.replaceChildren();
+        bandDotGroups.forEach((group) => group.replaceChildren());
         elements.bandsList.replaceChildren();
 
         [...bands]
@@ -225,7 +226,7 @@
             const applied = Boolean(band.applied);
             dot.className = "scarcity-v1__band-dot";
             dot.dataset.state = applied ? "on" : "off";
-            elements.bandDots.appendChild(dot);
+            bandDotGroups.forEach((group) => group.appendChild(dot.cloneNode(true)));
 
             const row = document.createElement("div");
             row.className = "scarcity-v1__band-row";
@@ -244,10 +245,12 @@
             elements.bandsList.appendChild(row);
         });
 
-        elements.bandDotsTrigger.setAttribute(
-            "aria-label",
-            `Show all scarcity bands. ${bands.filter((band) => band.applied).length} of ${bands.length} are on.`
-        );
+        bandDialogTriggers.forEach((trigger) => {
+            trigger.setAttribute(
+                "aria-label",
+                `Show all scarcity bands. ${bands.filter((band) => band.applied).length} of ${bands.length} are on.`
+            );
+        });
     }
 
     function cancelDialogClose() {
@@ -258,7 +261,8 @@
     function closeBandsDialog() {
         cancelDialogClose();
         if (bandsDialog?.open) bandsDialog.close("hover-leave");
-        elements.bandDotsTrigger.setAttribute("aria-expanded", "false");
+        bandDialogTriggers.forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+        activeBandDialogTrigger = null;
     }
 
     function scheduleDialogClose() {
@@ -266,7 +270,7 @@
         dialogCloseTimer = window.setTimeout(() => {
             if (
                 desktopHover.matches
-                && (elements.bandDotsTrigger.matches(":hover")
+                && (bandDialogTriggers.some((trigger) => trigger.matches(":hover"))
                     || bandsDialog.matches(":hover")
                     || bandsDialog.contains(document.activeElement))
             ) {
@@ -276,10 +280,11 @@
         }, 140);
     }
 
-    function positionDesktopDialog() {
+    function positionDesktopDialog(trigger = activeBandDialogTrigger) {
+        if (!trigger) return;
         const gap = 8;
         const viewportPadding = 12;
-        const triggerRect = elements.bandDotsTrigger.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
         const dialogRect = bandsDialog.getBoundingClientRect();
         let left = triggerRect.left;
         left = Math.max(viewportPadding, Math.min(left, window.innerWidth - dialogRect.width - viewportPadding));
@@ -291,22 +296,24 @@
         bandsDialog.style.top = `${Math.max(viewportPadding, Math.round(top))}px`;
     }
 
-    function openDesktopDialog() {
+    function openDesktopDialog(trigger) {
         if (!desktopHover.matches || !bandsDialog) return;
         cancelDialogClose();
+        activeBandDialogTrigger = trigger;
         bandsDialog.dataset.displayMode = "desktop";
         if (!bandsDialog.open) bandsDialog.show();
-        positionDesktopDialog();
-        elements.bandDotsTrigger.setAttribute("aria-expanded", "true");
+        positionDesktopDialog(trigger);
+        bandDialogTriggers.forEach((candidate) => candidate.setAttribute("aria-expanded", String(candidate === trigger)));
     }
 
-    function openMobileDialog() {
+    function openMobileDialog(trigger) {
         if (!bandsDialog || desktopHover.matches) return;
+        activeBandDialogTrigger = trigger;
         bandsDialog.dataset.displayMode = "mobile";
         bandsDialog.style.removeProperty("left");
         bandsDialog.style.removeProperty("top");
-        window.GraphiteDialog.open(bandsDialog, { trigger: elements.bandDotsTrigger });
-        elements.bandDotsTrigger.setAttribute("aria-expanded", "true");
+        window.GraphiteDialog.open(bandsDialog, { trigger });
+        bandDialogTriggers.forEach((candidate) => candidate.setAttribute("aria-expanded", String(candidate === trigger)));
     }
 
     function cancelRefillDialogClose() {
@@ -489,19 +496,22 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
-    elements.bandDotsTrigger.addEventListener("pointerenter", openDesktopDialog);
-    elements.bandDotsTrigger.addEventListener("pointerleave", scheduleDialogClose);
-    elements.bandDotsTrigger.addEventListener("focus", openDesktopDialog);
-    elements.bandDotsTrigger.addEventListener("blur", () => {
-        if (desktopHover.matches && !bandsDialog.matches(":hover")) scheduleDialogClose();
+    bandDialogTriggers.forEach((trigger) => {
+        trigger.addEventListener("pointerenter", () => openDesktopDialog(trigger));
+        trigger.addEventListener("pointerleave", scheduleDialogClose);
+        trigger.addEventListener("focus", () => openDesktopDialog(trigger));
+        trigger.addEventListener("blur", () => {
+            if (desktopHover.matches && !bandsDialog.matches(":hover")) scheduleDialogClose();
+        });
+        trigger.addEventListener("click", () => openMobileDialog(trigger));
     });
-    elements.bandDotsTrigger.addEventListener("click", openMobileDialog);
     bandsDialog.addEventListener("pointerenter", cancelDialogClose);
     bandsDialog.addEventListener("pointerleave", () => {
         if (desktopHover.matches) scheduleDialogClose();
     });
     bandsDialog.addEventListener("close", () => {
-        elements.bandDotsTrigger.setAttribute("aria-expanded", "false");
+        bandDialogTriggers.forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+        activeBandDialogTrigger = null;
         bandsDialog.style.removeProperty("left");
         bandsDialog.style.removeProperty("top");
     });

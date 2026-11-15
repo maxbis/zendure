@@ -70,18 +70,19 @@ $pageConfig = [
             <section class="gsd-card scarcity-v1__panel" aria-labelledby="scarcity-v1-status-title">
                 <div class="scarcity-v1__panel-top">
                     <div class="scarcity-v1__title-row">
+                        <h2 class="gsd-sr-only" id="scarcity-v1-status-title">Scarcity bands</h2>
                         <button
                             class="scarcity-v1__band-dots-trigger"
                             type="button"
-                            data-role="band-dots-trigger"
+                            data-band-dialog-trigger
                             aria-label="Show all scarcity bands"
                             aria-haspopup="dialog"
                             aria-controls="scarcity-v1-bands-dialog"
                             aria-expanded="false"
                         >
-                            <span class="scarcity-v1__band-dots" data-role="band-dots" aria-hidden="true"></span>
+                            <span class="scarcity-v1__band-dots" data-band-dots aria-hidden="true"></span>
+                            <span class="scarcity-v1__band-title-text">Scarcity bands</span>
                         </button>
-                        <h2 id="scarcity-v1-status-title">Scarcity bands</h2>
                     </div>
                     <span class="app-state-pill scarcity-v1__pill" data-role="status-pill">Checking</span>
                 </div>
@@ -103,8 +104,19 @@ $pageConfig = [
             <section class="gsd-card scarcity-v1__panel scarcity-v1__battery-panel" aria-labelledby="scarcity-v1-battery-title">
                 <div class="scarcity-v1__panel-top">
                     <div class="scarcity-v1__title-row">
-                        <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#battery"></use></svg>
-                        <h2 id="scarcity-v1-battery-title">Scheduled refill</h2>
+                        <h2 class="gsd-sr-only" id="scarcity-v1-battery-title">Scarcity bands and scheduled refill</h2>
+                        <button
+                            class="scarcity-v1__band-dots-trigger"
+                            type="button"
+                            data-band-dialog-trigger
+                            aria-label="Show all scarcity bands"
+                            aria-haspopup="dialog"
+                            aria-controls="scarcity-v1-bands-dialog"
+                            aria-expanded="false"
+                        >
+                            <span class="scarcity-v1__band-dots" data-band-dots aria-hidden="true"></span>
+                            <span class="scarcity-v1__band-title-text">Scarcity bands</span>
+                        </button>
                     </div>
                     <button
                         class="app-state-pill scarcity-v1__pill scarcity-v1__refill-trigger"

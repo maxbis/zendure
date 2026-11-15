@@ -130,6 +130,13 @@
     outline-offset: 2px;
 }
 
+.scarcity-v1__band-title-text {
+    color: var(--gsd-text);
+    font-size: 1.08rem;
+    font-weight: 680;
+    letter-spacing: -0.02em;
+}
+
 .scarcity-v1__band-dot {
     width: 14px;
     height: 14px;
