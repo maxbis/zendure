@@ -111,18 +111,30 @@
     gap: 6px;
 }
 
+.scarcity-v1__band-dots-trigger {
+    appearance: none;
+    display: inline-flex;
+    padding: 5px 2px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.scarcity-v1__band-dots-trigger:focus-visible {
+    outline: 2px solid var(--gsd-accent);
+    outline-offset: 2px;
+}
+
 .scarcity-v1__band-dot {
-    position: relative;
     width: 14px;
     height: 14px;
-    appearance: none;
-    padding: 0;
+    display: block;
     border: 2px solid color-mix(in srgb, currentColor 45%, var(--gsd-surface-2));
     border-radius: 50%;
     background: currentColor;
     box-shadow: 0 0 8px color-mix(in srgb, currentColor 28%, transparent);
     color: var(--gsd-negative);
-    cursor: help;
 }
 
 .scarcity-v1__band-dot[data-state="on"] {
@@ -131,36 +143,6 @@
 
 .scarcity-v1__band-dot[data-state="off"] {
     color: var(--gsd-negative);
-}
-
-.scarcity-v1__band-dot::after {
-    position: absolute;
-    z-index: 10;
-    top: calc(100% + 10px);
-    left: 50%;
-    width: max-content;
-    max-width: min(250px, calc(100vw - 32px));
-    padding: 8px 10px;
-    border: 1px solid var(--gsd-border-strong);
-    border-radius: var(--gsd-radius-sm);
-    background: var(--gsd-surface-3);
-    box-shadow: var(--gsd-shadow-floating);
-    color: var(--gsd-text-secondary);
-    content: attr(data-tooltip);
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.4;
-    opacity: 0;
-    pointer-events: none;
-    transform: translate(-50%, -3px);
-    transition: opacity var(--gsd-duration-fast) ease, transform var(--gsd-duration-fast) ease;
-    white-space: normal;
-}
-
-.scarcity-v1__band-dot:hover::after,
-.scarcity-v1__band-dot:focus-visible::after {
-    opacity: 1;
-    transform: translate(-50%, 0);
 }
 
 .scarcity-v1__status-main {
@@ -255,13 +237,13 @@
 
 .scarcity-v1__battery-segment::before {
     width: var(--scheduled-fill, 0%);
-    background: color-mix(in srgb, var(--gsd-positive) 38%, var(--gsd-surface-3));
+    background: var(--gsd-positive);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--gsd-positive) 24%, transparent);
 }
 
 .scarcity-v1__battery-segment::after {
     width: var(--current-fill, 0%);
-    background: var(--gsd-positive);
-    box-shadow: 0 0 6px color-mix(in srgb, var(--gsd-positive) 24%, transparent);
+    background: color-mix(in srgb, var(--gsd-positive) 38%, var(--gsd-surface-3));
 }
 
 .scarcity-v1__battery-legend {
@@ -286,11 +268,92 @@
 }
 
 .scarcity-v1__legend-key--current {
-    background: var(--gsd-positive);
+    background: color-mix(in srgb, var(--gsd-positive) 38%, var(--gsd-surface-3));
 }
 
 .scarcity-v1__legend-key--scheduled {
-    background: color-mix(in srgb, var(--gsd-positive) 38%, var(--gsd-surface-3));
+    background: var(--gsd-positive);
+}
+
+.scarcity-v1__bands-dialog {
+    width: min(360px, calc(100vw - 24px));
+}
+
+.scarcity-v1__bands-dialog[data-display-mode="desktop"] {
+    position: fixed;
+    margin: 0;
+    border-radius: 10px;
+}
+
+.scarcity-v1__bands-dialog[data-display-mode="desktop"][open] {
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.scarcity-v1__bands-dialog .gsd-dialog__header {
+    min-height: 54px;
+    padding: 8px 8px 8px 13px;
+}
+
+.scarcity-v1__bands-dialog .gsd-dialog__title {
+    font-size: 0.88rem;
+}
+
+.scarcity-v1__bands-dialog .gsd-icon-btn {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.scarcity-v1__bands-dialog-body {
+    padding: 10px 13px 13px;
+}
+
+.scarcity-v1__bands-list {
+    display: grid;
+}
+
+.scarcity-v1__band-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    min-height: 42px;
+    border-bottom: 1px solid var(--gsd-border-subtle);
+    color: var(--gsd-text-secondary);
+    font-size: 0.75rem;
+}
+
+.scarcity-v1__band-row:last-child {
+    border-bottom: 0;
+}
+
+.scarcity-v1__band-row-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-weight: 650;
+}
+
+.scarcity-v1__band-row-label i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--gsd-negative);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gsd-negative) 28%, transparent);
+}
+
+.scarcity-v1__band-row[data-state="on"] .scarcity-v1__band-row-label i {
+    background: var(--gsd-positive);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gsd-positive) 28%, transparent);
+}
+
+.scarcity-v1__band-row-price {
+    color: var(--gsd-text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .scarcity-v1__battery-panel .scarcity-v1__caption {

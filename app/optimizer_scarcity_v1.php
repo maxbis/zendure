@@ -70,7 +70,17 @@ $pageConfig = [
             <section class="gsd-card scarcity-v1__panel" aria-labelledby="scarcity-v1-status-title">
                 <div class="scarcity-v1__panel-top">
                     <div class="scarcity-v1__title-row">
-                        <span class="scarcity-v1__band-dots" data-role="band-dots" aria-label="Scarcity band states"></span>
+                        <button
+                            class="scarcity-v1__band-dots-trigger"
+                            type="button"
+                            data-role="band-dots-trigger"
+                            aria-label="Show all scarcity bands"
+                            aria-haspopup="dialog"
+                            aria-controls="scarcity-v1-bands-dialog"
+                            aria-expanded="false"
+                        >
+                            <span class="scarcity-v1__band-dots" data-role="band-dots" aria-hidden="true"></span>
+                        </button>
                         <h2 id="scarcity-v1-status-title">Scarcity bands</h2>
                     </div>
                     <span class="app-state-pill scarcity-v1__pill" data-role="status-pill">Checking</span>
@@ -116,6 +126,18 @@ $pageConfig = [
                 <a href="./">Live app</a>
             </nav>
         </div>
+
+        <dialog class="gsd-dialog scarcity-v1__bands-dialog" id="scarcity-v1-bands-dialog" aria-labelledby="scarcity-v1-bands-dialog-title">
+            <header class="gsd-dialog__header gsd-dialog__header--simple">
+                <h2 class="gsd-dialog__title" id="scarcity-v1-bands-dialog-title">Scarcity bands</h2>
+                <button class="gsd-icon-btn" type="button" aria-label="Close scarcity bands" data-gsd-dialog-close>
+                    <svg class="gsd-icon" aria-hidden="true"><use href="../themes/graphite-signal-dark/assets/icons/sprite.svg#close"></use></svg>
+                </button>
+            </header>
+            <div class="gsd-dialog__body scarcity-v1__bands-dialog-body">
+                <div class="scarcity-v1__bands-list" data-role="bands-list"></div>
+            </div>
+        </dialog>
     </main>
 </body>
 </html>

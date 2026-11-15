@@ -15,7 +15,9 @@
         refresh: get("refresh"),
         lastUpdate: get("last-update"),
         connectionBadge: get("connection-badge"),
+        bandDotsTrigger: get("band-dots-trigger"),
         bandDots: get("band-dots"),
+        bandsList: get("bands-list"),
         statusPill: get("status-pill"),
         statusValue: get("status-value"),
         statusLabel: get("status-label"),
@@ -29,10 +31,13 @@
     };
 
     const segments = Array.from(root.querySelectorAll("[data-segment]"));
+    const bandsDialog = document.getElementById("scarcity-v1-bands-dialog");
+    const desktopHover = window.matchMedia("(hover: hover) and (pointer: fine)");
     let controller = null;
     let lastUpdatedAt = null;
     let refreshTimer = null;
     let clockTimer = null;
+    let dialogCloseTimer = null;
 
     const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
         ? Number(value)
@@ -91,18 +96,97 @@
 
     function renderBands(bands) {
         elements.bandDots.replaceChildren();
-        bands.forEach((band) => {
-            const dot = document.createElement("button");
+        elements.bandsList.replaceChildren();
+
+        [...bands]
+            .sort((left, right) => Number(left.from_soc_percent) - Number(right.from_soc_percent))
+            .forEach((band) => {
+            const dot = document.createElement("span");
             const applied = Boolean(band.applied);
-            const range = `${band.from_soc_percent}–${band.to_soc_percent}% SoC`;
-            const reference = `Reference price ${money(band.reference_price_eur_per_kwh)}`;
-            dot.type = "button";
             dot.className = "scarcity-v1__band-dot";
             dot.dataset.state = applied ? "on" : "off";
-            dot.dataset.tooltip = `${range} · ${reference}`;
-            dot.setAttribute("aria-label", `${range}. ${reference}. ${applied ? "On" : "Off"}.`);
             elements.bandDots.appendChild(dot);
+
+            const row = document.createElement("div");
+            row.className = "scarcity-v1__band-row";
+            row.dataset.state = applied ? "on" : "off";
+            const label = document.createElement("span");
+            label.className = "scarcity-v1__band-row-label";
+            const indicator = document.createElement("i");
+            indicator.setAttribute("aria-hidden", "true");
+            const range = document.createElement("span");
+            range.textContent = `SoC ${Number(band.from_soc_percent).toFixed(0)}%–${Number(band.to_soc_percent).toFixed(0)}%`;
+            label.append(indicator, range);
+            const price = document.createElement("span");
+            price.className = "scarcity-v1__band-row-price";
+            price.textContent = `Min. price ${money(band.reference_price_eur_per_kwh)}`;
+            row.append(label, price);
+            elements.bandsList.appendChild(row);
         });
+
+        elements.bandDotsTrigger.setAttribute(
+            "aria-label",
+            `Show all scarcity bands. ${bands.filter((band) => band.applied).length} of ${bands.length} are on.`
+        );
+    }
+
+    function cancelDialogClose() {
+        window.clearTimeout(dialogCloseTimer);
+        dialogCloseTimer = null;
+    }
+
+    function closeBandsDialog() {
+        cancelDialogClose();
+        if (bandsDialog?.open) bandsDialog.close("hover-leave");
+        elements.bandDotsTrigger.setAttribute("aria-expanded", "false");
+    }
+
+    function scheduleDialogClose() {
+        cancelDialogClose();
+        dialogCloseTimer = window.setTimeout(() => {
+            if (
+                desktopHover.matches
+                && (elements.bandDotsTrigger.matches(":hover")
+                    || bandsDialog.matches(":hover")
+                    || bandsDialog.contains(document.activeElement))
+            ) {
+                return;
+            }
+            closeBandsDialog();
+        }, 140);
+    }
+
+    function positionDesktopDialog() {
+        const gap = 8;
+        const viewportPadding = 12;
+        const triggerRect = elements.bandDotsTrigger.getBoundingClientRect();
+        const dialogRect = bandsDialog.getBoundingClientRect();
+        let left = triggerRect.left;
+        left = Math.max(viewportPadding, Math.min(left, window.innerWidth - dialogRect.width - viewportPadding));
+        let top = triggerRect.bottom + gap;
+        if (top + dialogRect.height > window.innerHeight - viewportPadding) {
+            top = triggerRect.top - dialogRect.height - gap;
+        }
+        bandsDialog.style.left = `${Math.round(left)}px`;
+        bandsDialog.style.top = `${Math.max(viewportPadding, Math.round(top))}px`;
+    }
+
+    function openDesktopDialog() {
+        if (!desktopHover.matches || !bandsDialog) return;
+        cancelDialogClose();
+        bandsDialog.dataset.displayMode = "desktop";
+        if (!bandsDialog.open) bandsDialog.show();
+        positionDesktopDialog();
+        elements.bandDotsTrigger.setAttribute("aria-expanded", "true");
+    }
+
+    function openMobileDialog() {
+        if (!bandsDialog || desktopHover.matches) return;
+        bandsDialog.dataset.displayMode = "mobile";
+        bandsDialog.style.removeProperty("left");
+        bandsDialog.style.removeProperty("top");
+        window.GraphiteDialog.open(bandsDialog, { trigger: elements.bandDotsTrigger });
+        elements.bandDotsTrigger.setAttribute("aria-expanded", "true");
     }
 
     function render(payload) {
@@ -189,6 +273,25 @@
 
     elements.refresh.addEventListener("click", load);
     elements.retry.addEventListener("click", load);
+    elements.bandDotsTrigger.addEventListener("pointerenter", openDesktopDialog);
+    elements.bandDotsTrigger.addEventListener("pointerleave", scheduleDialogClose);
+    elements.bandDotsTrigger.addEventListener("focus", openDesktopDialog);
+    elements.bandDotsTrigger.addEventListener("blur", () => {
+        if (desktopHover.matches && !bandsDialog.matches(":hover")) scheduleDialogClose();
+    });
+    elements.bandDotsTrigger.addEventListener("click", openMobileDialog);
+    bandsDialog.addEventListener("pointerenter", cancelDialogClose);
+    bandsDialog.addEventListener("pointerleave", () => {
+        if (desktopHover.matches) scheduleDialogClose();
+    });
+    bandsDialog.addEventListener("close", () => {
+        elements.bandDotsTrigger.setAttribute("aria-expanded", "false");
+        bandsDialog.style.removeProperty("left");
+        bandsDialog.style.removeProperty("top");
+    });
+    window.addEventListener("resize", () => {
+        if (bandsDialog.open && desktopHover.matches) positionDesktopDialog();
+    });
 
     load();
     refreshTimer = window.setInterval(load, Math.max(10000, Number(config.refreshIntervalMs) || 60000));
@@ -196,6 +299,7 @@
 
     window.addEventListener("pagehide", () => {
         controller?.abort();
+        cancelDialogClose();
         window.clearInterval(refreshTimer);
         window.clearInterval(clockTimer);
     }, { once: true });
