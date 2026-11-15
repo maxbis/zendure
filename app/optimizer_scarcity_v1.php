@@ -114,8 +114,11 @@ $pageConfig = [
                     <div class="scarcity-v1__battery" data-role="battery" role="meter" aria-label="Current and maximum scheduled battery level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                         <span class="scarcity-v1__battery-segments" aria-hidden="true">
                             <?php for ($segment = 0; $segment < 10; $segment++): ?>
-                                <span class="scarcity-v1__battery-segment" data-segment="<?= $segment; ?>"></span>
+                                <span class="scarcity-v1__battery-segment" data-segment="<?= $segment; ?>">
+                                    <span class="scarcity-v1__battery-scarcity"></span>
+                                </span>
                             <?php endfor; ?>
+                            <span class="scarcity-v1__battery-limit-marker" data-role="battery-limit-marker"></span>
                         </span>
                     </div>
                 </div>
@@ -123,6 +126,7 @@ $pageConfig = [
                 <div class="scarcity-v1__battery-legend" aria-label="Battery fill legend">
                     <span><i class="scarcity-v1__legend-key scarcity-v1__legend-key--current" aria-hidden="true"></i><span data-role="current-label">Current —</span></span>
                     <span><i class="scarcity-v1__legend-key scarcity-v1__legend-key--scheduled" aria-hidden="true"></i><span data-role="scheduled-label">Scheduled —</span></span>
+                    <span data-role="scarcity-legend" hidden><i class="scarcity-v1__legend-key scarcity-v1__legend-key--scarcity" aria-hidden="true"></i><span data-role="scarcity-label">Scarcity —</span></span>
                 </div>
                 <p class="scarcity-v1__caption" data-role="battery-caption">Waiting for the scheduled battery maximum</p>
             </section>

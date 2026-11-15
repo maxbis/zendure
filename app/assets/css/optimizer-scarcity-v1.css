@@ -264,6 +264,7 @@
 }
 
 .scarcity-v1__battery-segments {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(10, minmax(4px, 1fr));
     gap: 4px;
@@ -287,14 +288,47 @@
 }
 
 .scarcity-v1__battery-segment::before {
+    z-index: 1;
     width: var(--scheduled-fill, 0%);
     background: var(--gsd-positive);
     box-shadow: 0 0 6px color-mix(in srgb, var(--gsd-positive) 24%, transparent);
 }
 
 .scarcity-v1__battery-segment::after {
+    z-index: 2;
     width: var(--current-fill, 0%);
     background: color-mix(in srgb, var(--gsd-positive) 38%, var(--gsd-surface-3));
+}
+
+.scarcity-v1__battery-scarcity {
+    position: absolute;
+    z-index: 3;
+    right: auto;
+    bottom: 0;
+    left: var(--scarcity-start, 0%);
+    width: var(--scarcity-fill, 0%);
+    height: 5px;
+    background: var(--gsd-warning);
+    box-shadow: 0 -2px 7px color-mix(in srgb, var(--gsd-warning) 36%, transparent);
+    pointer-events: none;
+}
+
+.scarcity-v1__battery-limit-marker {
+    position: absolute;
+    z-index: 4;
+    top: -3px;
+    bottom: -3px;
+    left: var(--scarcity-limit, 0%);
+    width: 2px;
+    border-radius: 2px;
+    background: var(--gsd-warning);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gsd-warning) 65%, transparent);
+    pointer-events: none;
+    transform: translateX(-1px);
+}
+
+.scarcity-v1__battery-limit-marker[hidden] {
+    display: none;
 }
 
 .scarcity-v1__battery-legend {
@@ -324,6 +358,10 @@
 
 .scarcity-v1__legend-key--scheduled {
     background: var(--gsd-positive);
+}
+
+.scarcity-v1__legend-key--scarcity {
+    background: var(--gsd-warning);
 }
 
 .scarcity-v1__bands-dialog {

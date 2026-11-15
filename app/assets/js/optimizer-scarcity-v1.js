@@ -29,6 +29,9 @@
         battery: get("battery"),
         currentLabel: get("current-label"),
         scheduledLabel: get("scheduled-label"),
+        scarcityLegend: get("scarcity-legend"),
+        scarcityLabel: get("scarcity-label"),
+        batteryLimitMarker: get("battery-limit-marker"),
         batteryCaption: get("battery-caption")
     };
 
@@ -83,22 +86,52 @@
         return Math.max(0, Math.min(100, (level - index * 10) * 10));
     }
 
-    function renderBattery(currentSoc, maximumScheduledSoc) {
+    function scarcitySegmentRange(fromSoc, toSoc, index) {
+        const segmentStart = index * 10;
+        const segmentEnd = segmentStart + 10;
+        const overlapStart = Math.max(fromSoc, segmentStart);
+        const overlapEnd = Math.min(toSoc, segmentEnd);
+        if (overlapEnd <= overlapStart) return { start: 0, width: 0 };
+        return {
+            start: (overlapStart - segmentStart) * 10,
+            width: (overlapEnd - overlapStart) * 10
+        };
+    }
+
+    function renderBattery(currentSoc, maximumScheduledSoc, firstAppliedBand) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
         const scheduledLevel = current === null ? scheduled : scheduled === null ? current : Math.max(current, scheduled);
+        const bandFrom = finite(firstAppliedBand?.from_soc_percent);
+        const bandTo = finite(firstAppliedBand?.to_soc_percent);
+        const hasScarcityBand = bandFrom !== null && bandTo !== null && bandTo > bandFrom;
 
         segments.forEach((segment, index) => {
             segment.style.setProperty("--scheduled-fill", `${segmentFill(scheduledLevel, index)}%`);
             segment.style.setProperty("--current-fill", `${segmentFill(current, index)}%`);
+            const scarcityRange = hasScarcityBand
+                ? scarcitySegmentRange(bandFrom, bandTo, index)
+                : { start: 0, width: 0 };
+            segment.style.setProperty("--scarcity-start", `${scarcityRange.start}%`);
+            segment.style.setProperty("--scarcity-fill", `${scarcityRange.width}%`);
         });
+
+        elements.batteryLimitMarker.hidden = !hasScarcityBand;
+        elements.scarcityLegend.hidden = !hasScarcityBand;
+        if (hasScarcityBand) {
+            elements.batteryLimitMarker.style.setProperty("--scarcity-limit", `${Math.max(0, Math.min(100, bandTo))}%`);
+            elements.scarcityLabel.textContent = `Scarcity ${bandFrom.toFixed(0)}–${bandTo.toFixed(0)}% · ${cents(firstAppliedBand.reference_price_eur_per_kwh)}`;
+        } else {
+            elements.batteryLimitMarker.style.removeProperty("--scarcity-limit");
+            elements.scarcityLabel.textContent = "Scarcity —";
+        }
 
         elements.battery.setAttribute("aria-valuenow", String(current ?? 0));
         elements.battery.setAttribute(
             "aria-valuetext",
             current === null || scheduled === null
                 ? "Battery schedule unavailable"
-                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled`
+                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasScarcityBand ? `, first scarcity band ${percent(bandFrom)} to ${percent(bandTo)}` : ""}`
         );
     }
 
@@ -210,13 +243,13 @@
         const scheduledGain = finite(scheduled.scheduled_gain_percent_points);
         const refillPercent = finite(scheduled.scheduled_refill_percent);
 
-        renderBands(bands);
-        renderBattery(currentSoc, maximumScheduledSoc);
-
-        elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         const firstAppliedBand = bands
             .filter((band) => band.applied && finite(band.to_soc_percent) !== null)
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent))[0] || null;
+        renderBands(bands);
+        renderBattery(currentSoc, maximumScheduledSoc, firstAppliedBand);
+
+        elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         if (firstAppliedBand) {
             elements.firstLimit.dataset.state = "applied";
             elements.firstLimitBoundary.textContent = `${Number(firstAppliedBand.to_soc_percent).toFixed(0)}%`;
