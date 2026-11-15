@@ -47,7 +47,7 @@
     let controller = null;
     let refreshTimer = null;
     let lastLoadedAt = 0;
-    const desktopHover = window.matchMedia("(hover: hover) and (pointer: fine)");
+    let activeDetailClose = null;
 
     const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
         ? Number(value)
@@ -289,18 +289,10 @@
 
     function attachDetailDialog(triggerElement, detailDialog, align = "left") {
         if (!(triggerElement instanceof HTMLElement) || !(detailDialog instanceof HTMLDialogElement)) return;
-        let closeTimer = null;
-        let pinnedOpen = false;
-        let suppressFocusOpen = false;
-
-        const cancelClose = () => {
-            window.clearTimeout(closeTimer);
-            closeTimer = null;
-        };
         const close = () => {
-            cancelClose();
-            if (detailDialog.open) detailDialog.close("hover-leave");
+            if (detailDialog.open) detailDialog.close("dismiss");
             triggerElement.setAttribute("aria-expanded", "false");
+            if (activeDetailClose === close) activeDetailClose = null;
         };
         const position = () => {
             const gap = 8;
@@ -316,60 +308,29 @@
             detailDialog.style.left = `${Math.round(left)}px`;
             detailDialog.style.top = `${Math.max(viewportPadding, Math.round(top))}px`;
         };
-        const openHover = () => {
-            if (!desktopHover.matches) return;
-            cancelClose();
-            detailDialog.dataset.displayMode = "desktop";
-            if (!detailDialog.open) detailDialog.show();
-            position();
-            triggerElement.setAttribute("aria-expanded", "true");
-        };
-        const scheduleClose = () => {
-            cancelClose();
-            closeTimer = window.setTimeout(() => {
-                if (desktopHover.matches && (
-                    triggerElement.matches(":hover")
-                    || detailDialog.matches(":hover")
-                    || detailDialog.contains(document.activeElement)
-                )) return;
+        const toggle = () => {
+            if (detailDialog.open) {
                 close();
-            }, 140);
-        };
-        const openPinned = () => {
-            cancelClose();
-            if (detailDialog.open) detailDialog.close("promote-to-modal");
-            detailDialog.dataset.displayMode = "mobile";
-            detailDialog.style.removeProperty("left");
-            detailDialog.style.removeProperty("top");
-            pinnedOpen = true;
-            window.GraphiteDialog.open(detailDialog, { trigger: triggerElement });
-            triggerElement.setAttribute("aria-expanded", "true");
-        };
-
-        triggerElement.addEventListener("pointerenter", openHover);
-        triggerElement.addEventListener("pointerleave", scheduleClose);
-        triggerElement.addEventListener("focus", () => {
-            if (suppressFocusOpen) {
-                suppressFocusOpen = false;
                 return;
             }
-            openHover();
-        });
-        triggerElement.addEventListener("blur", scheduleClose);
-        triggerElement.addEventListener("click", openPinned);
-        detailDialog.addEventListener("pointerenter", cancelClose);
-        detailDialog.addEventListener("pointerleave", scheduleClose);
+
+            activeDetailClose?.();
+            detailDialog.dataset.displayMode = "desktop";
+            detailDialog.show();
+            position();
+            triggerElement.setAttribute("aria-expanded", "true");
+            activeDetailClose = close;
+        };
+
+        triggerElement.addEventListener("click", toggle);
         detailDialog.addEventListener("close", () => {
-            if (pinnedOpen) {
-                suppressFocusOpen = true;
-                pinnedOpen = false;
-            }
             triggerElement.setAttribute("aria-expanded", "false");
             detailDialog.style.removeProperty("left");
             detailDialog.style.removeProperty("top");
+            if (activeDetailClose === close) activeDetailClose = null;
         });
         window.addEventListener("resize", () => {
-            if (detailDialog.open && detailDialog.dataset.displayMode === "desktop") position();
+            if (detailDialog.open) position();
         });
     }
 
@@ -404,6 +365,7 @@
         window.GraphiteDialog.open(dialog, { trigger });
         if (Date.now() - lastLoadedAt > 60000) load({ preserveContent: !elements.content.hidden });
     });
+    dialog.addEventListener("close", () => activeDetailClose?.());
     elements.retry.addEventListener("click", () => load());
     elements.priceRefresh?.addEventListener("click", () => load({ preserveContent: !elements.content.hidden }));
     attachDetailDialog(elements.bandsTrigger, elements.bandsDialog, "left");

@@ -23,6 +23,7 @@
 
     function trapFocus(event) {
         const dialog = event.currentTarget;
+        if (event.target instanceof Element && event.target.closest("dialog") !== dialog) return;
 
         if (event.key === "Escape") {
             if (dialog.dataset.gsdBlocking !== "true") {

@@ -1892,7 +1892,7 @@ button.app-state-pill:focus-visible {
     background: transparent;
     color: inherit;
     font: inherit;
-    cursor: help;
+    cursor: pointer;
 }
 
 .app-scarcity-dialog__title-trigger:focus-visible {
@@ -1945,6 +1945,10 @@ button.app-state-pill:focus-visible {
 
 .app-scarcity-detail-dialog {
     z-index: 1300;
+}
+
+.app-scarcity-dialog .scarcity-v1__refill-trigger {
+    cursor: pointer;
 }
 
 @media (max-width: 600px) {
