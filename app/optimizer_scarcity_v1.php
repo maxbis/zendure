@@ -125,15 +125,17 @@ $pageConfig = [
                                 <span class="scarcity-v1__battery-segment" data-segment="<?= $segment; ?>"></span>
                             <?php endfor; ?>
                             <span class="scarcity-v1__battery-reserve" data-role="battery-reserve"></span>
+                            <span class="scarcity-v1__battery-upper-buffer" data-role="battery-upper-buffer"></span>
                             <span class="scarcity-v1__battery-scarcity-layer" data-role="battery-scarcity-layer"></span>
                             <span class="scarcity-v1__battery-reserve-marker" data-role="battery-reserve-marker"></span>
+                            <span class="scarcity-v1__battery-upper-marker" data-role="battery-upper-marker"></span>
                             <span class="scarcity-v1__battery-limit-marker" data-role="battery-limit-marker"></span>
                         </span>
                     </div>
                 </div>
 
                 <div class="scarcity-v1__battery-legend" aria-label="Battery fill legend">
-                    <span data-role="reserve-legend" hidden><i class="scarcity-v1__legend-key scarcity-v1__legend-key--reserve" aria-hidden="true"></i><span data-role="reserve-label">Reserve —</span></span>
+                    <span data-role="reserve-legend" hidden><i class="scarcity-v1__legend-key scarcity-v1__legend-key--reserve" aria-hidden="true"></i><span data-role="reserve-label">Operating range —</span></span>
                     <span><i class="scarcity-v1__legend-key scarcity-v1__legend-key--current" aria-hidden="true"></i><span data-role="current-label">Current —</span></span>
                     <span><i class="scarcity-v1__legend-key scarcity-v1__legend-key--scheduled" aria-hidden="true"></i><span data-role="scheduled-label">Scheduled —</span></span>
                     <span data-role="scarcity-legend" hidden><i class="scarcity-v1__legend-key scarcity-v1__legend-key--scarcity" aria-hidden="true"></i><span data-role="scarcity-label">Scarcity —</span></span>

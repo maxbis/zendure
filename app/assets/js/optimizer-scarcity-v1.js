@@ -41,6 +41,8 @@
         reserveLabel: get("reserve-label"),
         batteryReserve: get("battery-reserve"),
         batteryReserveMarker: get("battery-reserve-marker"),
+        batteryUpperBuffer: get("battery-upper-buffer"),
+        batteryUpperMarker: get("battery-upper-marker"),
         batteryScarcityLayer: get("battery-scarcity-layer"),
         batteryLimitMarker: get("battery-limit-marker"),
         batteryCaption: get("battery-caption")
@@ -100,10 +102,11 @@
         return Math.max(0, Math.min(100, (level - index * 10) * 10));
     }
 
-    function renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, appliedBands) {
+    function renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, maximumSoc, appliedBands) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
         const minimum = finite(minimumSoc);
+        const maximum = finite(maximumSoc);
         const scheduledLevel = current === null ? scheduled : scheduled === null ? current : Math.max(current, scheduled);
         const firstAppliedBand = appliedBands[0] || null;
         const bandFrom = finite(firstAppliedBand?.from_soc_percent);
@@ -137,19 +140,35 @@
             : null;
         const reserveEnd = minimum ?? lowestBandStart;
         const hasReserve = reserveEnd !== null && reserveEnd > 0;
+        const hasUpperBuffer = maximum !== null && maximum < 100;
         elements.batteryReserve.hidden = !hasReserve;
         elements.batteryReserveMarker.hidden = !hasReserve;
-        elements.reserveLegend.hidden = !hasReserve;
+        elements.batteryUpperBuffer.hidden = !hasUpperBuffer;
+        elements.batteryUpperMarker.hidden = !hasUpperBuffer;
+        elements.reserveLegend.hidden = !hasReserve && !hasUpperBuffer;
         if (hasReserve) {
             const clampedReserve = Math.max(0, Math.min(100, reserveEnd));
             elements.batteryReserve.style.setProperty("--reserve-end", `${clampedReserve}%`);
             elements.batteryReserveMarker.style.setProperty("--reserve-end", `${clampedReserve}%`);
-            elements.reserveLabel.textContent = `Reserve 0–${clampedReserve.toFixed(0)}%`;
         } else {
             elements.batteryReserve.style.removeProperty("--reserve-end");
             elements.batteryReserveMarker.style.removeProperty("--reserve-end");
-            elements.reserveLabel.textContent = "Reserve —";
         }
+        if (hasUpperBuffer) {
+            const clampedMaximum = Math.max(0, Math.min(100, maximum));
+            elements.batteryUpperBuffer.style.setProperty("--upper-start", `${clampedMaximum}%`);
+            elements.batteryUpperMarker.style.setProperty("--upper-start", `${clampedMaximum}%`);
+        } else {
+            elements.batteryUpperBuffer.style.removeProperty("--upper-start");
+            elements.batteryUpperMarker.style.removeProperty("--upper-start");
+        }
+        elements.reserveLabel.textContent = hasReserve && hasUpperBuffer
+            ? `Operating range ${Math.max(0, Math.min(100, reserveEnd)).toFixed(0)}–${Math.max(0, Math.min(100, maximum)).toFixed(0)}%`
+            : hasReserve
+                ? `Minimum ${Math.max(0, Math.min(100, reserveEnd)).toFixed(0)}%`
+                : hasUpperBuffer
+                    ? `Maximum ${Math.max(0, Math.min(100, maximum)).toFixed(0)}%`
+                    : "Operating range —";
 
         elements.batteryLimitMarker.hidden = !hasScarcityBand;
         elements.scarcityLegend.hidden = !hasScarcityBand;
@@ -166,7 +185,7 @@
             "aria-valuetext",
             current === null || scheduled === null
                 ? "Battery schedule unavailable"
-                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasReserve ? `, minimum reserve ${percent(reserveEnd)}` : ""}${hasScarcityBand ? `, ${appliedBands.length} applied scarcity band${appliedBands.length === 1 ? "" : "s"}` : ""}`
+                : `${percent(current)} current, ${percent(scheduled)} maximum scheduled${hasReserve ? `, minimum reserve ${percent(reserveEnd)}` : ""}${hasUpperBuffer ? `, maximum operating level ${percent(maximum)}` : ""}${hasScarcityBand ? `, ${appliedBands.length} applied scarcity band${appliedBands.length === 1 ? "" : "s"}` : ""}`
         );
     }
 
@@ -351,7 +370,7 @@
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent));
         const firstAppliedBand = appliedBands[0] || null;
         renderBands(bands);
-        renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, appliedBands);
+        renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, maximumSoc, appliedBands);
 
         elements.statusValue.textContent = totalCount ? `${appliedCount}/${totalCount}` : "—";
         if (firstAppliedBand) {
