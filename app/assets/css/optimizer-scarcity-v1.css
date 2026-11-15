@@ -145,11 +145,18 @@
     color: var(--gsd-negative);
 }
 
+.scarcity-v1__status-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.82fr);
+    gap: 28px;
+    align-items: end;
+    margin-top: 25px;
+}
+
 .scarcity-v1__status-main {
     display: flex;
     align-items: baseline;
     gap: 10px;
-    margin-top: 25px;
 }
 
 .scarcity-v1__status-value,
@@ -176,29 +183,50 @@
 }
 
 .scarcity-v1__first-limit {
-    display: inline-flex;
-    width: fit-content;
-    align-items: center;
-    gap: 7px;
-    margin: 16px 0 0;
-    padding: 5px 9px;
-    border: 1px solid color-mix(in srgb, var(--gsd-warning) 34%, var(--gsd-border));
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--gsd-warning-soft) 58%, var(--gsd-surface-2));
+    display: grid;
+    justify-items: start;
+    align-content: end;
+    min-width: 0;
     color: var(--gsd-warning);
-    font-size: 0.72rem;
-    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
+.scarcity-v1__first-limit-label {
+    margin-bottom: 3px;
+    color: var(--gsd-text-muted);
+    font-size: 0.68rem;
+    font-weight: 650;
+}
+
+.scarcity-v1__first-limit strong {
+    font-size: clamp(2rem, 9vw, 3rem);
+    font-weight: 740;
+    letter-spacing: -0.055em;
+    line-height: 0.95;
+}
+
+.scarcity-v1__first-limit > span:last-child {
+    margin-top: 7px;
+    padding: 4px 8px;
+    border: 1px solid color-mix(in srgb, var(--gsd-warning) 34%, var(--gsd-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gsd-warning-soft) 58%, var(--gsd-surface-2));
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .scarcity-v1__first-limit[data-state="empty"] {
-    border-color: var(--gsd-border);
-    background: var(--gsd-surface-3);
     color: var(--gsd-text-muted);
 }
 
+.scarcity-v1__first-limit[data-state="empty"] > span:last-child {
+    border-color: var(--gsd-border);
+    background: var(--gsd-surface-3);
+}
+
 .scarcity-v1__caption {
-    margin: 12px 0 0;
+    margin: 18px 0 0;
     color: var(--gsd-text-muted);
     font-size: 0.78rem;
     text-align: center;
@@ -407,9 +435,23 @@
         padding: 14px;
     }
 
-    .scarcity-v1__status-main,
+    .scarcity-v1__status-overview,
     .scarcity-v1__battery-main {
         margin-top: 20px;
+    }
+
+    .scarcity-v1__status-overview {
+        grid-template-columns: minmax(0, 1fr) minmax(126px, 0.8fr);
+        gap: 14px;
+    }
+
+    .scarcity-v1__first-limit strong {
+        font-size: 2rem;
+    }
+
+    .scarcity-v1__first-limit > span:last-child {
+        padding-inline: 7px;
+        font-size: 0.62rem;
     }
 
     .scarcity-v1__battery-main {
@@ -437,5 +479,12 @@
 
     .scarcity-v1__caption {
         margin-top: 16px;
+    }
+}
+
+@media (max-width: 350px) {
+    .scarcity-v1__status-overview {
+        grid-template-columns: 1fr;
+        align-items: start;
     }
 }

@@ -86,11 +86,17 @@ $pageConfig = [
                     <span class="app-state-pill scarcity-v1__pill" data-role="status-pill">Checking</span>
                 </div>
 
-                <div class="scarcity-v1__status-main">
-                    <strong class="scarcity-v1__status-value" data-role="status-value">—</strong>
-                    <span class="scarcity-v1__status-label" data-role="status-label">bands applied</span>
+                <div class="scarcity-v1__status-overview">
+                    <div class="scarcity-v1__status-main">
+                        <strong class="scarcity-v1__status-value" data-role="status-value">—</strong>
+                        <span class="scarcity-v1__status-label" data-role="status-label">bands applied</span>
+                    </div>
+                    <div class="scarcity-v1__first-limit" data-role="first-limit">
+                        <span class="scarcity-v1__first-limit-label">First applied limit</span>
+                        <strong data-role="first-limit-boundary">—</strong>
+                        <span data-role="first-limit-price">Determining price…</span>
+                    </div>
                 </div>
-                <p class="scarcity-v1__first-limit" data-role="first-limit">Determining the first applied limit…</p>
                 <p class="scarcity-v1__caption" data-role="status-caption">Waiting for the current activation input</p>
             </section>
 

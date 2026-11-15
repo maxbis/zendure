@@ -22,6 +22,8 @@
         statusValue: get("status-value"),
         statusLabel: get("status-label"),
         firstLimit: get("first-limit"),
+        firstLimitBoundary: get("first-limit-boundary"),
+        firstLimitPrice: get("first-limit-price"),
         statusCaption: get("status-caption"),
         refillPill: get("refill-pill"),
         currentSoc: get("current-soc"),
@@ -219,10 +221,12 @@
             .sort((left, right) => Number(right.to_soc_percent) - Number(left.to_soc_percent))[0] || null;
         if (firstAppliedBand) {
             elements.firstLimit.dataset.state = "applied";
-            elements.firstLimit.textContent = `${Number(firstAppliedBand.to_soc_percent).toFixed(0)}% limit · ${cents(firstAppliedBand.reference_price_eur_per_kwh)}`;
+            elements.firstLimitBoundary.textContent = `${Number(firstAppliedBand.to_soc_percent).toFixed(0)}%`;
+            elements.firstLimitPrice.textContent = cents(firstAppliedBand.reference_price_eur_per_kwh);
         } else {
             elements.firstLimit.dataset.state = "empty";
-            elements.firstLimit.textContent = "No scarcity limit applied";
+            elements.firstLimitBoundary.textContent = "—";
+            elements.firstLimitPrice.textContent = "No limit applied";
         }
         elements.statusCaption.textContent = finite(activation.percent) === null
             ? "Activation input unavailable"
