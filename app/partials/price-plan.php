@@ -19,6 +19,21 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
                         <span class="app-day-availability" data-role="tomorrow-availability" data-availability="loading" aria-hidden="true"></span>
                         <span data-role="tomorrow-status-label">Checking tomorrow</span>
                     </span>
+                    <?php if (!$appPricePlanReadOnly): ?>
+                        <button
+                            class="gsd-icon-btn app-scarcity-trigger"
+                            type="button"
+                            data-role="scarcity-trigger"
+                            aria-label="Open scarcity overview"
+                            aria-haspopup="dialog"
+                            aria-controls="app-scarcity-dialog"
+                            title="Scarcity bands"
+                        >
+                            <span class="app-scarcity-dots" data-role="scarcity-trigger-dots" aria-hidden="true">
+                                <i data-state="loading"></i>
+                            </span>
+                        </button>
+                    <?php endif; ?>
                     <button
                         class="gsd-icon-btn app-price-view-toggle"
                         type="button"
@@ -193,4 +208,5 @@ $appPricePlanReadOnly = $appPricePlanReadOnly ?? false;
             </footer>
         </form>
     </dialog>
+    <?php require __DIR__ . '/scarcity-dialog.php'; ?>
 <?php endif; ?>

@@ -122,6 +122,7 @@ $appConfig = [
     'priceConversion' => $systemConfig['priceConversion'] ?? null,
     'energyHistoryUrl' => '../main/api/app_energy_history.php?days=3',
     'shortwaveRadiationUrl' => '../main/api/shortwave_radiation_api.php',
+    'scarcityUrl' => 'api/optimizer_scarcity.php',
     'solarLocation' => $systemConfig['installation'] ?? null,
     'solarEvents' => $systemConfig === null ? [] : buildAppSolarEvents($systemConfig['installation']),
 ];
@@ -143,6 +144,7 @@ $appConfig = [
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/theme.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('../themes/graphite-signal-dark/assets/css/components.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('assets/css/app.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(appAssetUrl('assets/css/optimizer-scarcity-v1.css', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>">
     <script>
         window.GRAPHITE_APP_CONFIG = <?= json_encode(
             $appConfig,
@@ -156,6 +158,7 @@ $appConfig = [
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/health-metric-color-scale.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/current-energy-status.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/price-plan.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+    <script src="<?= htmlspecialchars(appAssetUrl('assets/js/scarcity-dialog.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/energy-history.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/shortwave-radiation.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
     <script src="<?= htmlspecialchars(appAssetUrl('assets/js/automation-control-dialog.js', $reloadToken), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

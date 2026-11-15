@@ -1824,6 +1824,163 @@ button.app-state-pill:focus-visible {
     }
 }
 
+/* Scarcity overview trigger and dialog */
+.app-scarcity-trigger {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+}
+
+.app-scarcity-trigger[data-state="active"] {
+    border-color: color-mix(in srgb, var(--gsd-warning) 45%, var(--gsd-border));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--gsd-warning) 11%, transparent);
+}
+
+.app-scarcity-dots {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+}
+
+.app-scarcity-dots i {
+    width: 7px;
+    height: 7px;
+    border: 1px solid color-mix(in srgb, currentColor 48%, var(--gsd-surface-2));
+    border-radius: 50%;
+    background: currentColor;
+    color: var(--gsd-text-muted);
+    box-shadow: 0 0 5px color-mix(in srgb, currentColor 26%, transparent);
+}
+
+.app-scarcity-dots i[data-state="on"] {
+    color: var(--gsd-positive);
+}
+
+.app-scarcity-dots i[data-state="off"],
+.app-scarcity-dots i[data-state="error"] {
+    color: var(--gsd-negative);
+}
+
+.app-scarcity-dots i[data-state="loading"] {
+    color: var(--gsd-text-muted);
+}
+
+.app-scarcity-dialog {
+    width: min(calc(100% - 24px), 720px);
+}
+
+.app-scarcity-dialog__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+}
+
+.app-scarcity-dialog__title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+}
+
+.app-scarcity-dialog__title .app-scarcity-dots i {
+    width: 12px;
+    height: 12px;
+}
+
+.app-scarcity-dialog__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-scarcity-dialog__loading,
+.app-scarcity-dialog__error {
+    min-height: 250px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    color: var(--gsd-text-muted);
+}
+
+.app-scarcity-dialog__loading:not([hidden]),
+.app-scarcity-dialog__error:not([hidden]) {
+    display: flex;
+}
+
+.app-scarcity-dialog__error {
+    flex-wrap: wrap;
+    color: var(--gsd-negative);
+}
+
+.app-scarcity-dialog__body {
+    padding: 26px 28px 24px;
+}
+
+.app-scarcity-dialog .scarcity-v1__battery-main {
+    margin-top: 0;
+}
+
+.app-scarcity-dialog .scarcity-v1__caption {
+    margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+    .app-scarcity-trigger {
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+    }
+
+    .app-scarcity-dialog__header {
+        min-height: 64px;
+        padding: 10px;
+    }
+
+    .app-scarcity-dialog__actions {
+        gap: 5px;
+    }
+
+    .app-scarcity-dialog__actions .app-state-pill {
+        padding-inline: 8px;
+        font-size: 0.68rem;
+    }
+
+    .app-scarcity-dialog__body {
+        padding: 22px 16px 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-price-plan .app-section-heading {
+        grid-template-columns: minmax(0, 1fr) auto 40px 40px 40px;
+    }
+
+    .app-price-plan .app-scarcity-trigger {
+        grid-column: 3;
+        grid-row: 1 / 3;
+    }
+
+    .app-price-plan .app-price-view-toggle {
+        grid-column: 4;
+    }
+
+    .app-price-plan .app-price-refresh {
+        grid-column: 5;
+    }
+
+    .app-scarcity-dialog__title {
+        gap: 7px;
+        font-size: 0.98rem;
+    }
+
+    .app-scarcity-dialog__title .app-scarcity-dots i {
+        width: 9px;
+        height: 9px;
+    }
+}
+
 /* Historical rule backtest */
 .app-simulation-page {
     border-top: 5px solid var(--gsd-warning);
@@ -5433,5 +5590,24 @@ dialog#app-energy-summary-tooltip.is-overview {
     .app-power-hero .app-state-pill,
     .app-state-pill.app-state-pill--tick {
         transition: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-price-plan .app-section-heading {
+        grid-template-columns: minmax(0, 1fr) auto 40px 40px 40px;
+    }
+
+    .app-price-plan .app-scarcity-trigger {
+        grid-column: 3;
+        grid-row: 1 / 3;
+    }
+
+    .app-price-plan .app-price-view-toggle {
+        grid-column: 4;
+    }
+
+    .app-price-plan .app-price-refresh {
+        grid-column: 5;
     }
 }
