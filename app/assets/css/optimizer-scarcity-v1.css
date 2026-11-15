@@ -118,6 +118,8 @@
 .scarcity-v1__band-dots-trigger {
     appearance: none;
     display: inline-flex;
+    align-items: center;
+    gap: 9px;
     padding: 5px 2px;
     border: 0;
     border-radius: 999px;
@@ -135,6 +137,7 @@
     font-size: 1.08rem;
     font-weight: 680;
     letter-spacing: -0.02em;
+    line-height: 1.1;
 }
 
 .scarcity-v1__band-dot {
