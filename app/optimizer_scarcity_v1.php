@@ -131,9 +131,6 @@ $pageConfig = [
                                     <span class="scarcity-v1__battery-scarcity-clip" data-scarcity-segment="<?= $segment; ?>"></span>
                                 <?php endfor; ?>
                             </span>
-                            <span class="scarcity-v1__battery-reserve-marker" data-role="battery-reserve-marker"></span>
-                            <span class="scarcity-v1__battery-upper-marker" data-role="battery-upper-marker"></span>
-                            <span class="scarcity-v1__battery-limit-marker" data-role="battery-limit-marker"></span>
                         </span>
                     </div>
                 </div>

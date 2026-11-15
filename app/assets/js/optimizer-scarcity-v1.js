@@ -40,10 +40,7 @@
         reserveLegend: get("reserve-legend"),
         reserveLabel: get("reserve-label"),
         batteryReserve: get("battery-reserve"),
-        batteryReserveMarker: get("battery-reserve-marker"),
         batteryUpperBuffer: get("battery-upper-buffer"),
-        batteryUpperMarker: get("battery-upper-marker"),
-        batteryLimitMarker: get("battery-limit-marker"),
         batteryCaption: get("battery-caption")
     };
 
@@ -114,6 +111,26 @@
         };
     }
 
+    function appendBatteryTileMarker(value, modifier) {
+        const number = finite(value);
+        if (number === null || !scarcityClips.length) return;
+        const clamped = Math.max(0, Math.min(100, number));
+        const onTileBoundary = clamped > 0 && clamped % 10 === 0;
+        const index = clamped >= 100
+            ? scarcityClips.length - 1
+            : onTileBoundary
+                ? Math.max(0, Math.floor(clamped / 10) - 1)
+                : Math.min(scarcityClips.length - 1, Math.floor(clamped / 10));
+        const position = onTileBoundary || clamped >= 100
+            ? 100
+            : (clamped - index * 10) * 10;
+        const marker = document.createElement("span");
+        marker.className = `scarcity-v1__battery-tile-marker scarcity-v1__battery-tile-marker--${modifier}`;
+        marker.style.setProperty("--marker-position", `${position}%`);
+        marker.style.setProperty("--marker-shift", position >= 100 ? "-100%" : position <= 0 ? "0" : "-50%");
+        scarcityClips[index].appendChild(marker);
+    }
+
     function renderBattery(currentSoc, maximumScheduledSoc, minimumSoc, maximumSoc, appliedBands) {
         const current = finite(currentSoc);
         const scheduled = finite(maximumScheduledSoc);
@@ -155,25 +172,19 @@
         const hasReserve = reserveEnd !== null && reserveEnd > 0;
         const hasUpperBuffer = maximum !== null && maximum < 100;
         elements.batteryReserve.hidden = !hasReserve;
-        elements.batteryReserveMarker.hidden = !hasReserve;
         elements.batteryUpperBuffer.hidden = !hasUpperBuffer;
-        elements.batteryUpperMarker.hidden = !hasUpperBuffer;
         elements.reserveLegend.hidden = !hasReserve && !hasUpperBuffer;
         if (hasReserve) {
             const clampedReserve = Math.max(0, Math.min(100, reserveEnd));
             elements.batteryReserve.style.setProperty("--reserve-end", `${clampedReserve}%`);
-            elements.batteryReserveMarker.style.setProperty("--reserve-end", `${clampedReserve}%`);
         } else {
             elements.batteryReserve.style.removeProperty("--reserve-end");
-            elements.batteryReserveMarker.style.removeProperty("--reserve-end");
         }
         if (hasUpperBuffer) {
             const clampedMaximum = Math.max(0, Math.min(100, maximum));
             elements.batteryUpperBuffer.style.setProperty("--upper-start", `${clampedMaximum}%`);
-            elements.batteryUpperMarker.style.setProperty("--upper-start", `${clampedMaximum}%`);
         } else {
             elements.batteryUpperBuffer.style.removeProperty("--upper-start");
-            elements.batteryUpperMarker.style.removeProperty("--upper-start");
         }
         elements.reserveLabel.textContent = hasReserve && hasUpperBuffer
             ? `Operating range ${Math.max(0, Math.min(100, reserveEnd)).toFixed(0)}–${Math.max(0, Math.min(100, maximum)).toFixed(0)}%`
@@ -183,15 +194,16 @@
                     ? `Maximum ${Math.max(0, Math.min(100, maximum)).toFixed(0)}%`
                     : "Operating range —";
 
-        elements.batteryLimitMarker.hidden = !hasScarcityBand;
         elements.scarcityLegend.hidden = !hasScarcityBand;
         if (hasScarcityBand) {
-            elements.batteryLimitMarker.style.setProperty("--scarcity-limit", `${Math.max(0, Math.min(100, bandTo))}%`);
             elements.scarcityLabel.textContent = `Scarcity ${appliedBands.length} band${appliedBands.length === 1 ? "" : "s"}`;
         } else {
-            elements.batteryLimitMarker.style.removeProperty("--scarcity-limit");
             elements.scarcityLabel.textContent = "Scarcity —";
         }
+
+        if (hasReserve) appendBatteryTileMarker(reserveEnd, "reserve");
+        if (hasUpperBuffer) appendBatteryTileMarker(maximum, "upper");
+        if (hasScarcityBand) appendBatteryTileMarker(bandTo, "limit");
 
         elements.battery.setAttribute("aria-valuenow", String(current ?? 0));
         elements.battery.setAttribute(

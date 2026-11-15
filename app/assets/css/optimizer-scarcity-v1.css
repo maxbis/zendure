@@ -363,45 +363,28 @@
 }
 
 .scarcity-v1__battery-reserve[hidden],
-.scarcity-v1__battery-reserve-marker[hidden],
-.scarcity-v1__battery-upper-buffer[hidden],
-.scarcity-v1__battery-upper-marker[hidden] {
+.scarcity-v1__battery-upper-buffer[hidden] {
     display: none;
 }
 
-.scarcity-v1__battery-reserve-marker,
-.scarcity-v1__battery-upper-marker {
+.scarcity-v1__battery-tile-marker {
     position: absolute;
-    z-index: 4;
-    top: -2px;
-    bottom: -2px;
-    left: var(--reserve-end, 0%);
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: var(--marker-position, 0%);
     width: 1px;
     background: var(--gsd-text-muted);
     opacity: 0.85;
     pointer-events: none;
+    transform: translateX(var(--marker-shift, 0));
 }
 
-.scarcity-v1__battery-upper-marker {
-    left: var(--upper-start, 100%);
-}
-
-.scarcity-v1__battery-limit-marker {
-    position: absolute;
-    z-index: 4;
-    top: -3px;
-    bottom: -3px;
-    left: var(--scarcity-limit, 0%);
+.scarcity-v1__battery-tile-marker--limit {
     width: 2px;
-    border-radius: 2px;
     background: var(--gsd-warning);
+    opacity: 1;
     box-shadow: 0 0 7px color-mix(in srgb, var(--gsd-warning) 65%, transparent);
-    pointer-events: none;
-    transform: translateX(-1px);
-}
-
-.scarcity-v1__battery-limit-marker[hidden] {
-    display: none;
 }
 
 .scarcity-v1__battery-legend {
