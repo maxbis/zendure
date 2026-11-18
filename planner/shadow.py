@@ -21,6 +21,7 @@ from planner.household_usage import select_household_usage
 from planner.models import BatteryState
 from planner.rolling_optimizer import (
     RollingInputSlot,
+    _grid_arbitrage_margin_cost,
     _scarcity_discharge_cost,
     build_rolling_boundaries,
     optimize_rolling_schedule,
@@ -340,8 +341,13 @@ def _recalculate_plan_trajectory(
         0.0,
         float(plan.get("battery_wear_cost_eur_per_kwh_discharged", 0.0)),
     )
+    grid_margin_rate = max(
+        0.0,
+        float(plan.get("minimum_grid_arbitrage_margin_eur_per_kwh_charged", 0.0)),
+    )
     total_energy_cost = 0.0
     total_wear_cost = 0.0
+    total_grid_margin_cost = 0.0
     total_scarcity_cost = 0.0
     scarcity_bands = list((plan.get("scarcity") or {}).get("bands") or [])
 
@@ -372,6 +378,13 @@ def _recalculate_plan_trajectory(
         grid_kwh = grid_power_w * duration_hours / 1000.0
         expected_cost = grid_kwh * (import_price if grid_kwh >= 0 else export_price)
         expected_wear_cost = max(0.0, -power_w) * duration_hours / 1000.0 * wear_rate
+        expected_grid_margin_cost = _grid_arbitrage_margin_cost(
+            power_w,
+            load_w,
+            pv_w,
+            duration_hours,
+            grid_margin_rate,
+        )
         expected_scarcity_cost = _scarcity_discharge_cost(
             start_energy_wh=energy_wh,
             end_energy_wh=next_energy_wh,
@@ -384,9 +397,13 @@ def _recalculate_plan_trajectory(
         decision["grid_power_w"] = round(grid_power_w, 1)
         decision["expected_cost_eur"] = round(expected_cost, 6)
         decision["expected_battery_wear_cost_eur"] = round(expected_wear_cost, 6)
+        decision["expected_grid_arbitrage_margin_cost_eur"] = round(
+            expected_grid_margin_cost, 6
+        )
         decision["expected_scarcity_cost_eur"] = round(expected_scarcity_cost, 6)
         total_energy_cost += expected_cost
         total_wear_cost += expected_wear_cost
+        total_grid_margin_cost += expected_grid_margin_cost
         total_scarcity_cost += expected_scarcity_cost
         energy_wh = next_energy_wh
 
@@ -400,9 +417,19 @@ def _recalculate_plan_trajectory(
     stabilized["ending_soc_percent"] = round(energy_wh / capacity_wh * 100.0, 2)
     stabilized["expected_energy_cost_eur"] = round(total_energy_cost, 6)
     stabilized["expected_battery_wear_cost_eur"] = round(total_wear_cost, 6)
+    stabilized["expected_grid_arbitrage_margin_cost_eur"] = round(
+        total_grid_margin_cost, 6
+    )
     stabilized["expected_scarcity_cost_eur"] = round(total_scarcity_cost, 6)
     stabilized["terminal_energy_value_eur"] = round(terminal_value, 6)
-    stabilized["objective_eur"] = round(total_energy_cost + total_wear_cost + total_scarcity_cost - terminal_value, 6)
+    stabilized["objective_eur"] = round(
+        total_energy_cost
+        + total_wear_cost
+        + total_grid_margin_cost
+        + total_scarcity_cost
+        - terminal_value,
+        6,
+    )
     return stabilized
 
 
@@ -569,6 +596,9 @@ def run_shadow_once(
         battery_wear_cost_eur_per_kwh_discharged=(
             settings.battery_wear_cost_eur_per_kwh_discharged
         ),
+        minimum_grid_arbitrage_margin_eur_per_kwh_charged=(
+            settings.minimum_grid_arbitrage_margin_eur_per_kwh_charged
+        ),
         scarcity=scarcity,
     )
     payload = {
@@ -590,6 +620,9 @@ def run_shadow_once(
             "active_hour_deadband_w": settings.active_hour_deadband_w,
             "battery_wear_cost_eur_per_kwh_discharged": (
                 settings.battery_wear_cost_eur_per_kwh_discharged
+            ),
+            "minimum_grid_arbitrage_margin_eur_per_kwh_charged": (
+                settings.minimum_grid_arbitrage_margin_eur_per_kwh_charged
             ),
             "dynamic_reserve_enabled": settings.dynamic_reserve["enabled"],
             **household_usage.log_fields(),

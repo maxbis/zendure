@@ -23,6 +23,7 @@ function systemConfigDefaultPath(): string
  *     efficiency: float,
  *     roundTripEfficiency?: float,
  *     wearCostEurPerKwhDischarged?: float,
+ *     minimumGridArbitrageMarginEurPerKwhCharged?: float,
  *     dynamicReserve: array<string, mixed>,
  *     maxChargePowerW: int,
  *     maxDischargePowerW: int
@@ -104,6 +105,9 @@ function validateSystemConfig(array $config): array
     if (array_key_exists('wearCostEurPerKwhDischarged', $battery)) {
         $batteryKeys[] = 'wearCostEurPerKwhDischarged';
     }
+    if (array_key_exists('minimumGridArbitrageMarginEurPerKwhCharged', $battery)) {
+        $batteryKeys[] = 'minimumGridArbitrageMarginEurPerKwhCharged';
+    }
     $batteryKeys[] = 'dynamicReserve';
     systemConfigAssertExactKeys($battery, $batteryKeys, '$.battery');
     $capacityWh = systemConfigRequireInteger($battery['capacityWh'], '$.battery.capacityWh', 1);
@@ -138,6 +142,13 @@ function validateSystemConfig(array $config): array
         ? systemConfigRequireNumber(
             $battery['wearCostEurPerKwhDischarged'],
             '$.battery.wearCostEurPerKwhDischarged',
+            0.0
+        )
+        : null;
+    $minimumGridArbitrageMarginEurPerKwhCharged = array_key_exists('minimumGridArbitrageMarginEurPerKwhCharged', $battery)
+        ? systemConfigRequireNumber(
+            $battery['minimumGridArbitrageMarginEurPerKwhCharged'],
+            '$.battery.minimumGridArbitrageMarginEurPerKwhCharged',
             0.0
         )
         : null;
@@ -278,6 +289,9 @@ function validateSystemConfig(array $config): array
     }
     if ($wearCostEurPerKwhDischarged !== null) {
         $normalizedBattery['wearCostEurPerKwhDischarged'] = $wearCostEurPerKwhDischarged;
+    }
+    if ($minimumGridArbitrageMarginEurPerKwhCharged !== null) {
+        $normalizedBattery['minimumGridArbitrageMarginEurPerKwhCharged'] = $minimumGridArbitrageMarginEurPerKwhCharged;
     }
     $normalizedBattery['dynamicReserve'] = $dynamicReserve;
 

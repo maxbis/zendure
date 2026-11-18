@@ -33,8 +33,9 @@ EXPECTED_CONFIG = {
         "efficiency": 0.9,
         "roundTripEfficiency": 0.85,
         "wearCostEurPerKwhDischarged": 0.0005,
+        "minimumGridArbitrageMarginEurPerKwhCharged": 0.02,
         "dynamicReserve": {
-            "enabled": False,
+            "enabled": True,
             "priceHistoryDays": 21,
             "priceHistoryHalfLifeDays": 7.0,
             "referencePriceCapEurPerKwh": 0.8,
@@ -171,6 +172,19 @@ def test_dynamic_reserve_master_switch_can_be_disabled(tmp_path: Path):
     assert json.loads(php_result.stdout) == python_config
 
 
+def test_minimum_grid_arbitrage_margin_is_optional(tmp_path: Path):
+    payload = copy.deepcopy(SOURCE_CONFIG)
+    payload["battery"].pop("minimumGridArbitrageMarginEurPerKwhCharged")
+    path = _write_config(tmp_path / "system.json", payload)
+
+    python_config = load_system_config(path)
+    php_result = _run_php_loader(path)
+
+    assert php_result.returncode == 0, php_result.stderr
+    assert "minimumGridArbitrageMarginEurPerKwhCharged" not in python_config["battery"]
+    assert json.loads(php_result.stdout) == python_config
+
+
 def test_schema_contract_matches_loader_sections():
     schema = json.loads(SYSTEM_SCHEMA_FILE.read_text(encoding="utf-8"))
 
@@ -184,8 +198,10 @@ def test_schema_contract_matches_loader_sections():
         if section == "battery":
             expected_required.remove("roundTripEfficiency")
             expected_required.remove("wearCostEurPerKwhDischarged")
+            expected_required.remove("minimumGridArbitrageMarginEurPerKwhCharged")
             assert "roundTripEfficiency" in section_schema["properties"]
             assert "wearCostEurPerKwhDischarged" in section_schema["properties"]
+            assert "minimumGridArbitrageMarginEurPerKwhCharged" in section_schema["properties"]
             assert "dynamicReserve" in section_schema["properties"]
         if section == "schedule":
             expected_required.remove("activeHourDeadbandW")
@@ -217,6 +233,7 @@ def test_schema_contract_matches_loader_sections():
         (lambda value: value["battery"].update({"roundTripEfficiency": 0}), r"roundTripEfficiency must be greater than 0\."),
         (lambda value: value["battery"].update({"roundTripEfficiency": 1.01}), r"roundTripEfficiency must be at most 1\."),
         (lambda value: value["battery"].update({"wearCostEurPerKwhDischarged": -0.01}), r"wearCostEurPerKwhDischarged must be at least 0\."),
+        (lambda value: value["battery"].update({"minimumGridArbitrageMarginEurPerKwhCharged": -0.01}), r"minimumGridArbitrageMarginEurPerKwhCharged must be at least 0\."),
         (lambda value: value["battery"]["dynamicReserve"].update({"enabled": 1}), r"dynamicReserve\.enabled must be a boolean\."),
         (lambda value: value["battery"]["dynamicReserve"]["bands"][0].update({"fromSocPercent": 16}), r"fromSocPercent must equal \$\.battery\.minChargePercent\."),
         (lambda value: value["battery"].update({"maxChargePowerW": 0}), r"maxChargePowerW must be at least 1\."),

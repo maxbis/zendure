@@ -43,6 +43,7 @@ def plan(generated_at: datetime, power_w: int, *, value: object | None = None) -
         "terminal_energy_value_eur": 0.0,
         "objective_eur": 0.0,
         "round_trip_efficiency": 0.85,
+        "minimum_grid_arbitrage_margin_eur_per_kwh_charged": 0.02,
         "decisions": [current],
     }
 
@@ -86,6 +87,16 @@ class ActiveHourStabilizationTests(unittest.TestCase):
         self.assertTrue(metadata["applied"])
         self.assertEqual(metadata["difference_w"], 100)
         self.assertEqual(metadata["reason"], "below_active_hour_deadband")
+        duration_hours = 39.0 / 60.0
+        self.assertAlmostEqual(
+            published["decisions"][0]["expected_grid_arbitrage_margin_cost_eur"],
+            1000.0 * duration_hours / 1000.0 * 0.02,
+            places=6,
+        )
+        self.assertEqual(
+            published["expected_grid_arbitrage_margin_cost_eur"],
+            published["decisions"][0]["expected_grid_arbitrage_margin_cost_eur"],
+        )
 
     def test_change_at_deadband_is_published(self) -> None:
         proposed = plan(self.now, 1000)

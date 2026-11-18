@@ -83,6 +83,7 @@ class PlannerSettings:
     arbitrage_min_spread_eur_per_kwh: float
     round_trip_efficiency: float
     battery_wear_cost_eur_per_kwh_discharged: float
+    minimum_grid_arbitrage_margin_eur_per_kwh_charged: float
     dynamic_reserve: Dict[str, Any]
     cheap_hour_tolerance_eur_per_kwh: float
     expensive_hour_tolerance_eur_per_kwh: float
@@ -372,6 +373,13 @@ def load_settings() -> PlannerSettings:
         battery_wear_cost_eur_per_kwh_discharged=max(
             0.0,
             _get_float(battery.get("wearCostEurPerKwhDischarged"), 0.0),
+        ),
+        minimum_grid_arbitrage_margin_eur_per_kwh_charged=max(
+            0.0,
+            _get_float(
+                battery.get("minimumGridArbitrageMarginEurPerKwhCharged"),
+                0.0,
+            ),
         ),
         dynamic_reserve=dict(battery["dynamicReserve"]),
         cheap_hour_tolerance_eur_per_kwh=_get_float(

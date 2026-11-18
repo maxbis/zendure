@@ -42,6 +42,7 @@ class RollingDecision:
     grid_power_w: float
     expected_cost_eur: float
     expected_battery_wear_cost_eur: float
+    expected_grid_arbitrage_margin_cost_eur: float
     expected_scarcity_cost_eur: float
     schedule_value: object
     min_power: Optional[int]
@@ -63,6 +64,9 @@ class RollingDecision:
             "grid_power_w": round(self.grid_power_w, 1),
             "expected_cost_eur": round(self.expected_cost_eur, 6),
             "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
+            "expected_grid_arbitrage_margin_cost_eur": round(
+                self.expected_grid_arbitrage_margin_cost_eur, 6
+            ),
             "expected_scarcity_cost_eur": round(self.expected_scarcity_cost_eur, 6),
             "schedule_value": self.schedule_value,
             "reason": self.reason,
@@ -83,11 +87,13 @@ class RollingPlan:
     ending_soc_percent: float
     expected_energy_cost_eur: float
     expected_battery_wear_cost_eur: float
+    expected_grid_arbitrage_margin_cost_eur: float
     expected_scarcity_cost_eur: float
     terminal_energy_value_eur: float
     objective_eur: float
     round_trip_efficiency: float
     battery_wear_cost_eur_per_kwh_discharged: float
+    minimum_grid_arbitrage_margin_eur_per_kwh_charged: float
     scarcity: dict
     decisions: List[RollingDecision]
 
@@ -100,11 +106,17 @@ class RollingPlan:
             "ending_soc_percent": round(self.ending_soc_percent, 2),
             "expected_energy_cost_eur": round(self.expected_energy_cost_eur, 6),
             "expected_battery_wear_cost_eur": round(self.expected_battery_wear_cost_eur, 6),
+            "expected_grid_arbitrage_margin_cost_eur": round(
+                self.expected_grid_arbitrage_margin_cost_eur, 6
+            ),
             "expected_scarcity_cost_eur": round(self.expected_scarcity_cost_eur, 6),
             "terminal_energy_value_eur": round(self.terminal_energy_value_eur, 6),
             "objective_eur": round(self.objective_eur, 6),
             "round_trip_efficiency": self.round_trip_efficiency,
             "battery_wear_cost_eur_per_kwh_discharged": self.battery_wear_cost_eur_per_kwh_discharged,
+            "minimum_grid_arbitrage_margin_eur_per_kwh_charged": (
+                self.minimum_grid_arbitrage_margin_eur_per_kwh_charged
+            ),
             "scarcity": self.scarcity,
             "decisions": [decision.to_dict() for decision in self.decisions],
         }
@@ -160,6 +172,27 @@ def _battery_wear_cost(
     """Return discharge-only wear cost using AC-side battery output."""
     discharged_kwh = max(0.0, -battery_power_w) * duration_hours / 1000.0
     return discharged_kwh * max(0.0, wear_cost_eur_per_kwh_discharged)
+
+
+def _grid_arbitrage_margin_cost(
+    battery_power_w: float,
+    load_w: float,
+    pv_w: float,
+    duration_hours: float,
+    minimum_margin_eur_per_kwh_charged: float,
+) -> float:
+    """Return the virtual profit hurdle for incremental grid charging only."""
+    if battery_power_w <= 0 or duration_hours <= 0:
+        return 0.0
+    baseline_import_w = max(0.0, load_w - pv_w)
+    candidate_import_w = max(0.0, load_w - pv_w + battery_power_w)
+    incremental_grid_charge_w = max(0.0, candidate_import_w - baseline_import_w)
+    return (
+        incremental_grid_charge_w
+        * duration_hours
+        / 1000.0
+        * max(0.0, minimum_margin_eur_per_kwh_charged)
+    )
 
 
 def _scarcity_discharge_cost(
@@ -471,6 +504,7 @@ def optimize_rolling_schedule(
     soc_step_wh: float,
     terminal_value_factor: float = 1.0,
     battery_wear_cost_eur_per_kwh_discharged: float = 0.0,
+    minimum_grid_arbitrage_margin_eur_per_kwh_charged: float = 0.0,
     scarcity: Optional[dict] = None,
 ) -> RollingPlan:
     if not slots:
@@ -480,6 +514,10 @@ def optimize_rolling_schedule(
 
     rte = max(0.01, min(1.0, float(round_trip_efficiency)))
     wear_rate = max(0.0, float(battery_wear_cost_eur_per_kwh_discharged))
+    grid_margin_rate = max(
+        0.0,
+        float(minimum_grid_arbitrage_margin_eur_per_kwh_charged),
+    )
     scarcity_payload = scarcity or {"algorithm_enabled": False, "calculation_available": False, "bands": []}
     scarcity_bands = list(scarcity_payload.get("bands") or [])
     charge_efficiency = math.sqrt(rte)
@@ -557,6 +595,13 @@ def optimize_rolling_schedule(
                     slot.export_price_eur_per_kwh,
                 )
                 wear_cost = _battery_wear_cost(action_w, duration, wear_rate)
+                grid_margin_cost = _grid_arbitrage_margin_cost(
+                    action_w,
+                    slot.load_w,
+                    slot.pv_w,
+                    duration,
+                    grid_margin_rate,
+                )
                 scarcity_cost = _scarcity_discharge_cost(
                     start_energy_wh=energy_wh,
                     end_energy_wh=next_energy_wh,
@@ -564,7 +609,13 @@ def optimize_rolling_schedule(
                     discharge_efficiency=discharge_efficiency,
                     bands=scarcity_bands,
                 )
-                candidate_cost = cost_so_far + hour_cost + wear_cost + scarcity_cost
+                candidate_cost = (
+                    cost_so_far
+                    + hour_cost
+                    + wear_cost
+                    + grid_margin_cost
+                    + scarcity_cost
+                )
                 previous = next_states.get(next_key)
                 previous_action = (
                     previous[2][-1][0]
@@ -646,6 +697,17 @@ def optimize_rolling_schedule(
     )
     best_wear_cost = sum(
         _battery_wear_cost(candidate.power_w, slot.duration_hours, wear_rate)
+        for slot, (candidate, _start_energy_wh, _end_energy_wh, _grid_power_w)
+        in zip(slots, best_path)
+    )
+    best_grid_margin_cost = sum(
+        _grid_arbitrage_margin_cost(
+            candidate.power_w,
+            slot.load_w,
+            slot.pv_w,
+            slot.duration_hours,
+            grid_margin_rate,
+        )
         for slot, (candidate, _start_energy_wh, _end_energy_wh, _grid_power_w)
         in zip(slots, best_path)
     )
@@ -737,6 +799,13 @@ def optimize_rolling_schedule(
                     duration,
                     wear_rate,
                 ),
+                expected_grid_arbitrage_margin_cost_eur=_grid_arbitrage_margin_cost(
+                    action_w,
+                    slot.load_w,
+                    slot.pv_w,
+                    duration,
+                    grid_margin_rate,
+                ),
                 expected_scarcity_cost_eur=_scarcity_discharge_cost(
                     start_energy_wh=start_energy_wh,
                     end_energy_wh=end_energy_wh,
@@ -759,11 +828,13 @@ def optimize_rolling_schedule(
         ending_soc_percent=best_ending_energy_wh / capacity_wh * 100.0,
         expected_energy_cost_eur=best_energy_cost,
         expected_battery_wear_cost_eur=best_wear_cost,
+        expected_grid_arbitrage_margin_cost_eur=best_grid_margin_cost,
         expected_scarcity_cost_eur=best_scarcity_cost,
         terminal_energy_value_eur=best_terminal_value,
         objective_eur=best_objective,
         round_trip_efficiency=rte,
         battery_wear_cost_eur_per_kwh_discharged=wear_rate,
+        minimum_grid_arbitrage_margin_eur_per_kwh_charged=grid_margin_rate,
         scarcity=scarcity_payload,
         decisions=decisions,
     )

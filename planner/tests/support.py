@@ -33,6 +33,7 @@ def build_test_settings(tmp_path: Path) -> PlannerSettings:
         arbitrage_min_spread_eur_per_kwh=0.12,
         round_trip_efficiency=0.85,
         battery_wear_cost_eur_per_kwh_discharged=0.0005,
+        minimum_grid_arbitrage_margin_eur_per_kwh_charged=0.02,
         dynamic_reserve={
             "enabled": False,
             "priceHistoryDays": 21,

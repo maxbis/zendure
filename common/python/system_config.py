@@ -146,6 +146,8 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         battery_keys.add("roundTripEfficiency")
     if "wearCostEurPerKwhDischarged" in battery:
         battery_keys.add("wearCostEurPerKwhDischarged")
+    if "minimumGridArbitrageMarginEurPerKwhCharged" in battery:
+        battery_keys.add("minimumGridArbitrageMarginEurPerKwhCharged")
     battery_keys.add("dynamicReserve")
     _assert_exact_keys(battery, battery_keys, "$.battery")
     capacity_wh = _require_integer(battery["capacityWh"], "$.battery.capacityWh", 1)
@@ -174,6 +176,13 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         wear_cost_eur_per_kwh_discharged = _require_number(
             battery["wearCostEurPerKwhDischarged"],
             "$.battery.wearCostEurPerKwhDischarged",
+            0.0,
+        )
+    minimum_grid_arbitrage_margin_eur_per_kwh_charged = None
+    if "minimumGridArbitrageMarginEurPerKwhCharged" in battery:
+        minimum_grid_arbitrage_margin_eur_per_kwh_charged = _require_number(
+            battery["minimumGridArbitrageMarginEurPerKwhCharged"],
+            "$.battery.minimumGridArbitrageMarginEurPerKwhCharged",
             0.0,
         )
     dynamic_reserve = _validate_dynamic_reserve(
@@ -302,6 +311,10 @@ def validate_system_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_battery["roundTripEfficiency"] = round_trip_efficiency
     if wear_cost_eur_per_kwh_discharged is not None:
         normalized_battery["wearCostEurPerKwhDischarged"] = wear_cost_eur_per_kwh_discharged
+    if minimum_grid_arbitrage_margin_eur_per_kwh_charged is not None:
+        normalized_battery["minimumGridArbitrageMarginEurPerKwhCharged"] = (
+            minimum_grid_arbitrage_margin_eur_per_kwh_charged
+        )
     normalized_battery["dynamicReserve"] = dynamic_reserve
 
     return {

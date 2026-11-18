@@ -32,6 +32,7 @@ The configuration contains:
 - Battery forecast efficiency: 0.9.
 - Battery round-trip efficiency for rolling optimization: 0.85.
 - Discharge-side battery wear cost for rolling optimization: 0.0005 EUR/kWh (0.05 euro-cent/kWh).
+- Minimum grid-arbitrage margin for rolling optimization: 0.02 EUR per AC-side kWh charged from the grid (2 euro cents/kWh).
 - Low-SoC discharge threshold for rolling optimization: 26%.
 - Virtual low-SoC discharge cost: 10 euro cents per AC-side kWh discharged below 26%.
 - Maximum charge command magnitude: 1200 W.
@@ -83,6 +84,7 @@ Required properties:
 - `efficiency`: number greater than 0 and no greater than 1.
 - `roundTripEfficiency`: optional number greater than 0 and no greater than 1. It is used by the rolling optimizer and remains separate from the legacy one-way forecast efficiency.
 - `wearCostEurPerKwhDischarged`: optional non-negative number in EUR per AC-side kWh discharged. It affects only the rolling optimizer objective and is excluded from daily cash P&L.
+- `minimumGridArbitrageMarginEurPerKwhCharged`: optional non-negative number in EUR per AC-side kWh that battery charging adds to grid import. The current value is `0.02`. It is a virtual optimizer hurdle, not a cash charge. Forecast solar-surplus charging is excluded, and omitting the property preserves the previous behavior with an effective value of zero.
 - `dynamicReserve`: required refill-aware scarcity configuration. `enabled` is the master switch. Its history settings define weighted consumer-price percentiles, and its contiguous `bands` define the SoC range, price percentile, and expected-refill activation boundary for each virtual scarcity cost.
 
 See [Scarcity bands](../planner/scarcity-bands.md) for the full calculation, configuration example, API contract, and operating procedure.

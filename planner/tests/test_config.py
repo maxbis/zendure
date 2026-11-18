@@ -21,7 +21,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.active_hour_deadband_w, 0)
         self.assertEqual(settings.round_trip_efficiency, 0.85)
         self.assertEqual(settings.battery_wear_cost_eur_per_kwh_discharged, 0.0005)
-        self.assertFalse(settings.dynamic_reserve["enabled"])
+        self.assertEqual(settings.minimum_grid_arbitrage_margin_eur_per_kwh_charged, 0.02)
+        self.assertTrue(settings.dynamic_reserve["enabled"])
         self.assertEqual(len(settings.dynamic_reserve["bands"]), 3)
         self.assertEqual(
             settings.household_usage_profile_path,

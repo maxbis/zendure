@@ -65,6 +65,11 @@
           "type": "number",
           "minimum": 0
         },
+        "minimumGridArbitrageMarginEurPerKwhCharged": {
+          "description": "Minimum modeled margin in euros per AC-side kilowatt-hour charged from the grid, applied as a virtual rolling-optimizer cost. Solar-surplus charging is excluded.",
+          "type": "number",
+          "minimum": 0
+        },
         "dynamicReserve": {
           "description": "Refill-aware scarcity bands used by the rolling optimizer.",
           "type": "object",
