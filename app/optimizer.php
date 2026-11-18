@@ -67,6 +67,7 @@ $viewerConfig = [
                 </div>
             </div>
             <div class="app-topbar__actions">
+                <a class="gsd-btn gsd-btn--secondary optimizer-return" href="configuration.php">Configuration</a>
                 <a class="gsd-btn gsd-btn--secondary optimizer-return" href="optimizer_scarcity.php">Scarcity bands</a>
                 <a class="gsd-btn gsd-btn--secondary optimizer-return" href="optimizer_runtime.php">Runtime log</a>
                 <a class="gsd-btn gsd-btn--secondary optimizer-return" href="./">Live app</a>

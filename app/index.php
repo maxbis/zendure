@@ -723,6 +723,12 @@ $appConfig = [
             'icon' => 'activity',
         ],
         [
+            'href' => 'configuration.php',
+            'label' => 'System Configuration',
+            'description' => 'Review webserver settings, effects, and recommended defaults',
+            'icon' => 'settings',
+        ],
+        [
             'dialogId' => 'app-shortwave-radiation-dialog',
             'label' => 'Shortwave Radiation',
             'description' => 'Hourly solar radiation and daily totals',
