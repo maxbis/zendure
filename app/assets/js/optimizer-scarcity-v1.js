@@ -412,7 +412,7 @@
         }
         elements.statusCaption.textContent = finite(activation.percent) === null
             ? "Activation input unavailable"
-            : `Activation input ${percent(activation.percent)} · previous published schedule`;
+            : `Activation input ${percent(activation.percent)} · forecast refill capability`;
 
         const calculationReady = Boolean(scarcity.calculation_available) && !payload.stale;
         const algorithmEnabled = Boolean(scarcity.algorithm_enabled);

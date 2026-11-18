@@ -11,10 +11,8 @@
         banner: get("status-banner"), statusTitle: get("status-title"), statusCopy: get("status-copy"),
         algorithm: get("algorithm"), activationPercent: get("activation-percent"), appliedCount: get("applied-count"), age: get("age"),
         activationPercentLarge: get("activation-percent-large"), activationSource: get("activation-source"),
-        activationSourceAge: get("activation-source-age"), activationMaxAge: get("activation-max-age"),
         activationSourceTime: get("activation-source-time"), activationReason: get("activation-reason"),
-        activationStartingSoc: get("activation-starting-soc"), activationMaximumSoc: get("activation-maximum-soc"),
-        activationGain: get("activation-gain"), activationHorizonEnd: get("activation-horizon-end"),
+        activationHorizonStart: get("activation-horizon-start"), activationHorizonEnd: get("activation-horizon-end"),
         scheduledRefillPercent: get("scheduled-refill-percent"), scheduledStartingSoc: get("scheduled-starting-soc"),
         maximumScheduledSoc: get("maximum-scheduled-soc"), scheduledGain: get("scheduled-gain"),
         grossRefillPercent: get("gross-refill-percent"), startingSoc: get("starting-soc"), maximumSoc: get("maximum-soc"),
@@ -66,18 +64,11 @@
     };
     const sourceLabel = (source) => ({ price_ticks: "MariaDB price_ticks", json_price_files: "Local JSON price files" }[source] || source || "—");
     const activationSourceLabel = (source) => ({
-        previous_schedule: "Previous published schedule",
-        conservative_fallback: "Conservative 0% fallback"
+        forecast_refill_capability: "Current forecast refill capability"
     }[source] || source || "—");
     const activationReasonLabel = (reason) => ({
-        previous_schedule_missing: "No previous published schedule",
-        previous_schedule_invalid: "Previous schedule structure is invalid",
-        scheduled_refill_missing: "Previous schedule predates scheduled-refill output",
-        scheduled_refill_invalid: "Previous scheduled-refill values are invalid",
-        previous_schedule_stale: "Previous schedule is older than the freshness limit",
-        previous_schedule_from_future: "Previous schedule timestamp is in the future",
-        battery_configuration_changed: "Battery capacity or SoC limits changed"
-    }[reason] || reason || "None");
+        calculation_unavailable: "Refill capability unavailable"
+    }[reason] || reason || "Available");
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     function hideTooltip(trigger = null) {
@@ -266,7 +257,7 @@
             copy.textContent = `${reference.shortLabel} ${reference.label} · ${money(reference.price)}`;
             item.append(dot, copy);
             bindTooltip(item, reference.state === "cheap"
-                ? `${reference.shortLabel} is calculated from completed historical hourly consumer prices. Prices at or below ${money(reference.price)} contribute only to the gross-opportunity diagnostic.`
+                ? `${reference.shortLabel} is calculated from completed historical hourly consumer prices. Prices at or below ${money(reference.price)} contribute to forecast refill capability.`
                 : `${reference.shortLabel} is calculated from completed historical hourly consumer prices using the configured recency weighting. It values energy in the ${reference.label} band at ${money(reference.price)}.`);
             elements.percentileLegend.appendChild(item);
         });
@@ -471,13 +462,9 @@
         elements.activationPercent.textContent = percent(activationValue);
         elements.activationPercentLarge.textContent = percent(activationValue);
         elements.activationSource.textContent = activationSourceLabel(activation.source);
-        elements.activationSourceAge.textContent = activation.source === "previous_schedule" ? ageText(activation.source_age_seconds) : "Not applicable";
-        elements.activationMaxAge.textContent = ageText(activation.max_age_seconds);
-        elements.activationSourceTime.textContent = dateTime(activation.source_calculated_at);
-        elements.activationStartingSoc.textContent = percent(activation.source_starting_soc_percent);
-        elements.activationMaximumSoc.textContent = percent(activation.source_maximum_scheduled_soc_percent);
-        elements.activationGain.textContent = points(activation.source_scheduled_gain_percent_points);
-        elements.activationHorizonEnd.textContent = dateTime(activation.source_horizon_end);
+        elements.activationSourceTime.textContent = dateTime(activation.calculated_at);
+        elements.activationHorizonStart.textContent = dateTime(activation.horizon_start);
+        elements.activationHorizonEnd.textContent = dateTime(activation.horizon_end);
         elements.activationReason.textContent = activationReasonLabel(activation.reason);
         elements.scheduledRefillPercent.textContent = percent(scheduled.scheduled_refill_percent);
         elements.scheduledStartingSoc.textContent = percent(scheduled.starting_soc_percent);
@@ -521,12 +508,12 @@
         elements.sampleCount.textContent = finite(history.sample_count) === null ? "—" : `${history.sample_count} hours`;
         elements.halfLife.textContent = finite(history.half_life_days) === null ? "—" : `${history.half_life_days} days`;
         bindRoleTooltip("algorithm", `Master scarcity-band switch from the shared system configuration. When enabled, active bands add virtual discharge cost to optimizer decisions; when disabled, bands remain diagnostic only.`);
-        bindRoleTooltip("activation-percent", `The single refill percentage used to activate bands. It comes from the previous valid published schedule, or is 0% when the conservative fallback is required.`);
+        bindRoleTooltip("activation-percent", `The forecast refill capability used to activate bands, calculated before optimization from current SoC, solar surplus, and qualifying cheap-grid opportunities.`);
         bindRoleTooltip("activation-percent-large", `The current activation input. Every band compares this value with its inclusive configured boundary.`);
-        bindRoleTooltip("activation-source", `Identifies whether activation uses the previous published schedule or the conservative 0% fallback.`);
-        bindRoleTooltip("scheduled-refill-percent", `This schedule's maximum SoC gain divided by its starting gap to maximum. It is published for the next optimizer run.`);
+        bindRoleTooltip("activation-source", `Activation uses refill capability calculated from the current SoC, forecast solar surplus, and qualifying cheap-grid opportunities.`);
+        bindRoleTooltip("scheduled-refill-percent", `This schedule's maximum SoC gain divided by its starting gap to maximum. It is diagnostic and does not activate the next run's bands.`);
         bindRoleTooltip("maximum-scheduled-soc", `Highest start or end SoC on the final published schedule after active-hour stabilization.`);
-        bindRoleTooltip("gross-refill-percent", `Gross solar and cheap-grid opportunity divided by the current gap. This upper-bound diagnostic does not activate scarcity bands.`);
+        bindRoleTooltip("gross-refill-percent", `Forecast solar and cheap-grid opportunity divided by the current gap. This upper-bound capability activates scarcity bands before optimization.`);
         bindRoleTooltip("gross-refill-ceiling", `Starting SoC plus gross refill opportunity, capped at maximum SoC. This is a hypothetical ceiling that assumes no intervening battery use.`);
         bindRoleTooltip("ending-soc", `Optimizer-estimated absolute battery level at the end of the horizon after all planned charging and discharging decisions.`);
         bindRoleTooltip("applied-count", `Number of configured bands whose expected-refill condition is active and whose virtual cost is currently enabled by the master scarcity switch.`);
@@ -538,7 +525,7 @@
         bindRoleTooltip("refill-factor", `Decimal coverage of the current gap: gross available refill ÷ current energy gap. A value of 1.000 means enough charging opportunity exists to restore the current gap, not that ending SoC will be 100%.`);
         bindRoleTooltip("horizon", `Start and end of the slots examined for predicted solar and cheap-grid refill. Derived from the current rolling optimizer plan.`);
         bindRoleTooltip("terminal-price", `Arithmetic mean of consumer/import prices across all slots in the current optimizer horizon. This forward-looking baseline values stored energy at the end of the forecast; it does not come from historical percentiles.`);
-        bindRoleTooltip("cheap-price", `Recency-weighted P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} consumer price from completed historical hours. It is used only for the gross-opportunity diagnostic, not band activation.`);
+        bindRoleTooltip("cheap-price", `Recency-weighted P${Number(scarcity.cheap_grid_charge_percentile).toFixed(0)} consumer price from completed historical hours. Prices at or below it count toward refill capability and band activation.`);
         bindRoleTooltip("history-source", history.source === "price_ticks"
             ? `Historical hourly consumer prices loaded from the MariaDB price_ticks table. The database is used when it contains at least the required 168 valid samples.`
             : `Historical hourly consumer prices loaded from local archived JSON price files because the database source was unavailable or did not contain enough valid samples.`);
@@ -567,10 +554,6 @@
             elements.statusCopy.textContent = scarcity.unavailable_reason === "insufficient_price_history"
                 ? `Only ${history.sample_count || 0} historical hours are available; at least 168 are required.`
                 : `Reason: ${scarcity.unavailable_reason || "missing calculation inputs"}.`;
-        } else if (activation.source === "conservative_fallback") {
-            elements.banner.dataset.state = "warning";
-            elements.statusTitle.textContent = "Conservative refill fallback active";
-            elements.statusCopy.textContent = `${activationReasonLabel(activation.reason)}. Bands are evaluated with a 0% activation refill.`;
         } else {
             elements.banner.dataset.state = "ready";
             elements.statusTitle.textContent = scarcity.algorithm_enabled ? "Scarcity bands are enabled" : "Diagnostics ready · algorithm disabled";

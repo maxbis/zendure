@@ -226,7 +226,7 @@ in `common/`, `main/`, `planner/`, `app/`, `daily_report/`, `pathlab/` and
   - Latest executable optimizer plan.
   - Atomically written by `planner/shadow.py`; read, validated and selectively
     applied by `app/includes/optimizer_schedule.php`.
-  - Its scarcity payload stores the current run's activation source and scheduled-refill result. The following optimizer run uses that result when it is fresh and battery-compatible; otherwise it uses a conservative 0% fallback.
+  - Its scarcity payload stores the current forecast refill capability used for activation and the selected plan's scheduled-refill result. Scheduled refill is diagnostic and does not feed the following optimizer run.
   - Delivered through `main/data/api/data_api.php` and the optimizer view when
     optimizer mode is active; exact manual schedule entries still take priority.
 

@@ -69,13 +69,13 @@ $pageConfig = [
 
             <section class="scarcity-summary" aria-label="Scarcity calculation summary">
                 <article class="gsd-card scarcity-metric"><span>Algorithm</span><strong data-role="algorithm">—</strong><small>Whether active bands influence optimizer decisions.</small></article>
-                <article class="gsd-card scarcity-metric"><span>Activation refill</span><strong data-role="activation-percent">—</strong><small>Previous schedule refill, or a conservative 0% fallback, used to activate bands.</small></article>
+                <article class="gsd-card scarcity-metric"><span>Activation refill</span><strong data-role="activation-percent">—</strong><small>Current forecast refill capability used to activate bands.</small></article>
                 <article class="gsd-card scarcity-metric"><span>Applied bands</span><strong data-role="applied-count">—</strong><small>Active bands currently adding virtual discharge cost.</small></article>
                 <article class="gsd-card scarcity-metric"><span>Calculation age</span><strong data-role="age">—</strong><small>Age of the published optimizer calculation.</small></article>
             </section>
 
             <section class="gsd-card scarcity-section" aria-labelledby="activation-title">
-                <div class="scarcity-section__header"><div><h2 id="activation-title">Scarcity activation and next-run reference</h2><p>The current bands use the previous published schedule. This schedule publishes the refill reference for the next optimizer run.</p></div></div>
+                <div class="scarcity-section__header"><div><h2 id="activation-title">Scarcity activation and scheduled refill</h2><p>Forecast refill capability activates the current bands before optimization. Scheduled refill remains a diagnostic outcome.</p></div></div>
                 <div class="scarcity-forecast-comparison">
                     <article class="scarcity-forecast-card scarcity-forecast-card--activation">
                         <span class="scarcity-forecast-card__eyebrow">Current activation input</span>
@@ -83,19 +83,14 @@ $pageConfig = [
                         <p>The single refill value compared with every configured band boundary.</p>
                         <dl class="scarcity-forecast-card__facts">
                             <div><dt>Source</dt><dd data-role="activation-source">—</dd></div>
-                            <div><dt>Source age</dt><dd data-role="activation-source-age">—</dd></div>
-                            <div class="scarcity-forecast-card__wide"><dt>Freshness limit</dt><dd data-role="activation-max-age">—</dd></div>
-                            <div><dt>Previous starting SoC</dt><dd data-role="activation-starting-soc">—</dd></div>
-                            <div><dt>Previous maximum scheduled</dt><dd data-role="activation-maximum-soc">—</dd></div>
-                            <div class="scarcity-forecast-card__wide"><dt>Previous scheduled gain</dt><dd data-role="activation-gain">—</dd></div>
-                            <div class="scarcity-forecast-card__wide"><dt>Source calculation</dt><dd data-role="activation-source-time">—</dd></div>
-                            <div class="scarcity-forecast-card__wide"><dt>Source horizon end</dt><dd data-role="activation-horizon-end">—</dd></div>
-                            <div class="scarcity-forecast-card__wide"><dt>Fallback reason</dt><dd data-role="activation-reason">—</dd></div>
+                            <div><dt>Calculation</dt><dd data-role="activation-source-time">—</dd></div>
+                            <div class="scarcity-forecast-card__wide"><dt>Forecast horizon</dt><dd><span data-role="activation-horizon-start">—</span> → <span data-role="activation-horizon-end">—</span></dd></div>
+                            <div class="scarcity-forecast-card__wide"><dt>Availability</dt><dd data-role="activation-reason">—</dd></div>
                         </dl>
-                        <small>A fallback value of 0% activates bands conservatively when no valid previous schedule exists.</small>
+                        <small>This value is calculated from the current SoC, forecast solar surplus, and qualifying cheap-grid opportunities.</small>
                     </article>
                     <article class="scarcity-forecast-card scarcity-forecast-card--scheduled">
-                        <span class="scarcity-forecast-card__eyebrow">Current schedule · next-run input</span>
+                        <span class="scarcity-forecast-card__eyebrow">Current schedule · diagnostic outcome</span>
                         <strong class="scarcity-forecast-card__value" data-role="scheduled-refill-percent">—</strong>
                         <p>Scheduled SoC gain as a share of this run's starting gap to maximum.</p>
                         <dl class="scarcity-forecast-card__facts">
@@ -106,21 +101,21 @@ $pageConfig = [
                             <div><dt>Ending SoC</dt><dd data-role="ending-soc">—</dd></div>
                             <div><dt>Outcome time</dt><dd data-role="outcome-time">—</dd></div>
                         </dl>
-                        <small>This value is stored in the published plan and becomes the next valid run's activation input.</small>
+                        <small>This value describes the selected plan and does not feed the next scarcity calculation.</small>
                     </article>
                     <aside class="scarcity-forecast-explanation">
                         <strong>Why can these values differ?</strong>
-                        <p>Activation deliberately uses the preceding schedule, so it reacts one optimizer cycle later. The current schedule's refill is published for the following run.</p>
+                        <p>Activation measures available refill capacity before optimization. Scheduled refill reports how much of that opportunity the optimizer actually selects.</p>
                     </aside>
                 </div>
                 <div class="scarcity-refill-bar" aria-hidden="true"><span data-role="activation-bar"></span></div>
             </section>
 
             <section class="gsd-card scarcity-section" aria-labelledby="gross-refill-title">
-                <div class="scarcity-section__header"><div><h2 id="gross-refill-title">Gross charging opportunity · diagnostic only</h2><p>Solar surplus and historically cheap grid capacity remain visible for comparison, but do not activate scarcity bands.</p></div></div>
+                <div class="scarcity-section__header"><div><h2 id="gross-refill-title">Forecast refill capability</h2><p>Solar surplus and historically cheap grid capacity determine the refill percentage used to activate scarcity bands.</p></div></div>
                 <div class="scarcity-forecast-comparison scarcity-forecast-comparison--single">
                     <article class="scarcity-forecast-card scarcity-forecast-card--gross">
-                        <span class="scarcity-forecast-card__eyebrow">Hypothetical gross opportunity</span>
+                        <span class="scarcity-forecast-card__eyebrow">Available refill opportunity</span>
                         <strong class="scarcity-forecast-card__value" data-role="gross-refill-percent">—</strong>
                         <p>Share of the current gap that could be restored if every qualifying opportunity charged without intervening battery use.</p>
                         <dl class="scarcity-forecast-card__facts">
@@ -130,7 +125,7 @@ $pageConfig = [
                             <div><dt>Gross refill</dt><dd data-role="gross-refill-points">—</dd></div>
                             <div class="scarcity-forecast-card__wide"><dt>Gross-only SoC ceiling</dt><dd data-role="gross-refill-ceiling">—</dd></div>
                         </dl>
-                        <small>This is an upper-bound diagnostic and is never used for band activation.</small>
+                        <small>This upper-bound capability is the one-way activation input; optimizer decisions do not feed back into it.</small>
                     </article>
                 </div>
                 <dl class="scarcity-details">
@@ -144,7 +139,7 @@ $pageConfig = [
             </section>
 
             <section class="gsd-card scarcity-section" aria-labelledby="prices-title">
-                <div class="scarcity-section__header"><div><h2 id="prices-title">Price references</h2><p>The horizon average and band percentiles value stored energy. The cheap-grid percentile is retained only for gross-opportunity diagnostics.</p></div></div>
+                <div class="scarcity-section__header"><div><h2 id="prices-title">Price references</h2><p>The horizon average and band percentiles value stored energy. The cheap-grid percentile identifies qualifying refill opportunities.</p></div></div>
                 <div class="scarcity-reference-groups">
                     <section class="scarcity-reference-group" aria-labelledby="horizon-reference-title">
                         <h3 id="horizon-reference-title">Forecast-horizon reference</h3>
@@ -155,7 +150,7 @@ $pageConfig = [
                     <section class="scarcity-reference-group" aria-labelledby="historical-reference-title">
                         <h3 id="historical-reference-title">Historical references</h3>
                         <dl class="scarcity-details scarcity-details--prices">
-                            <div><dt>Diagnostic cheap-grid boundary</dt><dd data-role="cheap-price">—</dd><small>Grid prices at or below this historical threshold contribute only to the gross-opportunity diagnostic.</small></div>
+                            <div><dt>Cheap-grid refill boundary</dt><dd data-role="cheap-price">—</dd><small>Grid prices at or below this historical threshold contribute to forecast refill capability.</small></div>
                             <div><dt>History source</dt><dd data-role="history-source">—</dd><small>Price database first, with local JSON files as fallback.</small></div>
                             <div><dt>History period</dt><dd data-role="history-period">—</dd><small>Completed local dates included in the percentile calculation.</small></div>
                             <div><dt>Hourly samples</dt><dd data-role="sample-count">—</dd><small>At least 168 valid hourly prices are required.</small></div>
@@ -190,7 +185,7 @@ $pageConfig = [
 
             <section class="gsd-card scarcity-section scarcity-explainer" aria-labelledby="logic-title">
                 <div class="scarcity-section__header"><div><h2 id="logic-title">How to read this page</h2><p>The optimizer applies the calculation in three steps.</p></div><a class="gsd-btn gsd-btn--secondary" href="docs.php?doc=planner%2Fscarcity-bands.md">Read full documentation</a></div>
-                <ol><li>Read scheduled refill from the previous valid published optimizer plan, or use a conservative 0% fallback.</li><li>Activate each band whose boundary is at least as high as that activation refill percentage.</li><li>Optimize once, then publish this schedule’s refill percentage for the next run.</li></ol>
+                <ol><li>Calculate refill capability from current SoC, forecast solar surplus, and qualifying cheap-grid capacity.</li><li>Activate each band whose boundary is at least as high as that capability percentage.</li><li>Optimize once with those fixed bands, then publish scheduled refill as a diagnostic outcome.</li></ol>
             </section>
         </div>
     </main>

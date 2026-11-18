@@ -580,6 +580,14 @@ class RollingOptimizerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             now = datetime(2026, 9, 12, 10, 0, tzinfo=ZoneInfo(settings.timezone))
+            for offset in range(1, 8):
+                day = now.date() - timedelta(days=offset)
+                price_path = root / "main" / "data" / "price" / day.strftime("%Y%m") / f"price{day:%Y%m%d}.json"
+                price_path.parent.mkdir(parents=True, exist_ok=True)
+                price_path.write_text(
+                    json.dumps({f"{hour:02d}": 0.20 for hour in range(24)}),
+                    encoding="utf-8",
+                )
             prices = PricePayload(
                 today_date="20260912",
                 tomorrow_date=None,
@@ -633,13 +641,20 @@ class RollingOptimizerTests(unittest.TestCase):
             self.assertEqual(published["inputs"], payload["inputs"])
             self.assertEqual(
                 published["plan"]["scarcity"]["refill_activation"]["source"],
-                "conservative_fallback",
+                "forecast_refill_capability",
             )
-            self.assertEqual(
+            self.assertAlmostEqual(
                 published["plan"]["scarcity"]["refill_activation"]["percent"],
-                0.0,
+                published["plan"]["scarcity"]["refill"]["expected_refill_percent"],
+                places=6,
             )
+            self.assertGreater(published["plan"]["scarcity"]["refill_activation"]["percent"], 0.0)
             self.assertIn("scheduled_refill", published["plan"]["scarcity"])
+            previous_scheduled = published["plan"]["scarcity"]["scheduled_refill"]
+            previous_scheduled["maximum_scheduled_soc_percent"] = previous_scheduled["starting_soc_percent"]
+            previous_scheduled["scheduled_gain_percent_points"] = 0.0
+            previous_scheduled["scheduled_refill_percent"] = 0.0
+            latest_path.write_text(json.dumps(published), encoding="utf-8")
 
             with patch.dict(
                 "os.environ",
@@ -664,8 +679,14 @@ class RollingOptimizerTests(unittest.TestCase):
             second_published = json.loads(latest_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 second_published["plan"]["scarcity"]["refill_activation"]["source"],
-                "previous_schedule",
+                "forecast_refill_capability",
             )
+            self.assertAlmostEqual(
+                second_published["plan"]["scarcity"]["refill_activation"]["percent"],
+                second_published["plan"]["scarcity"]["refill"]["expected_refill_percent"],
+                places=6,
+            )
+            self.assertGreater(second_published["plan"]["scarcity"]["refill_activation"]["percent"], 0.0)
 
     def test_json_lines_log_appends_complete_records(self) -> None:
         with TemporaryDirectory() as temp_dir:

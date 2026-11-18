@@ -17,15 +17,15 @@ The authenticated endpoint accepts `GET` only. It returns schedule freshness plu
 - Master-switch state and calculation availability.
 - Historical price source, range, sample count, and weighting half-life.
 - Normal terminal price and cheap-grid threshold.
-- Previous-schedule activation refill, source timestamp, age, and fallback reason.
-- Current schedule starting SoC, maximum scheduled SoC, scheduled gain, and normalized refill for the next run.
-- Required, solar, cheap-grid, and total gross opportunity as diagnostics only.
+- Current forecast refill capability, calculation timestamp, and forecast horizon used for activation.
+- Current schedule starting SoC, maximum scheduled SoC, scheduled gain, and diagnostic normalized refill.
+- Required, solar, cheap-grid, and total refill opportunities used to calculate activation capability.
 - Each configured band's reference price, additional scarcity value, activation boundary, active state, and applied state.
 
 ## Flow/Behavior
 
 1. Read the latest atomically published optimizer schedule.
-2. Extract the scarcity object calculated by Python, including activation, scheduled-refill, and gross-diagnostic groups.
+2. Extract the scarcity object calculated by Python, including forecast activation capability and scheduled-refill diagnostics.
 3. Calculate schedule age and stale state.
 4. Return the data with `Cache-Control: no-store`.
 
@@ -35,7 +35,7 @@ The PHP endpoint never recalculates price percentiles, activation, or refill.
 
 - When no published schedule exists, return HTTP 404.
 - When the latest plan predates scarcity support, return `calculation_available: false` with `not_calculated`.
-- When the latest plan predates scheduled-refill support, expose the planner's conservative 0% fallback and its reason after the next local optimizer calculation.
+- When the latest plan predates forecast-refill activation support, expose its published legacy scarcity payload until the next local optimizer calculation replaces it.
 - When historical inputs are insufficient, return the planner's unavailable reason and no applied bands.
 - When the master switch is off, bands may still be active diagnostically but are not applied.
 

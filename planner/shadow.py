@@ -28,7 +28,6 @@ from planner.rolling_optimizer import (
 from planner.scarcity import (
     build_scarcity_context,
     build_scheduled_refill,
-    resolve_refill_activation,
 )
 from planner.runtime_log import runtime_log_path, update_runtime_log
 
@@ -550,11 +549,6 @@ def run_shadow_once(
         household_usage_w_by_hour=household_usage.values_w_by_hour,
     )
     terminal_price = fmean(slot.import_price_eur_per_kwh for slot in slots)
-    refill_activation = resolve_refill_activation(
-        previous_payload,
-        now=generated_at,
-        battery_state=battery_state,
-    )
     scarcity = build_scarcity_context(
         now=generated_at,
         battery_state=battery_state,
@@ -563,7 +557,6 @@ def run_shadow_once(
         normal_terminal_price=terminal_price,
         config=settings.dynamic_reserve,
         price_root=settings.repo_root / "main" / "data" / "price",
-        refill_activation=refill_activation,
     )
     plan = optimize_rolling_schedule(
         now=generated_at,

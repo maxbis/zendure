@@ -67,7 +67,7 @@ The algorithm is configured under `battery.dynamicReserve`:
 
 - `enabled: true` means active bands add their scarcity cost to optimizer discharge candidates.
 - `enabled: false` means no scarcity cost affects optimizer decisions.
-- When disabled, the planner still calculates and publishes history, activation input, scheduled refill, gross diagnostics, band activation, and additional scarcity values. This supports shadow evaluation before activation.
+- When disabled, the planner still calculates and publishes history, refill capability, activation input, scheduled refill, band activation, and additional scarcity values. This supports shadow evaluation before activation.
 - A diagnostically active band has `active: true`. It has `applied: true` only when the master switch is also enabled.
 
 ### Historical-price settings
@@ -75,7 +75,7 @@ The algorithm is configured under `battery.dynamicReserve`:
 - `priceHistoryDays` selects the number of completed local calendar days requested for the historical distribution.
 - `priceHistoryHalfLifeDays` controls recency weighting. With a value of 7, a price seven days old has half the weight of the newest completed day.
 - `referencePriceCapEurPerKwh` caps every percentile reference price before the additional scarcity value is calculated. It prevents a small number of extreme historical prices from assigning an excessive value to stored energy.
-- `cheapGridChargePercentile` defines which visible import-price slots count as potential cheap-grid refill in the gross-opportunity diagnostic. A value of 25 uses the weighted 25th-percentile historical consumer price. This diagnostic does not activate scarcity bands.
+- `cheapGridChargePercentile` defines which visible import-price slots count as potential cheap-grid refill. A value of 25 uses the weighted 25th-percentile historical consumer price. Solar and qualifying grid opportunities form the refill capability that activates scarcity bands.
 
 The historical weight is:
 
@@ -92,7 +92,7 @@ Each band contains:
 - `fromSocPercent`: lower edge of the SoC band.
 - `toSocPercent`: upper edge of the SoC band.
 - `pricePercentile`: weighted historical consumer-price percentile used to value energy in the band.
-- `activateWhenExpectedRefillBelowPercent`: the band is active when the previous valid schedule's refill coverage is at or below this percentage. When no valid previous value exists, the activation input is conservatively 0%.
+- `activateWhenExpectedRefillBelowPercent`: the band is active when current forecast refill capability is at or below this percentage.
 
 Deeper energy uses a higher price percentile. In the example:
 
@@ -123,7 +123,6 @@ The calculation receives:
 - Maximum charge power.
 - Round-trip efficiency.
 - Optimizer slots with duration, consumer price, forecast PV, and forecast household load.
-- The latest atomically published executable optimizer schedule, when present.
 - The normal terminal price used by the optimizer, calculated as the mean consumer import price across the current optimization horizon.
 - Completed historical consumer prices.
 - The `dynamicReserve` configuration.
@@ -153,7 +152,7 @@ The optimizer plan publishes a `scarcity` object containing:
 - `scheduled_refill`
 - `bands`
 
-`refill_activation` records the single value used to activate bands, its source, age, and any conservative-fallback reason. `scheduled_refill` records the final published schedule's starting SoC, maximum scheduled SoC, scheduled gain, and normalized refill percentage for the following optimizer run. `refill` remains the gross solar and cheap-grid opportunity diagnostic and does not activate bands.
+`refill` records the solar and cheap-grid refill capability calculated before optimization. `refill_activation` records that capability as the single value used to activate bands, together with its calculation time and forecast horizon. `scheduled_refill` records the final published schedule's starting SoC, maximum scheduled SoC, scheduled gain, and normalized refill percentage as a diagnostic outcome only.
 
 Each optimizer decision also publishes `expected_scarcity_cost_eur`. The plan publishes the total as `expected_scarcity_cost_eur`.
 
@@ -169,7 +168,7 @@ At least 168 valid hourly values are required. This is a minimum sample count, n
 
 The planner calculates:
 
-- The diagnostic cheap-grid charging boundary from `cheapGridChargePercentile`.
+- The cheap-grid charging boundary from `cheapGridChargePercentile`.
 - A reference price for each band from its configured `pricePercentile`.
 - The band reference after applying `referencePriceCapEurPerKwh`.
 
@@ -182,18 +181,7 @@ additional scarcity value =
 
 Only the difference is added because the normal terminal price already values energy retained at the end of the horizon. Adding the full percentile price would count part of the stored-energy value twice.
 
-### 3. Resolve the activation refill
-
-The planner reads `scheduled_refill` from the previously published executable schedule. It accepts that value only when:
-
-- The previous plan and scheduled-refill fields are structurally valid and finite.
-- Battery capacity and configured minimum and maximum SoC match the current battery configuration.
-- The source calculation is no more than 70 minutes old.
-- The source timestamp is not materially in the future.
-
-When validation succeeds, `refill_activation.percent` is the previous schedule's `scheduled_refill_percent`. When validation fails, `refill_activation.percent` is 0% and the output records a `conservative_fallback` source plus a reason. The gross-opportunity calculation is never used as an activation fallback.
-
-### 4. Calculate diagnostic required refill
+### 3. Calculate required refill
 
 Required refill is the internal battery energy needed to move from current SoC to `maxChargePercent`:
 
@@ -202,7 +190,7 @@ required refill Wh =
     max(0, energy at maximum SoC - current battery energy)
 ```
 
-### 5. Calculate diagnostic forecast solar refill
+### 4. Calculate forecast solar refill
 
 For every optimizer slot:
 
@@ -217,7 +205,7 @@ The contribution is limited by:
 - Charge efficiency, calculated as the square root of round-trip efficiency.
 - Remaining energy needed to reach maximum SoC.
 
-### 6. Calculate diagnostic cheap-grid refill
+### 5. Calculate cheap-grid refill
 
 A slot counts as a cheap-grid opportunity when:
 
@@ -227,9 +215,9 @@ slot import price <= cheap-grid charging boundary
 
 Available grid charging uses the charging power left after forecast solar charging in the same slot. This prevents solar and grid refill from double-counting the same charge-power capacity.
 
-The gross refill calculation measures available opportunities. It is not a claim that the final optimizer schedule will use every opportunity, and it does not activate scarcity bands.
+The refill calculation measures available opportunities. It is not a claim that the final optimizer schedule will use every opportunity. It is calculated before optimization and provides the one-way activation input for scarcity bands.
 
-### 7. Calculate diagnostic gross refill coverage
+### 6. Calculate forecast refill capability
 
 ```text
 expected refill factor =
@@ -242,14 +230,16 @@ expected refill percent = expected refill factor * 100
 
 When the battery is already at its configured maximum SoC, the factor is 1 and the percentage is 100%.
 
-The gross refill percentage is not predicted ending SoC and is not the activation input. It describes the percentage of the currently missing energy that could theoretically be restored. For example:
+The refill percentage is not predicted ending SoC. It describes the percentage of the currently missing energy that could theoretically be restored and becomes `refill_activation.percent`. For example:
 
 - Current SoC is 60%.
 - Maximum SoC is 91%.
 - Predicted refill covers 92% of the missing 31 percentage points.
 - Predicted ending SoC is approximately 88.5%, not 92%.
 
-### 8. Activate bands
+### 7. Activate bands
+
+The planner publishes the activation input with `source: forecast_refill_capability`. The optimizer's previous or current chosen schedule does not influence this value.
 
 The activation boundary is inclusive:
 
@@ -271,7 +261,7 @@ Examples for the activation input:
 - When refill is 45%, the 15–25% and 25–40% bands are active.
 - When refill is 20%, all three example bands are active.
 
-### 9. Apply virtual discharge cost
+### 8. Apply virtual discharge cost
 
 For each discharge candidate, the optimizer determines how much internal battery energy crosses every applied band. It converts that energy to deliverable AC energy using discharge efficiency.
 
@@ -304,7 +294,7 @@ objective =
 
 A discharge crossing multiple bands pays the corresponding marginal cost for the portion inside each band. Charging and idle actions do not incur scarcity cost.
 
-### 10. Publish scheduled refill for the next run
+### 9. Publish scheduled refill as a diagnostic
 
 After active-hour stabilization, the runner finds the highest start or end SoC in the final executable trajectory and publishes:
 
@@ -316,7 +306,7 @@ scheduled refill percent =
     min(100, scheduled gain / (maximum allowed SoC - starting SoC) * 100)
 ```
 
-When starting SoC is already at the maximum allowed SoC, scheduled refill is 100%. The following optimizer run validates and consumes this published value.
+When starting SoC is already at the maximum allowed SoC, scheduled refill is 100%. This value explains the optimizer outcome but is not consumed by the following run.
 
 ## API and diagnostics
 
@@ -337,9 +327,9 @@ The authenticated diagnostics page is:
 The page explains:
 
 - Whether the master switch is enabled.
-- The previous-schedule activation refill, source age, and fallback reason.
-- The current schedule's maximum SoC, gain, and refill output for the next run.
-- Gross solar and cheap-grid opportunity as a clearly separated diagnostic only.
+- The current forecast refill capability used for band activation.
+- The current schedule's maximum SoC, gain, and diagnostic refill outcome.
+- Forecast solar and cheap-grid contributions to refill capability.
 - Historical source, sample count, period, and weighting.
 - Normal terminal and cheap-grid reference prices.
 - Every band’s reference price and additional scarcity value.
@@ -353,8 +343,7 @@ The page explains:
 - When the database connection or query fails, then the planner silently tries the JSON price-file source.
 - When the master switch is disabled, then active bands remain visible for diagnostics but `applied` is false.
 - When a band reference is below the normal terminal price, then its additional scarcity value is zero.
-- When gross opportunity exceeds required refill, then the diagnostic total and coverage are capped at the required amount and 100%.
-- When the previous scheduled-refill output is missing, invalid, older than 70 minutes, timestamped materially in the future, or battery-incompatible, then activation uses a conservative 0% fallback and publishes the reason.
+- When forecast refill opportunity exceeds required refill, then the total and coverage are capped at the required amount and 100%.
 - When solar and cheap-grid charging occur in the same slot, then their combined input power cannot exceed maximum charge power.
 - When a discharge stays above all applied bands, then scarcity cost is zero.
 - When a discharge crosses only part of a band, then only that portion receives the band’s scarcity cost.
@@ -365,7 +354,7 @@ The page explains:
 
 1. Keep `dynamicReserve.enabled` false while validating diagnostics.
 2. Run the optimizer and inspect the API or diagnostics page.
-3. Confirm activation source, source age, current scheduled refill, historical references, gross diagnostics, and active bands are plausible across consecutive runs.
+3. Confirm forecast refill capability, current scheduled refill, historical references, and active bands are plausible across consecutive runs.
 4. Enable the algorithm only after shadow observations are satisfactory.
 5. Run the optimizer again; only then will active bands report `applied: true` and influence new decisions.
 6. To roll back schedule influence without removing diagnostics, set `dynamicReserve.enabled` to false and run the optimizer again.
